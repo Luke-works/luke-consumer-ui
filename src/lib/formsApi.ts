@@ -27,6 +27,9 @@ export type StoredForm = {
   updatedBy?: string;
   createdAt: number;
   updatedAt: number;
+  /** When the form last passed its self-test ("Test the form"), 0/undefined if never. */
+  lastTestedAt?: number | null;
+  lastTestedBy?: string | null;
 };
 
 /** A checked-in, immutable version (the artifact workflows resolve). */
@@ -50,6 +53,8 @@ type ApiForm = {
   updatedBy?: string | null;
   createdAt: string;
   updatedAt?: string | null;
+  lastTestedAt?: string | null;
+  lastTestedBy?: string | null;
 };
 type ApiVersion = { version: number; schema: string; checkedInBy?: string | null; checkedInAt: string };
 type ApiAudit = { action: string; detail?: string | null; actor?: string | null; at: string };
@@ -74,6 +79,8 @@ function toForm(f: ApiForm, latestVersion = 0): StoredForm {
     updatedBy: f.updatedBy ?? undefined,
     createdAt: ms(f.createdAt),
     updatedAt: ms(f.updatedAt) || ms(f.createdAt),
+    lastTestedAt: f.lastTestedAt ? ms(f.lastTestedAt) : null,
+    lastTestedBy: f.lastTestedBy ?? null,
   };
 }
 
@@ -196,6 +203,12 @@ export async function getAudit(tenant: string, id: string): Promise<AuditEvent[]
 /** Mint an opaque, signed embed token for a published form (for the iframe). */
 export async function getEmbedToken(tenant: string, id: string): Promise<{ token: string; code: string }> {
   return req(tenant, `${BASE}/${seg(id)}/embed-token`);
+}
+
+/** Record that the form passed its self-test ("Test the form" sign-off). */
+export async function signOffTest(tenant: string, id: string): Promise<StoredForm> {
+  const f = await req<ApiForm>(tenant, `${BASE}/${seg(id)}/sign-off`, { method: "POST" });
+  return toForm(f);
 }
 
 /** Highest checked-in version for a loaded form (0 when never checked in). */

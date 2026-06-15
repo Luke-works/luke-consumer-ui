@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
@@ -15,4 +16,10 @@ export default defineConfig({
       },
     }),
   ],
+  test: {
+    // jsdom so component tests (FormRenderer) can mount; the pure-logic suites
+    // (formSchema, expression) run fine under it too.
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+  },
 });

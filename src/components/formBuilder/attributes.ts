@@ -178,6 +178,14 @@ export const logicAttribute = createAttribute({
       .parse(value),
 });
 
+// Button behaviour: submit the form, reset it to initial values, or a plain
+// no-op button (for custom logic later).
+export const BUTTON_ACTIONS = ["submit", "reset", "button"] as const;
+export const buttonActionAttribute = createAttribute({
+  name: "buttonAction",
+  validate: (value) => z.enum(BUTTON_ACTIONS).optional().parse(value),
+});
+
 // Wizard: block advancing to the next step until this step's fields are valid.
 export const blockedByValidationAttribute = createAttribute({
   name: "blockedByValidation",
@@ -194,10 +202,25 @@ export const hideLabelAttribute = createAttribute({ name: "hideLabel", validate:
 export const inputMaskAttribute = createAttribute({ name: "inputMask", validate: optStr });
 export const tabIndexAttribute = createAttribute({ name: "tabIndex", validate: optInt });
 export const autocompleteAttribute = createAttribute({ name: "autocomplete", validate: bool });
+// Semantic browser-autofill hint (the HTML `autocomplete` token). Supersedes the
+// boolean above; the renderer prefers this when set.
+export const AUTOCOMPLETE_TOKENS = [
+  "off", "on", "name", "given-name", "family-name", "nickname", "email", "username",
+  "new-password", "current-password", "one-time-code", "organization", "organization-title",
+  "street-address", "address-line1", "address-line2", "address-level2", "address-level1",
+  "country", "country-name", "postal-code", "tel", "tel-national", "url",
+  "cc-name", "cc-number", "cc-exp", "bday", "sex", "language",
+] as const;
+export const autocompleteTokenAttribute = createAttribute({
+  name: "autocompleteToken",
+  validate: (v) => z.enum(AUTOCOMPLETE_TOKENS).optional().parse(v),
+});
 export const autofocusAttribute = createAttribute({ name: "autofocus", validate: bool });
 export const spellcheckAttribute = createAttribute({ name: "spellcheck", validate: bool });
 export const showCharCountAttribute = createAttribute({ name: "showCharCount", validate: bool });
 export const showWordCountAttribute = createAttribute({ name: "showWordCount", validate: bool });
+// Render a ✕ that clears the field (single-value text-like fields only).
+export const clearableAttribute = createAttribute({ name: "clearable", validate: bool });
 // Data
 export const textCaseAttribute = createAttribute({ name: "textCase", validate: (v) => z.enum(["uppercase", "lowercase"]).optional().parse(v) });
 export const persistentAttribute = createAttribute({ name: "persistent", validate: bool });
@@ -223,6 +246,10 @@ export const searchableAttribute = createAttribute({ name: "searchable", validat
 
 /* ===== Table layout ===== */
 export const numColumnsAttribute = createAttribute({ name: "numColumns", validate: (v) => z.number().int().min(1).max(6).optional().parse(v) });
+
+/* ===== Grid (repeating rows) ===== */
+export const minRowsAttribute = createAttribute({ name: "minRows", validate: (v) => z.number().int().nonnegative().optional().parse(v) });
+export const maxRowsAttribute = createAttribute({ name: "maxRows", validate: (v) => z.number().int().positive().optional().parse(v) });
 
 /* ===== Signature ===== */
 export const footerAttribute = createAttribute({ name: "footer", validate: optStr });
@@ -253,3 +280,17 @@ export const requireDecimalAttribute = createAttribute({ name: "requireDecimal",
 export const rowsAttribute = createAttribute({ name: "rows", validate: (v) => z.number().int().positive().optional().parse(v) });
 export const autoExpandAttribute = createAttribute({ name: "autoExpand", validate: bool });
 export const editorAttribute = createAttribute({ name: "editor", validate: (v) => z.enum(["richtext"]).optional().parse(v) });
+
+/* ===== Time extras ===== */
+export const minTimeAttribute = createAttribute({ name: "minTime", validate: optStr });
+export const maxTimeAttribute = createAttribute({ name: "maxTime", validate: optStr });
+export const stepAttribute = createAttribute({ name: "step", validate: (v) => z.number().int().positive().optional().parse(v) });
+
+/* ===== Tags extras ===== */
+export const minTagsAttribute = createAttribute({ name: "minTags", validate: (v) => z.number().int().nonnegative().optional().parse(v) });
+export const maxTagsAttribute = createAttribute({ name: "maxTags", validate: (v) => z.number().int().nonnegative().optional().parse(v) });
+
+/* ===== File extras ===== */
+export const acceptAttribute = createAttribute({ name: "accept", validate: optStr });
+export const maxSizeAttribute = createAttribute({ name: "maxSize", validate: (v) => z.number().nonnegative().optional().parse(v) });
+export const maxFilesAttribute = createAttribute({ name: "maxFiles", validate: (v) => z.number().int().positive().optional().parse(v) });

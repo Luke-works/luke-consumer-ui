@@ -4,9 +4,12 @@ import {
   allowCalculateOverrideAttribute,
   autoExpandAttribute,
   autocompleteAttribute,
+  autocompleteTokenAttribute,
   autofocusAttribute,
   blockedByValidationAttribute,
+  buttonActionAttribute,
   calculateValueAttribute,
+  clearableAttribute,
   clearOnHideAttribute,
   conditionalAttribute,
   contentAttribute,
@@ -37,9 +40,19 @@ import {
   inlineAttribute,
   inputMaskAttribute,
   keyAttribute,
+  acceptAttribute,
   labelAttribute,
   labelPositionAttribute,
   logicAttribute,
+  maxFilesAttribute,
+  maxRowsAttribute,
+  maxSizeAttribute,
+  maxTagsAttribute,
+  maxTimeAttribute,
+  minRowsAttribute,
+  minTagsAttribute,
+  minTimeAttribute,
+  stepAttribute,
   maxAttribute,
   maxDateAttribute,
   maxLengthAttribute,
@@ -140,8 +153,8 @@ const passthrough = (value: unknown) => z.any().optional().parse(value);
 // Full Form.io-parity attribute set for the Text Field.
 const textFieldAttrs = [
   ...textAttrs,
-  hideLabelAttribute, inputMaskAttribute, tabIndexAttribute, autocompleteAttribute,
-  autofocusAttribute, spellcheckAttribute, showCharCountAttribute, showWordCountAttribute,
+  hideLabelAttribute, inputMaskAttribute, tabIndexAttribute, autocompleteAttribute, autocompleteTokenAttribute,
+  autofocusAttribute, spellcheckAttribute, showCharCountAttribute, showWordCountAttribute, clearableAttribute,
   textCaseAttribute, persistentAttribute, clearOnHideAttribute, customDefaultValueAttribute,
   allowCalculateOverrideAttribute, minWordsAttribute, maxWordsAttribute, errorLabelAttribute, uniqueAttribute,
 ];
@@ -150,7 +163,7 @@ const textFieldAttrs = [
 // auto-expand / rich-text editor.
 const textareaAttrs = [
   ...textAttrs,
-  hideLabelAttribute, tabIndexAttribute, autocompleteAttribute, autofocusAttribute,
+  hideLabelAttribute, tabIndexAttribute, autocompleteAttribute, autocompleteTokenAttribute, autofocusAttribute,
   spellcheckAttribute, showCharCountAttribute, showWordCountAttribute, textCaseAttribute,
   persistentAttribute, clearOnHideAttribute, customDefaultValueAttribute, allowCalculateOverrideAttribute,
   minWordsAttribute, maxWordsAttribute, errorLabelAttribute, uniqueAttribute,
@@ -169,8 +182,8 @@ const numberFieldAttrs = [
 ];
 export const numberEntity = createEntity({ name: "number", attributes: numberFieldAttrs, validate: num });
 const passwordFieldAttrs = [
-  labelAttribute, hideLabelAttribute, placeholderAttribute, prefixAttribute, suffixAttribute, ...displayBase, tabIndexAttribute, autofocusAttribute,
-  persistentAttribute, clearOnHideAttribute, customDefaultValueAttribute,
+  labelAttribute, hideLabelAttribute, placeholderAttribute, prefixAttribute, suffixAttribute, ...displayBase, tabIndexAttribute, autofocusAttribute, autocompleteTokenAttribute,
+  persistentAttribute, clearOnHideAttribute, customDefaultValueAttribute, multipleAttribute, clearableAttribute,
   requiredAttribute, minLengthAttribute, maxLengthAttribute, patternAttribute, errorLabelAttribute, customMessageAttribute, validateOnAttribute, uniqueAttribute,
   calculateValueAttribute, allowCalculateOverrideAttribute, customValidationAttribute, ...api,
 ];
@@ -196,7 +209,7 @@ export const radioEntity = createEntity({ name: "radio", attributes: [...choiceF
 export const selectBoxesEntity = createEntity({ name: "selectBoxes", attributes: [...choiceFieldAttrs, inlineAttribute, minSelectedAttribute, maxSelectedAttribute], validate: (v) => z.array(z.string()).optional().parse(v) });
 export const buttonEntity = createEntity({
   name: "button",
-  attributes: [labelAttribute, customClassAttribute, hiddenAttribute, disabledAttribute, keyAttribute],
+  attributes: [labelAttribute, buttonActionAttribute, customClassAttribute, hiddenAttribute, disabledAttribute, keyAttribute],
   validate: passthrough,
 });
 
@@ -213,7 +226,7 @@ const dateFieldAttrs = [
   calculateValueAttribute, allowCalculateOverrideAttribute, customValidationAttribute, ...api,
 ];
 export const datetimeEntity = createEntity({ name: "datetime", attributes: dateFieldAttrs, validate: str });
-export const timeEntity = createEntity({ name: "time", attributes: dateAttrs, validate: str });
+export const timeEntity = createEntity({ name: "time", attributes: [...dateAttrs, minTimeAttribute, maxTimeAttribute, stepAttribute], validate: str });
 export const dayEntity = createEntity({
   name: "day",
   attributes: [
@@ -226,12 +239,12 @@ export const dayEntity = createEntity({
 });
 export const tagsFieldEntity = createEntity({
   name: "tagsField",
-  attributes: [labelAttribute, placeholderAttribute, ...displayBase, requiredAttribute, ...api],
+  attributes: [labelAttribute, placeholderAttribute, ...displayBase, requiredAttribute, minTagsAttribute, maxTagsAttribute, ...api],
   validate: (v) => z.array(z.string()).optional().parse(v),
 });
 export const fileEntity = createEntity({
   name: "file",
-  attributes: [labelAttribute, ...displayBase, multipleAttribute, requiredAttribute, ...api],
+  attributes: [labelAttribute, ...displayBase, multipleAttribute, acceptAttribute, requiredAttribute, maxFilesAttribute, maxSizeAttribute, ...api],
   validate: passthrough,
 });
 export const signatureEntity = createEntity({
@@ -284,13 +297,13 @@ export const cellEntity = createEntity({
 });
 export const dataGridEntity = createEntity({
   name: "dataGrid",
-  attributes: [labelAttribute, keyAttribute, customClassAttribute, hiddenAttribute, requiredAttribute, ...containerApi],
+  attributes: [labelAttribute, keyAttribute, customClassAttribute, hiddenAttribute, requiredAttribute, minRowsAttribute, maxRowsAttribute, ...containerApi],
   childrenAllowed: true,
   validate: passthrough,
 });
 export const editGridEntity = createEntity({
   name: "editGrid",
-  attributes: [labelAttribute, keyAttribute, customClassAttribute, hiddenAttribute, requiredAttribute, ...containerApi],
+  attributes: [labelAttribute, keyAttribute, customClassAttribute, hiddenAttribute, requiredAttribute, minRowsAttribute, maxRowsAttribute, ...containerApi],
   childrenAllowed: true,
   validate: passthrough,
 });

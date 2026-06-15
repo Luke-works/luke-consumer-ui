@@ -27,7 +27,7 @@ import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import { Modal } from "../../components/ui/modal";
-import { GripVertical, ArrowUp, MonitorPlay } from "lucide-react";
+import { GripVertical, ArrowUp, MonitorPlay, FlaskConical, BadgeCheck } from "lucide-react";
 import { ChevronLeftIcon, CheckLineIcon, PaperPlaneIcon, TrashBinIcon, AngleUpIcon, AngleDownIcon, PencilIcon } from "../../icons";
 import {
   checkIn,
@@ -40,11 +40,13 @@ import {
   publishVersion,
   release,
   saveDraft,
+  signOffTest,
   updateMeta,
   type AuditEvent,
   type FormStatus,
   type StoredForm,
 } from "../../lib/formsApi";
+import { autofillSchema } from "../../lib/autofill";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import { formBuilder, PALETTE_GROUPS, CONTAINER_TYPES, type PaletteItem } from "../../components/formBuilder/formBuilder";
@@ -320,6 +322,15 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [status, setStatus] = useState<FormStatus>(form.status);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewSchema, setPreviewSchema] = useState("");
+  // "Test the form": auto-fill + auto-validate + sign-off.
+  const [testOpen, setTestOpen] = useState(false);
+  const [testSchema, setTestSchema] = useState("");
+  const [testInitial, setTestInitial] = useState<Record<string, unknown>>({});
+  const [testSignal, setTestSignal] = useState(0);
+  const [testNonce, setTestNonce] = useState(0); // remounts the renderer per test session
+  const [testResult, setTestResult] = useState<{ ok: boolean; errorCount: number } | null>(null);
+  const [signing, setSigning] = useState(false);
+  const [lastTestedAt, setLastTestedAt] = useState<number | null>(form.lastTestedAt ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragLabel, setDragLabel] = useState<string | null>(null);
   const [formSettingsOpen, setFormSettingsOpen] = useState(false);
@@ -694,6 +705,35 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     setPreviewOpen(true);
   };
 
+  // Test the form: snapshot the schema, auto-fill valid sample data, open the
+  // modal, then trigger validation once it has mounted (and calc values settle).
+  const openTest = () => {
+    const json = currentSchemaJson();
+    setTestSchema(json);
+    setTestInitial(autofillSchema(json));
+    setTestResult(null);
+    setTestSignal(0);
+    setTestNonce((n) => n + 1);
+    setTestOpen(true);
+  };
+  // Fire the auto-validate signal a beat after the test modal opens.
+  useEffect(() => {
+    if (!testOpen) return;
+    const t = window.setTimeout(() => setTestSignal((s) => s + 1), 80);
+    return () => window.clearTimeout(t);
+  }, [testOpen]);
+
+  const signOff = async () => {
+    setSigning(true);
+    try {
+      const updated = await signOffTest(tenant, formId);
+      setLastTestedAt(updated.lastTestedAt ?? Date.now());
+      setTestOpen(false);
+    } finally {
+      setSigning(false);
+    }
+  };
+
   const saveFormSettings = async () => {
     const name = formName.trim() || form.name;
     setFormName(name);
@@ -741,6 +781,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
             <span className="font-mono">{form.code}</span>
             <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase ${STATUS_BADGE[status]}`}>{status}</span>
             <span>{publishedVersion ? `v${publishedVersion} live` : version ? `v${version} checked in` : "never checked in"}</span>
+            {lastTestedAt && (<><span className="size-1 rounded-full bg-success-400" /><span className="inline-flex items-center gap-1 text-success-600 dark:text-success-400"><BadgeCheck className="size-3.5" />Tested</span></>)}
             {dirty && (<><span className="size-1 rounded-full bg-amber-400" /><span className="text-amber-500">unchecked-in changes</span></>)}
           </p>
         </div>
@@ -751,6 +792,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
                 View only
               </span>
               <Tooltip content="Preview & test the form — conditions, calculations and validation run live."><Button size="sm" variant="outline" onClick={openPreview} startIcon={<MonitorPlay className="size-4" />}>Preview</Button></Tooltip>
+              <Tooltip content="Auto-fill the form with valid sample data and validate it."><Button size="sm" variant="outline" onClick={openTest} startIcon={<FlaskConical className="size-4" />}>Test</Button></Tooltip>
             </>
           ) : (
             <>
@@ -775,6 +817,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
                 <Tooltip content="Discard draft edits and revert to the live version."><Button size="sm" variant="outline" onClick={handleDiscard}>Discard</Button></Tooltip>
               )}
               <Tooltip content="Preview & test the form — conditions, calculations and validation run live."><Button size="sm" variant="outline" onClick={openPreview} startIcon={<MonitorPlay className="size-4" />}>Preview</Button></Tooltip>
+              <Tooltip content="Auto-fill the form with valid sample data, validate it, and sign off."><Button size="sm" variant="outline" onClick={openTest} startIcon={<FlaskConical className="size-4" />}>Test</Button></Tooltip>
               <Tooltip content="Save your progress as a draft. Drafts keep your edits so you can continue working, but can't be used in workflows yet."><Button size="sm" variant="outline" onClick={flushSave} startIcon={<CheckLineIcon className="size-4" />}>Save</Button></Tooltip>
               <Tooltip content={blocking.length ? "Fix the blocking problems before checking in." : "Check in a version as an artifact that workflows can use. Your draft stays editable for further changes."}><Button size="sm" variant="outline" onClick={handleCheckIn} disabled={blocking.length > 0} startIcon={<PaperPlaneIcon className="size-4" />}>Check in</Button></Tooltip>
               {version > 0 && (
@@ -1024,6 +1067,50 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
           <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Preview — {form.name}</h2>
           <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Fill it out to test conditions, calculated values and validation.</p>
           <FormRenderer schema={previewSchema} />
+        </div>
+      </Modal>
+
+      {/* Test the form — auto-filled with valid sample data, validated, signed off. */}
+      <Modal isOpen={testOpen} onClose={() => setTestOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
+        <div className="p-6 sm:p-8">
+          <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Test — {form.name}</h2>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Auto-filled with valid sample data and validated. Fields with regex patterns or custom rules may need a manual value.
+          </p>
+
+          {testResult && (
+            <div
+              className={`mb-5 flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm ${
+                testResult.ok
+                  ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
+                  : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
+              }`}
+            >
+              <span className="font-medium">
+                {testResult.ok
+                  ? "✓ All fields valid — ready to sign off."
+                  : `✗ ${testResult.errorCount} field${testResult.errorCount === 1 ? "" : "s"} need attention (see below).`}
+              </span>
+              {testResult.ok && canEdit && (
+                <Button size="sm" onClick={signOff} disabled={signing} startIcon={<BadgeCheck className="size-4" />}>
+                  {signing ? "Signing off…" : "Sign off"}
+                </Button>
+              )}
+              {testResult.ok && !canEdit && <span className="text-xs">Sign-off needs edit access.</span>}
+            </div>
+          )}
+
+          <FormRenderer
+            key={testNonce}
+            schema={testSchema}
+            initialValues={testInitial}
+            autoSubmitSignal={testSignal}
+            onResult={setTestResult}
+          />
+
+          <div className="mt-5 flex justify-end gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <Button size="sm" variant="outline" onClick={() => setTestSignal((s) => s + 1)}>Re-run</Button>
+          </div>
         </div>
       </Modal>
     </>

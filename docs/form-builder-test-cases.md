@@ -20,6 +20,7 @@ Two layers:
 | D | Builder UX (problems, gating, expr, leave-guard) | UT-VALID-\*, UT-EXPR-\* | E2E-D-\* |
 | E | Accessibility + field tooltips | — | E2E-E-\* |
 | F | Field help content (HTML modal) | — | E2E-F-\* |
+| G | Text Field hardening (add-ons, label pos, validateOn, multi-value, clearable) | UT-REND-\* | E2E-G-\* |
 
 Statuses: ✅ automated · ⬜ manual (pending Playwright).
 
@@ -38,7 +39,10 @@ Statuses: ✅ automated · ⬜ manual (pending Playwright).
 
 ## Layer 1 — Unit tests (✅ automated)
 
-Run: `npm test`. 35 cases across two files. Listed here for traceability.
+Run: `npm test`. 104 cases across four files. Listed here for traceability.
+The renderer suite ([FormRenderer.test.tsx](../src/components/formBuilder/FormRenderer.test.tsx))
+mounts the real component in jsdom (testing-library) and covers the Tier-G
+Text Field hardening.
 
 ### formSchema.test.ts
 
@@ -87,6 +91,72 @@ Run: `npm test`. 35 cases across two files. Listed here for traceability.
 | UT-EXPR-05 | multiple unknown fields → plural message | `/fields/i` |
 | UT-EXPR-EVAL-01 | `evaluateExpression` arithmetic against scope | `3*4=12` |
 | UT-EXPR-EVAL-02 | `evaluateCondition` defaults to show on bad/empty condition | true |
+
+### FormRenderer.test.tsx (component, jsdom)
+
+| Id | Case | Expect |
+|----|------|--------|
+| UT-REND-01 | Text field renders `prefix` + `suffix` add-ons | both visible |
+| UT-REND-02 | `customClass` applied to the field wrapper | class present |
+| UT-REND-03 | `labelPosition: left` keeps label↔control association | `getByLabelText` resolves |
+| UT-REND-04 | `autocompleteToken` set → input `autocomplete` attr | semantic token |
+| UT-REND-05 | No token → legacy `autocomplete:true` → `on` | fallback works |
+| UT-REND-06 | `validateOn:blur` on required field → error on blur | `/required/i` |
+| UT-REND-07 | `validateOn:change` minLength → error live, clears when satisfied | toggles |
+| UT-REND-08 | No `validateOn` → no live error (only clears on edit) | no alert |
+| UT-REND-09 | Invalid email blocks submit + shows error | `onSubmit` not called |
+| UT-REND-10 | Valid field submits keyed data | `{ name: "Ada" }` |
+| UT-REND-11 | Required enforced on submit | blocked |
+| UT-REND-12 | `textCase:uppercase` transforms input | `ABC` |
+| UT-REND-13 | `showCharCount` renders the counter | `2 characters` |
+| UT-REND-14 | `multiple` adds/removes entries, submits an array | `["first","second"]` |
+| UT-REND-15 | `multiple` email validates each entry | `/valid email/i` |
+| UT-REND-16 | `multiple` entry ✕ removes a row | count drops |
+| UT-REND-17 | `clearable` ✕ empties the field | value `""` |
+| UT-REND-18 | `clearable` button hidden while empty | no button |
+| UT-REND-19 | Empty form → "no fields yet" message | shown |
+| UT-REND-20 | `readOnly` disables inputs + hides submit | disabled, no button |
+| UT-REND-21 | `validateOn:blur` on a **Number** (custom control) → error on blur | `/required/i` |
+| UT-REND-22 | Multi-value **Number** submits an array + numeric per-entry check | `/≤ 10/` |
+| UT-REND-23 | Multi-**select** renders a checkbox group, submits an array | `["js","ts"]` |
+| UT-REND-24 | Multi-select required on empty | blocked |
+| UT-REND-25 | **Text Area** renders prefix/suffix add-ons | both visible |
+| UT-REND-26 | **Password** honors an autocomplete token | `current-password` |
+| UT-REND-27 | **Checkbox** required must be checked (false ≠ provided) | blocked then submits `true` |
+| UT-REND-28 | **Time** enforces minTime / maxTime | `/at or after 09:00/` |
+| UT-REND-29 | **Time** accepts an in-range value | submits |
+| UT-REND-30 | **Tags** enforces minTags | `/at least 2 tags/` |
+| UT-REND-31 | **Tags** enforces maxTags | `/at most 2 tags/` |
+| UT-REND-32 | **File** sets the `accept` attribute | `image/*,.pdf` |
+| UT-REND-33 | **File** enforces maxFiles on submit | `/at most 2 files/` |
+| UT-REND-34 | **File** enforces maxSize (MB) per file | `/≤ 1 MB/` |
+| UT-REND-35 | **Signature** required blocks empty submit | `/required/i` |
+| UT-REND-36 | **Signature** submits when present | data URL |
+| UT-REND-37 | **Content** renders rich HTML (`<b>`, `<a href>`) | markup present |
+| UT-REND-38 | **Content** sanitizes XSS (`<script>`, `onerror`) | stripped, safe kept |
+| UT-REND-39 | **Data Grid** enforces minRows | `/at least 2 rows/` |
+| UT-REND-40 | **Data Grid** disables Add at maxRows | button disabled |
+| UT-REND-41 | **Button** honors the disabled attribute | disabled |
+| UT-REND-42 | **Button** reset action restores initial values | input cleared |
+| UT-REND-43 | **Auto-validate**: `onResult` ok when autofilled data passes | `{ok:true}` |
+| UT-REND-44 | **Auto-validate**: `onResult` reports error count when invalid | `{ok:false,count}` |
+
+### autofill.test.ts ("Test the form" data generator)
+
+| Id | Case | Expect |
+|----|------|--------|
+| UT-FILL-01 | invalid JSON → `{}` | empty |
+| UT-FILL-02 | output keyed by field key | `{firstName: …}` |
+| UT-FILL-03 | respects minLength / maxLength | length bounds |
+| UT-FILL-04 | valid email / url / number (within min/max) | valid |
+| UT-FILL-05 | picks first option for select/radio | first value |
+| UT-FILL-06 | checks a required checkbox | `true` |
+| UT-FILL-07 | fills minSelected select boxes | array len = min |
+| UT-FILL-08 | fills minTags tags | array len = min |
+| UT-FILL-09 | wraps a `multiple` field in an array | `[value]` |
+| UT-FILL-10 | fills minRows grid rows keyed by cell key | rows[] |
+| UT-FILL-11 | skips layout/static entities | only fields |
+| UT-FILL-12 | (covers null/garbage option shapes) | safe |
 
 ---
 
@@ -374,6 +444,86 @@ still renders (DOMPurify).
 1. Set only the link text (no HTML), or only HTML (no link text).
 
 ✅ No link renders (both are required to show the trigger).
+
+---
+
+### Tier G — Text Field hardening
+
+> These apply to the **text-like family** (Text Field, Email, URL, Phone,
+> Password) which share one attribute set — verify on at least Text Field + Email.
+
+**E2E-G-01 — Prefix / suffix render at runtime** · P1
+1. Add a Text Field; set **Prefix** = `$` and **Suffix** = `.00`. Preview.
+
+✅ The prefix and suffix sit inline beside the input (previously only Number/Currency
+showed them).
+
+**E2E-G-02 — Label position (left / right)** · P2
+1. Set **Label Position** = `left`, Preview; then `right`.
+
+✅ Label sits beside the control (left or right); clicking the label still focuses
+the input (association preserved).
+
+**E2E-G-03 — Custom CSS class on the field** · P2
+1. Set **Custom CSS Class** = `qa-highlight`. Preview → inspect the field.
+
+✅ The field wrapper carries the `qa-highlight` class.
+
+**E2E-G-04 — Validate on blur** · P0
+1. Required Text Field, **Validate On** = `blur`. Preview → focus then blur empty.
+
+✅ The required error appears on blur (not only on submit); fixing + blurring clears it.
+
+**E2E-G-05 — Validate on change** · P1
+1. Text Field with **Min Length** = 3, **Validate On** = `change`. Preview → type 2 chars.
+
+✅ Error shows live; typing the 3rd char clears it immediately.
+
+**E2E-G-06 — Semantic autocomplete token** · P2
+1. Email field → **Autocomplete (browser autofill)** = `email`. Preview → inspect input.
+
+✅ Input has `autocomplete="email"`; the browser offers the right autofill.
+
+**E2E-G-07 — Multiple values** · P0
+1. Text Field → enable **Allow multiple values**. Preview.
+
+✅ One entry shows with **+ Add another**; add a couple, fill them, remove one with its
+✕. Submit → the value is an **array** keyed by the field key. Required = at least one
+non-empty entry; per-entry validation (e.g. email format) applies.
+
+**E2E-G-08 — Clearable** · P1
+1. Text Field → enable **Show clear (✕) button**. Preview.
+
+✅ With a value, a ✕ appears and empties the field on click; it's hidden while empty
+and while the field is multi-value or read-only.
+
+---
+
+### Tier H — Test the form (self-test + sign-off)
+
+**E2E-H-01 — One-click test auto-fills and validates** · P0
+1. Open a form in the builder → click **Test**.
+
+✅ A modal opens with the form **pre-filled** with valid sample data; validation runs
+automatically and a green *"All fields valid — ready to sign off"* banner appears.
+
+**E2E-H-02 — Sign off persists** · P0
+1. From a passing test, click **Sign off**.
+
+✅ The modal closes and a **Tested ✓** badge shows in the toolbar; reload → badge
+persists (capability-engine recorded `lastTestedAt`/`by` + a `tested` audit event).
+
+**E2E-H-03 — Failing fields are surfaced** · P1
+1. Add a field with a regex **pattern** the generator can't satisfy → Test.
+
+✅ A red banner reports the count; the offending field shows its inline error. Fix it
+in the form (or it needs a manual value) and **Re-run** → passes.
+
+**E2E-H-04 — View-only can test but not sign off** · P2
+1. Open as a FORMS read-only user → Test.
+
+✅ The test runs and shows the verdict, but the **Sign off** action is hidden/disabled
+(persisting needs edit access).
 
 ---
 

@@ -43,11 +43,11 @@ const normOptions = (v: unknown): Opt[] =>
 const inputClass =
   "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90";
 
-type StoredFile = { name: string; url: string };
+type StoredFile = { name: string; url: string; size?: number };
 
 // File input. With no backend, files are read into data URLs and held in the
 // form value — swap the read step for a POST to your storage when you have one.
-function FileField({ multiple, value, disabled, onChange, id, invalid, required, describedBy }: { multiple: boolean; value: unknown; disabled: boolean; onChange: (v: StoredFile[]) => void; id?: string; invalid?: boolean; required?: boolean; describedBy?: string }) {
+function FileField({ multiple, accept, maxFiles, value, disabled, onChange, id, invalid, required, describedBy }: { multiple: boolean; accept?: string; maxFiles?: number; value: unknown; disabled: boolean; onChange: (v: StoredFile[]) => void; id?: string; invalid?: boolean; required?: boolean; describedBy?: string }) {
   const files = Array.isArray(value) ? (value as StoredFile[]) : [];
   const handle = (ev: React.ChangeEvent<HTMLInputElement>) => {
     const list = Array.from(ev.target.files ?? []);
@@ -56,15 +56,18 @@ function FileField({ multiple, value, disabled, onChange, id, invalid, required,
         (f) =>
           new Promise<StoredFile>((resolve) => {
             const reader = new FileReader();
-            reader.onload = () => resolve({ name: f.name, url: String(reader.result) });
+            reader.onload = () => resolve({ name: f.name, url: String(reader.result), size: f.size });
             reader.readAsDataURL(f);
           })
       )
-    ).then((read) => onChange(multiple ? read : read.slice(0, 1)));
+    ).then((read) => {
+      const next = multiple ? read : read.slice(0, 1);
+      onChange(multiple && typeof maxFiles === "number" ? next.slice(0, maxFiles) : next);
+    });
   };
   return (
     <div>
-      <input type="file" id={id} aria-invalid={invalid || undefined} aria-required={required || undefined} aria-describedby={describedBy} multiple={multiple} disabled={disabled} onChange={handle} className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-600 dark:text-gray-300" />
+      <input type="file" id={id} accept={accept} aria-invalid={invalid || undefined} aria-required={required || undefined} aria-describedby={describedBy} multiple={multiple} disabled={disabled} onChange={handle} className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-600 dark:text-gray-300" />
       {files.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs text-gray-500">
           {files.map((f, i) => <li key={i}>📎 {f.name}</li>)}
@@ -77,9 +80,19 @@ function FileField({ multiple, value, disabled, onChange, id, invalid, required,
 const CONTAINER = new Set(["panel", "fieldset", "columns", "well", "table", "cell", "dataGrid", "editGrid", "tabs", "tab"]);
 const GRID = new Set(["dataGrid", "editGrid"]);
 const STATIC = new Set(["button", "content", "heading", "divider", "next", "previous"]);
+// Text-like fields that support the `clearable` ✕ (single value, add-on wrapper).
+const MULTI_TEXT = new Set(["textField", "email", "url", "phoneNumber", "password", "textarea"]);
+// All fields whose `multiple` toggle renders a repeatable add/remove list. Text
+// entries run string checks per row; number/currency run numeric checks. (Select
+// handles its own `multiple` as a checkbox group, so it's not here.)
+const MULTI_FIELDS = new Set([...MULTI_TEXT, "number", "currency"]);
 
 const textareaClass =
   "w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90";
+
+// Shared prose styling for author-supplied rich text (Content blocks + help modal).
+const richTextClass =
+  "prose prose-sm max-w-none text-gray-700 dark:prose-invert dark:text-gray-300 [&_a]:text-brand-600 [&_a]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5";
 
 // Textarea that grows to fit its content.
 function AutoTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
@@ -375,7 +388,7 @@ const emptyValueFor = (e: SchemaEntity): unknown => {
   if (e.type === "checkbox") return false;
   if (e.type === "selectBoxes" || e.type === "file" || e.type === "tagsField") return [];
   if (GRID.has(e.type)) return [];
-  if (e.type === "select" && Boolean(e.attributes.multiple)) return [];
+  if (Boolean(e.attributes.multiple) && (e.type === "select" || MULTI_FIELDS.has(e.type))) return [];
   return "";
 };
 
@@ -410,6 +423,8 @@ export default function FormRenderer({
   initialValues,
   onSubmit: onSubmitProp,
   onChange,
+  onResult,
+  autoSubmitSignal,
   readOnly = false,
   submitting = false,
 }: {
@@ -420,6 +435,10 @@ export default function FormRenderer({
   onSubmit?: (data: Record<string, unknown>) => void;
   /** Called with the live data (keyed by field key) on every change (autosave). */
   onChange?: (data: Record<string, unknown>) => void;
+  /** Called after every validate-submit attempt with the outcome (for "Test the form"). */
+  onResult?: (result: { ok: boolean; errorCount: number }) => void;
+  /** Bump this number to programmatically validate+submit (auto-test). */
+  autoSubmitSignal?: number;
   /** View-only: inputs disabled, no submit. For viewing a response. */
   readOnly?: boolean;
   /** Disables the submit button (while a submit is in flight). */
@@ -429,6 +448,8 @@ export default function FormRenderer({
   const { entities, root } = parsed;
   const submitMessage = useMemo(() => readSubmitMessage(schema), [schema]);
 
+  // The seeded initial values, captured so a reset button can restore them.
+  const initialRef = useRef<Record<string, unknown>>({});
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const init: Record<string, unknown> = {};
     const seed = (ids: string[]) => {
@@ -463,6 +484,7 @@ export default function FormRenderer({
       }
     };
     seed(root);
+    initialRef.current = init;
     return init;
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -569,7 +591,20 @@ export default function FormRenderer({
     if (readOnly) return;
     touched.current.add(id);
     setValues((p) => ({ ...p, [id]: value }));
-    setErrors((p) => (p[id] ? { ...p, [id]: "" } : p));
+    const e = entities[id];
+    // validate-on-change re-checks the field immediately; otherwise just clear
+    // any existing error so it disappears as the user fixes the value.
+    if (e && asStr(e.attributes.validateOn) === "change") validateLive(id, e, value);
+    else setErrors((p) => (p[id] ? { ...p, [id]: "" } : p));
+  };
+
+  // Reset button: restore the seeded initial values and clear errors/success.
+  const resetForm = () => {
+    if (readOnly) return;
+    setValues(initialRef.current);
+    setErrors({});
+    setSubmitted(null);
+    touched.current.clear();
   };
 
   // Logic rules (triggers → actions). Returns whichever overrides fired.
@@ -624,6 +659,22 @@ export default function FormRenderer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope]);
 
+  // Length / words / pattern / email / url checks for one string value. Shared
+  // by the single-value path and each entry of a multi-value field.
+  const stringChecks = (e: SchemaEntity, a: Attrs, v: string): string | null => {
+    const min = asNum(a.minLength), max = asNum(a.maxLength);
+    if (min !== undefined && v.length < min) return asStr(a.customMessage) || `Must be at least ${min} characters`;
+    if (max !== undefined && v.length > max) return asStr(a.customMessage) || `Must be at most ${max} characters`;
+    const minW = asNum(a.minWords), maxW = asNum(a.maxWords);
+    if (minW !== undefined && wordCount(v) < minW) return asStr(a.customMessage) || `Must be at least ${minW} words`;
+    if (maxW !== undefined && wordCount(v) > maxW) return asStr(a.customMessage) || `Must be at most ${maxW} words`;
+    const pattern = asStr(a.pattern);
+    if (pattern) { try { if (!new RegExp(pattern).test(v)) return asStr(a.customMessage) || "Invalid format"; } catch { /* bad regex */ } }
+    if (e.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return asStr(a.customMessage) || "Enter a valid email address";
+    if (e.type === "url" && !/^https?:\/\/\S+$/.test(v)) return asStr(a.customMessage) || "Enter a valid URL (https://…)";
+    return null;
+  };
+
   const validateField = (e: SchemaEntity, v: unknown, ownScope: Scope): string | null => {
     const a = e.attributes;
     const name = asStr(a.errorLabel) || asStr(a.label) || "This field";
@@ -634,19 +685,57 @@ export default function FormRenderer({
       if (required && incomplete) return asStr(a.customMessage) || `${name} is required`;
       return null;
     }
+    if (e.type === "checkbox") {
+      // A required checkbox must be actively checked — `false` is not "provided".
+      if (required && v !== true) return asStr(a.customMessage) || `${name} is required`;
+      return null;
+    }
+    if (e.type === "file") {
+      const files = Array.isArray(v) ? (v as { size?: number }[]) : [];
+      if (required && files.length === 0) return asStr(a.customMessage) || `${name} is required`;
+      const maxFiles = asNum(a.maxFiles);
+      if (maxFiles !== undefined && files.length > maxFiles) return asStr(a.customMessage) || `Upload at most ${maxFiles} file${maxFiles === 1 ? "" : "s"}`;
+      const maxSize = asNum(a.maxSize);
+      if (maxSize !== undefined && files.some((f) => typeof f.size === "number" && f.size > maxSize * 1024 * 1024)) {
+        return asStr(a.customMessage) || `Each file must be ≤ ${maxSize} MB`;
+      }
+      return null;
+    }
+    if (e.type === "tagsField") {
+      const arr = Array.isArray(v) ? (v as unknown[]) : [];
+      if (required && arr.length === 0) return asStr(a.customMessage) || `${name} is required`;
+      const minT = asNum(a.minTags), maxT = asNum(a.maxTags);
+      if (minT !== undefined && arr.length < minT) return asStr(a.customMessage) || `Add at least ${minT} tag${minT === 1 ? "" : "s"}`;
+      if (maxT !== undefined && arr.length > maxT) return asStr(a.customMessage) || `Add at most ${maxT} tag${maxT === 1 ? "" : "s"}`;
+      return null;
+    }
+    // Multi-value field: require ≥1 non-empty entry, then validate each non-empty
+    // entry (string checks for text, numeric min/max for number/currency).
+    if (asBool(a.multiple) && MULTI_FIELDS.has(e.type) && Array.isArray(v)) {
+      const entries = v as unknown[];
+      const filled = entries.filter((x) => x != null && x !== "");
+      if (required && filled.length === 0) return asStr(a.customMessage) || `${name} is required`;
+      const numeric = e.type === "number" || e.type === "currency";
+      for (const item of entries) {
+        if (item == null || item === "") continue;
+        if (numeric) {
+          const n = Number(item), min = asNum(a.min), max = asNum(a.max);
+          if (min !== undefined && n < min) return asStr(a.customMessage) || `Must be ≥ ${min}`;
+          if (max !== undefined && n > max) return asStr(a.customMessage) || `Must be ≤ ${max}`;
+        } else {
+          const err = stringChecks(e, a, String(item));
+          if (err) return err;
+        }
+      }
+      const cvm = asStr(a.customValidation);
+      if (cvm && !evaluateValidation(cvm, ownScope)) return asStr(a.customMessage) || "Invalid value";
+      return null;
+    }
     const empty = v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
     if (required && empty) return asStr(a.customMessage) || `${name} is required`;
     if (!empty && typeof v === "string") {
-      const min = asNum(a.minLength), max = asNum(a.maxLength);
-      if (min !== undefined && v.length < min) return asStr(a.customMessage) || `Must be at least ${min} characters`;
-      if (max !== undefined && v.length > max) return asStr(a.customMessage) || `Must be at most ${max} characters`;
-      const minW = asNum(a.minWords), maxW = asNum(a.maxWords);
-      if (minW !== undefined && wordCount(v) < minW) return asStr(a.customMessage) || `Must be at least ${minW} words`;
-      if (maxW !== undefined && wordCount(v) > maxW) return asStr(a.customMessage) || `Must be at most ${maxW} words`;
-      const pattern = asStr(a.pattern);
-      if (pattern) { try { if (!new RegExp(pattern).test(v)) return asStr(a.customMessage) || "Invalid format"; } catch { /* bad regex */ } }
-      if (e.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return asStr(a.customMessage) || "Enter a valid email address";
-      if (e.type === "url" && !/^https?:\/\/\S+$/.test(v)) return asStr(a.customMessage) || "Enter a valid URL (https://…)";
+      const err = stringChecks(e, a, v);
+      if (err) return err;
     }
     if (!empty && (e.type === "number" || e.type === "currency")) {
       const n = Number(v), min = asNum(a.min), max = asNum(a.max);
@@ -664,9 +753,23 @@ export default function FormRenderer({
       if (minD && v < minD) return asStr(a.customMessage) || `Must be on or after ${minD}`;
       if (maxD && v > maxD) return asStr(a.customMessage) || `Must be on or before ${maxD}`;
     }
+    if (!empty && e.type === "time" && typeof v === "string") {
+      const minT = asStr(a.minTime), maxT = asStr(a.maxTime);
+      if (minT && v < minT) return asStr(a.customMessage) || `Must be at or after ${minT}`;
+      if (maxT && v > maxT) return asStr(a.customMessage) || `Must be at or before ${maxT}`;
+    }
     const cv = asStr(a.customValidation);
     if (cv && !evaluateValidation(cv, ownScope)) return asStr(a.customMessage) || "Invalid value";
     return null;
+  };
+
+  // Validate a single field live (validateOn change/blur). The changed field
+  // uses the supplied value (the shared scope is one render behind for it);
+  // cross-field rules read the current scope.
+  const validateLive = (id: string, e: SchemaEntity, value: unknown) => {
+    const own: Scope = { ...scope, [keyOf(id, e)]: coerce(value), value: coerce(value) };
+    const err = validateField(e, value, own);
+    setErrors((p) => ({ ...p, [id]: err ?? "" }));
   };
 
   // The data-field cell ids directly under a grid (skipping layout/static).
@@ -677,7 +780,11 @@ export default function FormRenderer({
   // a per-row scope so min/max/pattern/email and customValidation all apply
   // inside grids. Returns the first error message, or null.
   const validateGridRows = (e: SchemaEntity, rows: Record<string, unknown>[]): string | null => {
-    if (asBool(e.attributes.required) && rows.length === 0) return "Add at least one row";
+    const a = e.attributes;
+    if (asBool(a.required) && rows.length === 0) return asStr(a.customMessage) || "Add at least one row";
+    const minR = asNum(a.minRows), maxR = asNum(a.maxRows);
+    if (minR !== undefined && rows.length < minR) return asStr(a.customMessage) || `Add at least ${minR} row${minR === 1 ? "" : "s"}`;
+    if (maxR !== undefined && rows.length > maxR) return asStr(a.customMessage) || `Add at most ${maxR} row${maxR === 1 ? "" : "s"}`;
     const cellIds = gridCellIds(e);
     for (let ri = 0; ri < rows.length; ri++) {
       const row = rows[ri];
@@ -693,14 +800,39 @@ export default function FormRenderer({
   };
 
   // Renders just the input control for an entity, bound to value/onChange.
-  const renderControl = (e: SchemaEntity, value: unknown, onChange: (v: unknown) => void, disabled: boolean, a11y?: FieldA11y) => {
+  // Renders one bound control (no multi-value wrapper). renderControl delegates
+  // here per entry for multi-value fields.
+  const renderSingle = (e: SchemaEntity, value: unknown, onChange: (v: unknown) => void, disabled: boolean, a11y?: FieldA11y) => {
     const a = e.attributes;
     // Text-like extras (Text Field parity): mask, text case, a11y attributes.
     const textExtras = {
       tabIndex: typeof a.tabIndex === "number" ? a.tabIndex : undefined,
-      autoComplete: a.autocomplete === undefined ? undefined : a.autocomplete ? "on" : "off",
+      // Prefer a semantic autocomplete token (name/email/tel…); fall back to the
+      // legacy on/off boolean for schemas saved before tokens existed.
+      autoComplete: asStr(a.autocompleteToken) || (a.autocomplete === undefined ? undefined : a.autocomplete ? "on" : "off"),
       autoFocus: asBool(a.autofocus),
       spellCheck: a.spellcheck === undefined ? undefined : asBool(a.spellcheck),
+    };
+    // Wrap a text-like control with its prefix/suffix add-ons (e.g. "$", ".00")
+    // and, when `clearable` is on, a ✕ that empties the field. Clear is hidden in
+    // multi-value mode (each entry has its own Remove button instead).
+    const withAddons = (control: React.ReactNode): React.ReactNode => {
+      const prefix = asStr(a.prefix), suffix = asStr(a.suffix);
+      // Wrap whenever clearable is enabled (not just when the ✕ shows) so the
+      // input element isn't remounted as the value toggles empty/non-empty.
+      const clearable = asBool(a.clearable) && !asBool(a.multiple);
+      const showClear = clearable && asStr(value) !== "" && !disabled;
+      if (!prefix && !suffix && !clearable) return control;
+      return (
+        <div className="flex items-center gap-1">
+          {prefix ? <span className="shrink-0 text-sm text-gray-500">{prefix}</span> : null}
+          {control}
+          {suffix ? <span className="shrink-0 text-sm text-gray-500">{suffix}</span> : null}
+          {showClear ? (
+            <button type="button" onClick={() => onChange("")} aria-label="Clear" className="shrink-0 rounded-lg px-2 py-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-error-500 dark:hover:bg-white/5">✕</button>
+          ) : null}
+        </div>
+      );
     };
     // ARIA attributes shared by single labelable controls (input/textarea/select).
     const aria = {
@@ -718,8 +850,10 @@ export default function FormRenderer({
       case "textarea": {
         if (asStr(a.editor) === "richtext") return <RichText value={value} disabled={disabled} onChange={(v) => onChange(v)} />;
         const rows = typeof a.rows === "number" ? a.rows : 3;
-        if (asBool(a.autoExpand)) return <AutoTextarea {...common} className={textareaClass} rows={rows} />;
-        return <textarea {...common} className={textareaClass} rows={rows} />;
+        const ta = asBool(a.autoExpand)
+          ? <AutoTextarea {...common} className={textareaClass} rows={rows} />
+          : <textarea {...common} className={textareaClass} rows={rows} />;
+        return withAddons(ta);
       }
       case "number": case "currency": {
         const num = (
@@ -738,27 +872,33 @@ export default function FormRenderer({
             describedBy={a11y?.describedBy}
           />
         );
-        if (!asStr(a.prefix) && !asStr(a.suffix)) return num;
-        return (
-          <div className="flex items-center gap-1">
-            {asStr(a.prefix) ? <span className="text-sm text-gray-500">{asStr(a.prefix)}</span> : null}
-            {num}
-            {asStr(a.suffix) ? <span className="text-sm text-gray-500">{asStr(a.suffix)}</span> : null}
-          </div>
-        );
+        return withAddons(num);
       }
-      case "password": return <input {...common} type="password" />;
-      case "email": return <input {...common} type="email" />;
-      case "url": return <input {...common} type="url" />;
-      case "phoneNumber": return <input {...common} type="tel" />;
+      case "password": return withAddons(<input {...common} type="password" />);
+      case "email": return withAddons(<input {...common} type="email" />);
+      case "url": return withAddons(<input {...common} type="url" />);
+      case "phoneNumber": return withAddons(<input {...common} type="tel" />);
       case "datetime": return <input {...common} type={asBool(a.enableTime) ? "datetime-local" : "date"} min={asStr(a.minDate) || undefined} max={asStr(a.maxDate) || undefined} />;
-      case "time": return <input {...common} type="time" />;
+      case "time": return <input {...common} type="time" min={asStr(a.minTime) || undefined} max={asStr(a.maxTime) || undefined} step={asNum(a.step)} />;
       case "tagsField": return <TagsInput value={value} onChange={onChange} placeholder={asStr(a.placeholder)} disabled={disabled} id={a11y?.id} labelId={a11y?.labelId} invalid={a11y?.invalid} describedBy={a11y?.describedBy} />;
-      case "file": return <FileField multiple={asBool(a.multiple)} value={value} disabled={disabled} onChange={(v) => onChange(v)} id={a11y?.id} invalid={a11y?.invalid} required={a11y?.required} describedBy={a11y?.describedBy} />;
+      case "file": return <FileField multiple={asBool(a.multiple)} accept={asStr(a.accept) || undefined} maxFiles={asNum(a.maxFiles)} value={value} disabled={disabled} onChange={(v) => onChange(v)} id={a11y?.id} invalid={a11y?.invalid} required={a11y?.required} describedBy={a11y?.describedBy} />;
       case "signature": return <SignaturePad value={value} penColor={asStr(a.penColor) || "#000000"} disabled={disabled} onChange={(v) => onChange(v)} id={a11y?.id} labelId={a11y?.labelId} invalid={a11y?.invalid} describedBy={a11y?.describedBy} />;
       case "day":
         return <DayField value={value} onChange={onChange} disabled={disabled} opts={{ hideDay: asBool(a.hideDay), hideMonth: asBool(a.hideMonth), hideYear: asBool(a.hideYear), dayFirst: asBool(a.dayFirst), minYear: asNum(a.minYear), maxYear: asNum(a.maxYear) }} id={a11y?.id} labelId={a11y?.labelId} invalid={a11y?.invalid} describedBy={a11y?.describedBy} />;
       case "select": {
+        if (asBool(a.multiple)) {
+          // Multi-select renders as an accessible checkbox group; value = string[].
+          const sel = asArr(value);
+          return (
+            <div role="group" id={a11y?.id} aria-labelledby={a11y?.labelId} aria-invalid={a11y?.invalid || undefined} aria-describedby={a11y?.describedBy} className="space-y-2">
+              {normOptions(a.options).map((o) => (
+                <label key={o.value} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" checked={sel.includes(o.value)} disabled={disabled} onChange={(ev) => onChange(ev.target.checked ? [...sel, o.value] : sel.filter((x) => x !== o.value))} className="size-4 rounded text-brand-500" />{o.label}
+                </label>
+              ))}
+            </div>
+          );
+        }
         if (asBool(a.searchable)) return <SearchSelect options={normOptions(a.options)} value={asStr(value)} onChange={onChange} placeholder={asStr(a.placeholder)} disabled={disabled} id={a11y?.id} labelId={a11y?.labelId} invalid={a11y?.invalid} describedBy={a11y?.describedBy} />;
         return (
           <select {...common}>
@@ -791,8 +931,34 @@ export default function FormRenderer({
       }
       case "checkbox":
         return <input type="checkbox" id={a11y?.id} aria-invalid={a11y?.invalid || undefined} aria-required={a11y?.required || undefined} aria-describedby={a11y?.describedBy} checked={asBool(value)} onChange={(ev) => onChange(ev.target.checked)} disabled={disabled} className="size-4 rounded text-brand-500" />;
-      default: return <input {...common} type="text" />;
+      default: return withAddons(<input {...common} type="text" />);
     }
+  };
+
+  // Renders a field's control, expanding text-like `multiple` fields into a
+  // repeatable add/remove list. The label points at the first entry.
+  const renderControl = (e: SchemaEntity, value: unknown, onChange: (v: unknown) => void, disabled: boolean, a11y?: FieldA11y) => {
+    const a = e.attributes;
+    if (!asBool(a.multiple) || !MULTI_FIELDS.has(e.type)) return renderSingle(e, value, onChange, disabled, a11y);
+    const arr = Array.isArray(value) ? value : value == null || value === "" ? [] : [value];
+    const list = arr.length ? arr : [""];
+    return (
+      <div className="space-y-2">
+        {list.map((item, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div className="flex-1">
+              {renderSingle(e, item, (v) => onChange(list.map((x, j) => (j === i ? v : x))), disabled, i === 0 ? a11y : undefined)}
+            </div>
+            {disabled ? null : (
+              <button type="button" onClick={() => onChange(list.filter((_, j) => j !== i))} aria-label="Remove value" className="shrink-0 rounded-lg px-2 py-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-error-500 dark:hover:bg-white/5">✕</button>
+            )}
+          </div>
+        ))}
+        {disabled ? null : (
+          <button type="button" onClick={() => onChange([...list, ""])} className="text-xs font-medium text-brand-500 hover:text-brand-600">+ Add another</button>
+        )}
+      </div>
+    );
   };
 
   const fieldWrapper = (id: string, e: SchemaEntity) => {
@@ -806,7 +972,7 @@ export default function FormRenderer({
     if (e.type === "checkbox") {
       const a11y: FieldA11y = { id: controlId, labelId, invalid: hasErr, required, describedBy: hasErr ? errId : undefined };
       return (
-        <div key={id}>
+        <div key={id} className={asStr(a.customClass) || undefined}>
           <label htmlFor={controlId} id={labelId} className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
             {renderControl(e, values[id], (v) => set(id, v), disabled, a11y)}
             {hideLabel ? null : (<span>{labelContent(e)}{required ? <span className="text-error-500"> *</span> : null}<FieldTooltip text={asStr(a.tooltip)} /></span>)}
@@ -827,14 +993,37 @@ export default function FormRenderer({
       counters ? `${descId}-c` : null,
     ].filter(Boolean).join(" ") || undefined;
     const a11y: FieldA11y = { id: controlId, labelId, invalid: hasErr, required, describedBy };
+    const pos = asStr(a.labelPosition) || "top";
+    const side = pos === "left" || pos === "right";
+    const onBlur = asStr(a.validateOn) === "blur" ? () => validateLive(id, e, values[id]) : undefined;
+    const labelEl = hideLabel ? null : (
+      <label
+        htmlFor={labelable ? controlId : undefined}
+        id={labelId}
+        className={side
+          ? "shrink-0 pt-2.5 text-sm font-medium text-gray-700 sm:w-40 dark:text-gray-300"
+          : "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"}
+      >
+        {labelContent(e)}{required ? <span className="text-error-500"> *</span> : null}<FieldTooltip text={asStr(a.tooltip)} />
+      </label>
+    );
+    const controlEl = renderControl(e, values[id], (v) => set(id, v), disabled, a11y);
     return (
-      <div key={id}>
-        {hideLabel ? null : (
-          <label htmlFor={labelable ? controlId : undefined} id={labelId} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {labelContent(e)}{required ? <span className="text-error-500"> *</span> : null}<FieldTooltip text={asStr(a.tooltip)} />
-          </label>
+      // onBlur on the wrapper (focusout bubbles) so validateOn:blur covers custom
+      // controls too — Number, Day, Tags, Radio, Select Boxes, searchable Select.
+      <div key={id} className={asStr(a.customClass) || undefined} onBlur={onBlur}>
+        {side ? (
+          <div className="flex items-start gap-3">
+            {pos === "left" ? labelEl : null}
+            <div className="flex-1">{controlEl}</div>
+            {pos === "right" ? labelEl : null}
+          </div>
+        ) : (
+          <>
+            {labelEl}
+            {controlEl}
+          </>
         )}
-        {renderControl(e, values[id], (v) => set(id, v), disabled, a11y)}
         {asStr(a.footer) ? <p className="mt-1 text-xs text-gray-400">{asStr(a.footer)}</p> : null}
         <div className="mt-1 flex items-center justify-between gap-2">
           {asStr(a.description) ? <p id={descId} className="text-xs text-gray-400">{asStr(a.description)}</p> : <span />}
@@ -853,7 +1042,7 @@ export default function FormRenderer({
     const setRows = (next: Record<string, unknown>[]) => set(id, next);
     const edit = e.type === "editGrid";
     return (
-      <div key={id}>
+      <div key={id} className={asStr(a.customClass) || undefined}>
         <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
           {asStr(a.label)}{asBool(a.required) ? <span className="text-error-500"> *</span> : null}
         </label>
@@ -877,7 +1066,11 @@ export default function FormRenderer({
             </div>
           ))}
         </div>
-        {readOnly ? null : <button type="button" onClick={() => setRows([...rows, {}])} className="mt-2 text-sm font-medium text-brand-500 hover:text-brand-600">+ Add {edit ? "entry" : "row"}</button>}
+        {readOnly ? null : (() => {
+          const maxR = asNum(a.maxRows);
+          const atMax = maxR !== undefined && rows.length >= maxR;
+          return <button type="button" disabled={atMax} onClick={() => setRows([...rows, {}])} className="mt-2 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-40 disabled:hover:text-brand-500">+ Add {edit ? "entry" : "row"}</button>;
+        })()}
         {errors[id] ? <p role="alert" className="mt-1 text-xs text-error-500">{errors[id]}</p> : null}
       </div>
     );
@@ -914,9 +1107,18 @@ export default function FormRenderer({
     const a = e.attributes;
     if (e.type === "divider") return <hr key={id} className="border-gray-200 dark:border-gray-700" />;
     if (e.type === "heading") return <h3 key={id} className="text-lg font-semibold text-gray-800 dark:text-white/90">{asStr(a.label)}</h3>;
-    if (e.type === "content") return <p key={id} className="text-sm text-gray-600 dark:text-gray-400">{asStr(a.content)}</p>;
-    if (e.type === "button")
-      return <button key={id} type="submit" disabled={readOnly || submitting} className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50">{submitting ? "Submitting…" : asStr(a.label) || "Submit"}</button>;
+    if (e.type === "content") {
+      const html = asStr(a.content);
+      return html ? <div key={id} className={richTextClass} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} /> : null;
+    }
+    if (e.type === "button") {
+      const action = asStr(a.buttonAction) || "submit";
+      const dis = readOnly || asBool(a.disabled);
+      if (action === "submit")
+        return <button key={id} type="submit" disabled={dis || submitting} className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50">{submitting ? "Submitting…" : asStr(a.label) || "Submit"}</button>;
+      // reset / plain button — secondary styling, never submits.
+      return <button key={id} type="button" disabled={dis} onClick={action === "reset" ? resetForm : undefined} className="rounded-lg border border-brand-300 px-5 py-2.5 text-sm font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50 dark:hover:bg-white/5">{asStr(a.label) || (action === "reset" ? "Reset" : "Button")}</button>;
+    }
     if (e.type === "next" || e.type === "previous") {
       const goNext = e.type === "next";
       const onClick = () => {
@@ -1033,16 +1235,28 @@ export default function FormRenderer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values]);
 
-  const onSubmit = (ev: React.FormEvent) => {
-    ev.preventDefault();
+  const submitForm = () => {
     if (readOnly || submitting) return;
     const { data, errs } = collect(true);
     setErrors(errs);
-    if (Object.keys(errs).length === 0) {
+    const count = Object.keys(errs).length;
+    onResult?.({ ok: count === 0, errorCount: count });
+    if (count === 0) {
       if (onSubmitProp) onSubmitProp(data);
       else setSubmitted(data);
     }
   };
+  const onSubmit = (ev: React.FormEvent) => {
+    ev.preventDefault();
+    submitForm();
+  };
+
+  // "Test the form": when the signal bumps, validate + submit programmatically.
+  const submitRef = useRef(submitForm);
+  submitRef.current = submitForm;
+  useEffect(() => {
+    if (autoSubmitSignal) submitRef.current();
+  }, [autoSubmitSignal]);
 
   if (root.length === 0) return <p className="py-10 text-center text-sm text-gray-400">This form has no fields yet.</p>;
 
@@ -1069,7 +1283,7 @@ export default function FormRenderer({
         <div className="p-6 sm:p-8">
           {htmlModal?.title ? <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">{htmlModal.title}</h2> : null}
           <div
-            className="prose prose-sm max-w-none text-gray-700 dark:prose-invert dark:text-gray-300 [&_a]:text-brand-600 [&_a]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
+            className={richTextClass}
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlModal?.html ?? "") }}
           />
         </div>

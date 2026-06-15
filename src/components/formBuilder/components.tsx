@@ -1,5 +1,6 @@
 import { Children, createContext, useContext, useState } from "react";
 import { z } from "zod";
+import DOMPurify from "dompurify";
 import {
   createAttributeComponent,
   createEntityComponent,
@@ -118,8 +119,8 @@ export const DisabledAttribute = createAttributeComponent(A.disabledAttribute, (
   <Toggle label="Disabled" value={p.attribute.value} onChange={p.setValue} />
 ));
 export const ContentAttribute = createAttributeComponent(A.contentAttribute, (p) => (
-  <Row label="Content" error={p.attribute.error}>
-    <textarea className={`${editorInputClass} h-24 py-2`} value={p.attribute.value ?? ""} onChange={(e) => p.setValue(e.target.value)} />
+  <Row label="Content (rich text)" error={p.attribute.error}>
+    <RichTextEditor value={p.attribute.value ?? ""} onChange={(html) => p.setValue(html)} minHeightClass="min-h-[8rem]" />
   </Row>
 ));
 export const DefaultValueAttribute = createAttributeComponent(A.defaultValueAttribute, (p) => (
@@ -250,6 +251,9 @@ export const LogicAttribute = createAttributeComponent(A.logicAttribute, (p) => 
 export const BlockedByValidationAttribute = createAttributeComponent(A.blockedByValidationAttribute, (p) => (
   <Toggle label="Block until this step's fields are valid" value={p.attribute.value} onChange={p.setValue} />
 ));
+export const ButtonActionAttribute = createAttributeComponent(A.buttonActionAttribute, (p) => (
+  <SelectInput label="Action" value={p.attribute.value} onChange={(v) => p.setValue(v ? (v as (typeof A.BUTTON_ACTIONS)[number]) : undefined)} options={[...A.BUTTON_ACTIONS]} />
+));
 
 /* ---- Text Field extras ---- */
 export const HideLabelAttribute = createAttributeComponent(A.hideLabelAttribute, (p) => (
@@ -267,6 +271,9 @@ export const TabIndexAttribute = createAttributeComponent(A.tabIndexAttribute, (
 export const AutocompleteAttribute = createAttributeComponent(A.autocompleteAttribute, (p) => (
   <Toggle label="Autocomplete" value={p.attribute.value} onChange={p.setValue} />
 ));
+export const AutocompleteTokenAttribute = createAttributeComponent(A.autocompleteTokenAttribute, (p) => (
+  <SelectInput label="Autocomplete (browser autofill)" value={p.attribute.value} onChange={(v) => p.setValue(v ? (v as (typeof A.AUTOCOMPLETE_TOKENS)[number]) : undefined)} options={[...A.AUTOCOMPLETE_TOKENS]} />
+));
 export const AutofocusAttribute = createAttributeComponent(A.autofocusAttribute, (p) => (
   <Toggle label="Initial focus" value={p.attribute.value} onChange={p.setValue} />
 ));
@@ -278,6 +285,9 @@ export const ShowCharCountAttribute = createAttributeComponent(A.showCharCountAt
 ));
 export const ShowWordCountAttribute = createAttributeComponent(A.showWordCountAttribute, (p) => (
   <Toggle label="Show word counter" value={p.attribute.value} onChange={p.setValue} />
+));
+export const ClearableAttribute = createAttributeComponent(A.clearableAttribute, (p) => (
+  <Toggle label="Show clear (✕) button" value={p.attribute.value} onChange={p.setValue} />
 ));
 export const TextCaseAttribute = createAttributeComponent(A.textCaseAttribute, (p) => (
   <SelectInput label="Text Case" value={p.attribute.value} onChange={(v) => p.setValue(v ? (v as "uppercase" | "lowercase") : undefined)} options={["uppercase", "lowercase"]} />
@@ -353,6 +363,8 @@ export const MinYearAttribute = createAttributeComponent(A.minYearAttribute, (p)
 export const MaxYearAttribute = createAttributeComponent(A.maxYearAttribute, (p) => <NumberInput label="Maximum year" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />);
 export const SearchableAttribute = createAttributeComponent(A.searchableAttribute, (p) => <Toggle label="Enable search (typeahead)" value={p.attribute.value} onChange={p.setValue} />);
 export const NumColumnsAttribute = createAttributeComponent(A.numColumnsAttribute, (p) => <NumberInput label="Number of columns" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />);
+export const MinRowsAttribute = createAttributeComponent(A.minRowsAttribute, (p) => <NumberInput label="Minimum rows" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />);
+export const MaxRowsAttribute = createAttributeComponent(A.maxRowsAttribute, (p) => <NumberInput label="Maximum rows" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />);
 
 /* ---- Number extras ---- */
 export const CurrencyCodeAttribute = createAttributeComponent(A.currencyCodeAttribute, (p) => (
@@ -366,6 +378,43 @@ export const DecimalLimitAttribute = createAttributeComponent(A.decimalLimitAttr
 ));
 export const RequireDecimalAttribute = createAttributeComponent(A.requireDecimalAttribute, (p) => (
   <Toggle label="Always show decimals" value={p.attribute.value} onChange={p.setValue} />
+));
+
+/* ---- Time extras ---- */
+export const MinTimeAttribute = createAttributeComponent(A.minTimeAttribute, (p) => (
+  <Row label="Minimum time" error={p.attribute.error}>
+    <input type="time" className={editorInputClass} value={p.attribute.value ?? ""} onChange={(e) => p.setValue(e.target.value || undefined)} />
+  </Row>
+));
+export const MaxTimeAttribute = createAttributeComponent(A.maxTimeAttribute, (p) => (
+  <Row label="Maximum time" error={p.attribute.error}>
+    <input type="time" className={editorInputClass} value={p.attribute.value ?? ""} onChange={(e) => p.setValue(e.target.value || undefined)} />
+  </Row>
+));
+export const StepAttribute = createAttributeComponent(A.stepAttribute, (p) => (
+  <NumberInput label="Step (seconds)" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />
+));
+
+/* ---- Tags extras ---- */
+export const MinTagsAttribute = createAttributeComponent(A.minTagsAttribute, (p) => (
+  <NumberInput label="Minimum tags" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />
+));
+export const MaxTagsAttribute = createAttributeComponent(A.maxTagsAttribute, (p) => (
+  <NumberInput label="Maximum tags" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />
+));
+
+/* ---- File extras ---- */
+export const AcceptAttribute = createAttributeComponent(A.acceptAttribute, (p) => (
+  <Row label="Accepted file types" error={p.attribute.error}>
+    <input className={editorInputClass} placeholder="image/*,.pdf" value={p.attribute.value ?? ""} onChange={(e) => p.setValue(e.target.value || undefined)} />
+    <p className="mt-1 text-[11px] text-gray-400">Comma-separated MIME types and/or extensions.</p>
+  </Row>
+));
+export const MaxSizeAttribute = createAttributeComponent(A.maxSizeAttribute, (p) => (
+  <NumberInput label="Max file size (MB)" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />
+));
+export const MaxFilesAttribute = createAttributeComponent(A.maxFilesAttribute, (p) => (
+  <NumberInput label="Max number of files" value={p.attribute.value} onChange={p.setValue} error={p.attribute.error} />
 ));
 
 /* ---- Text Area extras ---- */
@@ -617,9 +666,12 @@ export const PreviousEntity = createEntityComponent(E.previousEntity, (p) => (
   <span className={navButtonClass}>{p.entity.attributes.label || "Previous"}</span>
 ));
 
-export const ContentEntity = createEntityComponent(E.contentEntity, (p) => (
-  <div className="text-sm text-gray-600 dark:text-gray-400">{p.entity.attributes.content || "Content"}</div>
-));
+export const ContentEntity = createEntityComponent(E.contentEntity, (p) => {
+  const html = String(p.entity.attributes.content ?? "");
+  return html
+    ? <div className="text-sm text-gray-600 dark:text-gray-400" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
+    : <div className="text-sm text-gray-400">Content</div>;
+});
 export const HeadingEntity = createEntityComponent(E.headingEntity, (p) => (
   <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{p.entity.attributes.label}</h3>
 ));
@@ -681,7 +733,7 @@ const logicFull: React.ComponentType[] = [CalculateValueAttribute, CustomValidat
 const logicCond: React.ComponentType[] = [CustomConditionalAttribute];
 
 const textareaPanel = makePanel({
-  Display: [LabelAttribute, HideLabelAttribute, PlaceholderAttribute, PrefixAttribute, SuffixAttribute, DescriptionAttribute, TooltipAttribute, LabelPositionAttribute, CustomClassAttribute, EditorAttribute, RowsAttribute, AutoExpandAttribute, TabIndexAttribute, AutocompleteAttribute, AutofocusAttribute, SpellcheckAttribute, ShowCharCountAttribute, ShowWordCountAttribute, HiddenAttribute, DisabledAttribute],
+  Display: [LabelAttribute, HideLabelAttribute, PlaceholderAttribute, PrefixAttribute, SuffixAttribute, DescriptionAttribute, TooltipAttribute, LabelPositionAttribute, CustomClassAttribute, EditorAttribute, RowsAttribute, AutoExpandAttribute, TabIndexAttribute, AutocompleteTokenAttribute, AutofocusAttribute, SpellcheckAttribute, ShowCharCountAttribute, ShowWordCountAttribute, HiddenAttribute, DisabledAttribute],
   Data: [DefaultValueAttribute, CustomDefaultValueAttribute, MultipleAttribute, TextCaseAttribute, PersistentAttribute, ClearOnHideAttribute],
   Validation: [RequiredAttribute, MinLengthAttribute, MaxLengthAttribute, MinWordsAttribute, MaxWordsAttribute, PatternAttribute, UniqueAttribute, ErrorLabelAttribute, CustomMessageAttribute, ValidateOnAttribute],
   API: [KeyAttribute, TagsAttribute],
@@ -690,8 +742,8 @@ const textareaPanel = makePanel({
 });
 // Full Form.io-parity Text Field panel.
 const textFieldPanel = makePanel({
-  Display: [LabelAttribute, HideLabelAttribute, PlaceholderAttribute, PrefixAttribute, SuffixAttribute, InputMaskAttribute, DescriptionAttribute, TooltipAttribute, LabelPositionAttribute, CustomClassAttribute, TabIndexAttribute, AutocompleteAttribute, AutofocusAttribute, SpellcheckAttribute, ShowCharCountAttribute, ShowWordCountAttribute, HiddenAttribute, DisabledAttribute],
-  Data: [DefaultValueAttribute, CustomDefaultValueAttribute, MultipleAttribute, TextCaseAttribute, PersistentAttribute, ClearOnHideAttribute],
+  Display: [LabelAttribute, HideLabelAttribute, PlaceholderAttribute, PrefixAttribute, SuffixAttribute, InputMaskAttribute, DescriptionAttribute, TooltipAttribute, LabelPositionAttribute, CustomClassAttribute, TabIndexAttribute, AutocompleteTokenAttribute, AutofocusAttribute, SpellcheckAttribute, ShowCharCountAttribute, ShowWordCountAttribute, HiddenAttribute, DisabledAttribute],
+  Data: [DefaultValueAttribute, CustomDefaultValueAttribute, MultipleAttribute, ClearableAttribute, TextCaseAttribute, PersistentAttribute, ClearOnHideAttribute],
   Validation: [RequiredAttribute, MinLengthAttribute, MaxLengthAttribute, MinWordsAttribute, MaxWordsAttribute, PatternAttribute, UniqueAttribute, ErrorLabelAttribute, CustomMessageAttribute, ValidateOnAttribute],
   API: [KeyAttribute, TagsAttribute],
   Conditional: [ConditionalAttribute],
@@ -708,7 +760,7 @@ const numberFieldPanel = makePanel({
 });
 const currencyPanel = makePanel({
   Display: [LabelAttribute, HideLabelAttribute, PlaceholderAttribute, DescriptionAttribute, TooltipAttribute, LabelPositionAttribute, CustomClassAttribute, TabIndexAttribute, AutofocusAttribute, HiddenAttribute, DisabledAttribute],
-  Data: [CurrencyCodeAttribute, DefaultValueAttribute, CustomDefaultValueAttribute, DelimiterAttribute, DecimalLimitAttribute, RequireDecimalAttribute, PersistentAttribute, ClearOnHideAttribute],
+  Data: [CurrencyCodeAttribute, DefaultValueAttribute, CustomDefaultValueAttribute, MultipleAttribute, DelimiterAttribute, DecimalLimitAttribute, RequireDecimalAttribute, PersistentAttribute, ClearOnHideAttribute],
   Validation: [RequiredAttribute, MinAttribute, MaxAttribute, UniqueAttribute, ErrorLabelAttribute, CustomMessageAttribute, ValidateOnAttribute],
   API: [KeyAttribute, TagsAttribute],
   Conditional: [ConditionalAttribute],
@@ -716,8 +768,8 @@ const currencyPanel = makePanel({
 });
 const choiceLogic = [CalculateValueAttribute, AllowCalculateOverrideAttribute, CustomValidationAttribute, CustomConditionalAttribute, LogicAttribute];
 const passwordPanel = makePanel({
-  Display: [LabelAttribute, HideLabelAttribute, PlaceholderAttribute, PrefixAttribute, SuffixAttribute, ...displayCommon, TabIndexAttribute, AutofocusAttribute],
-  Data: [CustomDefaultValueAttribute, PersistentAttribute, ClearOnHideAttribute],
+  Display: [LabelAttribute, HideLabelAttribute, PlaceholderAttribute, PrefixAttribute, SuffixAttribute, ...displayCommon, TabIndexAttribute, AutofocusAttribute, AutocompleteTokenAttribute],
+  Data: [CustomDefaultValueAttribute, MultipleAttribute, ClearableAttribute, PersistentAttribute, ClearOnHideAttribute],
   Validation: [RequiredAttribute, MinLengthAttribute, MaxLengthAttribute, PatternAttribute, UniqueAttribute, ErrorLabelAttribute, CustomMessageAttribute, ValidateOnAttribute],
   API: [KeyAttribute, TagsAttribute],
   Conditional: [ConditionalAttribute],
@@ -765,11 +817,11 @@ const dayPanel = makePanel({
   Conditional: [ConditionalAttribute],
   Logic: logicCond,
 });
-// Time field (simple).
-const datePanel = makePanel({
-  Display: [LabelAttribute, ...displayCommon],
+// Time field.
+const timePanel = makePanel({
+  Display: [LabelAttribute, ...displayCommon, StepAttribute],
   Data: [DefaultValueAttribute],
-  Validation: [RequiredAttribute, CustomMessageAttribute, ValidateOnAttribute],
+  Validation: [RequiredAttribute, MinTimeAttribute, MaxTimeAttribute, CustomMessageAttribute, ValidateOnAttribute],
   API: [KeyAttribute, TagsAttribute],
   Conditional: [ConditionalAttribute],
   Logic: logicFull,
@@ -785,7 +837,7 @@ const dateFieldPanel = makePanel({
 });
 const tagsPanel = makePanel({
   Display: [LabelAttribute, PlaceholderAttribute, ...displayCommon],
-  Validation: [RequiredAttribute],
+  Validation: [RequiredAttribute, MinTagsAttribute, MaxTagsAttribute],
   API: [KeyAttribute, TagsAttribute],
   Conditional: [ConditionalAttribute],
   Logic: logicCond,
@@ -799,14 +851,14 @@ const signaturePanel = makePanel({
 });
 const filePanel = makePanel({
   Display: [LabelAttribute, DescriptionAttribute, TooltipAttribute, LabelPositionAttribute, CustomClassAttribute, HiddenAttribute, DisabledAttribute],
-  Data: [MultipleAttribute],
-  Validation: [RequiredAttribute],
+  Data: [MultipleAttribute, AcceptAttribute],
+  Validation: [RequiredAttribute, MaxFilesAttribute, MaxSizeAttribute],
   API: [KeyAttribute, TagsAttribute],
   Conditional: [ConditionalAttribute],
   Logic: logicCond,
 });
 const buttonPanel = makePanel({
-  Display: [LabelAttribute, CustomClassAttribute, HiddenAttribute, DisabledAttribute],
+  Display: [LabelAttribute, ButtonActionAttribute, CustomClassAttribute, HiddenAttribute, DisabledAttribute],
   API: [KeyAttribute],
 });
 const contentPanel = makePanel({
@@ -818,7 +870,7 @@ const dividerPanel = makePanel({ Display: [CustomClassAttribute, HiddenAttribute
 const containerPanel = makePanel({ Display: [LabelAttribute, CustomClassAttribute, HiddenAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
 const columnsPanelDef = makePanel({ Display: [CustomClassAttribute, HiddenAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
 const tablePanel = makePanel({ Display: [NumColumnsAttribute, CustomClassAttribute, HiddenAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
-const gridPanel = makePanel({ Display: [LabelAttribute, CustomClassAttribute, HiddenAttribute], Validation: [RequiredAttribute], API: [KeyAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
+const gridPanel = makePanel({ Display: [LabelAttribute, CustomClassAttribute, HiddenAttribute], Validation: [RequiredAttribute, MinRowsAttribute, MaxRowsAttribute], API: [KeyAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
 const tabPanel = makePanel({ Display: [LabelAttribute, HiddenAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
 const nextPanel = makePanel({ Display: [LabelAttribute, CustomClassAttribute, HiddenAttribute], Validation: [BlockedByValidationAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
 const previousPanel = makePanel({ Display: [LabelAttribute, CustomClassAttribute, HiddenAttribute], Conditional: [ConditionalAttribute], Logic: logicCond });
@@ -830,7 +882,7 @@ export const attributesComponents = {
   checkbox: checkboxPanel,
   selectBoxes: selectBoxesPanel, radio: radioPanel,
   select: selectPanel,
-  datetime: dateFieldPanel, time: datePanel, day: dayPanel,
+  datetime: dateFieldPanel, time: timePanel, day: dayPanel,
   tagsField: tagsPanel,
   file: filePanel,
   signature: signaturePanel,
