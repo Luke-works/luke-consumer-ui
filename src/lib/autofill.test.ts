@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { autofillSchema } from "./autofill";
+import { autofillSchema, negativeFillSchema } from "./autofill";
 
 type Ent = { type: string; attributes: Record<string, unknown>; children?: string[] };
 const schema = (entities: Record<string, Ent>, root: string[]) => JSON.stringify({ entities, root });
@@ -73,5 +73,49 @@ describe("autofillSchema", () => {
       ["h1", "t1"],
     );
     expect(autofillSchema(s)).toEqual({ name: "Sample text" });
+  });
+});
+
+describe("negativeFillSchema", () => {
+  it("makes a required field empty and expects it", () => {
+    const r = negativeFillSchema(one("textField", { key: "name", label: "Name", required: true }));
+    expect(r.values.name).toBe("");
+    expect(r.expected).toEqual([{ key: "name", label: "Name", reason: "required" }]);
+  });
+
+  it("produces a format-violating value for a non-required email", () => {
+    const r = negativeFillSchema(one("email", { key: "e", label: "Email" }));
+    expect(r.values.e).toBe("not-an-email");
+    expect(r.expected[0].reason).toBe("email format");
+  });
+
+  it("violates numeric min", () => {
+    const r = negativeFillSchema(one("number", { key: "age", min: 18 }));
+    expect(r.values.age).toBe(17);
+    expect(r.expected[0].reason).toMatch(/minimum 18/);
+  });
+
+  it("skips fields with no negatively-testable constraint", () => {
+    const r = negativeFillSchema(one("textField", { key: "free" }));
+    expect(r.expected).toEqual([]);
+  });
+
+  it("skips conditionally-hidden fields (avoids false alarms)", () => {
+    const r = negativeFillSchema(one("textField", { key: "x", required: true, customConditional: "age > 18" }));
+    expect(r.expected).toEqual([]);
+  });
+
+  it("keeps other fields valid (only the targeted field is invalid)", () => {
+    const s = schema(
+      {
+        a: { type: "textField", attributes: { key: "a", required: true } },
+        b: { type: "email", attributes: { key: "b" } },
+      },
+      ["a", "b"],
+    );
+    const r = negativeFillSchema(s);
+    expect(r.values.a).toBe(""); // required → empty (invalid)
+    expect(r.values.b).toBe("not-an-email"); // email → invalid
+    expect(r.expected.map((e) => e.key).sort()).toEqual(["a", "b"]);
   });
 });

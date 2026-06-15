@@ -88,6 +88,91 @@ function fieldValue(e: Entity): unknown {
   return scalarValue(e);
 }
 
+// ── Negative testing ────────────────────────────────────────────────────────
+// Produces deliberately INVALID data so the test can confirm the form's
+// validation actually rejects it. Each entry says which field was made invalid
+// and why, so the panel can verify that field reported an error.
+export type NegativeExpectation = { key: string; label: string; reason: string };
+export type NegativeFill = { values: Record<string, unknown>; expected: NegativeExpectation[] };
+
+// Could this field be conditionally hidden? Hidden fields aren't validated, so
+// we exclude them from negative testing to avoid false "not rejected" alarms.
+function maybeHidden(a: Attrs): boolean {
+  const cond = a.conditional as { when?: string } | undefined;
+  const logic = Array.isArray(a.logic) ? (a.logic as { action?: string }[]) : [];
+  return bool(a.hidden) || !!cond?.when || !!str(a.customConditional) || logic.some((r) => r.action === "show" || r.action === "hide");
+}
+
+// An invalid value (+ human reason) for a field, or null if it has no
+// negatively-testable constraint (so any value is valid → nothing to assert).
+function invalidValue(e: Entity): { value: unknown; reason: string } | null {
+  const a = e.attributes;
+  const t = e.type;
+  if (bool(a.required)) {
+    if (t === "checkbox") return { value: false, reason: "required (must be checked)" };
+    if (t === "selectBoxes" || t === "tagsField" || t === "file") return { value: [], reason: "required" };
+    return { value: "", reason: "required" };
+  }
+  if (t === "email") return { value: "not-an-email", reason: "email format" };
+  if (t === "url") return { value: "notaurl", reason: "URL format" };
+  const minLen = num(a.minLength);
+  if (minLen !== undefined && minLen > 1) return { value: "a", reason: `min length ${minLen}` };
+  const maxLen = num(a.maxLength);
+  if (maxLen !== undefined) return { value: "x".repeat(maxLen + 1), reason: `max length ${maxLen}` };
+  const minW = num(a.minWords);
+  if (minW !== undefined && minW > 1) return { value: "word", reason: `min words ${minW}` };
+  const maxW = num(a.maxWords);
+  if (maxW !== undefined) return { value: Array.from({ length: maxW + 1 }, () => "w").join(" "), reason: `max words ${maxW}` };
+  if (t === "number" || t === "currency") {
+    const min = num(a.min);
+    if (min !== undefined) return { value: min - 1, reason: `minimum ${min}` };
+    const max = num(a.max);
+    if (max !== undefined) return { value: max + 1, reason: `maximum ${max}` };
+  }
+  if (str(a.pattern)) return { value: "###", reason: "pattern" };
+  if (t === "selectBoxes") {
+    const minS = num(a.minSelected);
+    if (minS !== undefined && minS > 0) return { value: [], reason: `min selected ${minS}` };
+  }
+  if (t === "tagsField") {
+    const minT = num(a.minTags);
+    if (minT !== undefined && minT > 0) return { value: [], reason: `min tags ${minT}` };
+  }
+  return null;
+}
+
+/**
+ * Valid data with each negatively-testable, always-visible field overridden to
+ * an invalid value. Skips grids and multi-value fields (deferred). `expected`
+ * lists the fields that SHOULD now report an error.
+ */
+export function negativeFillSchema(schemaJson: string): NegativeFill {
+  let parsed: FormSchema;
+  try {
+    parsed = repairSchema(JSON.parse(schemaJson) as FormSchema).schema;
+  } catch {
+    return { values: {}, expected: [] };
+  }
+  const entities = parsed.entities as Record<string, Entity>;
+  const values: Record<string, unknown> = { ...autofillSchema(schemaJson) }; // valid base
+  const expected: NegativeExpectation[] = [];
+  const walk = (ids: string[]) => {
+    for (const id of ids) {
+      const e = entities[id];
+      if (!e || GRID.has(e.type)) continue;
+      if (CONTAINER.has(e.type)) { walk(e.children ?? []); continue; }
+      if (STATIC.has(e.type) || bool(e.attributes.multiple) || maybeHidden(e.attributes)) continue;
+      const inv = invalidValue(e);
+      if (!inv) continue;
+      const key = keyOf(id, e);
+      values[key] = inv.value;
+      expected.push({ key, label: str(e.attributes.label) || key, reason: inv.reason });
+    }
+  };
+  walk(parsed.root);
+  return { values, expected };
+}
+
 /** Valid sample data for every fillable field, keyed by field key (grids → rows). */
 export function autofillSchema(schemaJson: string): Record<string, unknown> {
   let parsed: FormSchema;

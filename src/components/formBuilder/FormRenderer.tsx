@@ -425,6 +425,7 @@ export default function FormRenderer({
   onChange,
   onResult,
   autoSubmitSignal,
+  playback,
   readOnly = false,
   submitting = false,
 }: {
@@ -435,10 +436,14 @@ export default function FormRenderer({
   onSubmit?: (data: Record<string, unknown>) => void;
   /** Called with the live data (keyed by field key) on every change (autosave). */
   onChange?: (data: Record<string, unknown>) => void;
-  /** Called after every validate-submit attempt with the outcome (for "Test the form"). */
-  onResult?: (result: { ok: boolean; errorCount: number }) => void;
+  /** Called after every validate-submit attempt with the outcome (for "Test the form").
+   *  `errorKeys` are the field KEYS that failed — so negative tests can assert per-field. */
+  onResult?: (result: { ok: boolean; errorCount: number; errorKeys: string[] }) => void;
   /** Bump this number to programmatically validate+submit (auto-test). */
   autoSubmitSignal?: number;
+  /** Animated playback for "Test the form": types each field's value in, then
+   *  validates. Bump `signal` to (re)play; `steps` are in form order, keyed by field key. */
+  playback?: { steps: { key: string; value: unknown }[]; signal: number; speed?: number };
   /** View-only: inputs disabled, no submit. For viewing a response. */
   readOnly?: boolean;
   /** Disables the submit button (while a submit is in flight). */
@@ -1239,8 +1244,10 @@ export default function FormRenderer({
     if (readOnly || submitting) return;
     const { data, errs } = collect(true);
     setErrors(errs);
-    const count = Object.keys(errs).length;
-    onResult?.({ ok: count === 0, errorCount: count });
+    const errIds = Object.keys(errs);
+    const count = errIds.length;
+    const errorKeys = errIds.map((id) => (entities[id] ? keyOf(id, entities[id]) : id));
+    onResult?.({ ok: count === 0, errorCount: count, errorKeys });
     if (count === 0) {
       if (onSubmitProp) onSubmitProp(data);
       else setSubmitted(data);
@@ -1257,6 +1264,69 @@ export default function FormRenderer({
   useEffect(() => {
     if (autoSubmitSignal) submitRef.current();
   }, [autoSubmitSignal]);
+
+  // Validation triggered at the end of playback. Bumped after the last typed
+  // value is set so it runs once React has committed it (not against stale state).
+  const [playSubmitTick, setPlaySubmitTick] = useState(0);
+  useEffect(() => {
+    if (playSubmitTick) submitRef.current();
+  }, [playSubmitTick]);
+
+  // Animated playback: clear the form, then "type" each field's value in order
+  // (char-by-char for short strings), then validate. Lets the user watch the
+  // test fill the form. Driven by `playback.signal`.
+  const playbackRef = useRef(playback);
+  playbackRef.current = playback;
+  useEffect(() => {
+    const pb = playbackRef.current;
+    if (!pb || !pb.signal) return;
+    let cancelled = false;
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    const charMs = pb.speed ?? 32;
+    const fieldMs = (pb.speed ?? 32) * 6;
+    // field key → entity id (recursing layout containers, not grids).
+    const keyToId: Record<string, string> = {};
+    const map = (ids: string[]) => {
+      for (const id of ids) {
+        const e = entities[id];
+        if (!e) continue;
+        if (CONTAINER.has(e.type)) { if (!GRID.has(e.type)) map(children(e)); }
+        if (!STATIC.has(e.type)) keyToId[keyOf(id, e)] = id;
+      }
+    };
+    map(root);
+    const run = async () => {
+      setValues({});
+      setErrors({});
+      setSubmitted(null);
+      await sleep(150);
+      for (const step of pb.steps) {
+        if (cancelled) return;
+        const id = keyToId[step.key];
+        if (!id) continue;
+        try {
+          const el = document.getElementById(`f-${id}`);
+          el?.scrollIntoView({ block: "center", behavior: "smooth" });
+          (el as HTMLElement | null)?.focus({ preventScroll: true });
+        } catch { /* not focusable / not in DOM */ }
+        const v = step.value;
+        if (typeof v === "string" && v.length > 0 && v.length <= 25) {
+          for (let i = 1; i <= v.length; i++) {
+            if (cancelled) return;
+            setValues((prev) => ({ ...prev, [id]: v.slice(0, i) }));
+            await sleep(charMs);
+          }
+        } else {
+          setValues((prev) => ({ ...prev, [id]: v }));
+        }
+        await sleep(fieldMs);
+      }
+      if (!cancelled) setPlaySubmitTick((t) => t + 1); // validate after values commit
+    };
+    run();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playback?.signal]);
 
   if (root.length === 0) return <p className="py-10 text-center text-sm text-gray-400">This form has no fields yet.</p>;
 

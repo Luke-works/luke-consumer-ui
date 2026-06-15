@@ -46,7 +46,7 @@ import {
   type FormStatus,
   type StoredForm,
 } from "../../lib/formsApi";
-import { autofillSchema } from "../../lib/autofill";
+import { autofillSchema, negativeFillSchema, type NegativeExpectation } from "../../lib/autofill";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import { formBuilder, PALETTE_GROUPS, CONTAINER_TYPES, type PaletteItem } from "../../components/formBuilder/formBuilder";
@@ -322,13 +322,18 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [status, setStatus] = useState<FormStatus>(form.status);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewSchema, setPreviewSchema] = useState("");
-  // "Test the form": auto-fill + auto-validate + sign-off.
+  // "Test the form": positive (valid → must pass) + negative (invalid → must reject).
   const [testOpen, setTestOpen] = useState(false);
   const [testSchema, setTestSchema] = useState("");
-  const [testInitial, setTestInitial] = useState<Record<string, unknown>>({});
-  const [testSignal, setTestSignal] = useState(0);
-  const [testNonce, setTestNonce] = useState(0); // remounts the renderer per test session
-  const [testResult, setTestResult] = useState<{ ok: boolean; errorCount: number } | null>(null);
+  const [posInitial, setPosInitial] = useState<Record<string, unknown>>({});
+  const [negInitial, setNegInitial] = useState<Record<string, unknown>>({});
+  const [negExpected, setNegExpected] = useState<NegativeExpectation[]>([]);
+  const [posResult, setPosResult] = useState<{ ok: boolean; errorCount: number; errorKeys: string[] } | null>(null);
+  const [negResult, setNegResult] = useState<{ ok: boolean; errorCount: number; errorKeys: string[] } | null>(null);
+  const [posPlay, setPosPlay] = useState(0); // bump → (re)play the positive typing animation
+  const [negPlay, setNegPlay] = useState(0); // bump → (re)play the negative typing animation
+  const [testNonce, setTestNonce] = useState(0); // remounts the renderers per test session
+  const [testTab, setTestTab] = useState<"positive" | "negative">("positive");
   const [signing, setSigning] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(form.lastTestedAt ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -709,19 +714,19 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   // modal, then trigger validation once it has mounted (and calc values settle).
   const openTest = () => {
     const json = currentSchemaJson();
+    const neg = negativeFillSchema(json);
     setTestSchema(json);
-    setTestInitial(autofillSchema(json));
-    setTestResult(null);
-    setTestSignal(0);
+    setPosInitial(autofillSchema(json));
+    setNegInitial(neg.values);
+    setNegExpected(neg.expected);
+    setPosResult(null);
+    setNegResult(null);
+    setTestTab("positive");
+    setNegPlay(0);
+    setPosPlay((p) => p + 1); // play positive on open (renderer plays on mount)
     setTestNonce((n) => n + 1);
     setTestOpen(true);
   };
-  // Fire the auto-validate signal a beat after the test modal opens.
-  useEffect(() => {
-    if (!testOpen) return;
-    const t = window.setTimeout(() => setTestSignal((s) => s + 1), 80);
-    return () => window.clearTimeout(t);
-  }, [testOpen]);
 
   const signOff = async () => {
     setSigning(true);
@@ -733,6 +738,17 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
       setSigning(false);
     }
   };
+
+  // Verdicts. Negative passes when every intentionally-invalid field was rejected
+  // (or there were no rules to test). Sign-off needs a clean positive AND negative.
+  const negCaught = negResult ? negExpected.filter((e) => negResult.errorKeys.includes(e.key)) : [];
+  const negNA = negExpected.length === 0;
+  const negOk = !!negResult && negExpected.every((e) => negResult.errorKeys.includes(e.key));
+  const posOk = !!posResult?.ok;
+  const canSignOff = posOk && (negNA || negOk);
+  // Playback steps (form order) for the typing animation.
+  const posSteps = Object.entries(posInitial).map(([key, value]) => ({ key, value }));
+  const negSteps = Object.entries(negInitial).map(([key, value]) => ({ key, value }));
 
   const saveFormSettings = async () => {
     const name = formName.trim() || form.name;
@@ -1070,46 +1086,75 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
         </div>
       </Modal>
 
-      {/* Test the form — auto-filled with valid sample data, validated, signed off. */}
+      {/* Test the form — positive (valid → must pass) + negative (invalid → must reject). */}
       <Modal isOpen={testOpen} onClose={() => setTestOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
         <div className="p-6 sm:p-8">
           <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Test — {form.name}</h2>
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-            Auto-filled with valid sample data and validated. Fields with regex patterns or custom rules may need a manual value.
+            <strong>Positive</strong> fills valid data (must pass). <strong>Negative</strong> fills invalid data (validation must reject it). Regex / custom-rule fields may need a manual value.
           </p>
 
-          {testResult && (
-            <div
-              className={`mb-5 flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm ${
-                testResult.ok
-                  ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
-                  : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
-              }`}
-            >
-              <span className="font-medium">
-                {testResult.ok
-                  ? "✓ All fields valid — ready to sign off."
-                  : `✗ ${testResult.errorCount} field${testResult.errorCount === 1 ? "" : "s"} need attention (see below).`}
-              </span>
-              {testResult.ok && canEdit && (
-                <Button size="sm" onClick={signOff} disabled={signing} startIcon={<BadgeCheck className="size-4" />}>
-                  {signing ? "Signing off…" : "Sign off"}
-                </Button>
-              )}
-              {testResult.ok && !canEdit && <span className="text-xs">Sign-off needs edit access.</span>}
-            </div>
+          {/* Overall summary */}
+          <div className="mb-4 flex flex-wrap gap-2 text-xs">
+            <span className={`rounded-full px-2.5 py-1 font-medium ${posResult ? (posOk ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400") : "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400"}`}>
+              Positive: {posResult ? (posOk ? "✓ valid" : `✗ ${posResult.errorCount} error${posResult.errorCount === 1 ? "" : "s"}`) : "running…"}
+            </span>
+            <span className={`rounded-full px-2.5 py-1 font-medium ${negResult ? (negNA || negOk ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400") : "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400"}`}>
+              Negative: {negResult ? (negNA ? "n/a (no rules)" : `${negOk ? "✓" : "✗"} ${negCaught.length}/${negExpected.length} rejected`) : "running…"}
+            </span>
+          </div>
+
+          {/* Tabs */}
+          <div className="mb-4 flex gap-1 border-b border-gray-200 dark:border-gray-700">
+            {(["positive", "negative"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => { setTestTab(t); if (t === "negative" && negPlay === 0) setNegPlay((s) => s + 1); }}
+                className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition ${testTab === t ? "border-brand-500 text-brand-600" : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {/* Negative per-field breakdown */}
+          {testTab === "negative" && negResult && !negNA && (
+            <ul className="mb-4 space-y-1 rounded-lg bg-gray-50 p-3 text-xs dark:bg-white/5">
+              {negExpected.map((e) => {
+                const caught = negResult.errorKeys.includes(e.key);
+                return (
+                  <li key={e.key} className="flex items-center gap-2">
+                    <span aria-hidden className={caught ? "text-success-600 dark:text-success-400" : "text-error-600 dark:text-error-400"}>{caught ? "✓" : "✗"}</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{e.label}</span>
+                    <span className="text-gray-400">— {e.reason} {caught ? "rejected" : "NOT rejected (validation gap)"}</span>
+                  </li>
+                );
+              })}
+            </ul>
           )}
 
-          <FormRenderer
-            key={testNonce}
-            schema={testSchema}
-            initialValues={testInitial}
-            autoSubmitSignal={testSignal}
-            onResult={setTestResult}
-          />
+          {/* Renderers play the typing animation then validate. Inactive tab is hidden but mounted. */}
+          <div className={testTab === "positive" ? "" : "hidden"}>
+            <FormRenderer key={`pos-${testNonce}`} schema={testSchema} playback={{ steps: posSteps, signal: posPlay }} onResult={setPosResult} />
+          </div>
+          <div className={testTab === "negative" ? "" : "hidden"}>
+            <FormRenderer key={`neg-${testNonce}`} schema={testSchema} playback={{ steps: negSteps, signal: negPlay }} onResult={setNegResult} />
+          </div>
 
-          <div className="mt-5 flex justify-end gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
-            <Button size="sm" variant="outline" onClick={() => setTestSignal((s) => s + 1)}>Re-run</Button>
+          <div className="mt-5 flex items-center justify-between gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <Button size="sm" variant="outline" onClick={() => (testTab === "positive" ? setPosPlay((s) => s + 1) : setNegPlay((s) => s + 1))}>Re-run</Button>
+            {canEdit ? (
+              <Tooltip content={canSignOff ? "Record that this form passed its self-test." : "Sign-off needs a clean positive run and all negative rules rejected."}>
+                <span>
+                  <Button size="sm" onClick={signOff} disabled={!canSignOff || signing} startIcon={<BadgeCheck className="size-4" />}>
+                    {signing ? "Signing off…" : "Sign off"}
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : (
+              <span className="text-xs text-gray-400">Sign-off needs edit access.</span>
+            )}
           </div>
         </div>
       </Modal>

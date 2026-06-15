@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import FormRenderer from "./FormRenderer";
 
@@ -401,13 +401,34 @@ describe("FormRenderer — auto-validate (Test the form)", () => {
   it("reports ok when autofilled valid data passes", () => {
     const onResult = vi.fn();
     render(<FormRenderer schema={single("textField", { label: "Name", key: "name", required: true })} initialValues={{ name: "Ada" }} autoSubmitSignal={1} onResult={onResult} />);
-    expect(onResult).toHaveBeenCalledWith({ ok: true, errorCount: 0 });
+    expect(onResult).toHaveBeenCalledWith({ ok: true, errorCount: 0, errorKeys: [] });
   });
 
-  it("reports failure with an error count when invalid", () => {
+  it("reports failure with the failing field keys when invalid", () => {
     const onResult = vi.fn();
     render(<FormRenderer schema={single("textField", { label: "Name", key: "name", required: true })} autoSubmitSignal={1} onResult={onResult} />);
-    expect(onResult).toHaveBeenCalledWith({ ok: false, errorCount: 1 });
+    expect(onResult).toHaveBeenCalledWith({ ok: false, errorCount: 1, errorKeys: ["name"] });
+  });
+});
+
+describe("FormRenderer — playback animation", () => {
+  it("types each field in, then validates", async () => {
+    vi.useFakeTimers();
+    try {
+      const onResult = vi.fn();
+      render(
+        <FormRenderer
+          schema={single("textField", { label: "Name", key: "name", required: true })}
+          playback={{ steps: [{ key: "name", value: "Ada" }], signal: 1, speed: 4 }}
+          onResult={onResult}
+        />,
+      );
+      await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+      expect(screen.getByLabelText(/Name/)).toHaveValue("Ada");
+      expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

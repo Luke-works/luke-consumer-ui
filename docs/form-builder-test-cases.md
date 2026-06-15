@@ -39,7 +39,7 @@ Statuses: ✅ automated · ⬜ manual (pending Playwright).
 
 ## Layer 1 — Unit tests (✅ automated)
 
-Run: `npm test`. 104 cases across four files. Listed here for traceability.
+Run: `npm test`. 111 cases across four files. Listed here for traceability.
 The renderer suite ([FormRenderer.test.tsx](../src/components/formBuilder/FormRenderer.test.tsx))
 mounts the real component in jsdom (testing-library) and covers the Tier-G
 Text Field hardening.
@@ -138,8 +138,9 @@ Text Field hardening.
 | UT-REND-40 | **Data Grid** disables Add at maxRows | button disabled |
 | UT-REND-41 | **Button** honors the disabled attribute | disabled |
 | UT-REND-42 | **Button** reset action restores initial values | input cleared |
-| UT-REND-43 | **Auto-validate**: `onResult` ok when autofilled data passes | `{ok:true}` |
-| UT-REND-44 | **Auto-validate**: `onResult` reports error count when invalid | `{ok:false,count}` |
+| UT-REND-43 | **Auto-validate**: `onResult` ok + empty `errorKeys` when valid | `{ok:true,errorKeys:[]}` |
+| UT-REND-44 | **Auto-validate**: `onResult` returns failing field keys | `{ok:false,errorKeys:["name"]}` |
+| UT-REND-45 | **Playback**: types each field in, then validates | value typed + `{ok:true}` |
 
 ### autofill.test.ts ("Test the form" data generator)
 
@@ -157,6 +158,12 @@ Text Field hardening.
 | UT-FILL-10 | fills minRows grid rows keyed by cell key | rows[] |
 | UT-FILL-11 | skips layout/static entities | only fields |
 | UT-FILL-12 | (covers null/garbage option shapes) | safe |
+| UT-FILL-13 | negative: required field → empty + expected | `{reason:"required"}` |
+| UT-FILL-14 | negative: non-required email → format-violating value | `not-an-email` |
+| UT-FILL-15 | negative: numeric `min` violated | `min-1` |
+| UT-FILL-16 | negative: field with no constraint → not expected | `[]` |
+| UT-FILL-17 | negative: conditionally-hidden field excluded | `[]` |
+| UT-FILL-18 | negative: only targeted fields invalid, rest valid | per-field |
 
 ---
 
@@ -499,31 +506,38 @@ and while the field is multi-value or read-only.
 
 ---
 
-### Tier H — Test the form (self-test + sign-off)
+### Tier H — Test the form (positive + negative + sign-off)
 
-**E2E-H-01 — One-click test auto-fills and validates** · P0
-1. Open a form in the builder → click **Test**.
+**E2E-H-01 — Positive: animated fill passes** · P0
+1. Open a form → click **Test** (opens on the **Positive** tab).
 
-✅ A modal opens with the form **pre-filled** with valid sample data; validation runs
-automatically and a green *"All fields valid — ready to sign off"* banner appears.
+✅ The form **types itself in** field by field (you can watch each value appear, the
+focused field scrolls into view), then validation runs and the summary shows
+*Positive: ✓ valid*. **Re-run** replays the animation.
 
-**E2E-H-02 — Sign off persists** · P0
-1. From a passing test, click **Sign off**.
+**E2E-H-02 — Negative: invalid data is rejected per field** · P0
+1. On a form with constrained fields, open **Test** → **Negative** tab.
 
-✅ The modal closes and a **Tested ✓** badge shows in the toolbar; reload → badge
-persists (capability-engine recorded `lastTestedAt`/`by` + a `tested` audit event).
+✅ Each constrained field is filled with an invalid value; the breakdown lists every
+field as *✓ rejected*, and the summary shows *Negative: ✓ N/N rejected*. A field shown
+as *✗ NOT rejected* is a real validation gap.
 
-**E2E-H-03 — Failing fields are surfaced** · P1
+**E2E-H-03 — Sign off needs both green; persists** · P0
+1. With Positive ✓ and Negative ✓, click **Sign off**.
+
+✅ Sign-off is enabled only when both pass; a **Tested ✓** badge shows in the toolbar
+and persists on reload (capability-engine `lastTestedAt`/`by` + `tested` audit event).
+
+**E2E-H-04 — Pattern/custom fields surface in Positive** · P1
 1. Add a field with a regex **pattern** the generator can't satisfy → Test.
 
-✅ A red banner reports the count; the offending field shows its inline error. Fix it
-in the form (or it needs a manual value) and **Re-run** → passes.
+✅ Positive reports the error and the field shows its inline error; fix or fill manually
+and **Re-run**.
 
-**E2E-H-04 — View-only can test but not sign off** · P2
+**E2E-H-05 — View-only can test but not sign off** · P2
 1. Open as a FORMS read-only user → Test.
 
-✅ The test runs and shows the verdict, but the **Sign off** action is hidden/disabled
-(persisting needs edit access).
+✅ Both tabs run and show verdicts, but **Sign off** is hidden/disabled.
 
 ---
 
