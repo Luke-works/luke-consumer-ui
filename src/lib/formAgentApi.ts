@@ -1,14 +1,16 @@
-// Client for the luke-form-agent service (the AI form builder).
+// Client for the luke-agents form agent (the AI form builder).
 //
 // The agent is a stateless schema generator: given the CURRENT coltorapps
 // schema ({entities, root}) plus a natural-language instruction, it returns the
 // COMPLETE updated schema, which we then saveDraft + reload into the builder.
 //
-// It runs as its own service (Render free tier), so its URL is configured
-// separately from the main API. Falls back to the known deployment.
+// luke-agents runs as its own service (hosting the agent fleet under
+// /agents/<slug>), so its base URL is configured separately from the main API.
+// VITE_FORM_AGENT_URL is the luke-agents service base; we hit the form agent's
+// canonical endpoint at /agents/form/chat. Falls back to the known deployment.
 
 const AGENT_URL = (
-  import.meta.env.VITE_FORM_AGENT_URL || "https://luke-form-agent.onrender.com"
+  import.meta.env.VITE_FORM_AGENT_URL || "https://luke-agents.onrender.com"
 ).replace(/\/$/, "");
 
 /** coltorapps builder schema — kept loose here; the builder owns the real type. */
@@ -41,7 +43,7 @@ export async function generateSchema(
 ): Promise<AgentResult> {
   let res: Response;
   try {
-    res = await fetch(`${AGENT_URL}/chat`, {
+    res = await fetch(`${AGENT_URL}/agents/form/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, schema, title, user_id: userId }),

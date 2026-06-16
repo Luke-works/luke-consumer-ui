@@ -18,7 +18,7 @@ const SUGGESTIONS = [
 
 /**
  * Docked chat panel (a permanent right rail beside the builder canvas) that
- * drives luke-form-agent. It lives in the parent, above the keyed Designer, so
+ * drives the luke-agents form agent. It lives in the parent, above the keyed Designer, so
  * its history survives the builder remount each applied change triggers. On
  * success it saveDrafts the new schema and hands it up via onApplied(schema,
  * title), which the parent applies locally (no page reload). onApplied is the
