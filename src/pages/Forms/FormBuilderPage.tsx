@@ -28,7 +28,7 @@ import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import { Modal } from "../../components/ui/modal";
-import { GripVertical, ArrowUp, MonitorPlay, FlaskConical, BadgeCheck } from "lucide-react";
+import { GripVertical, ArrowUp, MonitorPlay, FlaskConical, BadgeCheck, CodeXml } from "lucide-react";
 import { ChevronLeftIcon, CheckLineIcon, PaperPlaneIcon, TrashBinIcon, AngleUpIcon, AngleDownIcon, PencilIcon } from "../../icons";
 import {
   checkIn,
@@ -910,6 +910,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
       {/* Toolbar — portaled into the page-wide header slot so the actions sit at
           the top-right (above the LukeBuilds rail); falls back to inline. */}
       {(() => {
+      const eq = "min-w-[128px]"; // uniform width for all toolbar action buttons
       const toolbar = (
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Tooltip content="Back to form list">
@@ -937,8 +938,8 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
               <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-white/10 dark:text-gray-400">
                 View only
               </span>
-              <Tooltip content="Preview & test the form — conditions, calculations and validation run live."><Button size="sm" variant="outline" onClick={openPreview} startIcon={<MonitorPlay className="size-4" />}>Preview</Button></Tooltip>
-              <Tooltip content="Auto-fill the form with valid sample data and validate it."><Button size="sm" variant="outline" onClick={openTest} startIcon={<FlaskConical className="size-4" />}>Test</Button></Tooltip>
+              <Tooltip content="Preview & test the form — conditions, calculations and validation run live."><Button size="sm" variant="outline" className={eq} onClick={openPreview} startIcon={<MonitorPlay className="size-4" />}>Preview</Button></Tooltip>
+              <Tooltip content="Auto-fill the form with valid sample data and validate it."><Button size="sm" variant="outline" className={eq} onClick={openTest} startIcon={<FlaskConical className="size-4" />}>Test</Button></Tooltip>
             </>
           ) : (
             <>
@@ -960,17 +961,17 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
                 </Tooltip>
               )}
               {dirty && version > 0 && (
-                <Tooltip content="Discard draft edits and revert to the live version."><Button size="sm" variant="outline" onClick={handleDiscard}>Discard</Button></Tooltip>
+                <Tooltip content="Discard draft edits and revert to the live version."><Button size="sm" variant="outline" className={eq} onClick={handleDiscard}>Discard</Button></Tooltip>
               )}
-              <Tooltip content="Preview & test the form — conditions, calculations and validation run live."><Button size="sm" variant="outline" onClick={openPreview} startIcon={<MonitorPlay className="size-4" />}>Preview</Button></Tooltip>
-              <Tooltip content="Auto-fill the form with valid sample data, validate it, and sign off."><Button size="sm" variant="outline" onClick={openTest} startIcon={<FlaskConical className="size-4" />}>Test</Button></Tooltip>
-              <Tooltip content="Save your progress as a draft. Drafts keep your edits so you can continue working, but can't be used in workflows yet."><Button size="sm" variant="outline" onClick={flushSave} startIcon={<CheckLineIcon className="size-4" />}>Save</Button></Tooltip>
-              <Tooltip content={blocking.length ? "Fix the blocking problems before checking in." : "Check in a version as an artifact that workflows can use. Your draft stays editable for further changes."}><Button size="sm" variant="outline" onClick={handleCheckIn} disabled={blocking.length > 0} startIcon={<PaperPlaneIcon className="size-4" />}>Check in</Button></Tooltip>
+              <Tooltip content="Preview & test the form — conditions, calculations and validation run live."><Button size="sm" variant="outline" className={eq} onClick={openPreview} startIcon={<MonitorPlay className="size-4" />}>Preview</Button></Tooltip>
+              <Tooltip content="Auto-fill the form with valid sample data, validate it, and sign off."><Button size="sm" variant="outline" className={eq} onClick={openTest} startIcon={<FlaskConical className="size-4" />}>Test</Button></Tooltip>
+              <Tooltip content="Save your progress as a draft. Drafts keep your edits so you can continue working, but can't be used in workflows yet."><Button size="sm" variant="outline" className={eq} onClick={flushSave} startIcon={<CheckLineIcon className="size-4" />}>Save</Button></Tooltip>
+              <Tooltip content={blocking.length ? "Fix the blocking problems before checking in." : "Check in a version as an artifact that workflows can use. Your draft stays editable for further changes."}><Button size="sm" variant="outline" className={eq} onClick={handleCheckIn} disabled={blocking.length > 0} startIcon={<PaperPlaneIcon className="size-4" />}>Check in</Button></Tooltip>
               {version > 0 && (
-                <Tooltip content={blocking.length ? "Fix the blocking problems before publishing." : "Make the latest checked-in version the live one that workflows use."}><Button size="sm" onClick={handlePublish} disabled={publishedVersion === version || blocking.length > 0}>{publishedVersion === version ? "Published" : `Publish v${version}`}</Button></Tooltip>
+                <Tooltip content={blocking.length ? "Fix the blocking problems before publishing." : "Make the latest checked-in version the live one that workflows use."}><Button size="sm" className={eq} onClick={handlePublish} disabled={publishedVersion === version || blocking.length > 0}>{publishedVersion === version ? "Published" : `Publish v${version}`}</Button></Tooltip>
               )}
               {publishedVersion && (
-                <Tooltip content="Get an iframe snippet to embed this form on any website."><Button size="sm" variant="outline" onClick={openEmbed}>Embed</Button></Tooltip>
+                <Tooltip content="Get an iframe snippet to embed this form on any website."><Button size="sm" variant="outline" className={eq} onClick={openEmbed} startIcon={<CodeXml className="size-4" />}>Embed</Button></Tooltip>
               )}
             </>
           )}
