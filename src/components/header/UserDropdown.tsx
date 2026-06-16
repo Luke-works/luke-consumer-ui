@@ -28,9 +28,20 @@ export default function UserDropdown({
     void signOut();
   }
 
+  const [imgError, setImgError] = useState(false);
   const email = user?.email ?? "";
   const displayName = user?.fullName || user?.firstName || email || "Account";
-  const avatarUrl = user?.profilePictureUrl || "/images/user/owner.jpg";
+  // Real photo only (social logins). Password signups have none — fall back to
+  // initials, NOT a stock photo.
+  const avatarUrl = user?.profilePictureUrl || null;
+  const initials = (() => {
+    const name = (user?.fullName || user?.firstName || "").trim();
+    if (name) {
+      const parts = name.split(/\s+/);
+      return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+    }
+    return (email[0] ?? "?").toUpperCase();
+  })();
 
   const place =
     placement === "top"
@@ -47,8 +58,17 @@ export default function UserDropdown({
             : "w-full gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-white/5"
         }`}
       >
-        <span className={`overflow-hidden rounded-full ${compact ? "size-9" : "size-9 shrink-0"}`}>
-          <img src={avatarUrl} alt="User" />
+        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-sm font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+          {avatarUrl && !imgError ? (
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              className="size-full object-cover"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            initials
+          )}
         </span>
 
         {!compact && (
