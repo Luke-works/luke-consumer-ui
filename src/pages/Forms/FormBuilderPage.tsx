@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router";
 import { type Schema } from "@coltorapps/builder";
 import {
@@ -319,12 +320,15 @@ const STATUS_BADGE: Record<FormStatus, string> = {
   archived: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
 };
 
-function Designer({ tenant, formId, form, reload, onSchema, building, suppressFlushRef }: {
+function Designer({ tenant, formId, form, reload, onSchema, building, suppressFlushRef, headerEl }: {
   tenant: string; formId: string; form: StoredForm; reload: () => void;
   onSchema?: (s: BuilderSchemaLike) => void; building?: boolean;
   // When set, the next unmount skips its autosave flush — the parent (AI apply)
   // has already persisted a newer schema and is remounting the builder.
   suppressFlushRef?: React.RefObject<boolean>;
+  // Full-width header slot (owned by FormBuilderPage). The toolbar is portaled
+  // here so its actions sit at the page's top-right, above the LukeBuilds rail.
+  headerEl?: HTMLElement | null;
 }) {
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -903,7 +907,10 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* Toolbar — portaled into the page-wide header slot so the actions sit at
+          the top-right (above the LukeBuilds rail); falls back to inline. */}
+      {(() => {
+      const toolbar = (
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Tooltip content="Back to form list">
           <button type="button" onClick={() => navigate("/forms")} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/5">
@@ -969,6 +976,9 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
           )}
         </div>
       </div>
+      );
+      return headerEl ? createPortal(toolbar, headerEl) : toolbar;
+      })()}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragLabel(null)}>
         <div className={`grid min-h-[520px] grid-cols-1 items-start gap-4 ${canEdit ? "lg:grid-cols-[220px_1fr]" : ""}`}>
@@ -1349,6 +1359,9 @@ export default function FormBuilderPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [form, setForm] = useState<StoredForm | null>(null);
   const [loading, setLoading] = useState(true);
+  // Full-width header slot the (keyed) Designer portals its toolbar into, so the
+  // form actions sit at the page's top-right, above the LukeBuilds rail.
+  const [headerEl, setHeaderEl] = useState<HTMLDivElement | null>(null);
   // AI panel state lives here (above the keyed Designer) so chat history and the
   // panel survive the builder remount that applying a change triggers.
   // `aiBuilding` drives the canvas "building" animation — it's true ONLY while an
@@ -1407,7 +1420,10 @@ export default function FormBuilderPage() {
   const canEdit = canWrite(session, FORMS);
 
   return (
-    <div className="flex items-start gap-4">
+    <div>
+      {/* Full-width header band: the Designer toolbar portals in here. */}
+      <div ref={setHeaderEl} />
+      <div className="flex items-start gap-4">
       <div className="min-w-0 flex-1">
         <Designer
           key={`${form.id}-${reloadKey}-${designerNonce}`}
@@ -1418,6 +1434,7 @@ export default function FormBuilderPage() {
           onSchema={setLiveSchema}
           building={aiBuilding}
           suppressFlushRef={suppressFlushRef}
+          headerEl={headerEl}
         />
       </div>
       {/* Permanent LukeBuilds rail — sticky and viewport-tall so it stays fully
@@ -1433,6 +1450,7 @@ export default function FormBuilderPage() {
           />
         </aside>
       )}
+      </div>
     </div>
   );
 }
