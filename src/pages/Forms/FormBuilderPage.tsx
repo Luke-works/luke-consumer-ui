@@ -55,7 +55,7 @@ import FormRenderer from "../../components/formBuilder/FormRenderer";
 import AiAssistPanel from "./AiAssistPanel";
 import CapabilityBuildingAnimation from "./CapabilityBuildingAnimation";
 import { generateSchema, generateTestData, type BuilderSchemaLike } from "../../lib/formAgentApi";
-import LukeTalksMark from "../../components/branding/LukeTalksMark";
+import LukeTestsMark from "../../components/branding/LukeTestsMark";
 import { z } from "zod";
 import {
   camelCaseKeys,
@@ -264,7 +264,7 @@ function Canvas({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Shown over the canvas while LukeTalks is working — a seamless status with a
+// Shown over the canvas while LukeBuilds is working — a seamless status with a
 // little worker tightening bolts, stepping through what's happening.
 const PROCESSING_STEPS = [
   "Understanding your request…",
@@ -285,7 +285,7 @@ function AiProcessingOverlay() {
         <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Generating capability…</p>
         <p className="text-xs text-gray-400">{PROCESSING_STEPS[i]}</p>
         <p className="mt-1 bg-gradient-to-r from-brand-500 to-purple-500 bg-clip-text text-[11px] font-bold uppercase tracking-wider text-transparent">
-          LukeTalks
+          LukeBuilds
         </p>
       </div>
     </div>
@@ -337,7 +337,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [testTab, setTestTab] = useState<"positive" | "negative">("positive");
   const [signing, setSigning] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(form.lastTestedAt ?? null);
-  // LukeTalks collaboration on the Test panel: generate sample data + fix failures.
+  // LukeTests collaboration on the Test panel: generate sample data + fix failures.
   const [aiFilling, setAiFilling] = useState(false);
   const [aiFixing, setAiFixing] = useState(false);
   const [aiTestError, setAiTestError] = useState<string | null>(null);
@@ -755,8 +755,8 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const posSteps = Object.entries(posInitial).map(([key, value]) => ({ key, value }));
   const negSteps = Object.entries(negInitial).map(([key, value]) => ({ key, value }));
 
-  // ── LukeTalks ↔ Test collaboration ───────────────────────────────────────
-  // Is there a failure on the active tab that LukeTalks could fix?
+  // ── LukeTests ↔ Test collaboration ───────────────────────────────────────
+  // Is there a failure on the active tab that LukeTests could fix?
   const hasFixableFailure =
     (testTab === "positive" && !!posResult && !posOk) ||
     (testTab === "negative" && !!negResult && !negNA && !negOk);
@@ -776,7 +776,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     }
   };
 
-  // Generate realistic VALID sample data for the positive run with LukeTalks
+  // Generate realistic VALID sample data for the positive run with LukeTests
   // (richer than the heuristic auto-fill). Negative stays rule-aware (its
   // expected-violation tracking needs the deterministic filler).
   const fillPositiveWithAi = async () => {
@@ -796,7 +796,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     }
   };
 
-  // Hand the active-tab failures to LukeTalks and apply its fix (saveDraft +
+  // Hand the active-tab failures to LukeTests and apply its fix (saveDraft +
   // remount the builder, same path AiAssistPanel uses).
   const askAiToFix = async () => {
     setAiFixing(true);
@@ -1231,16 +1231,16 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => (testTab === "positive" ? setPosPlay((s) => s + 1) : setNegPlay((s) => s + 1))}>Re-run</Button>
               {canEdit && testTab === "positive" && (
-                <Tooltip content="Let LukeTalks fill the positive run with realistic valid data.">
-                  <Button size="sm" variant="outline" onClick={fillPositiveWithAi} disabled={aiFilling} startIcon={<LukeTalksMark className="size-4" />}>
+                <Tooltip content="Let LukeTests fill the positive run with realistic valid data.">
+                  <Button size="sm" variant="outline" onClick={fillPositiveWithAi} disabled={aiFilling} startIcon={<LukeTestsMark className="size-4" />}>
                     {aiFilling ? "Generating…" : "Generate data"}
                   </Button>
                 </Tooltip>
               )}
               {canEdit && hasFixableFailure && (
-                <Tooltip content="Hand the failing fields to LukeTalks and apply its fix.">
-                  <Button size="sm" variant="outline" onClick={askAiToFix} disabled={aiFixing} startIcon={<LukeTalksMark className="size-4" />}>
-                    {aiFixing ? "Fixing…" : "Ask LukeTalks to fix"}
+                <Tooltip content="Hand the failing fields to LukeTests and apply its fix.">
+                  <Button size="sm" variant="outline" onClick={askAiToFix} disabled={aiFixing} startIcon={<LukeTestsMark className="size-4" />}>
+                    {aiFixing ? "Fixing…" : "Ask LukeTests to fix"}
                   </Button>
                 </Tooltip>
               )}
@@ -1342,7 +1342,7 @@ export default function FormBuilderPage() {
           suppressFlushRef={suppressFlushRef}
         />
       </div>
-      {/* Permanent LukeTalks rail — sticky and viewport-tall so it stays fully
+      {/* Permanent LukeBuilds rail — sticky and viewport-tall so it stays fully
           visible (composer included) and pins as you scroll a long form. */}
       {canEdit && (
         <aside className="sticky top-24 hidden h-[calc(100vh-9rem)] w-[360px] shrink-0 lg:block">

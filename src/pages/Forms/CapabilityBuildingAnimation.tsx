@@ -1,4 +1,4 @@
-// Sleek "form materializing" loader shown briefly while LukeTalks builds the
+// Sleek "form materializing" loader shown briefly while LukeBuilds builds the
 // form: skeleton field rows (label + input) rise in, staggered, under a
 // brand-tinted shimmer sweep. Pure CSS — no assets, theme-agnostic.
 

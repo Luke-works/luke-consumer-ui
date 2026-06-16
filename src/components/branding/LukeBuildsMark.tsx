@@ -1,8 +1,7 @@
-// Custom LukeTalks logo mark — a speech bubble with an AI spark (the "Talks" +
-// intelligence idea). Inline SVG so it inherits `currentColor` and needs no asset
-// pipeline; sized via className. To rebrand, swap the two paths below (or drop in
-// an <img> with your own asset).
-export default function LukeTalksMark({ className }: { className?: string }) {
+// Custom LukeBuilds logo mark — a speech bubble with an AI spark (chat that
+// builds). Inline SVG so it inherits `currentColor` and needs no asset pipeline;
+// sized via className. To rebrand, swap the two paths below (or drop in an <img>).
+export default function LukeBuildsMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
       {/* speech bubble */}

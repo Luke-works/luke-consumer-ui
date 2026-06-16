@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import LukeTalksMark from "../../components/branding/LukeTalksMark";
+import LukeBuildsMark from "../../components/branding/LukeBuildsMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { saveDraft } from "../../lib/formsApi";
@@ -79,11 +79,11 @@ export default function AiAssistPanel({
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
         <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm">
-          <LukeTalksMark className="size-5" />
+          <LukeBuildsMark className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-gray-800 dark:text-white/90">
-            Luke<span className="bg-gradient-to-r from-brand-500 to-purple-500 bg-clip-text text-transparent">Talks</span>
+            Luke<span className="bg-gradient-to-r from-brand-500 to-purple-500 bg-clip-text text-transparent">Builds</span>
           </h2>
           <p className="truncate text-[11px] text-gray-400">
             Describe it — I'll build the capability{brain ? ` · ${brain}` : ""}
