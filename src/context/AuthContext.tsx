@@ -36,7 +36,7 @@ type AuthValue = {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   createOrganization: (input: { name: string }) => Promise<api.CreateOrgResult>;
-  refreshSession: () => Promise<void>;
+  refreshSession: (opts?: { fresh?: boolean }) => Promise<void>;
   getToken: () => string | null;
 };
 
@@ -149,8 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionRef.current = session;
   }, [session]);
 
-  const refreshSession = useCallback(async () => {
-    setSession(await api.getSession(sessionRef.current?.tenant ?? undefined));
+  const refreshSession = useCallback(async (opts?: { fresh?: boolean }) => {
+    setSession(await api.getSession(sessionRef.current?.tenant ?? undefined, opts));
   }, []);
 
   const value: AuthValue = {

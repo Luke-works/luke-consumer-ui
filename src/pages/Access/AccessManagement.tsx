@@ -251,12 +251,16 @@ function MemberRow({
   groups,
   capabilities,
   onChanged,
+  currentUserId,
+  refreshSession,
 }: {
   tenant: string;
   member: OrgMember;
   groups: OrgGroup[];
   capabilities: CapabilityCatalogItem[];
   onChanged: () => void;
+  currentUserId: string;
+  refreshSession: (opts?: { fresh?: boolean }) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -283,6 +287,9 @@ function MemberRow({
       await fn();
       if (reloadGrants) loadGrants();
       else onChanged();
+      // When the change is to the signed-in user themselves, refresh their session
+      // (bypassing the cache) so the new access reflects immediately — no re-login.
+      if (member.id === currentUserId) await refreshSession({ fresh: true });
     } catch (e) {
       setErr(getAuthErrorMessage(e));
     } finally {
@@ -396,6 +403,8 @@ function MemberRow({
 }
 
 function AuthorizationTab({ tenant }: { tenant: string }) {
+  const { session, refreshSession } = useAuth();
+  const currentUserId = session?.userId ?? "";
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [groups, setGroups] = useState<OrgGroup[]>([]);
   const [capabilities, setCapabilities] = useState<CapabilityCatalogItem[]>([]);
@@ -530,6 +539,8 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
                 groups={groups}
                 capabilities={capabilities}
                 onChanged={reloadMembers}
+                currentUserId={currentUserId}
+                refreshSession={refreshSession}
               />
             ))}
           </div>

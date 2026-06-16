@@ -138,8 +138,13 @@ export async function authed<T>(path: string, init: RequestInit = {}, retry = tr
   return parse<T>(res);
 }
 
-export function getSession(tenantId?: string): Promise<SessionView> {
-  return authed("/session", {
+export function getSession(
+  tenantId?: string,
+  opts?: { fresh?: boolean },
+): Promise<SessionView> {
+  // fresh=true bypasses the gateway's per-(user,tenant) session cache — use it right
+  // after changing access so the new roles/capabilities show without waiting the TTL.
+  return authed(opts?.fresh ? "/session?fresh=true" : "/session", {
     headers: tenantId ? { "X-Tenant-Id": tenantId } : undefined,
   });
 }
