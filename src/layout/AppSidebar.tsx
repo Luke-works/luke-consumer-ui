@@ -5,7 +5,7 @@ import { ChevronDownIcon, GridIcon, HorizontaLDots, ListIcon, LockIcon, MailIcon
 import { FileText, Inbox } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { canRead, FORMS } from "../lib/capabilities";
+import { canRead, EMAIL, FORMS } from "../lib/capabilities";
 import SidebarFooter from "./SidebarFooter";
 
 type NavItem = {
@@ -36,11 +36,13 @@ const AppSidebar: React.FC = () => {
   const { session } = useAuth();
   const location = useLocation();
 
-  // Forms is hidden unless the user has at least read access to the FORMS capability.
+  // Capability-gated nav items are hidden unless the user has at least read access.
   // Org owners additionally get the Auth & Access admin page.
-  const items: NavItem[] = navItems.filter(
-    (item) => item.name !== "Forms" || canRead(session, FORMS),
-  );
+  const items: NavItem[] = navItems.filter((item) => {
+    if (item.name === "Forms") return canRead(session, FORMS);
+    if (item.name === "Email") return canRead(session, EMAIL);
+    return true;
+  });
   if (session?.tenantAdmin) {
     items.push({ icon: <LockIcon />, name: "Auth & Access", path: "/access" });
   }

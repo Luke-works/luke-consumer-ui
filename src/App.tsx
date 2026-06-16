@@ -27,7 +27,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import OnboardingGate from "./components/auth/OnboardingGate";
 import CapabilityRoute from "./components/auth/CapabilityRoute";
-import { FORMS } from "./lib/capabilities";
+import { EMAIL, FORMS } from "./lib/capabilities";
 
 if (!import.meta.env.VITE_AUTH_API_URL) {
   throw new Error(
@@ -48,7 +48,10 @@ export default function App() {
 
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Home />} />
-              <Route path="/email" element={<Email />} />
+              {/* Email — gated behind the EMAIL capability (read to view). */}
+              <Route element={<CapabilityRoute code={EMAIL} />}>
+                <Route path="/email" element={<Email />} />
+              </Route>
               <Route path="/phone" element={<Phone />} />
               <Route path="/account/profile" element={<Profile />} />
               <Route path="/account/settings" element={<Settings />} />
