@@ -539,6 +539,19 @@ and **Re-run**.
 
 ✅ Both tabs run and show verdicts, but **Sign off** is hidden/disabled.
 
+**E2E-H-06 — LukeTests generates many realistic datasets** · P1
+1. On the Positive tab, pick a count and click **Generate data**.
+
+✅ LukeTests (luke-agents `/testdata`) returns N distinct valid datasets; a **Local /
+AI 1 / AI 2 …** selector appears. Clicking a chip replays that dataset with the typing
+animation and re-validates. (Cold-start may take a few seconds; errors surface inline.)
+
+**E2E-H-07 — Ask LukeTests to fix a failure** · P2
+1. With a failing field on the active tab, click **Ask LukeTests to fix**.
+
+✅ The failing fields + reasons are sent to the agent; its corrected schema is saved and
+the builder remounts with the fix (same path as the AiAssistPanel apply).
+
 ---
 
 ## Traceability & next steps

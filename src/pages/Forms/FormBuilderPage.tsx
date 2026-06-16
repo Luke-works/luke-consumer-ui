@@ -54,7 +54,7 @@ import { attributesComponents, entityComponents, BuilderEntitiesContext } from "
 import FormRenderer from "../../components/formBuilder/FormRenderer";
 import AiAssistPanel from "./AiAssistPanel";
 import CapabilityBuildingAnimation from "./CapabilityBuildingAnimation";
-import { generateSchema, generateTestData, type BuilderSchemaLike } from "../../lib/formAgentApi";
+import { generateSchema, generateTestData, type BuilderSchemaLike, type TestDataset } from "../../lib/formAgentApi";
 import LukeTestsMark from "../../components/branding/LukeTestsMark";
 import { z } from "zod";
 import {
@@ -362,6 +362,10 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [aiFilling, setAiFilling] = useState(false);
   const [aiFixing, setAiFixing] = useState(false);
   const [aiTestError, setAiTestError] = useState<string | null>(null);
+  // Many positive datasets from LukeTests; posSel = which one is active ("local" = heuristic auto-fill).
+  const [posAiSets, setPosAiSets] = useState<TestDataset[]>([]);
+  const [posSel, setPosSel] = useState<"local" | number>("local");
+  const [genCount, setGenCount] = useState(5);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragLabel, setDragLabel] = useState<string | null>(null);
   const [formSettingsOpen, setFormSettingsOpen] = useState(false);
@@ -747,6 +751,8 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     setNegExpected(neg.expected);
     setPosResult(null);
     setNegResult(null);
+    setPosAiSets([]);
+    setPosSel("local");
     setTestTab("positive");
     setNegPlay(0);
     setPosPlay((p) => p + 1); // play positive on open (renderer plays on mount)
@@ -797,24 +803,39 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     }
   };
 
-  // Generate realistic VALID sample data for the positive run with LukeTests
-  // (richer than the heuristic auto-fill). Negative stays rule-aware (its
-  // expected-violation tracking needs the deterministic filler).
+  // Generate a batch of realistic VALID datasets for the positive run with
+  // LukeTests (richer + more varied than the heuristic auto-fill). Negative stays
+  // rule-aware (its expected-violation tracking needs the deterministic filler).
   const fillPositiveWithAi = async () => {
     setAiFilling(true);
     setAiTestError(null);
     try {
       const schema = JSON.parse(currentSchemaJson()) as BuilderSchemaLike;
-      const td = await generateTestData(schema, "valid", form.name, me ?? undefined);
-      setPosInitial(td.values);
-      setTestTab("positive");
-      setPosResult(null);
-      setPosPlay((p) => p + 1); // replay with the new values, then re-validate
+      const { datasets } = await generateTestData(schema, "valid", genCount, form.name, me ?? undefined);
+      if (datasets.length) {
+        setPosAiSets(datasets);
+        setPosSel(0);
+        setPosInitial(datasets[0].values);
+        setTestTab("positive");
+        setPosResult(null);
+        setPosPlay((p) => p + 1); // replay with the first dataset, then re-validate
+      } else {
+        setAiTestError("LukeTests returned no datasets — try again.");
+      }
     } catch (e) {
       setAiTestError((e as Error).message);
     } finally {
       setAiFilling(false);
     }
+  };
+
+  // Switch the active positive dataset (Local heuristic, or one of the AI batch)
+  // and replay the animation against it.
+  const selectPositive = (sel: "local" | number) => {
+    setPosSel(sel);
+    setPosInitial(sel === "local" ? autofillSchema(testSchema) : posAiSets[sel]?.values ?? {});
+    setPosResult(null);
+    setPosPlay((p) => p + 1);
   };
 
   // Hand the active-tab failures to LukeTests and apply its fix (saveDraft +
@@ -1244,6 +1265,24 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
             </ul>
           )}
 
+          {/* Positive dataset selector (Local heuristic + LukeTests batch). */}
+          {testTab === "positive" && posAiSets.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-gray-400">Dataset:</span>
+              {(["local", ...posAiSets.map((_, i) => i)] as ("local" | number)[]).map((sel) => (
+                <button
+                  key={String(sel)}
+                  type="button"
+                  onClick={() => selectPositive(sel)}
+                  title={typeof sel === "number" ? posAiSets[sel].notes : "Heuristic auto-fill"}
+                  className={`rounded-full border px-2.5 py-0.5 transition ${posSel === sel ? "border-brand-400 bg-brand-50 text-brand-600 dark:bg-brand-500/10" : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5"}`}
+                >
+                  {sel === "local" ? "Local" : `AI ${sel + 1}`}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Renderers play the typing animation then validate. Inactive tab is hidden but mounted. */}
           <div className={testTab === "positive" ? "" : "hidden"}>
             <FormRenderer key={`pos-${testNonce}`} schema={testSchema} playback={{ steps: posSteps, signal: posPlay }} onResult={setPosResult} />
@@ -1260,11 +1299,21 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => (testTab === "positive" ? setPosPlay((s) => s + 1) : setNegPlay((s) => s + 1))}>Re-run</Button>
               {canEdit && testTab === "positive" && (
-                <Tooltip content="Let LukeTests fill the positive run with realistic valid data.">
-                  <Button size="sm" variant="outline" onClick={fillPositiveWithAi} disabled={aiFilling} startIcon={<LukeTestsMark className="size-4" />}>
-                    {aiFilling ? "Generating…" : "Generate data"}
-                  </Button>
-                </Tooltip>
+                <div className="flex items-center gap-1.5">
+                  <Tooltip content="Let LukeTests generate realistic valid datasets for the positive run.">
+                    <Button size="sm" variant="outline" onClick={fillPositiveWithAi} disabled={aiFilling} startIcon={<LukeTestsMark className="size-4" />}>
+                      {aiFilling ? "Generating…" : "Generate data"}
+                    </Button>
+                  </Tooltip>
+                  <select
+                    aria-label="How many datasets to generate"
+                    value={genCount}
+                    onChange={(e) => setGenCount(Number(e.target.value))}
+                    className="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                  >
+                    {[1, 3, 5].map((n) => <option key={n} value={n}>{n} set{n === 1 ? "" : "s"}</option>)}
+                  </select>
+                </div>
               )}
               {canEdit && hasFixableFailure && (
                 <Tooltip content="Hand the failing fields to LukeTests and apply its fix.">
