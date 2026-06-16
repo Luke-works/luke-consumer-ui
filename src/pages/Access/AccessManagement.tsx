@@ -15,11 +15,13 @@ import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
 import {
+  EMAIL,
   LEVEL_LABEL,
   TIER_BADGE,
   TIER_LABEL,
   type CapabilityLevel,
 } from "../../lib/capabilities";
+import { isPersonalEmail } from "../../lib/emailDomains";
 
 // Editable role rows: dimension (as returned in member.roles) → the engine role
 // group we PUT to. Owner (tenant-admin) is guarded server-side so the last owner
@@ -377,28 +379,38 @@ function MemberRow({
           )}
 
           {/* Capabilities */}
-          {capabilities.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase text-gray-400">Capabilities</p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {capabilities.map((c) => (
-                  <div key={c.code} className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                      {c.name}
-                      <TierBadge tier={c.tier} />
-                    </span>
-                    <LevelSelect
-                      value={(grants[c.code] as RoleLevel) ?? "none"}
-                      disabled={busy}
-                      onChange={(level) =>
-                        run(() => api.setUserCapability(tenant, member.id, c.code, level), true)
-                      }
-                    />
-                  </div>
-                ))}
+          {(() => {
+            // Hide the company-sending EMAIL capability for members on a personal
+            // email domain (gmail/yahoo/…) — they can't verify a business sender. Keep
+            // it shown if already granted, so an admin can still revoke it.
+            const personal = isPersonalEmail(member.email);
+            const visibleCaps = capabilities.filter(
+              (c) => c.code !== EMAIL || !personal || (grants[c.code] && grants[c.code] !== "none"),
+            );
+            if (visibleCaps.length === 0) return null;
+            return (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase text-gray-400">Capabilities</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {visibleCaps.map((c) => (
+                    <div key={c.code} className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        {c.name}
+                        <TierBadge tier={c.tier} />
+                      </span>
+                      <LevelSelect
+                        value={(grants[c.code] as RoleLevel) ?? "none"}
+                        disabled={busy}
+                        onChange={(level) =>
+                          run(() => api.setUserCapability(tenant, member.id, c.code, level), true)
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {err && <p className="text-sm text-error-500">{err}</p>}
         </div>
