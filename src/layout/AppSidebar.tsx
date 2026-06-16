@@ -44,7 +44,7 @@ const AppSidebar: React.FC = () => {
     return true;
   });
   if (session?.tenantAdmin) {
-    items.push({ icon: <LockIcon />, name: "Auth & Access", path: "/access" });
+    items.push({ icon: <LockIcon />, name: "Access", path: "/access" });
   }
 
   const [openSubmenu, setOpenSubmenu] = useState<{

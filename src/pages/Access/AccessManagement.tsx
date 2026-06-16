@@ -1,4 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import {
+  Clock,
+  KeyRound,
+  Send,
+  ShieldCheck,
+  Trash2,
+  UserCog,
+  UserPlus,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import * as api from "../../lib/authApi";
 import type {
@@ -35,6 +47,49 @@ const ROLE_ROWS: { dim: keyof OrgMember["roles"]; role: string; label: string }[
 
 const card =
   "rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]";
+
+/** Modern section header: an icon badge + title (+ optional subtitle), with an
+ *  optional right-aligned slot (e.g. a count, a toggle). */
+function SectionHeader({
+  icon: Icon,
+  title,
+  subtitle,
+  right,
+}: {
+  icon: LucideIcon;
+  title: ReactNode;
+  subtitle?: string;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-500 dark:bg-brand-500/10">
+          <Icon className="size-5" />
+        </span>
+        <div>
+          <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>}
+        </div>
+      </div>
+      {right && <div className="shrink-0">{right}</div>}
+    </div>
+  );
+}
+
+/** Round initials avatar for a member row. */
+function MemberAvatar({ member }: { member: OrgMember }) {
+  const initials = (
+    (member.firstName?.[0] ?? "") + (member.lastName?.[0] ?? "") ||
+    member.email?.[0] ||
+    "?"
+  ).toUpperCase();
+  return (
+    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+      {initials}
+    </span>
+  );
+}
 
 function LevelSelect({
   value,
@@ -100,10 +155,11 @@ function MyAccessCard({
 
   return (
     <section className={card}>
-      <h2 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">My access</h2>
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        The capabilities granted to you in this organization.
-      </p>
+      <SectionHeader
+        icon={KeyRound}
+        title="My access"
+        subtitle="The capabilities granted to you in this organization."
+      />
       {codes.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           You don't have any capabilities granted yet. Ask an org owner to grant access.
@@ -182,11 +238,11 @@ function AuthenticationTab({ tenant }: { tenant: string }) {
   return (
     <div className="space-y-6">
       <section className={card}>
-        <h2 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">Invite a teammate</h2>
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          They'll get an email with a link to set their password. Add them to this organization from the
-          Authorization tab once they've accepted.
-        </p>
+        <SectionHeader
+          icon={UserPlus}
+          title="Invite a teammate"
+          subtitle="They'll get an email with a link to set their password. Add them to this organization from the Authorization tab once they've accepted."
+        />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div>
             <Label htmlFor="inv-first">First name</Label>
@@ -208,7 +264,12 @@ function AuthenticationTab({ tenant }: { tenant: string }) {
           </div>
         </div>
         <div className="mt-6 flex items-center gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
-          <Button size="sm" disabled={!email.trim() || status.kind === "sending"} onClick={send}>
+          <Button
+            size="sm"
+            startIcon={<Send className="size-4" />}
+            disabled={!email.trim() || status.kind === "sending"}
+            onClick={send}
+          >
             {status.kind === "sending" ? "Sending…" : "Send invite"}
           </Button>
           {status.kind === "ok" && <span className="text-sm text-success-600 dark:text-success-400">{status.msg}</span>}
@@ -217,7 +278,7 @@ function AuthenticationTab({ tenant }: { tenant: string }) {
       </section>
 
       <section className={card}>
-        <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Pending invitations</h2>
+        <SectionHeader icon={Clock} title="Pending invitations" />
         {invitations.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No invitations yet.</p>
         ) : (
@@ -231,8 +292,9 @@ function AuthenticationTab({ tenant }: { tenant: string }) {
                 {inv.state === "pending" && (
                   <button
                     onClick={() => revoke(inv.id)}
-                    className="text-sm text-error-500 hover:text-error-600"
+                    className="flex items-center gap-1.5 text-sm text-error-500 hover:text-error-600"
                   >
+                    <Trash2 className="size-3.5" />
                     Revoke
                   </button>
                 )}
@@ -307,9 +369,12 @@ function MemberRow({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-gray-800 dark:text-white/90">{fullName(member)}</p>
-          {member.email && <p className="truncate text-xs text-gray-400">{member.email}</p>}
+        <div className="flex min-w-0 items-center gap-3">
+          <MemberAvatar member={member} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-gray-800 dark:text-white/90">{fullName(member)}</p>
+            {member.email && <p className="truncate text-xs text-gray-400">{member.email}</p>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {member.platform && (
@@ -503,10 +568,11 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
 
       {/* Add user to organization */}
       <section className={card}>
-        <h2 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">Add user to organization</h2>
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Add someone who already has a Lukeflow login (invite them first if they don't).
-        </p>
+        <SectionHeader
+          icon={UserPlus}
+          title="Add user to organization"
+          subtitle="Add someone who already has a Lukeflow login (invite them first if they don't)."
+        />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="sm:flex-1">
             <Label htmlFor="add-email">Email</Label>
@@ -532,7 +598,12 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
               <option value="tenant-admin">Org owner</option>
             </select>
           </div>
-          <Button size="sm" disabled={!addEmail.trim() || addStatus.kind === "saving"} onClick={addMember}>
+          <Button
+            size="sm"
+            startIcon={<UserPlus className="size-4" />}
+            disabled={!addEmail.trim() || addStatus.kind === "saving"}
+            onClick={addMember}
+          >
             {addStatus.kind === "saving" ? "Adding…" : "Add"}
           </Button>
         </div>
@@ -548,22 +619,27 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
         const visible = showPlatform ? members : members.filter((m) => !m.platform);
         return (
           <section className={card}>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
-                Members <span className="text-sm font-normal text-gray-400">({visible.length})</span>
-              </h2>
-              {platformCount > 0 && (
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <input
-                    type="checkbox"
-                    checked={showPlatform}
-                    onChange={(e) => setShowPlatform(e.target.checked)}
-                    className="size-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900"
-                  />
-                  Show platform accounts ({platformCount})
-                </label>
-              )}
-            </div>
+            <SectionHeader
+              icon={Users}
+              title={
+                <>
+                  Members <span className="text-sm font-normal text-gray-400">({visible.length})</span>
+                </>
+              }
+              right={
+                platformCount > 0 ? (
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <input
+                      type="checkbox"
+                      checked={showPlatform}
+                      onChange={(e) => setShowPlatform(e.target.checked)}
+                      className="size-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900"
+                    />
+                    Show platform accounts ({platformCount})
+                  </label>
+                ) : undefined
+              }
+            />
             {visible.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No members yet.</p>
             ) : (
@@ -588,10 +664,11 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
 
       {/* Groups */}
       <section className={card}>
-        <h2 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">Groups</h2>
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Candidate groups for routing tasks. Assign members to groups above.
-        </p>
+        <SectionHeader
+          icon={UsersRound}
+          title="Groups"
+          subtitle="Candidate groups for routing tasks. Assign members to groups above."
+        />
         <div className="mb-4 flex flex-wrap gap-2">
           {groups.length === 0 ? (
             <span className="text-sm text-gray-400">No groups yet.</span>
@@ -616,7 +693,12 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
               placeholder="Sales"
             />
           </div>
-          <Button size="sm" disabled={!groupNameInput.trim() || groupStatus.kind === "saving"} onClick={createGroup}>
+          <Button
+            size="sm"
+            startIcon={<UsersRound className="size-4" />}
+            disabled={!groupNameInput.trim() || groupStatus.kind === "saving"}
+            onClick={createGroup}
+          >
             {groupStatus.kind === "saving" ? "Creating…" : "Create group"}
           </Button>
         </div>
@@ -658,13 +740,16 @@ export default function AccessManagement() {
       />
 
       <div className="mx-auto max-w-4xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-            Authentication &amp; Authorization
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Invite teammates, add them to your organization, and manage roles, groups, and capabilities.
-          </p>
+        <div className="mb-6 flex items-start gap-4">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-500/10">
+            <ShieldCheck className="size-6" />
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Access</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Invite teammates, add them to your organization, and manage roles, groups, and capabilities.
+            </p>
+          </div>
         </div>
 
         {/* Everyone sees their own access; only owners get the management tabs below. */}
@@ -684,18 +769,19 @@ export default function AccessManagement() {
           <>
             <div className="mb-6 flex gap-1 border-b border-gray-200 dark:border-gray-700">
               {[
-                { id: "auth" as const, label: "Authentication" },
-                { id: "authz" as const, label: "Authorization" },
+                { id: "auth" as const, label: "Authentication", icon: KeyRound },
+                { id: "authz" as const, label: "Authorization", icon: UserCog },
               ].map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
+                  className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition ${
                     tab === t.id
                       ? "border-brand-500 text-brand-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"
                   }`}
                 >
+                  <t.icon className="size-4" />
                   {t.label}
                 </button>
               ))}
