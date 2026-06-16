@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import LukeTalksMark from "../../components/branding/LukeTalksMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { saveDraft } from "../../lib/formsApi";
@@ -79,7 +79,7 @@ export default function AiAssistPanel({
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
         <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-sm">
-          <Sparkles className="size-5" />
+          <LukeTalksMark className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-gray-800 dark:text-white/90">

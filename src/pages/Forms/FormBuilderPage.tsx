@@ -54,7 +54,8 @@ import { attributesComponents, entityComponents, BuilderEntitiesContext } from "
 import FormRenderer from "../../components/formBuilder/FormRenderer";
 import AiAssistPanel from "./AiAssistPanel";
 import CapabilityBuildingAnimation from "./CapabilityBuildingAnimation";
-import type { BuilderSchemaLike } from "../../lib/formAgentApi";
+import { generateSchema, generateTestData, type BuilderSchemaLike } from "../../lib/formAgentApi";
+import LukeTalksMark from "../../components/branding/LukeTalksMark";
 import { z } from "zod";
 import {
   camelCaseKeys,
@@ -336,6 +337,10 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [testTab, setTestTab] = useState<"positive" | "negative">("positive");
   const [signing, setSigning] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(form.lastTestedAt ?? null);
+  // LukeTalks collaboration on the Test panel: generate sample data + fix failures.
+  const [aiFilling, setAiFilling] = useState(false);
+  const [aiFixing, setAiFixing] = useState(false);
+  const [aiTestError, setAiTestError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragLabel, setDragLabel] = useState<string | null>(null);
   const [formSettingsOpen, setFormSettingsOpen] = useState(false);
@@ -750,6 +755,82 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const posSteps = Object.entries(posInitial).map(([key, value]) => ({ key, value }));
   const negSteps = Object.entries(negInitial).map(([key, value]) => ({ key, value }));
 
+  // ── LukeTalks ↔ Test collaboration ───────────────────────────────────────
+  // Is there a failure on the active tab that LukeTalks could fix?
+  const hasFixableFailure =
+    (testTab === "positive" && !!posResult && !posOk) ||
+    (testTab === "negative" && !!negResult && !negNA && !negOk);
+
+  // key -> label, from the schema under test (for readable fix prompts).
+  const fieldLabels = (): Record<string, string> => {
+    try {
+      const s = JSON.parse(testSchema) as BuilderSchemaLike;
+      const out: Record<string, string> = {};
+      for (const [id, e] of Object.entries(s.entities ?? {})) {
+        const a = (e as { attributes?: { key?: string; label?: string } }).attributes ?? {};
+        out[a.key ?? id] = a.label ?? a.key ?? id;
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  };
+
+  // Generate realistic VALID sample data for the positive run with LukeTalks
+  // (richer than the heuristic auto-fill). Negative stays rule-aware (its
+  // expected-violation tracking needs the deterministic filler).
+  const fillPositiveWithAi = async () => {
+    setAiFilling(true);
+    setAiTestError(null);
+    try {
+      const schema = JSON.parse(currentSchemaJson()) as BuilderSchemaLike;
+      const td = await generateTestData(schema, "valid", form.name, me ?? undefined);
+      setPosInitial(td.values);
+      setTestTab("positive");
+      setPosResult(null);
+      setPosPlay((p) => p + 1); // replay with the new values, then re-validate
+    } catch (e) {
+      setAiTestError((e as Error).message);
+    } finally {
+      setAiFilling(false);
+    }
+  };
+
+  // Hand the active-tab failures to LukeTalks and apply its fix (saveDraft +
+  // remount the builder, same path AiAssistPanel uses).
+  const askAiToFix = async () => {
+    setAiFixing(true);
+    setAiTestError(null);
+    try {
+      const labels = fieldLabels();
+      let message: string;
+      if (testTab === "positive" && posResult) {
+        const fields = posResult.errorKeys.map((k) => labels[k] ?? k).join(", ") || "some fields";
+        message = `In a Test run I filled this form with VALID data, but these fields still fail validation: ${fields}. The validation is too strict or misconfigured — adjust the form so correct input passes.`;
+      } else {
+        const missed = negExpected.filter((e) => !negResult?.errorKeys.includes(e.key));
+        const fields = missed.map((e) => `${e.label} (${e.reason})`).join(", ") || "some fields";
+        message = `In a Test run these fields should REJECT invalid input but don't: ${fields}. Add or repair their validation so invalid values are rejected.`;
+      }
+      const result = await generateSchema(
+        message,
+        JSON.parse(currentSchemaJson()) as BuilderSchemaLike,
+        form.name,
+        me ?? undefined,
+      );
+      await saveDraft(tenant, formId, JSON.stringify(result.schema));
+      setTestOpen(false);
+      // The outgoing builder must not re-save its stale local schema over our fix
+      // (same guard the AiAssistPanel apply path uses).
+      if (suppressFlushRef) suppressFlushRef.current = true;
+      reload(); // remount the builder with the fixed schema
+    } catch (e) {
+      setAiTestError((e as Error).message);
+    } finally {
+      setAiFixing(false);
+    }
+  };
+
   const saveFormSettings = async () => {
     const name = formName.trim() || form.name;
     setFormName(name);
@@ -1142,8 +1223,28 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
             <FormRenderer key={`neg-${testNonce}`} schema={testSchema} playback={{ steps: negSteps, signal: negPlay }} onResult={setNegResult} />
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
-            <Button size="sm" variant="outline" onClick={() => (testTab === "positive" ? setPosPlay((s) => s + 1) : setNegPlay((s) => s + 1))}>Re-run</Button>
+          {aiTestError && (
+            <p className="mt-4 rounded-lg bg-error-50 px-3 py-2 text-xs text-error-600 dark:bg-error-500/10">{aiTestError}</p>
+          )}
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => (testTab === "positive" ? setPosPlay((s) => s + 1) : setNegPlay((s) => s + 1))}>Re-run</Button>
+              {canEdit && testTab === "positive" && (
+                <Tooltip content="Let LukeTalks fill the positive run with realistic valid data.">
+                  <Button size="sm" variant="outline" onClick={fillPositiveWithAi} disabled={aiFilling} startIcon={<LukeTalksMark className="size-4" />}>
+                    {aiFilling ? "Generating…" : "Generate data"}
+                  </Button>
+                </Tooltip>
+              )}
+              {canEdit && hasFixableFailure && (
+                <Tooltip content="Hand the failing fields to LukeTalks and apply its fix.">
+                  <Button size="sm" variant="outline" onClick={askAiToFix} disabled={aiFixing} startIcon={<LukeTalksMark className="size-4" />}>
+                    {aiFixing ? "Fixing…" : "Ask LukeTalks to fix"}
+                  </Button>
+                </Tooltip>
+              )}
+            </div>
             {canEdit ? (
               <Tooltip content={canSignOff ? "Record that this form passed its self-test." : "Sign-off needs a clean positive run and all negative rules rejected."}>
                 <span>

@@ -77,5 +77,49 @@ export async function generateSchema(
   return data as AgentResult;
 }
 
+export type TestData = {
+  /** Map of field key -> a value to enter into the form. */
+  values: Record<string, unknown>;
+  /** Short note, e.g. which rules the invalid values break. */
+  notes?: string;
+  brain: string;
+};
+
+/**
+ * Ask LukeTalks to generate test data for a form: `valid` data that should pass
+ * validation, or `invalid` data that should be rejected. Used to drive the
+ * builder's Test runs with realistic values instead of dumb auto-fill.
+ */
+export async function generateTestData(
+  schema: BuilderSchemaLike,
+  mode: "valid" | "invalid",
+  title?: string,
+  userId?: string,
+): Promise<TestData> {
+  let res: Response;
+  try {
+    res = await fetch(`${AGENT_URL}/agents/form/testdata`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ schema, mode, title, user_id: userId }),
+    });
+  } catch (e) {
+    throw new Error(`Couldn't reach the form assistant. ${(e as Error).message ?? ""}`.trim());
+  }
+  const raw = await res.text();
+  let data: (TestData & { detail?: string }) | null = null;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    /* non-JSON */
+  }
+  if (!res.ok || data === null) {
+    const detail =
+      (data && data.detail) || `The form assistant is unavailable (HTTP ${res.status}).`;
+    throw new Error(typeof detail === "string" ? detail : "Form assistant error");
+  }
+  return data as TestData;
+}
+
 /** Was a cold start likely (so callers can show a "waking up" hint)? */
 export const AGENT_BASE_URL = AGENT_URL;
