@@ -310,6 +310,11 @@ function MemberRow({
           {member.email && <p className="truncate text-xs text-gray-400">{member.email}</p>}
         </div>
         <div className="flex items-center gap-2">
+          {member.platform && (
+            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
+              Platform
+            </span>
+          )}
           {member.roles.tenantAdmin && member.roles.tenantAdmin !== "none" && (
             <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-600 dark:bg-brand-500/10">
               Owner
@@ -410,6 +415,9 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
   const [capabilities, setCapabilities] = useState<CapabilityCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Platform (admin/support) accounts are auto-added to every tenant — hidden by
+  // default so the owner sees their real teammates; a toggle reveals them.
+  const [showPlatform, setShowPlatform] = useState(false);
 
   // Add member by email
   const [addEmail, setAddEmail] = useState("");
@@ -523,29 +531,48 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
       </section>
 
       {/* Members */}
-      <section className={card}>
-        <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">
-          Members <span className="text-sm font-normal text-gray-400">({members.length})</span>
-        </h2>
-        {members.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">No members yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {members.map((m) => (
-              <MemberRow
-                key={m.id}
-                tenant={tenant}
-                member={m}
-                groups={groups}
-                capabilities={capabilities}
-                onChanged={reloadMembers}
-                currentUserId={currentUserId}
-                refreshSession={refreshSession}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      {(() => {
+        const platformCount = members.filter((m) => m.platform).length;
+        const visible = showPlatform ? members : members.filter((m) => !m.platform);
+        return (
+          <section className={card}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
+                Members <span className="text-sm font-normal text-gray-400">({visible.length})</span>
+              </h2>
+              {platformCount > 0 && (
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={showPlatform}
+                    onChange={(e) => setShowPlatform(e.target.checked)}
+                    className="size-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900"
+                  />
+                  Show platform accounts ({platformCount})
+                </label>
+              )}
+            </div>
+            {visible.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No members yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {visible.map((m) => (
+                  <MemberRow
+                    key={m.id}
+                    tenant={tenant}
+                    member={m}
+                    groups={groups}
+                    capabilities={capabilities}
+                    onChanged={reloadMembers}
+                    currentUserId={currentUserId}
+                    refreshSession={refreshSession}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       {/* Groups */}
       <section className={card}>

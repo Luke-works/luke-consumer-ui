@@ -218,6 +218,8 @@ export type OrgMember = {
   email: string | null;
   roles: MemberRoles;
   candidateGroups: string[];
+  /** True for platform/support accounts (camunda-admin) auto-added to every tenant. */
+  platform?: boolean;
 };
 
 export type OrgGroup = { id: string; name: string };
