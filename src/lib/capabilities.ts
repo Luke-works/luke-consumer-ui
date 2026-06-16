@@ -8,6 +8,7 @@ export type CapabilityLevel = "none" | "read" | "read-write";
 
 /** Well-known capability codes (the map keys the gateway emits, uppercase). */
 export const FORMS = "FORMS";
+export const EMAIL = "EMAIL";
 
 /** The caller's effective level for a capability, or "none" if not granted. */
 export function capabilityLevel(
