@@ -264,28 +264,49 @@ function Canvas({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Shown over the canvas while LukeBuilds is working — a seamless status with a
-// little worker tightening bolts, stepping through what's happening.
-const PROCESSING_STEPS = [
+// Step copy for the working overlay, per agent + task.
+const BUILD_STEPS = [
   "Understanding your request…",
   "Converting it to a technical capability…",
   "Designing the fields…",
   "Tightening the bolts…",
 ];
-function AiProcessingOverlay() {
+const TEST_GEN_STEPS = [
+  "Reading the form…",
+  "Inventing realistic answers…",
+  "Filling the fields…",
+];
+const TEST_FIX_STEPS = [
+  "Reviewing the failures…",
+  "Pinpointing the validation gaps…",
+  "Repairing the form…",
+];
+
+// Working overlay — shown over the canvas while LukeBuilds builds, or over the
+// Test modal while LukeTests generates data / fixes failures. A seamless status
+// with a little worker tightening bolts, stepping through what's happening.
+function AiProcessingOverlay({
+  title = "Generating capability…",
+  wordmark = "LukeBuilds",
+  steps = BUILD_STEPS,
+}: {
+  title?: string;
+  wordmark?: string;
+  steps?: string[];
+}) {
   const [i, setI] = useState(0);
   useEffect(() => {
-    const t = window.setInterval(() => setI((n) => (n + 1) % PROCESSING_STEPS.length), 1600);
+    const t = window.setInterval(() => setI((n) => (n + 1) % steps.length), 1600);
     return () => window.clearInterval(t);
-  }, []);
+  }, [steps.length]);
   return (
     <div className="absolute inset-0 z-10 rounded-2xl bg-white/80 backdrop-blur-[2px] dark:bg-gray-900/80">
       <div className="sticky top-[35vh] mx-auto flex w-fit flex-col items-center gap-2 text-center">
         <CapabilityBuildingAnimation />
-        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Generating capability…</p>
-        <p className="text-xs text-gray-400">{PROCESSING_STEPS[i]}</p>
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</p>
+        <p className="text-xs text-gray-400">{steps[i]}</p>
         <p className="mt-1 bg-gradient-to-r from-brand-500 to-purple-500 bg-clip-text text-[11px] font-bold uppercase tracking-wider text-transparent">
-          LukeBuilds
+          {wordmark}
         </p>
       </div>
     </div>
@@ -1169,7 +1190,15 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
 
       {/* Test the form — positive (valid → must pass) + negative (invalid → must reject). */}
       <Modal isOpen={testOpen} onClose={() => setTestOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
-        <div className="p-6 sm:p-8">
+        <div className="relative p-6 sm:p-8">
+          {/* LukeTests working overlay — the user sees it building/fixing in the background. */}
+          {(aiFilling || aiFixing) && (
+            <AiProcessingOverlay
+              wordmark="LukeTests"
+              title={aiFixing ? "LukeTests is fixing the form…" : "LukeTests is generating test data…"}
+              steps={aiFixing ? TEST_FIX_STEPS : TEST_GEN_STEPS}
+            />
+          )}
           <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Test — {form.name}</h2>
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
             <strong>Positive</strong> fills valid data (must pass). <strong>Negative</strong> fills invalid data (validation must reject it). Regex / custom-rule fields may need a manual value.
