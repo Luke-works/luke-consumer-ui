@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router";
 import { useMutationLock } from "../../hooks/useMutationLock";
+import { guardedLeave } from "../../lib/leaveGuard";
 import { type Schema } from "@coltorapps/builder";
 import {
   BuilderEntities,
@@ -580,9 +581,17 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  const flushSave = async () => {
+  const flushSave = async (): Promise<boolean> => {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    await persistDraft(currentSchemaJson());
+    return persistDraft(currentSchemaJson());
+  };
+
+  // Leaving the designer in-app (e.g. "Back to forms") during the autosave debounce
+  // window must not drop edits: flush first (awaited, error-handled) and only navigate
+  // if it succeeds; on failure stay put — the indicator already shows the error.
+  const leaveDesigner = async (to: string) => {
+    const safe = await guardedLeave(canEdit && unsavedRef.current, flushSave);
+    if (safe) navigate(to);
   };
 
   // Edit the form-level submission message (persisted in the schema, debounced).
@@ -960,7 +969,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
       const toolbar = (
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Tooltip content="Back to form list">
-          <button type="button" onClick={() => navigate("/forms")} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/5">
+          <button type="button" onClick={() => void leaveDesigner("/forms")} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/5">
             <ChevronLeftIcon className="size-5" />Forms
           </button>
         </Tooltip>
