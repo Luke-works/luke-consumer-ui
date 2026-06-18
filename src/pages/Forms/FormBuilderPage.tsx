@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router";
+import { useMutationLock } from "../../hooks/useMutationLock";
 import { type Schema } from "@coltorapps/builder";
 import {
   BuilderEntities,
@@ -389,6 +390,9 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [embedErr, setEmbedErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const saveTimer = useRef<number | null>(null);
+  // Mutual exclusion for lifecycle actions (check-in / publish / discard) so rapid
+  // clicks or check-in→publish can't interleave on stale version state (#37).
+  const { locked: mutating, runExclusive } = useMutationLock();
   // True while there are edits not yet persisted to the backend (the 600ms
   // autosave debounce window). Drives the leave-guard and the unmount flush.
   const unsavedRef = useRef(false);
@@ -592,25 +596,38 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     }, 600);
   };
 
-  const handleCheckIn = async () => {
+  const handleCheckIn = () => runExclusive(async () => {
     if (blocking.length) { setProblemsOpen(true); return; } // never check in a broken schema
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    const artifact = await checkIn(tenant, formId, currentSchemaJson());
-    if (artifact) {
+    try {
+      const artifact = await checkIn(tenant, formId, currentSchemaJson());
+      if (!artifact) { setSaveError(true); return; } // surface failure, don't claim success
       setVersion(artifact.version);
       if (publishedVersion === undefined) setPublishedVersion(artifact.version);
       setStatus("published");
       setSaved(true);
       setDirty(false);
+      setSaveError(false);
+    } catch (e) {
+      console.error("Check-in failed", e);
+      setSaveError(true);
     }
-  };
+  });
 
-  const handlePublish = async () => {
+  // The mutex guarantees a check-in (which sets `version`) has fully resolved before
+  // publish can start, so the version published here is never stale.
+  const handlePublish = () => runExclusive(async () => {
     if (blocking.length) { setProblemsOpen(true); return; } // never publish a broken schema
-    await publishVersion(tenant, formId, version);
-    setPublishedVersion(version);
-    setStatus("published");
-  };
+    try {
+      await publishVersion(tenant, formId, version);
+      setPublishedVersion(version);
+      setStatus("published");
+      setSaveError(false);
+    } catch (e) {
+      console.error("Publish failed", e);
+      setSaveError(true);
+    }
+  });
 
   const openEmbed = async () => {
     setEmbedOpen(true);
@@ -633,12 +650,17 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     try { await navigator.clipboard.writeText(embedSnippet); setCopied(true); } catch { /* ignore */ }
   };
 
-  const handleDiscard = async () => {
+  const handleDiscard = () => runExclusive(async () => {
     if (!window.confirm("Discard draft changes and revert to the published version?")) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    await discardDraft(tenant, formId);
-    reload();
-  };
+    try {
+      await discardDraft(tenant, formId);
+      reload();
+    } catch (e) {
+      console.error("Discard failed", e);
+      setSaveError(true);
+    }
+  });
 
   // Loose view of the schema entities for parent/child resolution.
   const ents = schema.entities as Record<string, { type: string; parentId?: string; children?: string[]; attributes: Record<string, unknown> }>;
@@ -985,14 +1007,14 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
                 </Tooltip>
               )}
               {dirty && version > 0 && (
-                <Tooltip content="Discard draft edits and revert to the live version."><Button size="sm" variant="outline" className={eq} onClick={handleDiscard}>Discard</Button></Tooltip>
+                <Tooltip content="Discard draft edits and revert to the live version."><Button size="sm" variant="outline" className={eq} onClick={handleDiscard} disabled={mutating}>Discard</Button></Tooltip>
               )}
               <Tooltip content="Preview & test the form — conditions, calculations and validation run live."><Button size="sm" variant="outline" className={eq} onClick={openPreview} startIcon={<MonitorPlay className="size-4" />}>Preview</Button></Tooltip>
               <Tooltip content="Auto-fill the form with valid sample data, validate it, and sign off."><Button size="sm" variant="outline" className={eq} onClick={openTest} startIcon={<FlaskConical className="size-4" />}>Test</Button></Tooltip>
               <Tooltip content="Save your progress as a draft. Drafts keep your edits so you can continue working, but can't be used in workflows yet."><Button size="sm" variant="outline" className={eq} onClick={flushSave} startIcon={<CheckLineIcon className="size-4" />}>Save</Button></Tooltip>
-              <Tooltip content={blocking.length ? "Fix the blocking problems before checking in." : "Check in a version as an artifact that workflows can use. Your draft stays editable for further changes."}><Button size="sm" variant="outline" className={eq} onClick={handleCheckIn} disabled={blocking.length > 0} startIcon={<PaperPlaneIcon className="size-4" />}>Check in</Button></Tooltip>
+              <Tooltip content={blocking.length ? "Fix the blocking problems before checking in." : "Check in a version as an artifact that workflows can use. Your draft stays editable for further changes."}><Button size="sm" variant="outline" className={eq} onClick={handleCheckIn} disabled={blocking.length > 0 || mutating} startIcon={<PaperPlaneIcon className="size-4" />}>Check in</Button></Tooltip>
               {version > 0 && (
-                <Tooltip content={blocking.length ? "Fix the blocking problems before publishing." : "Make the latest checked-in version the live one that workflows use."}><Button size="sm" className={eq} onClick={handlePublish} disabled={publishedVersion === version || blocking.length > 0}>{publishedVersion === version ? "Published" : `Publish v${version}`}</Button></Tooltip>
+                <Tooltip content={blocking.length ? "Fix the blocking problems before publishing." : "Make the latest checked-in version the live one that workflows use."}><Button size="sm" className={eq} onClick={handlePublish} disabled={publishedVersion === version || blocking.length > 0 || mutating}>{publishedVersion === version ? "Published" : `Publish v${version}`}</Button></Tooltip>
               )}
               {publishedVersion && (
                 <Tooltip content="Get an iframe snippet to embed this form on any website."><Button size="sm" variant="outline" className={eq} onClick={openEmbed} startIcon={<CodeXml className="size-4" />}>Embed</Button></Tooltip>
