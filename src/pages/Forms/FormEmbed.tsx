@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
+import ErrorBoundary from "../../components/common/ErrorBoundary";
 import FormRenderer from "../../components/formBuilder/FormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readSubmitMessage } from "../../lib/formSchema";
@@ -52,7 +53,17 @@ export default function FormEmbed() {
           <>
             <h1 className="mb-5 text-xl font-semibold text-gray-800 dark:text-white/90">{form.title}</h1>
             {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
-            <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+            {/* A bad schema must not blank the host's iframe — degrade to a message. */}
+            <ErrorBoundary
+              label="form-embed-renderer"
+              fallback={(e) => (
+                <p className="py-8 text-center text-sm text-error-500">
+                  This form couldn't be displayed. {e.message}
+                </p>
+              )}
+            >
+              <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+            </ErrorBoundary>
           </>
         ) : null}
       </div>

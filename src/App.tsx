@@ -1,6 +1,7 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { lazy, Suspense, type ReactNode } from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router";
 import { AuthProvider } from "./context/AuthContext";
+import ErrorBoundary from "./components/common/ErrorBoundary";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import SsoCallback from "./pages/AuthPages/SsoCallback";
@@ -40,6 +41,7 @@ export default function App() {
     <Router>
       <ScrollToTop />
       <AuthProvider>
+        <AppErrorBoundary>
         <Routes>
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>
@@ -137,7 +139,19 @@ export default function App() {
           {/* Fallback Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </AppErrorBoundary>
       </AuthProvider>
     </Router>
+  );
+}
+
+/** Top-level boundary so a render throw shows a recoverable fallback, not a blank
+ *  page. Keyed by path so navigating away clears a crashed route. */
+function AppErrorBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return (
+    <ErrorBoundary resetKeys={[pathname]} label="app-root">
+      {children}
+    </ErrorBoundary>
   );
 }
