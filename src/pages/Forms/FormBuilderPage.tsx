@@ -342,6 +342,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   );
   const [activeEntityId, setActiveEntityId] = useState<string | null>(null);
   const [saved, setSaved] = useState(true);
+  const [saveError, setSaveError] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [version, setVersion] = useState(() => latestVersion(form));
   const [publishedVersion, setPublishedVersion] = useState(form.publishedVersion);
@@ -505,18 +506,33 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     JSON.stringify({ ...(schemaObj as object), settings: { submitMessage: submitMessageRef.current } });
   const currentSchemaJson = () => withSettings(builderStore.getSchema());
 
+  // Persist a draft, SURFACING failures instead of swallowing them: on error the
+  // work stays marked unsaved and the indicator shows "Save failed" — it must
+  // never show "Draft saved" when the save didn't actually succeed.
+  const persistDraft = async (json: string): Promise<boolean> => {
+    try {
+      await saveDraft(tenant, formId, json);
+      unsavedRef.current = false;
+      setSaved(true);
+      setSaveError(false);
+      return true;
+    } catch {
+      setSaved(false);
+      setSaveError(true);
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (!canEdit) return; // view-only: never persist edits.
     return builderStore.subscribe((data) => {
       setSaved(false);
+      setSaveError(false);
       setDirty(true);
       unsavedRef.current = true;
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
       saveTimer.current = window.setTimeout(() => {
-        void saveDraft(tenant, formId, withSettings(data.schema)).then(() => {
-          unsavedRef.current = false;
-          setSaved(true);
-        });
+        void persistDraft(withSettings(data.schema));
       }, 600);
     });
   }, [builderStore, tenant, formId, canEdit]);
@@ -533,7 +549,10 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     }
     if (canEdit && unsavedRef.current) {
       unsavedRef.current = false;
-      void saveDraft(tenant, formId, currentSchemaJson());
+      // Best-effort flush on unmount; log on failure (can't surface UI once unmounted).
+      saveDraft(tenant, formId, currentSchemaJson()).catch((e) => {
+        console.error("Autosave on unmount failed; unsaved edits may be lost", e);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [builderStore, tenant, formId, canEdit, suppressFlushRef]);
@@ -552,19 +571,17 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
 
   const flushSave = async () => {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    await saveDraft(tenant, formId, currentSchemaJson());
-    unsavedRef.current = false;
-    setSaved(true);
+    await persistDraft(currentSchemaJson());
   };
 
   // Edit the form-level submission message (persisted in the schema, debounced).
   const onSubmitMessageChange = (v: string) => {
     setSubmitMessage(v);
     submitMessageRef.current = v;
-    setSaved(false); setDirty(true); unsavedRef.current = true;
+    setSaved(false); setSaveError(false); setDirty(true); unsavedRef.current = true;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
-      void saveDraft(tenant, formId, currentSchemaJson()).then(() => { unsavedRef.current = false; setSaved(true); });
+      void persistDraft(currentSchemaJson());
     }, 600);
   };
 
@@ -943,7 +960,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
             </>
           ) : (
             <>
-              <span className="mr-1 hidden text-xs text-gray-400 sm:inline">{saved ? "Draft saved" : "Saving…"}</span>
+              <span className={`mr-1 hidden text-xs sm:inline ${saveError ? "text-error-500" : "text-gray-400"}`}>{saveError ? "Save failed — retry" : saved ? "Draft saved" : "Saving…"}</span>
               {problemList.length > 0 && (
                 <Tooltip content={blocking.length ? `${blocking.length} problem(s) block check-in & publish` : `${warnCount} warning(s)`}>
                   <button

@@ -31,9 +31,15 @@ export default function FormFill() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState(false);
 
   const created = useRef(false);
   const saveTimer = useRef<number | null>(null);
+  // Track the latest edit + a pending flag so an in-debounce edit can be flushed
+  // on exit instead of dropped, plus the save context for the unmount flush.
+  const latestDataRef = useRef<Record<string, unknown> | null>(null);
+  const pendingRef = useRef(false);
+  const ctxRef = useRef<{ tenant: string | null; instanceId: string | null }>({ tenant: null, instanceId: null });
 
   // Create the instance once on entry.
   useEffect(() => {
@@ -48,7 +54,18 @@ export default function FormFill() {
     return () => { active = false; };
   }, [tenant, code, userId]);
 
-  useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }, []);
+  // On unmount, flush any in-debounce edit so the last keystrokes aren't dropped
+  // when the user navigates away within the autosave window.
+  useEffect(() => () => {
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    const { tenant: t, instanceId } = ctxRef.current;
+    if (pendingRef.current && t && instanceId && latestDataRef.current) {
+      pendingRef.current = false;
+      saveInstanceData(t, instanceId, latestDataRef.current).catch((e) => {
+        console.error("Autosave on exit failed; recent edits may be lost", e);
+      });
+    }
+  }, []);
 
   const instance = view?.instance ?? null;
   const open = instance ? isOpen(instance.state) : false;
@@ -59,11 +76,15 @@ export default function FormFill() {
 
   const handleChange = (data: Record<string, unknown>) => {
     if (!tenant || !instance || !open) return;
+    latestDataRef.current = data;
+    pendingRef.current = true;
+    ctxRef.current = { tenant, instanceId: instance.id };
+    setSaveError(false);
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       void saveInstanceData(tenant, instance.id, data)
-        .then(() => setSavedAt(Date.now()))
-        .catch(() => {});
+        .then(() => { pendingRef.current = false; setSavedAt(Date.now()); setSaveError(false); })
+        .catch(() => setSaveError(true)); // surface the failure instead of swallowing it
     }, 800);
   };
 
@@ -118,7 +139,7 @@ export default function FormFill() {
             <>
               <div className="mb-6 flex items-center justify-between">
                 <p className="text-xs uppercase tracking-wide text-gray-400">{instance?.definitionCode} · v{instance?.version}</p>
-                {savedAt ? <span className="text-xs text-gray-400">Saved</span> : null}
+                {saveError ? <span className="text-xs text-error-500">Couldn’t save — check your connection</span> : savedAt ? <span className="text-xs text-gray-400">Saved</span> : null}
               </div>
               <FormRenderer
                 schema={view!.schema}
