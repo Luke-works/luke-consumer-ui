@@ -1,0 +1,42 @@
+# CI — the "robot" that checks every change before it counts.
+# Runs automatically on every Pull Request and every push to develop.
+# Green check = safe to merge. Red X = something's broken (it tells you what).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch: {}
+
+jobs:
+  build-and-test:
+    name: Build & test (Node 22 / Vite)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm          # reuse downloaded packages between runs (faster)
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check & build
+        # 'npm run build' = tsc (type-check) + vite build. Catches type errors and
+        # broken imports before they ship.
+        run: npm run build
+
+      - name: Unit tests
+        # Runs the vitest suite once (skips automatically if there's no test script).
+        run: npm test --if-present
+
+      - name: Lint (informational for now)
+        # Shown but does NOT block merges yet — we can make it required later
+        # once the existing lint warnings are cleaned up.
+        run: npm run lint --if-present
+        continue-on-error: true
