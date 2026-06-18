@@ -447,11 +447,18 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const { schema } = useBuilderStoreData(builderStore);
   const order = schema.root;
 
-  // Live problem report. `blocking` (structural + key errors) gates check-in /
-  // publish; expression warnings are advisory and surfaced for visibility.
+  // Live problem report. `blocking` gates check-in / publish. Expression errors
+  // (syntax / unknown-field from analyzeExpression) are BLOCKING now too — they
+  // close the gap between authoring warnings and silent runtime no-ops (#36): a
+  // form whose custom-validation/conditional/calc expression is broken cannot be
+  // published with that rule quietly not running.
   const problems = useMemo(() => validateSchema(schema as unknown as FormSchema), [schema]);
-  const exprWarnings = useMemo(() => expressionProblems(schema as unknown as FormSchema), [schema]);
-  const blocking = useMemo(() => problems.filter((p) => p.severity === "error"), [problems]);
+  const exprErrors = useMemo(() => expressionProblems(schema as unknown as FormSchema), [schema]);
+  const blocking = useMemo(() => {
+    const structural = problems.filter((p) => p.severity === "error");
+    const expr = exprErrors.map((w) => ({ severity: "error" as const, entityId: w.entityId, message: `${w.attr}: ${w.message}` }));
+    return [...structural, ...expr];
+  }, [problems, exprErrors]);
   const problemList = useMemo(() => {
     const s = schema as unknown as FormSchema;
     const labelOf = (id?: string) => {
@@ -461,12 +468,12 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
       return lbl || id;
     };
     const items = problems.map((p) => ({ severity: p.severity, entityId: p.entityId, message: p.message, label: labelOf(p.entityId) }));
-    for (const w of exprWarnings) {
-      items.push({ severity: "warning" as const, entityId: w.entityId, message: `${w.attr}: ${w.message}`, label: labelOf(w.entityId) });
+    for (const w of exprErrors) {
+      items.push({ severity: "error" as const, entityId: w.entityId, message: `${w.attr}: ${w.message}`, label: labelOf(w.entityId) });
     }
     return items;
-  }, [schema, problems, exprWarnings]);
-  const warnCount = problemList.length - blocking.length;
+  }, [schema, problems, exprErrors]);
+  const warnCount = problemList.filter((p) => p.severity === "warning").length;
 
   const focusProblem = (entityId?: string) => {
     if (!entityId) return;

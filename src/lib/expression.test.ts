@@ -1,5 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { analyzeExpression, evaluateExpression, evaluateCondition } from "./expression";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("./reportError", () => ({ reportError: vi.fn() }));
+import { reportError } from "./reportError";
+import {
+  analyzeExpression,
+  evaluateExpression,
+  evaluateCondition,
+  evaluateValidation,
+} from "./expression";
 
 const known = new Set(["price", "quantity", "value", "age"]);
 
@@ -36,5 +44,25 @@ describe("evaluate* sanity (unchanged behavior)", () => {
   it("defaults to showing on a bad condition", () => {
     expect(evaluateCondition("nonsense (", { a: 1 })).toBe(true);
     expect(evaluateCondition("", {})).toBe(true);
+  });
+});
+
+describe("custom-validation fail-open + reporting (#36)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("evaluates a valid validation rule", () => {
+    expect(evaluateValidation("age >= 18", { age: 20 })).toBe(true);
+    expect(evaluateValidation("age >= 18", { age: 10 })).toBe(false);
+  });
+
+  it("empty validation is valid and not reported", () => {
+    expect(evaluateValidation("", {})).toBe(true);
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("a broken validation rule fails open (valid) but IS reported", () => {
+    // Distinct expression so the per-session dedupe doesn't suppress this report.
+    expect(evaluateValidation("salary >= floor(", { salary: 100 })).toBe(true);
+    expect(reportError).toHaveBeenCalledTimes(1);
   });
 });
