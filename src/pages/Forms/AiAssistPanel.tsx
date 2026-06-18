@@ -3,7 +3,7 @@ import LukeBuildsMark from "../../components/branding/LukeBuildsMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { saveDraft } from "../../lib/formsApi";
-import { generateSchema, type BuilderSchemaLike } from "../../lib/formAgentApi";
+import { generateSchema, AgentCancelledError, type BuilderSchemaLike } from "../../lib/formAgentApi";
 
 type Msg = { role: "you" | "ai"; text: string; error?: boolean; suggestions?: string[] };
 
@@ -43,7 +43,9 @@ export default function AiAssistPanel({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [brain, setBrain] = useState<string | null>(null);
+  const [coldHint, setColdHint] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -55,8 +57,13 @@ export default function AiAssistPanel({
     setMessages((m) => [...m, { role: "you", text: msg }]);
     setInput("");
     setBusy(true);
+    setColdHint(false);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    // After a few seconds, hint that the free-tier service may be waking up.
+    const coldTimer = setTimeout(() => setColdHint(true), 5000);
     try {
-      const result = await generateSchema(msg, schema ?? EMPTY, formName, session?.userId);
+      const result = await generateSchema(msg, schema ?? EMPTY, formName, session?.userId, controller.signal);
       setBrain(result.brain);
       const n = result.schema.root?.length ?? 0;
       const text = result.reply?.trim() || `Done — the form now has ${n} field${n === 1 ? "" : "s"}.`;
@@ -68,11 +75,21 @@ export default function AiAssistPanel({
         onApplied(result.schema, result.title);
       }
     } catch (e) {
-      setMessages((m) => [...m, { role: "ai", error: true, text: (e as Error).message }]);
+      // A user cancel isn't an error — note it quietly instead of a red banner.
+      if (e instanceof AgentCancelledError) {
+        setMessages((m) => [...m, { role: "ai", text: "Stopped." }]);
+      } else {
+        setMessages((m) => [...m, { role: "ai", error: true, text: (e as Error).message }]);
+      }
     } finally {
+      clearTimeout(coldTimer);
+      setColdHint(false);
+      abortRef.current = null;
       setBusy(false);
     }
   };
+
+  const cancel = () => abortRef.current?.abort();
 
   return (
     <div className="flex h-full min-h-[420px] w-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -141,8 +158,15 @@ export default function AiAssistPanel({
           ))
         )}
         {busy && (
-          <div className="w-fit rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
-            Thinking…
+          <div className="flex w-fit items-center gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
+            <span>{coldHint ? "Waking the assistant — this can take a few seconds…" : "Thinking…"}</span>
+            <button
+              type="button"
+              onClick={cancel}
+              className="text-xs font-medium text-brand-500 hover:text-brand-600"
+            >
+              Cancel
+            </button>
           </div>
         )}
       </div>

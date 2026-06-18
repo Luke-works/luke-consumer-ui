@@ -28,53 +28,131 @@ export type AgentResult = {
   brain: string;
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Thrown when a request is cancelled by the caller (not a service failure). */
+export class AgentCancelledError extends Error {
+  constructor() {
+    super("Request cancelled.");
+    this.name = "AgentCancelledError";
+  }
+}
+
+const MAX_ATTEMPTS = 3;
+const ATTEMPT_TIMEOUT_MS = 25_000; // a single hung request fails fast, not forever
+const TOTAL_DEADLINE_MS = 75_000; // overall budget across retries
+const BACKOFF_BASE_MS = 1_500;
+const BACKOFF_CAP_MS = 8_000;
+const COLD_START_STATUSES = new Set([502, 503]);
+
+/** Exponential backoff with jitter so retries don't thundering-herd a recovering service. */
+function backoffDelay(attempt: number): number {
+  const exp = Math.min(BACKOFF_BASE_MS * 2 ** (attempt - 1), BACKOFF_CAP_MS);
+  return exp + Math.floor(Math.random() * 500);
+}
+
+/** Sleep that rejects immediately if the caller cancels. */
+function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new AgentCancelledError());
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        reject(new AgentCancelledError());
+      },
+      { once: true },
+    );
+  });
+}
 
 /**
- * Ask the agent to build/edit a form. Retries a couple of times on a free-tier
- * cold start (the service returns an HTML wake-up page / 502 while spinning up).
+ * POST JSON to the form agent with bounded retry. Handles free-tier cold starts
+ * (HTML wake-up page / 502 / 503) and hung requests:
+ *  - each attempt has an AbortController timeout so a no-response fetch fails fast;
+ *  - retries use exponential backoff + jitter within a total deadline;
+ *  - an optional caller `signal` cancels everything (→ {@link AgentCancelledError}).
  */
-export async function generateSchema(
+async function postWithRetry<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const deadline = Date.now() + TOTAL_DEADLINE_MS;
+
+  for (let attempt = 1; ; attempt++) {
+    if (signal?.aborted) throw new AgentCancelledError();
+
+    const timeoutCtl = new AbortController();
+    const timer = setTimeout(() => timeoutCtl.abort(), ATTEMPT_TIMEOUT_MS);
+    const onExternalAbort = () => timeoutCtl.abort();
+    signal?.addEventListener("abort", onExternalAbort, { once: true });
+
+    let res: Response | null = null;
+    let networkErr: unknown = null;
+    try {
+      res = await fetch(`${AGENT_URL}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: timeoutCtl.signal,
+      });
+    } catch (e) {
+      networkErr = e; // network failure OR per-attempt timeout abort — both transient
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onExternalAbort);
+    }
+
+    // A caller cancel wins over timeout/network classification.
+    if (signal?.aborted) throw new AgentCancelledError();
+
+    let status = 0;
+    let ok = false;
+    let data: (T & { detail?: string }) | null = null;
+    if (res) {
+      status = res.status;
+      ok = res.ok;
+      // Read as text so a non-JSON cold-start page can't throw "Unexpected token <".
+      const raw = await res.text();
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        /* HTML / empty — treated as cold start below */
+      }
+      if (ok && data !== null) return data as T;
+    }
+
+    const transient =
+      networkErr !== null || res === null || data === null || COLD_START_STATUSES.has(status);
+    const delay = backoffDelay(attempt);
+    const canRetry = transient && attempt < MAX_ATTEMPTS && Date.now() + delay < deadline;
+
+    if (!canRetry) {
+      if (networkErr !== null || res === null) {
+        throw new Error(
+          `Couldn't reach the form assistant. ${(networkErr as Error)?.message ?? ""}`.trim(),
+        );
+      }
+      const detail = data?.detail || `The form assistant is unavailable (HTTP ${status}).`;
+      throw new Error(typeof detail === "string" ? detail : "Form assistant error");
+    }
+
+    await abortableSleep(delay, signal);
+  }
+}
+
+/**
+ * Ask the agent to build/edit a form. Retries on a free-tier cold start with
+ * backoff; pass `signal` to cancel a slow request.
+ */
+export function generateSchema(
   message: string,
   schema: BuilderSchemaLike,
   title?: string,
   userId?: string,
-  attempt = 1,
+  signal?: AbortSignal,
 ): Promise<AgentResult> {
-  let res: Response;
-  try {
-    res = await fetch(`${AGENT_URL}/agents/form/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, schema, title, user_id: userId }),
-    });
-  } catch (e) {
-    throw new Error(
-      `Couldn't reach the form assistant. ${(e as Error).message ?? ""}`.trim(),
-    );
-  }
-
-  // Read as text so a non-JSON cold-start page can't throw "Unexpected token <".
-  const raw = await res.text();
-  let data: (AgentResult & { detail?: string }) | null = null;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    /* HTML / empty — treated as cold start below */
-  }
-
-  if (!res.ok || data === null) {
-    const coldStart = res.status === 502 || res.status === 503 || data === null;
-    if (coldStart && attempt < 3) {
-      await sleep(4000);
-      return generateSchema(message, schema, title, userId, attempt + 1);
-    }
-    const detail =
-      (data && data.detail) || `The form assistant is unavailable (HTTP ${res.status}).`;
-    throw new Error(typeof detail === "string" ? detail : "Form assistant error");
-  }
-
-  return data as AgentResult;
+  return postWithRetry<AgentResult>(
+    "/agents/form/chat",
+    { message, schema, title, user_id: userId },
+    signal,
+  );
 }
 
 /** One generated dataset: field key -> value, plus a short note. */
@@ -93,42 +171,19 @@ export type TestDataResult = {
  * Drives the builder's Test runs with realistic/varied values. Retries a couple
  * of times on a free-tier cold start (like generateSchema).
  */
-export async function generateTestData(
+export function generateTestData(
   schema: BuilderSchemaLike,
   mode: "valid" | "invalid",
   count = 3,
   title?: string,
   userId?: string,
-  attempt = 1,
+  signal?: AbortSignal,
 ): Promise<TestDataResult> {
-  let res: Response;
-  try {
-    res = await fetch(`${AGENT_URL}/agents/form/testdata`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ schema, mode, count, title, user_id: userId }),
-    });
-  } catch (e) {
-    throw new Error(`Couldn't reach the form assistant. ${(e as Error).message ?? ""}`.trim());
-  }
-  const raw = await res.text();
-  let data: (TestDataResult & { detail?: string }) | null = null;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    /* non-JSON cold-start page */
-  }
-  if (!res.ok || data === null) {
-    const coldStart = res.status === 502 || res.status === 503 || data === null;
-    if (coldStart && attempt < 3) {
-      await sleep(4000);
-      return generateTestData(schema, mode, count, title, userId, attempt + 1);
-    }
-    const detail =
-      (data && data.detail) || `The form assistant is unavailable (HTTP ${res.status}).`;
-    throw new Error(typeof detail === "string" ? detail : "Form assistant error");
-  }
-  return data as TestDataResult;
+  return postWithRetry<TestDataResult>(
+    "/agents/form/testdata",
+    { schema, mode, count, title, user_id: userId },
+    signal,
+  );
 }
 
 /** Was a cold start likely (so callers can show a "waking up" hint)? */
