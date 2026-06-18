@@ -25,6 +25,9 @@ export type StoredForm = {
   deletedAt?: number | null;
   createdBy?: string;
   updatedBy?: string;
+  /** Resolved display names for createdBy/updatedBy (server falls back to the id). */
+  createdByName?: string;
+  updatedByName?: string;
   createdAt: number;
   updatedAt: number;
   /** When the form last passed its self-test ("Test the form"), 0/undefined if never. */
@@ -36,7 +39,7 @@ export type StoredForm = {
 export type FormArtifact = { version: number; schema: string; checkedInAt: number; by?: string };
 
 /** One entry in a form's activity feed. */
-export type AuditEvent = { action: string; detail?: string; actor?: string; at: number };
+export type AuditEvent = { action: string; detail?: string; actor?: string; actorName?: string; at: number };
 
 // ── Backend DTOs ────────────────────────────────────────────────────────────
 type ApiForm = {
@@ -51,13 +54,15 @@ type ApiForm = {
   lockedBy?: string | null;
   createdBy?: string | null;
   updatedBy?: string | null;
+  createdByName?: string | null;
+  updatedByName?: string | null;
   createdAt: string;
   updatedAt?: string | null;
   lastTestedAt?: string | null;
   lastTestedBy?: string | null;
 };
 type ApiVersion = { version: number; schema: string; checkedInBy?: string | null; checkedInAt: string };
-type ApiAudit = { action: string; detail?: string | null; actor?: string | null; at: string };
+type ApiAudit = { action: string; detail?: string | null; actor?: string | null; actorName?: string | null; at: string };
 
 // ── Adapters (backend ⇄ view model) ─────────────────────────────────────────
 const STATUS_IN: Record<string, FormStatus> = { DRAFT: "draft", PUBLISHED: "published", RETIRED: "archived" };
@@ -77,6 +82,8 @@ function toForm(f: ApiForm, latestVersion = 0): StoredForm {
     deletedAt: f.deletedAt ? ms(f.deletedAt) : null,
     createdBy: f.createdBy ?? undefined,
     updatedBy: f.updatedBy ?? undefined,
+    createdByName: f.createdByName ?? undefined,
+    updatedByName: f.updatedByName ?? undefined,
     createdAt: ms(f.createdAt),
     updatedAt: ms(f.updatedAt) || ms(f.createdAt),
     lastTestedAt: f.lastTestedAt ? ms(f.lastTestedAt) : null,
@@ -95,6 +102,7 @@ const toAudit = (a: ApiAudit): AuditEvent => ({
   action: a.action,
   detail: a.detail ?? undefined,
   actor: a.actor ?? undefined,
+  actorName: a.actorName ?? undefined,
   at: ms(a.at),
 });
 
