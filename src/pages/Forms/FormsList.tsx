@@ -68,7 +68,9 @@ export default function FormsList() {
   const canEdit = canWrite(session, FORMS);
   const { userId, tenant, forms, trashed, loading, error, createForm, clone, archive, softDelete, restore, purge, refresh } = useForms();
   const me = user?.fullName || user?.firstName || user?.email || "You";
-  const who = (id?: string) => (id && id === userId ? me : id ? `${id.slice(0, 10)}…` : "—");
+  // Prefer the server-resolved display name; fall back to "You" for self, then a short id.
+  const who = (id?: string, name?: string) =>
+    id && id === userId ? me : name ? name : id ? `${id.slice(0, 10)}…` : "—";
 
   const [isModalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
@@ -174,7 +176,7 @@ export default function FormsList() {
       header: "Created",
       cell: (c) => <span className="text-gray-500 dark:text-gray-400">{formatUpdated(c.getValue())}</span>,
     }),
-    col.accessor((f) => who(f.createdBy), {
+    col.accessor((f) => who(f.createdBy, f.createdByName), {
       id: "createdBy",
       header: "Created By",
       cell: (c) => <span className="text-gray-500 dark:text-gray-400">{c.getValue()}</span>,
@@ -183,7 +185,7 @@ export default function FormsList() {
       header: "Last Modified",
       cell: (c) => <span className="text-gray-500 dark:text-gray-400">{formatUpdated(c.getValue())}</span>,
     }),
-    col.accessor((f) => who(f.updatedBy), {
+    col.accessor((f) => who(f.updatedBy, f.updatedByName), {
       id: "updatedBy",
       header: "Modified By",
       cell: (c) => <span className="text-gray-500 dark:text-gray-400">{c.getValue()}</span>,

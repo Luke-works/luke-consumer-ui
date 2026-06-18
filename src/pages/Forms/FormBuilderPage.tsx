@@ -1230,7 +1230,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
               <ul className="max-h-40 space-y-1 overflow-y-auto">
                 {auditEvents.map((ev, i) => (
                   <li key={i} className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span><span className="font-medium text-gray-700 dark:text-gray-300">{ev.action.replace(/_/g, " ")}</span>{ev.detail ? ` ${ev.detail}` : ""}</span>
+                    <span><span className="font-medium text-gray-700 dark:text-gray-300">{ev.action.replace(/_/g, " ")}</span>{ev.detail ? ` ${ev.detail}` : ""}{ev.actorName ? ` · ${ev.actorName}` : ""}</span>
                     <span className="text-gray-400">{new Date(ev.at).toLocaleString()}</span>
                   </li>
                 ))}
