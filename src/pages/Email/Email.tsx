@@ -16,14 +16,24 @@ import { ApiError } from "../../lib/authApi";
 import * as emailApi from "../../lib/emailApi";
 import type { EmailServer, Verification } from "../../lib/emailApi";
 
-type Phase = "loading" | "form" | "code" | "done";
+type Phase = "loading" | "form" | "code" | "done" | "error";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LOAD_ATTEMPTS = 3; // initial try + 2 retries for transient load failures
 
 function messageOf(e: unknown): string {
   if (e instanceof ApiError) return e.message;
   if (e instanceof Error) return e.message;
   return "Something went wrong. Please try again.";
+}
+
+/** Resolves after `ms`, or immediately if the signal aborts (so retries don't outlive a switch). */
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => { clearTimeout(t); resolve(); }, { once: true });
+  });
 }
 
 export default function Email() {
@@ -45,38 +55,55 @@ export default function Email() {
   const [info, setInfo] = useState<string | null>(null);
 
   // Resolve the current state on entry: provisioned → done; a live OTP → resume
-  // code entry; otherwise start fresh at the form.
-  const load = useCallback(async () => {
+  // code entry; otherwise start fresh at the form. `signal` cancels stale work on
+  // a tenant/user switch so a slow earlier response can't render the wrong tenant.
+  const load = useCallback(async (signal?: AbortSignal) => {
     if (!tenant || !allowed) {
       setPhase("form");
       return;
     }
     setPhase("loading");
     setError(null);
-    try {
-      const srv = await emailApi.getEmailServer(tenant, userId);
-      if (srv) {
-        setServer(srv);
-        setPhase("done");
+    for (let attempt = 1; attempt <= LOAD_ATTEMPTS; attempt++) {
+      try {
+        const srv = await emailApi.getEmailServer(tenant, userId, signal);
+        if (signal?.aborted) return; // superseded by a newer load — drop the result
+        if (srv) {
+          setServer(srv);
+          setPhase("done");
+          return;
+        }
+        const v = await emailApi.getVerification(tenant, userId, signal);
+        if (signal?.aborted) return;
+        if (v && v.status === "PENDING") {
+          setPending(v);
+          setEmail(v.email);
+          setOrgName(v.orgName);
+          setPhase("code");
+          return;
+        }
+        setPhase("form");
+        return;
+      } catch (e) {
+        if (signal?.aborted) return; // aborted by the cleanup — not a real failure
+        if (attempt < LOAD_ATTEMPTS) {
+          await delay(300 * attempt, signal); // bounded linear backoff
+          if (signal?.aborted) return;
+          continue;
+        }
+        // Out of retries: surface the error with a Retry affordance instead of
+        // wedging on the spinner or silently dropping into the empty form.
+        setError(messageOf(e));
+        setPhase("error");
         return;
       }
-      const v = await emailApi.getVerification(tenant, userId);
-      if (v && v.status === "PENDING") {
-        setPending(v);
-        setEmail(v.email);
-        setOrgName(v.orgName);
-        setPhase("code");
-        return;
-      }
-      setPhase("form");
-    } catch (e) {
-      setError(messageOf(e));
-      setPhase("form");
     }
   }, [tenant, userId, allowed]);
 
   useEffect(() => {
-    void load();
+    const ac = new AbortController();
+    void load(ac.signal);
+    return () => ac.abort();
   }, [load]);
 
   const sendCode = async () => {
@@ -113,12 +140,26 @@ export default function Email() {
         setPhase("done");
         return;
       }
-      // Verified, but the Postmark server couldn't be provisioned right now.
+      // Verified, but the Postmark server couldn't be provisioned synchronously.
+      // The backend may finish provisioning out-of-band, so poll the server a few
+      // times (bounded) before asking the user to retry — recovery isn't manual-only.
+      setPending(result.verification);
+      setInfo("Email verified — finishing setup…");
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        await delay(800 * attempt);
+        const srv = await emailApi.getEmailServer(tenant, userId).catch(() => null);
+        if (srv) {
+          setServer(srv);
+          setInfo(null);
+          setPhase("done");
+          return;
+        }
+      }
+      setInfo(null);
       setError(
         result.provisioningError ??
           "Your email is verified, but we couldn't finish setup. Please try again shortly.",
       );
-      setPending(result.verification);
     } catch (e) {
       setError(messageOf(e));
     } finally {
@@ -147,6 +188,8 @@ export default function Email() {
         <Centered>
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
         </Centered>
+      ) : phase === "error" ? (
+        <LoadError message={error} onRetry={() => void load()} />
       ) : phase === "done" && server ? (
         <Connected server={server} />
       ) : (
@@ -270,7 +313,7 @@ function CodeStep({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (!busy) onVerify();
+        if (!busy && attemptsRemaining !== 0) onVerify();
       }}
     >
       <Header
@@ -292,12 +335,14 @@ function CodeStep({
         />
         {typeof attemptsRemaining === "number" && attemptsRemaining < 5 && (
           <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            {attemptsRemaining} attempt{attemptsRemaining === 1 ? "" : "s"} left.
+            {attemptsRemaining === 0
+              ? "No attempts left — use a different email to try again."
+              : `${attemptsRemaining} attempt${attemptsRemaining === 1 ? "" : "s"} left.`}
           </p>
         )}
       </div>
 
-      <Button className="mt-6 w-full" disabled={busy}>
+      <Button className="mt-6 w-full" disabled={busy || attemptsRemaining === 0}>
         {busy ? "Verifying…" : "Verify & finish"}
       </Button>
 
@@ -419,6 +464,24 @@ function Banner({ tone, children }: { tone: "error" | "info"; children: ReactNod
 function Centered({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">{children}</div>
+  );
+}
+
+function LoadError({ message, onRetry }: { message: string | null; onRetry: () => void }) {
+  return (
+    <Centered>
+      <div className="flex max-w-md flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-16 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+        <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">
+          Couldn't load email setup
+        </h1>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          {message ?? "Something went wrong. Please try again."}
+        </p>
+        <Button className="mt-6" onClick={onRetry}>
+          Retry
+        </Button>
+      </div>
+    </Centered>
   );
 }
 

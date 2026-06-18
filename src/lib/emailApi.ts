@@ -137,13 +137,21 @@ export async function verifyCode(tenant: string, code: string, userId?: string):
 }
 
 /** Current verification status, or null if none started. */
-export async function getVerification(tenant: string, userId?: string): Promise<Verification | null> {
-  const v = await optional(req<ApiVerification>(tenant, VERIFY_BASE, {}, userId));
+export async function getVerification(
+  tenant: string,
+  userId?: string,
+  signal?: AbortSignal,
+): Promise<Verification | null> {
+  const v = await optional(req<ApiVerification>(tenant, VERIFY_BASE, { signal }, userId));
   return v ? toVerification(v) : null;
 }
 
 /** The tenant's provisioned email server, or null if not set up yet. */
-export async function getEmailServer(tenant: string, userId?: string): Promise<EmailServer | null> {
-  const s = await optional(req<ApiServer>(tenant, SERVER_BASE, {}, userId));
+export async function getEmailServer(
+  tenant: string,
+  userId?: string,
+  signal?: AbortSignal,
+): Promise<EmailServer | null> {
+  const s = await optional(req<ApiServer>(tenant, SERVER_BASE, { signal }, userId));
   return s ? toServer(s) : null;
 }
