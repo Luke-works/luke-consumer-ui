@@ -18,7 +18,9 @@ import type { EmailServer, Verification } from "../../lib/emailApi";
 
 type Phase = "loading" | "form" | "code" | "done" | "error";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Soft pre-check before server validation: require a dotted domain with a 2+ letter
+// TLD, so obviously-invalid addresses (e.g. a@b.c) are caught client-side (#38).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
 const LOAD_ATTEMPTS = 3; // initial try + 2 retries for transient load failures
 
 function messageOf(e: unknown): string {

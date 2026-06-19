@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router";
 import { AuthProvider } from "./context/AuthContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
@@ -32,6 +32,7 @@ import GuestRoute from "./components/auth/GuestRoute";
 import OnboardingGate from "./components/auth/OnboardingGate";
 import CapabilityRoute from "./components/auth/CapabilityRoute";
 import { EMAIL, FORMS } from "./lib/capabilities";
+import { loadFreeEmailDomains } from "./lib/emailDomains";
 
 if (!import.meta.env.VITE_AUTH_API_URL) {
   throw new Error(
@@ -40,6 +41,8 @@ if (!import.meta.env.VITE_AUTH_API_URL) {
 }
 
 export default function App() {
+  // Pull the authoritative free-email-domain list once (advisory hint; #38).
+  useEffect(() => { void loadFreeEmailDomains(); }, []);
   return (
     <Router>
       <ScrollToTop />

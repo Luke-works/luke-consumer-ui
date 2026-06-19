@@ -1,14 +1,37 @@
-// Personal / free mailbox providers — mirrors OrgDomainMatcher.FREE_PROVIDERS in
-// luke-capability-engine. Used to hide company-only features (e.g. the EMAIL
-// capability) from accounts that signed up with a personal address, since they can't
-// verify a business sending domain.
-const PERSONAL_DOMAINS = new Set<string>([
+// Personal / free mailbox providers. This classification is ADVISORY only — it hides
+// company-only features (e.g. the EMAIL capability) from accounts on a personal
+// address — and the SERVER is always the source of truth (it re-checks on every
+// gated action via OrgDomainMatcher). The authoritative list is served at
+// /api/public/meta/free-email-domains (#38) and loaded by loadFreeEmailDomains();
+// the list below is a bundled fallback so the hint works before that resolves.
+import { authed } from "./authApi";
+
+const FALLBACK_DOMAINS: readonly string[] = [
   "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.uk", "yahoo.in",
   "outlook.com", "hotmail.com", "hotmail.co.uk", "live.com", "msn.com",
   "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com",
   "pm.me", "gmx.com", "gmx.net", "mail.com", "yandex.com", "zoho.com",
   "hey.com", "fastmail.com", "tutanota.com", "qq.com", "163.com", "126.com",
-]);
+];
+
+let personalDomains = new Set<string>(FALLBACK_DOMAINS);
+let loaded = false;
+
+/** Fetch the authoritative free-provider list once and replace the bundled fallback.
+ *  Best-effort: on failure we keep the fallback and allow a later retry. Call at
+ *  startup; the classification stays advisory either way. */
+export async function loadFreeEmailDomains(): Promise<void> {
+  if (loaded) return;
+  loaded = true;
+  try {
+    const { providers } = await authed<{ providers: string[] }>("/api/public/meta/free-email-domains");
+    if (Array.isArray(providers) && providers.length) {
+      personalDomains = new Set(providers.map((d) => d.trim().toLowerCase()));
+    }
+  } catch {
+    loaded = false; // keep the fallback; let a future call retry
+  }
+}
 
 /** The lowercased domain part of an email, or "" if there's no '@'. */
 export function emailDomain(email: string | null | undefined): string {
@@ -19,9 +42,9 @@ export function emailDomain(email: string | null | undefined): string {
 
 /**
  * True when the email is on a personal/free mailbox provider. Unknown/blank emails
- * return false (don't restrict when we can't tell).
+ * return false (don't restrict when we can't tell). Advisory — the server decides.
  */
 export function isPersonalEmail(email: string | null | undefined): boolean {
   const domain = emailDomain(email);
-  return domain !== "" && PERSONAL_DOMAINS.has(domain);
+  return domain !== "" && personalDomains.has(domain);
 }
