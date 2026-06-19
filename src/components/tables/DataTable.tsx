@@ -184,6 +184,8 @@ export default function DataTable<T>({
                   return (
                     <th
                       key={header.id}
+                      // aria-sort lets AT announce asc/desc/none (#34).
+                      aria-sort={canSort ? (sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none") : undefined}
                       className={`px-5 py-3 font-medium ${alignClass(meta?.align)} ${meta?.headerClassName ?? ""}`}
                     >
                       {header.isPlaceholder ? null : canSort ? (

@@ -421,12 +421,17 @@ function Header({
 
 function Stepper({ phase }: { phase: Phase }) {
   const step = phase === "code" ? 2 : 1;
+  // List semantics + aria-current so AT can convey the steps and which is active (#34).
   return (
-    <div className="mb-4 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-      <span className={step >= 1 ? "text-brand-500" : ""}>1. Your email</span>
-      <span className="h-px w-6 bg-gray-200 dark:bg-gray-700" />
-      <span className={step >= 2 ? "text-brand-500" : ""}>2. Verify</span>
-    </div>
+    <ol className="mb-4 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+      <li aria-current={step === 1 ? "step" : undefined} className={step >= 1 ? "text-brand-500" : ""}>
+        1. Your email
+      </li>
+      <span aria-hidden="true" className="h-px w-6 bg-gray-200 dark:bg-gray-700" />
+      <li aria-current={step === 2 ? "step" : undefined} className={step >= 2 ? "text-brand-500" : ""}>
+        2. Verify
+      </li>
+    </ol>
   );
 }
 
@@ -456,8 +461,15 @@ function Banner({ tone, children }: { tone: "error" | "info"; children: ReactNod
     tone === "error"
       ? "border-error-200 bg-error-50 text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400"
       : "border-brand-200 bg-brand-50 text-brand-600 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400";
+  // Announce status changes to AT: errors assertively, info politely (#34).
   return (
-    <div className={`mt-5 rounded-lg border px-4 py-3 text-sm ${classes}`}>{children}</div>
+    <div
+      role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
+      className={`mt-5 rounded-lg border px-4 py-3 text-sm ${classes}`}
+    >
+      {children}
+    </div>
   );
 }
 
