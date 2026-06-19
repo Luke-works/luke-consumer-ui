@@ -22,8 +22,11 @@ export type InboxPage = { items: InboxTask[]; total: number; firstResult: number
 export const INBOX_PAGE_MAX = 200;
 
 /** A page of open user tasks for the tenant, paged + sorted + searchable server-side
- *  (#26). `search` matches task name or assignee; `sort` is created|name|assignee. */
-export function getInbox(
+ *  (#26). `search` matches task name or assignee; `sort` is created|name|assignee.
+ *
+ *  Tolerant of both response shapes so a deploy window (new UI / old engine, or vice
+ *  versa) can't crash the inbox: a bare array (pre-#26 backend) is wrapped into a page. */
+export async function getInbox(
   tenant: string,
   opts: { firstResult?: number; maxResults?: number; search?: string; sort?: string; order?: "asc" | "desc" } = {},
 ): Promise<InboxPage> {
@@ -33,7 +36,17 @@ export function getInbox(
   if (opts.order) qs.set("order", opts.order);
   if (opts.firstResult != null) qs.set("firstResult", String(opts.firstResult));
   qs.set("maxResults", String(opts.maxResults ?? INBOX_PAGE_MAX));
-  return authed(`/api/form-inbox?${qs.toString()}`, tenantInit(tenant));
+  const body = await authed<InboxPage | InboxTask[]>(`/api/form-inbox?${qs.toString()}`, tenantInit(tenant));
+  if (Array.isArray(body)) {
+    return { items: body, total: body.length, firstResult: 0, maxResults: body.length };
+  }
+  const items = Array.isArray(body?.items) ? body.items : [];
+  return {
+    items,
+    total: typeof body?.total === "number" ? body.total : items.length,
+    firstResult: body?.firstResult ?? 0,
+    maxResults: body?.maxResults ?? items.length,
+  };
 }
 
 export function completeTask(tenant: string, taskId: string): Promise<{ ok: boolean; taskId: string }> {

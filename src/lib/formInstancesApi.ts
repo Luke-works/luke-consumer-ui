@@ -171,17 +171,20 @@ export async function listInstances(
   if (filter.order) qs.set("order", filter.order);
   if (filter.firstResult != null) qs.set("firstResult", String(filter.firstResult));
   qs.set("maxResults", String(filter.maxResults ?? INSTANCE_PAGE_MAX));
-  const body = await req<{
-    items: ApiInstance[];
-    total: number;
-    firstResult: number;
-    maxResults: number;
-  }>(tenant, `${BASE}?${qs.toString()}`);
+  // Tolerant of both response shapes so a deploy window (new UI / old engine, or
+  // vice versa) can't crash the list: a bare array (pre-#52 backend) is wrapped.
+  const body = await req<
+    { items: ApiInstance[]; total: number; firstResult: number; maxResults: number } | ApiInstance[]
+  >(tenant, `${BASE}?${qs.toString()}`);
+  if (Array.isArray(body)) {
+    return { items: body.map(toInstance), total: body.length, firstResult: 0, maxResults: body.length };
+  }
+  const raw = Array.isArray(body?.items) ? body.items : [];
   return {
-    items: body.items.map(toInstance),
-    total: body.total,
-    firstResult: body.firstResult,
-    maxResults: body.maxResults,
+    items: raw.map(toInstance),
+    total: typeof body?.total === "number" ? body.total : raw.length,
+    firstResult: body?.firstResult ?? 0,
+    maxResults: body?.maxResults ?? raw.length,
   };
 }
 
