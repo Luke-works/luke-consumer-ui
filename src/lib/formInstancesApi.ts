@@ -174,6 +174,15 @@ export async function listInstances(
   };
 }
 
+/** Per-definition rollup for the cockpit, keyed by definitionCode (#26). Computed
+ *  server-side over the whole tenant set, so the counts are correct even though the
+ *  instance list itself is capped. Definitions with no instances are absent. */
+export type DefinitionSummary = { total: number; subs: number; last: number | null };
+
+export async function getInstanceSummary(tenant: string): Promise<Record<string, DefinitionSummary>> {
+  return req<Record<string, DefinitionSummary>>(tenant, `${BASE}/summary`);
+}
+
 /** Partial autosave (merges into the instance's data; moves it to IN_PROGRESS). */
 export async function saveInstanceData(
   tenant: string,

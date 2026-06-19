@@ -6,7 +6,7 @@ import TruncationNotice from "../../components/common/TruncationNotice";
 import InstanceDetail, { STATE_BADGE } from "./InstanceDetail";
 import { pidOf } from "./TracePanel";
 import { listForms } from "../../lib/formsApi";
-import { listInstances, STATE_LABEL, type FormInstance, type InstanceState } from "../../lib/formInstancesApi";
+import { getInstanceSummary, listInstances, STATE_LABEL, type DefinitionSummary, type FormInstance, type InstanceState } from "../../lib/formInstancesApi";
 
 // A "submission" = the recipient actually submitted. CREATED/SENT/OPENED are
 // pre-submission and hidden by default.
@@ -29,6 +29,7 @@ const def = createColumnHelper<FormRow & { total: number; subs: number; last: nu
 export default function InstancesPanel({ tenant, definitionCode }: { tenant: string; definitionCode?: string }) {
   const [rows, setRows] = useState<FormInstance[]>([]);
   const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<Record<string, DefinitionSummary>>({});
   const [forms, setForms] = useState<FormRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,11 +46,12 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
     if (!tenant) return;
     let active = true;
     setLoading(true);
-    Promise.all([listInstances(tenant), listForms(tenant)])
-      .then(([insts, fs]) => {
+    Promise.all([listInstances(tenant), listForms(tenant), getInstanceSummary(tenant)])
+      .then(([insts, fs, sum]) => {
         if (!active) return;
         setRows(insts.items);
         setTotal(insts.total);
+        setSummary(sum);
         setForms(fs.map((f) => ({ id: f.id, code: f.code, name: f.name })));
         setLoading(false);
       })
@@ -66,18 +68,15 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
   const visible = useMemo(() => (showAll ? baseRows : baseRows.filter(isSub)), [baseRows, showAll]);
   const hiddenCount = baseRows.length - visible.length;
 
+  // Counts come from the server rollup (#26), not by reducing the capped instance
+  // page — so the cockpit totals stay correct for large tenants.
   const definitions = useMemo(
     () =>
       forms.map((f) => {
-        const mine = rows.filter((r) => r.definitionCode === f.code);
-        return {
-          ...f,
-          total: mine.length,
-          subs: mine.filter(isSub).length,
-          last: mine.reduce((m, r) => Math.max(m, r.submittedAt ?? r.createdAt), 0),
-        };
+        const s = summary[f.code];
+        return { ...f, total: s?.total ?? 0, subs: s?.subs ?? 0, last: s?.last ?? 0 };
       }),
-    [forms, rows],
+    [forms, summary],
   );
 
   const detailFor = (i: FormInstance, onBack?: () => void) => (
