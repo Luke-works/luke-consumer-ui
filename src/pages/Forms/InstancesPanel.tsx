@@ -6,6 +6,7 @@ import InstanceDetail, { STATE_BADGE } from "./InstanceDetail";
 import { pidOf } from "./TracePanel";
 import { listForms } from "../../lib/formsApi";
 import { getInstanceSummary, listInstances, STATE_LABEL, type DefinitionSummary, type FormInstance } from "../../lib/formInstancesApi";
+import { isAbortError } from "../../lib/abort";
 
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "—");
 
@@ -62,23 +63,27 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
   // Forms + per-form summary load once per tenant (independent of the page).
   useEffect(() => {
     if (!tenant) return;
-    let active = true;
+    const ctl = new AbortController();
     setLoading(true);
-    Promise.all([listForms(tenant), getInstanceSummary(tenant)])
+    Promise.all([listForms(tenant, false, ctl.signal), getInstanceSummary(tenant, ctl.signal)])
       .then(([fs, sum]) => {
-        if (!active) return;
         setForms(fs.map((f) => ({ id: f.id, code: f.code, name: f.name })));
         setSummary(sum);
         setLoading(false);
       })
-      .catch((e: unknown) => { if (active) { setError((e as { message?: string })?.message ?? "Couldn’t load forms."); setLoading(false); } });
-    return () => { active = false; };
+      .catch((e: unknown) => {
+        if (isAbortError(e)) return; // superseded/unmounted — not a real error
+        setError((e as { message?: string })?.message ?? "Couldn’t load forms.");
+        setLoading(false);
+      });
+    return () => ctl.abort();
   }, [tenant]);
 
-  // The instance page itself — refetched whenever a filter/sort/page changes.
+  // The instance page itself — refetched whenever a filter/sort/page changes; the
+  // prior (now superseded) request is aborted so it can't render stale data (#27).
   useEffect(() => {
     if (!tenant) return;
-    let active = true;
+    const ctl = new AbortController();
     listInstances(tenant, {
       definitionCode: scopedToCode ?? undefined,
       submittedOnly: !showAll,
@@ -87,10 +92,13 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
       order: sortOrder,
       firstResult: pageIndex * PAGE_SIZE,
       maxResults: PAGE_SIZE,
-    })
-      .then((page) => { if (active) { setRows(page.items); setTotal(page.total); } })
-      .catch((e: unknown) => { if (active) setError((e as { message?: string })?.message ?? "Couldn’t load instances."); });
-    return () => { active = false; };
+    }, ctl.signal)
+      .then((page) => { setRows(page.items); setTotal(page.total); })
+      .catch((e: unknown) => {
+        if (isAbortError(e)) return;
+        setError((e as { message?: string })?.message ?? "Couldn’t load instances.");
+      });
+    return () => ctl.abort();
   }, [tenant, scopedToCode, showAll, search, sortField, sortOrder, pageIndex]);
 
   // Counts come from the server rollup (#26), not by reducing the capped instance

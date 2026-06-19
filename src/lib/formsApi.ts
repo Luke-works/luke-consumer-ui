@@ -116,8 +116,8 @@ function req<T>(tenant: string, path: string, init: RequestInit = {}): Promise<T
 }
 
 /** Live forms (or trash when deleted=true). latestVersion is not resolved here. */
-export async function listForms(tenant: string, deleted = false): Promise<StoredForm[]> {
-  const list = await req<ApiForm[]>(tenant, `${BASE}?deleted=${deleted}`);
+export async function listForms(tenant: string, deleted = false, signal?: AbortSignal): Promise<StoredForm[]> {
+  const list = await req<ApiForm[]>(tenant, `${BASE}?deleted=${deleted}`, { signal });
   return list.map((f) => toForm(f));
 }
 

@@ -9,6 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/FormRenderer";
 import { completeTask, getInbox, type InboxTask } from "../../lib/formInboxApi";
 import { getInstance, type InstanceView } from "../../lib/formInstancesApi";
+import { isAbortError } from "../../lib/abort";
 
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "—");
 const who = (a?: string | null) => (a ? a.replace(/^workos:/, "") : null);
@@ -61,7 +62,7 @@ export default function FormInbox() {
 
   useEffect(() => {
     if (!tenant) return;
-    let active = true;
+    const ctl = new AbortController();
     setLoading(true);
     getInbox(tenant, {
       firstResult: pageIndex * PAGE_SIZE,
@@ -69,10 +70,14 @@ export default function FormInbox() {
       search: search || undefined,
       sort: sortField,
       order: sortOrder,
-    })
-      .then((p) => { if (active) { setTasks(p.items); setTotal(p.total); setLoading(false); } })
-      .catch((e: unknown) => { if (active) { setError((e as { message?: string })?.message ?? "Couldn’t load the inbox."); setLoading(false); } });
-    return () => { active = false; };
+    }, ctl.signal)
+      .then((p) => { setTasks(p.items); setTotal(p.total); setLoading(false); })
+      .catch((e: unknown) => {
+        if (isAbortError(e)) return; // superseded poll/filter — not a real error
+        setError((e as { message?: string })?.message ?? "Couldn’t load the inbox.");
+        setLoading(false);
+      });
+    return () => ctl.abort();
   }, [tenant, pageIndex, sortField, sortOrder, search, reloadKey]);
 
   const openTask = async (task: InboxTask) => {

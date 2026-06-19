@@ -29,6 +29,7 @@ export const INBOX_PAGE_MAX = 200;
 export async function getInbox(
   tenant: string,
   opts: { firstResult?: number; maxResults?: number; search?: string; sort?: string; order?: "asc" | "desc" } = {},
+  signal?: AbortSignal,
 ): Promise<InboxPage> {
   const qs = new URLSearchParams();
   if (opts.search) qs.set("search", opts.search);
@@ -36,7 +37,7 @@ export async function getInbox(
   if (opts.order) qs.set("order", opts.order);
   if (opts.firstResult != null) qs.set("firstResult", String(opts.firstResult));
   qs.set("maxResults", String(opts.maxResults ?? INBOX_PAGE_MAX));
-  const body = await authed<InboxPage | InboxTask[]>(`/api/form-inbox?${qs.toString()}`, tenantInit(tenant));
+  const body = await authed<InboxPage | InboxTask[]>(`/api/form-inbox?${qs.toString()}`, tenantInit(tenant, { signal }));
   if (Array.isArray(body)) {
     return { items: body, total: body.length, firstResult: 0, maxResults: body.length };
   }

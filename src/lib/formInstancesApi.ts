@@ -124,8 +124,8 @@ export async function getInstance(tenant: string, id: string): Promise<InstanceV
   return toView(await req<ApiView>(tenant, `${BASE}/${seg(id)}`));
 }
 
-export async function getInstanceByToken(tenant: string, token: string): Promise<InstanceView> {
-  return toView(await req<ApiView>(tenant, `${BASE}/by-token/${seg(token)}`));
+export async function getInstanceByToken(tenant: string, token: string, signal?: AbortSignal): Promise<InstanceView> {
+  return toView(await req<ApiView>(tenant, `${BASE}/by-token/${seg(token)}`, { signal }));
 }
 
 /** A page of instances. `total` is the full server-side count; `items` is the
@@ -161,6 +161,7 @@ export async function listInstances(
     firstResult?: number;
     maxResults?: number;
   } = {},
+  signal?: AbortSignal,
 ): Promise<InstancePage> {
   const qs = new URLSearchParams();
   if (filter.definitionCode) qs.set("definitionCode", filter.definitionCode);
@@ -175,7 +176,7 @@ export async function listInstances(
   // vice versa) can't crash the list: a bare array (pre-#52 backend) is wrapped.
   const body = await req<
     { items: ApiInstance[]; total: number; firstResult: number; maxResults: number } | ApiInstance[]
-  >(tenant, `${BASE}?${qs.toString()}`);
+  >(tenant, `${BASE}?${qs.toString()}`, { signal });
   if (Array.isArray(body)) {
     return { items: body.map(toInstance), total: body.length, firstResult: 0, maxResults: body.length };
   }
@@ -193,8 +194,11 @@ export async function listInstances(
  *  instance list itself is capped. Definitions with no instances are absent. */
 export type DefinitionSummary = { total: number; subs: number; last: number | null };
 
-export async function getInstanceSummary(tenant: string): Promise<Record<string, DefinitionSummary>> {
-  return req<Record<string, DefinitionSummary>>(tenant, `${BASE}/summary`);
+export async function getInstanceSummary(
+  tenant: string,
+  signal?: AbortSignal,
+): Promise<Record<string, DefinitionSummary>> {
+  return req<Record<string, DefinitionSummary>>(tenant, `${BASE}/summary`, { signal });
 }
 
 /** Partial autosave (merges into the instance's data; moves it to IN_PROGRESS). */
