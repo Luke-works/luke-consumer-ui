@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/FormRenderer";
-import TruncationNotice from "../../components/common/TruncationNotice";
 import {
   getInstance,
+  INSTANCE_PAGE_MAX,
   listInstances,
   STATE_LABEL,
   type FormInstance,
@@ -15,6 +16,8 @@ import {
   type InstanceView,
 } from "../../lib/formInstancesApi";
 import { ChevronLeftIcon } from "../../icons";
+
+const PAGE_SIZE = 25;
 
 const STATE_BADGE: Record<InstanceState, string> = {
   CREATED: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
@@ -37,6 +40,7 @@ export default function FormResponses() {
 
   const [rows, setRows] = useState<FormInstance[]>([]);
   const [total, setTotal] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<InstanceView | null>(null);
@@ -46,11 +50,15 @@ export default function FormResponses() {
     if (!tenant || !code) return;
     let active = true;
     setLoading(true);
-    listInstances(tenant, { definitionCode: code })
+    listInstances(tenant, { definitionCode: code, firstResult: pageIndex * PAGE_SIZE, maxResults: PAGE_SIZE })
       .then((page) => { if (active) { setRows(page.items); setTotal(page.total); setLoading(false); } })
       .catch((e: unknown) => { if (active) { setError((e as { message?: string })?.message ?? "Couldn’t load responses."); setLoading(false); } });
     return () => { active = false; };
-  }, [tenant, code]);
+  }, [tenant, code, pageIndex]);
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const from = total === 0 ? 0 : pageIndex * PAGE_SIZE + 1;
+  const to = Math.min((pageIndex + 1) * PAGE_SIZE, total);
 
   const openView = async (id: string) => {
     if (!tenant) return;
@@ -64,17 +72,32 @@ export default function FormResponses() {
     }
   };
 
-  const submittedCount = useMemo(() => rows.filter((r) => r.state === "SUBMITTED" || r.state === "PROCESSED").length, [rows]);
+  const [exporting, setExporting] = useState(false);
 
-  const exportCsv = () => {
-    const csv = toCsv(rows);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${code}-responses.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Export every response, not just the current page — page through the server in
+  // max-size chunks (the list is now paginated, #26).
+  const exportCsv = async () => {
+    if (!tenant || !code) return;
+    setExporting(true);
+    try {
+      const all: FormInstance[] = [];
+      for (let first = 0; ; first += INSTANCE_PAGE_MAX) {
+        const page = await listInstances(tenant, { definitionCode: code, firstResult: first, maxResults: INSTANCE_PAGE_MAX });
+        all.push(...page.items);
+        if (all.length >= page.total || page.items.length === 0) break;
+      }
+      const blob = new Blob([toCsv(all)], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${code}-responses.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError((e as { message?: string })?.message ?? "Couldn’t export responses.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (!tenant || !code) return null;
@@ -93,8 +116,10 @@ export default function FormResponses() {
           >
             <ChevronLeftIcon className="size-5" />Forms
           </button>
-          {rows.length > 0 && (
-            <Button size="sm" variant="outline" onClick={exportCsv}>Export CSV</Button>
+          {total > 0 && (
+            <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
+              {exporting ? "Exporting…" : "Export CSV"}
+            </Button>
           )}
         </div>
 
@@ -102,7 +127,7 @@ export default function FormResponses() {
           <div className="mb-4">
             <h1 className="text-lg font-semibold text-gray-800 dark:text-white/90">Responses</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              <span className="font-mono">{code}</span> · {rows.length} total · {submittedCount} submitted
+              <span className="font-mono">{code}</span> · {total} total
             </p>
           </div>
 
@@ -114,7 +139,6 @@ export default function FormResponses() {
             <p className="py-10 text-center text-sm text-gray-400">No responses yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <TruncationNotice shown={rows.length} total={total} noun="responses" />
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-gray-800">
@@ -141,6 +165,32 @@ export default function FormResponses() {
                   ))}
                 </tbody>
               </table>
+              {pageCount > 1 && (
+                <div className="mt-4 flex items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
+                  <span>Showing {from}–{to} of {total}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                      disabled={pageIndex === 0}
+                      aria-label="Previous page"
+                      className="inline-flex size-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/5"
+                    >
+                      <ChevronLeft className="size-4" />
+                    </button>
+                    <span className="px-2">Page {pageIndex + 1} of {pageCount}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPageIndex((p) => Math.min(pageCount - 1, p + 1))}
+                      disabled={pageIndex + 1 >= pageCount}
+                      aria-label="Next page"
+                      className="inline-flex size-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/5"
+                    >
+                      <ChevronRight className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

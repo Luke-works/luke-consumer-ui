@@ -151,6 +151,13 @@ export async function listInstances(
   filter: {
     definitionCode?: string;
     state?: InstanceState;
+    /** Narrow to received submissions (state ∈ SUBMITTED/PROCESSED) server-side. */
+    submittedOnly?: boolean;
+    /** Free text over form code/name, instance id, and createdBy. */
+    search?: string;
+    /** Whitelisted sort field: createdAt | submittedAt | state | definitionCode. */
+    sort?: string;
+    order?: "asc" | "desc";
     firstResult?: number;
     maxResults?: number;
   } = {},
@@ -158,6 +165,10 @@ export async function listInstances(
   const qs = new URLSearchParams();
   if (filter.definitionCode) qs.set("definitionCode", filter.definitionCode);
   if (filter.state) qs.set("state", filter.state);
+  if (filter.submittedOnly) qs.set("submittedOnly", "true");
+  if (filter.search) qs.set("search", filter.search);
+  if (filter.sort) qs.set("sort", filter.sort);
+  if (filter.order) qs.set("order", filter.order);
   if (filter.firstResult != null) qs.set("firstResult", String(filter.firstResult));
   qs.set("maxResults", String(filter.maxResults ?? INSTANCE_PAGE_MAX));
   const body = await req<{

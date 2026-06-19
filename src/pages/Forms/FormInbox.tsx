@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { createColumnHelper } from "@tanstack/react-table";
-import { Columns2, Inbox as InboxIcon, LayoutList } from "lucide-react";
+import { createColumnHelper, type SortingState } from "@tanstack/react-table";
+import { ChevronLeft, ChevronRight, Columns2, Inbox as InboxIcon, LayoutList } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
-import DataTable from "../../components/tables/DataTable";
+import DataTable, { type ManualTable } from "../../components/tables/DataTable";
 import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/FormRenderer";
@@ -12,6 +12,10 @@ import { getInstance, type InstanceView } from "../../lib/formInstancesApi";
 
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "—");
 const who = (a?: string | null) => (a ? a.replace(/^workos:/, "") : null);
+
+const PAGE_SIZE = 25;
+// Sortable column id → server sort field (see FormInboxController.applyOrder).
+const SORT_FIELD: Record<string, string> = { task: "name", created: "created", assignee: "assignee" };
 
 type ViewMode = "table" | "split";
 const VIEW_KEY = "lk.inbox.view";
@@ -25,8 +29,15 @@ export default function FormInbox() {
   const tenant = session?.tenant ?? null;
 
   const [tasks, setTasks] = useState<InboxTask[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Server-driven table controls (shared by both views).
+  const [pageIndex, setPageIndex] = useState(0);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "created", desc: true }]);
+  const [search, setSearch] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [mode, setMode] = useState<ViewMode>(
     () => (localStorage.getItem(VIEW_KEY) as ViewMode) || "table",
@@ -36,6 +47,10 @@ export default function FormInbox() {
   const [viewLoading, setViewLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
 
+  const sortCol = sorting[0];
+  const sortField = sortCol ? SORT_FIELD[sortCol.id] : undefined;
+  const sortOrder = sortCol && sortField ? (sortCol.desc ? "desc" : "asc") : undefined;
+
   const setViewMode = (m: ViewMode) => {
     setMode(m);
     localStorage.setItem(VIEW_KEY, m);
@@ -44,15 +59,21 @@ export default function FormInbox() {
     setView(null);
   };
 
-  const load = () => {
+  useEffect(() => {
     if (!tenant) return;
+    let active = true;
     setLoading(true);
-    getInbox(tenant)
-      .then((t) => { setTasks(t); setLoading(false); })
-      .catch((e: unknown) => { setError((e as { message?: string })?.message ?? "Couldn’t load the inbox."); setLoading(false); });
-  };
-
-  useEffect(load, [tenant]);
+    getInbox(tenant, {
+      firstResult: pageIndex * PAGE_SIZE,
+      maxResults: PAGE_SIZE,
+      search: search || undefined,
+      sort: sortField,
+      order: sortOrder,
+    })
+      .then((p) => { if (active) { setTasks(p.items); setTotal(p.total); setLoading(false); } })
+      .catch((e: unknown) => { if (active) { setError((e as { message?: string })?.message ?? "Couldn’t load the inbox."); setLoading(false); } });
+    return () => { active = false; };
+  }, [tenant, pageIndex, sortField, sortOrder, search, reloadKey]);
 
   const openTask = async (task: InboxTask) => {
     setSelected(task);
@@ -84,12 +105,24 @@ export default function FormInbox() {
       await completeTask(tenant, selected.taskId);
       setSelected(null);
       setView(null);
-      load();
+      setReloadKey((k) => k + 1); // refetch the current page
     } catch (e) {
       setError((e as { message?: string })?.message ?? "Couldn’t complete the task.");
     } finally {
       setCompleting(false);
     }
+  };
+
+  // Server-driven config for the table view; split view drives the same state.
+  const manual: ManualTable = {
+    pageIndex,
+    pageSize: PAGE_SIZE,
+    rowCount: total,
+    onPageChange: setPageIndex,
+    sorting,
+    onSortingChange: (s) => { setSorting(s); setPageIndex(0); },
+    search,
+    onSearchChange: (q) => { setSearch(q); setPageIndex(0); },
   };
 
   const columns = [
@@ -143,6 +176,7 @@ export default function FormInbox() {
         <DataTable
           columns={columns}
           data={tasks}
+          manual={manual}
           onRowClick={(t) => void openTask(t)}
           searchPlaceholder="Search tasks…"
           minWidth="min-w-[560px]"
@@ -151,6 +185,12 @@ export default function FormInbox() {
       ) : (
         <SplitInbox
           tasks={tasks}
+          total={total}
+          pageIndex={pageIndex}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPageIndex}
+          search={search}
+          onSearchChange={(q) => { setSearch(q); setPageIndex(0); }}
           selected={selected}
           onSelect={(t) => void openTask(t)}
           view={view}
@@ -209,9 +249,16 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 
 // ── Outlook-style master/detail ────────────────────────────────────────────
 function SplitInbox({
-  tasks, selected, onSelect, view, viewLoading, completing, onComplete,
+  tasks, total, pageIndex, pageSize, onPageChange, search, onSearchChange,
+  selected, onSelect, view, viewLoading, completing, onComplete,
 }: {
   tasks: InboxTask[];
+  total: number;
+  pageIndex: number;
+  pageSize: number;
+  onPageChange: (pageIndex: number) => void;
+  search: string;
+  onSearchChange: (search: string) => void;
   selected: InboxTask | null;
   onSelect: (t: InboxTask) => void;
   view: InstanceView | null;
@@ -219,10 +266,15 @@ function SplitInbox({
   completing: boolean;
   onComplete: () => void;
 }) {
-  const [q, setQ] = useState("");
-  const filtered = q
-    ? tasks.filter((t) => `${t.name ?? ""} ${who(t.assignee) ?? ""}`.toLowerCase().includes(q.toLowerCase()))
-    : tasks;
+  // Local input value, debounced into the server search so each keystroke doesn't refetch.
+  const [input, setInput] = useState(search);
+  useEffect(() => {
+    const id = setTimeout(() => { if (input !== search) onSearchChange(input); }, 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input]);
+
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
@@ -230,17 +282,17 @@ function SplitInbox({
       <div className="flex max-h-[72vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="border-b border-gray-100 p-3 dark:border-gray-800">
           <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Search tasks…"
             className="h-9 w-full rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
         <div className="divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
-          {filtered.length === 0 ? (
-            <p className="py-10 text-center text-sm text-gray-400">{tasks.length === 0 ? "Inbox empty." : "No matches."}</p>
+          {tasks.length === 0 ? (
+            <p className="py-10 text-center text-sm text-gray-400">{search ? "No matches." : "Inbox empty."}</p>
           ) : (
-            filtered.map((t) => {
+            tasks.map((t) => {
               const active = selected?.taskId === t.taskId;
               return (
                 <button
@@ -259,6 +311,29 @@ function SplitInbox({
             })
           )}
         </div>
+        {pageCount > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            <button
+              type="button"
+              onClick={() => onPageChange(Math.max(0, pageIndex - 1))}
+              disabled={pageIndex === 0}
+              aria-label="Previous page"
+              className="inline-flex size-7 items-center justify-center rounded-md border border-gray-200 transition hover:bg-gray-50 disabled:opacity-40 dark:border-gray-800 dark:hover:bg-white/5"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span>Page {pageIndex + 1} of {pageCount}</span>
+            <button
+              type="button"
+              onClick={() => onPageChange(Math.min(pageCount - 1, pageIndex + 1))}
+              disabled={pageIndex + 1 >= pageCount}
+              aria-label="Next page"
+              className="inline-flex size-7 items-center justify-center rounded-md border border-gray-200 transition hover:bg-gray-50 disabled:opacity-40 dark:border-gray-800 dark:hover:bg-white/5"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Reading pane */}
