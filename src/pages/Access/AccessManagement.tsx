@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  CheckCircle2,
   Clock,
+  Inbox,
   KeyRound,
   Send,
   ShieldCheck,
   Trash2,
-  UserCog,
   UserPlus,
   Users,
   UsersRound,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -20,7 +22,19 @@ import type {
   OrgGroup,
   OrgMember,
   RoleLevel,
+  SubscribedCapability,
 } from "../../lib/authApi";
+import {
+  approveAccessRequest,
+  cancelAccessRequest,
+  createAccessRequest,
+  denyAccessRequest,
+  listMyAccessRequests,
+  listOrgAccessRequests,
+  type AccessRequest,
+  type AccessRequestLevel,
+  type AccessRequestStatus,
+} from "../../lib/accessRequestsApi";
 import { getAuthErrorMessage } from "../../components/auth/authError";
 import PageMeta from "../../components/common/PageMeta";
 import Label from "../../components/form/Label";
@@ -138,56 +152,465 @@ const LEVEL_BADGE: Record<CapabilityLevel, string> = {
   "read-write": "bg-success-50 text-success-600 dark:bg-success-500/15",
 };
 
+/* ───────────────────────── Access-request helpers ───────────────────────── */
+
+const REQUEST_LEVELS: { value: AccessRequestLevel; label: string }[] = [
+  { value: "read", label: "Read-only" },
+  { value: "read-write", label: "Read & write" },
+];
+
+/** Colour + label for an access-request status chip. */
+const STATUS_BADGE: Record<AccessRequestStatus, { label: string; klass: string }> = {
+  PENDING: { label: "Pending", klass: "bg-amber-50 text-amber-600 dark:bg-amber-500/15" },
+  APPROVED: { label: "Approved", klass: "bg-success-50 text-success-600 dark:bg-success-500/15" },
+  DENIED: { label: "Denied", klass: "bg-error-50 text-error-600 dark:bg-error-500/15" },
+  CANCELLED: { label: "Cancelled", klass: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" },
+};
+
+function StatusBadge({ status }: { status: AccessRequestStatus }) {
+  const s = STATUS_BADGE[status] ?? STATUS_BADGE.PENDING;
+  return (
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${s.klass}`}>{s.label}</span>
+  );
+}
+
+const fmtWhen = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "");
+
+/* ────────────────────────── Manage My Access section ─────────────────────── */
+
 /**
- * "My access" — the signed-in user's own effective capabilities (from the session)
- * joined with the catalog for friendly names and pricing tiers. Read-only; visible
- * to every member, not just owners.
+ * "Manage My Access" — visible to every member. Shows the caller's current
+ * capabilities (read-only, from the session), a form to request access to a
+ * subscribed capability they lack, and the caller's own request history with a
+ * cancel action on pending ones.
  */
-function MyAccessCard({
+function ManageMyAccessSection({
+  tenant,
   capabilities,
   catalog,
 }: {
+  tenant: string;
   capabilities: Record<string, string>;
   catalog: CapabilityCatalogItem[];
 }) {
+  const [subscriptions, setSubscriptions] = useState<SubscribedCapability[]>([]);
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Request form
+  const [code, setCode] = useState("");
+  const [level, setLevel] = useState<AccessRequestLevel>("read");
+  const [note, setNote] = useState("");
+  const [status, setStatus] = useState<{ kind: "idle" | "sending" | "ok" | "error"; msg?: string }>({
+    kind: "idle",
+  });
+
+  const reloadRequests = useCallback(
+    () => listMyAccessRequests(tenant).then(setRequests).catch(() => setRequests([])),
+    [tenant],
+  );
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    Promise.all([api.getMySubscriptions(tenant), listMyAccessRequests(tenant)])
+      .then(([subs, reqs]) => {
+        if (!active) return;
+        setSubscriptions(Array.isArray(subs) ? subs : []);
+        setRequests(reqs);
+      })
+      .catch((e) => active && setError(getAuthErrorMessage(e)))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [tenant]);
+
+  // The caller's effective level for a capability ("none" when not granted).
+  const myLevel = (c: string): CapabilityLevel => {
+    const raw = capabilities[c];
+    return raw === "read" || raw === "read-write" ? raw : "none";
+  };
+
+  const hasPending = useCallback(
+    (c: string) => requests.some((r) => r.capabilityCode === c && r.status === "PENDING"),
+    [requests],
+  );
+
+  // Subscribed capabilities the caller doesn't already hold at full (read-write)
+  // level — the candidates worth requesting.
+  const requestable = useMemo(
+    () => subscriptions.filter((s) => myLevel(s.code) !== "read-write"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [subscriptions, capabilities],
+  );
+
+  // Keep the selected capability valid as the candidate list resolves.
+  useEffect(() => {
+    if (requestable.length === 0) {
+      if (code) setCode("");
+      return;
+    }
+    if (!requestable.some((s) => s.code === code)) setCode(requestable[0].code);
+  }, [requestable, code]);
+
+  const selectedPending = code ? hasPending(code) : false;
+
+  async function submit() {
+    if (!code) return;
+    setStatus({ kind: "sending" });
+    try {
+      await createAccessRequest(tenant, { capabilityCode: code, level, note: note.trim() || undefined });
+      setStatus({ kind: "ok", msg: "Request submitted." });
+      setNote("");
+      reloadRequests();
+    } catch (e) {
+      setStatus({ kind: "error", msg: getAuthErrorMessage(e) });
+    }
+  }
+
+  async function cancel(id: string) {
+    try {
+      await cancelAccessRequest(tenant, id);
+      reloadRequests();
+    } catch {
+      reloadRequests();
+    }
+  }
+
   const codes = Object.keys(capabilities);
-  const meta = (code: string) => catalog.find((c) => c.code === code);
+  const meta = (c: string) => catalog.find((x) => x.code === c);
 
   return (
-    <section className={card}>
-      <SectionHeader
-        icon={KeyRound}
-        title="My access"
-        subtitle="The capabilities granted to you in this organization."
-      />
-      {codes.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          You don't have any capabilities granted yet. Ask an org owner to grant access.
-        </p>
-      ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-          {codes.map((code) => {
-            const raw = capabilities[code];
-            const level: CapabilityLevel =
-              raw === "read" || raw === "read-write" ? raw : "none";
-            const m = meta(code);
-            return (
-              <li key={code} className="flex items-center justify-between gap-3 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                    {m?.name ?? code}
-                  </span>
-                  <TierBadge tier={m?.tier} />
-                </div>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${LEVEL_BADGE[level]}`}>
-                  {LEVEL_LABEL[level]}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+          {error}
+        </div>
       )}
-    </section>
+
+      {/* Current access */}
+      <section className={card}>
+        <SectionHeader
+          icon={KeyRound}
+          title="My access"
+          subtitle="The capabilities granted to you in this organization."
+        />
+        {codes.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            You don't have any capabilities granted yet. Request access below.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {codes.map((c) => {
+              const lvl = myLevel(c);
+              const m = meta(c);
+              return (
+                <li key={c} className="flex items-center justify-between gap-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                      {m?.name ?? c}
+                    </span>
+                    <TierBadge tier={m?.tier} />
+                  </div>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${LEVEL_BADGE[lvl]}`}>
+                    {LEVEL_LABEL[lvl]}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Request access */}
+      <section className={card}>
+        <SectionHeader
+          icon={Send}
+          title="Request access"
+          subtitle="Ask an org owner to grant you a capability your organization is subscribed to."
+        />
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading…</p>
+        ) : requestable.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            You already have full access to every capability your organization is subscribed to.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="req-cap">Capability</Label>
+                <select
+                  id="req-cap"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                >
+                  {requestable.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="req-level">Level</Label>
+                <select
+                  id="req-level"
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value as AccessRequestLevel)}
+                  className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                >
+                  {REQUEST_LEVELS.map((l) => (
+                    <option key={l.value} value={l.value}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-5">
+              <Label htmlFor="req-note">Note (optional)</Label>
+              <Input
+                id="req-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Why you need this access"
+              />
+            </div>
+            <div className="mt-6 flex items-center gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
+              <Button
+                size="sm"
+                startIcon={<Send className="size-4" />}
+                disabled={!code || selectedPending || status.kind === "sending"}
+                onClick={submit}
+              >
+                {status.kind === "sending" ? "Submitting…" : "Submit request"}
+              </Button>
+              {selectedPending && (
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  You already have a pending request for this capability.
+                </span>
+              )}
+              {status.kind === "ok" && (
+                <span className="text-sm text-success-600 dark:text-success-400">{status.msg}</span>
+              )}
+              {status.kind === "error" && <span className="text-sm text-error-500">{status.msg}</span>}
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* My requests */}
+      <section className={card}>
+        <SectionHeader icon={Clock} title="My requests" />
+        {requests.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">You haven't requested any access yet.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {requests.map((r) => (
+              <li key={r.id} className="flex items-start justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                      {r.capabilityName ?? r.capabilityCode}
+                    </span>
+                    <span className="text-xs text-gray-400">{LEVEL_LABEL[r.level]}</span>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-400">Requested {fmtWhen(r.requestedAt)}</p>
+                  {r.decisionNote && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{r.decisionNote}</p>
+                  )}
+                </div>
+                {r.status === "PENDING" && (
+                  <button
+                    onClick={() => cancel(r.id)}
+                    className="flex shrink-0 items-center gap-1.5 text-sm text-error-500 hover:text-error-600"
+                  >
+                    <Trash2 className="size-3.5" />
+                    Cancel
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/* ────────────────────────── Approve Requests section ─────────────────────── */
+
+/** Owner-only pending queue: approve (with an optional level override) or deny. */
+function ApproveRequestsSection({ tenant }: { tenant: string }) {
+  const { refreshSession } = useAuth();
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  // Per-row UI state: pending level override + deny note + busy flag.
+  const [levels, setLevels] = useState<Record<string, AccessRequestLevel>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [result, setResult] = useState<{ kind: "ok" | "error"; msg: string } | null>(null);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    listOrgAccessRequests(tenant, "PENDING")
+      .then((rs) => {
+        setRequests(rs);
+        setLevels(Object.fromEntries(rs.map((r) => [r.id, r.level])));
+      })
+      .catch((e) => setError(getAuthErrorMessage(e)))
+      .finally(() => setLoading(false));
+  }, [tenant]);
+
+  useEffect(() => reload(), [reload]);
+
+  async function approve(r: AccessRequest) {
+    setBusyId(r.id);
+    setResult(null);
+    try {
+      await approveAccessRequest(tenant, r.id, levels[r.id] ?? r.level);
+      setResult({ kind: "ok", msg: `Approved access for ${r.requesterName ?? "member"}.` });
+      reload();
+      // The grant may be for the signed-in owner themselves — refresh so it shows.
+      await refreshSession({ fresh: true });
+    } catch (e) {
+      setResult({ kind: "error", msg: getAuthErrorMessage(e) });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deny(r: AccessRequest) {
+    setBusyId(r.id);
+    setResult(null);
+    try {
+      await denyAccessRequest(tenant, r.id, notes[r.id]?.trim() || undefined);
+      setResult({ kind: "ok", msg: `Denied request from ${r.requesterName ?? "member"}.` });
+      reload();
+    } catch (e) {
+      setResult({ kind: "error", msg: getAuthErrorMessage(e) });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (loading) {
+    return <div className="flex h-[40vh] items-center justify-center text-sm text-gray-400">Loading…</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+          {error}
+        </div>
+      )}
+
+      <section className={card}>
+        <SectionHeader
+          icon={Inbox}
+          title={
+            <>
+              Pending requests{" "}
+              <span className="text-sm font-normal text-gray-400">({requests.length})</span>
+            </>
+          }
+          subtitle="Approve to grant the access immediately, or deny with a note."
+        />
+        {result && (
+          <p
+            className={`mb-4 text-sm ${
+              result.kind === "ok" ? "text-success-600 dark:text-success-400" : "text-error-500"
+            }`}
+          >
+            {result.msg}
+          </p>
+        )}
+        {requests.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">No pending requests.</p>
+        ) : (
+          <div className="space-y-3">
+            {requests.map((r) => {
+              const busy = busyId === r.id;
+              return (
+                <div key={r.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-gray-800 dark:text-white/90">
+                      {r.requesterName ?? "Member"}
+                    </span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      requested {r.capabilityName ?? r.capabilityCode}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                      {LEVEL_LABEL[r.level]}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">Requested {fmtWhen(r.requestedAt)}</p>
+                  {r.note && (
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">“{r.note}”</p>
+                  )}
+
+                  <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800 sm:flex-row sm:items-end">
+                    <div>
+                      <Label htmlFor={`grant-${r.id}`}>Grant level</Label>
+                      <select
+                        id={`grant-${r.id}`}
+                        value={levels[r.id] ?? r.level}
+                        disabled={busy}
+                        onChange={(e) =>
+                          setLevels((p) => ({ ...p, [r.id]: e.target.value as AccessRequestLevel }))
+                        }
+                        className="h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                      >
+                        {REQUEST_LEVELS.map((l) => (
+                          <option key={l.value} value={l.value}>
+                            {l.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:flex-1">
+                      <Label htmlFor={`deny-${r.id}`}>Deny note (optional)</Label>
+                      <Input
+                        id={`deny-${r.id}`}
+                        value={notes[r.id] ?? ""}
+                        onChange={(e) => setNotes((p) => ({ ...p, [r.id]: e.target.value }))}
+                        placeholder="Reason for denial"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        startIcon={<CheckCircle2 className="size-4" />}
+                        disabled={busy}
+                        onClick={() => approve(r)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        startIcon={<XCircle className="size-4" />}
+                        disabled={busy}
+                        onClick={() => deny(r)}
+                      >
+                        Deny
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -710,12 +1133,33 @@ function AuthorizationTab({ tenant }: { tenant: string }) {
 
 /* ───────────────────────────────── Page ─────────────────────────────────── */
 
+type SectionId = "my-access" | "approve" | "members" | "invitations";
+
+type Section = { id: SectionId; label: string; icon: LucideIcon; ownerOnly: boolean };
+
+const SECTIONS: Section[] = [
+  { id: "my-access", label: "Manage My Access", icon: KeyRound, ownerOnly: false },
+  { id: "approve", label: "Approve Requests", icon: Inbox, ownerOnly: true },
+  { id: "members", label: "Members", icon: Users, ownerOnly: true },
+  { id: "invitations", label: "Invitations", icon: UserPlus, ownerOnly: true },
+];
+
 export default function AccessManagement() {
   const { session } = useAuth();
-  const [tab, setTab] = useState<"auth" | "authz">("auth");
+  const [section, setSection] = useState<SectionId>("my-access");
   const [catalog, setCatalog] = useState<CapabilityCatalogItem[]>([]);
 
   const tenant = session?.tenant ?? null;
+  const isOwner = !!session?.tenantAdmin;
+
+  // Non-owners only ever see "Manage My Access". Owners get the full rail.
+  const sections = SECTIONS.filter((s) => !s.ownerOnly || isOwner);
+
+  // If a non-owner somehow lands on an owner-only section (e.g. role changed),
+  // snap back to the always-available "Manage My Access".
+  useEffect(() => {
+    if (!sections.some((s) => s.id === section)) setSection("my-access");
+  }, [sections, section]);
 
   // Catalog is used to label/tier the "My access" capabilities. It's a best-effort
   // read — non-owners may not be allowed to list it, in which case we fall back to
@@ -735,11 +1179,11 @@ export default function AccessManagement() {
   return (
     <>
       <PageMeta
-        title="Authentication & Authorization | Lukeflow"
-        description="Manage who can sign in and what they can do in your organization."
+        title="Access | Lukeflow"
+        description="Manage your access, approve requests, and administer your organization."
       />
 
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-6xl">
         <div className="mb-6 flex items-start gap-4">
           <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-500/10">
             <ShieldCheck className="size-6" />
@@ -747,48 +1191,58 @@ export default function AccessManagement() {
           <div>
             <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Access</h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Invite teammates, add them to your organization, and manage roles, groups, and capabilities.
+              Manage your own access and request more. Owners can approve requests, manage members, and
+              send invitations.
             </p>
           </div>
         </div>
 
-        {/* Everyone sees their own access; only owners get the management tabs below. */}
-        {session && tenant && (
-          <div className="mb-6">
-            <MyAccessCard capabilities={session.capabilities ?? {}} catalog={catalog} />
-          </div>
-        )}
-
-        {!session?.tenantAdmin || !tenant ? (
+        {!tenant ? (
           <div className={card}>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Only organization owners can manage authentication and authorization.
+              Join or create an organization to manage access.
             </p>
           </div>
         ) : (
-          <>
-            <div className="mb-6 flex gap-1 border-b border-gray-200 dark:border-gray-700">
-              {[
-                { id: "auth" as const, label: "Authentication", icon: KeyRound },
-                { id: "authz" as const, label: "Authorization", icon: UserCog },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition ${
-                    tab === t.id
-                      ? "border-brand-500 text-brand-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                  }`}
-                >
-                  <t.icon className="size-4" />
-                  {t.label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-col gap-6 lg:flex-row">
+            {/* Left internal sub-sidebar */}
+            <nav className="shrink-0 lg:w-56">
+              <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:gap-1 lg:overflow-visible">
+                {sections.map((s) => {
+                  const active = section === s.id;
+                  return (
+                    <li key={s.id} className="shrink-0">
+                      <button
+                        onClick={() => setSection(s.id)}
+                        className={`flex w-full items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                          active
+                            ? "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                            : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                        }`}
+                      >
+                        <s.icon className="size-4 shrink-0" />
+                        {s.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
 
-            {tab === "auth" ? <AuthenticationTab tenant={tenant} /> : <AuthorizationTab tenant={tenant} />}
-          </>
+            {/* Content pane */}
+            <div className="min-w-0 flex-1">
+              {section === "my-access" && (
+                <ManageMyAccessSection
+                  tenant={tenant}
+                  capabilities={session?.capabilities ?? {}}
+                  catalog={catalog}
+                />
+              )}
+              {section === "approve" && isOwner && <ApproveRequestsSection tenant={tenant} />}
+              {section === "members" && isOwner && <AuthorizationTab tenant={tenant} />}
+              {section === "invitations" && isOwner && <AuthenticationTab tenant={tenant} />}
+            </div>
+          </div>
         )}
       </div>
     </>
