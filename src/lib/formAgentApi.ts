@@ -4,14 +4,23 @@
 // schema ({entities, root}) plus a natural-language instruction, it returns the
 // COMPLETE updated schema, which we then saveDraft + reload into the builder.
 //
-// luke-agents runs as its own service (hosting the agent fleet under
-// /agents/<slug>), so its base URL is configured separately from the main API.
-// VITE_FORM_AGENT_URL is the luke-agents service base; we hit the form agent's
-// canonical endpoint at /agents/form/chat. Falls back to the known deployment.
+// luke-agents (an approved AI sub-processor) runs as its own service hosting the
+// agent fleet under /agents/<slug>; its base URL is configured separately from the
+// main API via VITE_FORM_AGENT_URL. There is deliberately NO hardcoded fallback
+// (#32): a missing env fails the AI feature with a clear error rather than silently
+// shipping authored content to a public host. Calls are tenant-scoped (X-Tenant-Id)
+// and carry no client user id.
 
-const AGENT_URL = (
-  import.meta.env.VITE_FORM_AGENT_URL || "https://luke-agents.onrender.com"
-).replace(/\/$/, "");
+/** Resolve the agents base URL, or throw if it isn't configured (no public fallback). */
+function agentBase(): string {
+  const raw = import.meta.env.VITE_FORM_AGENT_URL as string | undefined;
+  if (!raw) {
+    throw new Error(
+      "The AI assistant isn't configured. Set VITE_FORM_AGENT_URL to the luke-agents base URL.",
+    );
+  }
+  return raw.replace(/\/$/, "");
+}
 
 /** coltorapps builder schema — kept loose here; the builder owns the real type. */
 export type BuilderSchemaLike = { entities: Record<string, unknown>; root: string[] };
@@ -72,7 +81,10 @@ function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
  *  - retries use exponential backoff + jitter within a total deadline;
  *  - an optional caller `signal` cancels everything (→ {@link AgentCancelledError}).
  */
-async function postWithRetry<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+async function postWithRetry<T>(path: string, body: unknown, tenant?: string, signal?: AbortSignal): Promise<T> {
+  const base = agentBase(); // throws (no public fallback) if unconfigured
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (tenant) headers["X-Tenant-Id"] = tenant; // tenant-scoped egress (#32/#33)
   const deadline = Date.now() + TOTAL_DEADLINE_MS;
 
   for (let attempt = 1; ; attempt++) {
@@ -86,9 +98,9 @@ async function postWithRetry<T>(path: string, body: unknown, signal?: AbortSigna
     let res: Response | null = null;
     let networkErr: unknown = null;
     try {
-      res = await fetch(`${AGENT_URL}${path}`, {
+      res = await fetch(`${base}${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
         signal: timeoutCtl.signal,
       });
@@ -145,12 +157,13 @@ export function generateSchema(
   message: string,
   schema: BuilderSchemaLike,
   title?: string,
-  userId?: string,
+  tenant?: string,
   signal?: AbortSignal,
 ): Promise<AgentResult> {
   return postWithRetry<AgentResult>(
     "/agents/form/chat",
-    { message, schema, title, user_id: userId },
+    { message, schema, title }, // no client user id — the tenant scopes the call
+    tenant,
     signal,
   );
 }
@@ -176,15 +189,13 @@ export function generateTestData(
   mode: "valid" | "invalid",
   count = 3,
   title?: string,
-  userId?: string,
+  tenant?: string,
   signal?: AbortSignal,
 ): Promise<TestDataResult> {
   return postWithRetry<TestDataResult>(
     "/agents/form/testdata",
-    { schema, mode, count, title, user_id: userId },
+    { schema, mode, count, title }, // no client user id — the tenant scopes the call
+    tenant,
     signal,
   );
 }
-
-/** Was a cold start likely (so callers can show a "waking up" hint)? */
-export const AGENT_BASE_URL = AGENT_URL;

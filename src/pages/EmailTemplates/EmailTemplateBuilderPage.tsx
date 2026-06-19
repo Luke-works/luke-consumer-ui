@@ -52,7 +52,6 @@ function Builder({ tenant, templateId, template }: {
   const { session } = useAuth();
   // read → view-only (no edits persisted, write actions hidden). read-write → full.
   const canEdit = canWrite(session, EMAIL);
-  const me = session?.userId ?? null;
 
   // The live EmailDoc (the authoring source) + the inline-editable name/subject.
   const [doc, setDoc] = useState<EmailDoc>(() => parseEmailDoc(template.doc) ?? emptyEmailDoc());
@@ -246,7 +245,7 @@ function Builder({ tenant, templateId, template }: {
     if (variables.length === 0) return;
     setGenerating(true);
     try {
-      const { samples } = await generateTestData({ ...docRef.current, subject: subjectRef.current }, 1, me ?? undefined);
+      const { samples } = await generateTestData({ ...docRef.current, subject: subjectRef.current }, 1, session?.tenant ?? undefined);
       const values = samples[0]?.values ?? {};
       setTestModel((prev) => {
         const next = { ...prev };

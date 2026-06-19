@@ -4,15 +4,23 @@
 // null on the first turn) plus a natural-language instruction, it returns the
 // COMPLETE updated EmailDoc, which we then repair + saveDraft + re-render.
 //
-// luke-agents runs as its own service (hosting the agent fleet under
-// /agents/<slug>), so its base URL is configured separately from the main API.
-// VITE_FORM_AGENT_URL is the luke-agents service base; we hit the email agent's
-// canonical endpoint at /agents/email/chat. Falls back to the known deployment.
+// luke-agents (an approved AI sub-processor) hosts the agent fleet under
+// /agents/<slug>; base URL via VITE_FORM_AGENT_URL. No hardcoded public fallback
+// (#32): a missing env fails the AI feature with a clear error instead of silently
+// shipping authored content to a public host. Calls are tenant-scoped (X-Tenant-Id)
+// and carry no client user id.
 import type { EmailDoc } from "./emailDoc";
 
-const AGENT_URL = (
-  import.meta.env.VITE_FORM_AGENT_URL || "https://luke-agents.onrender.com"
-).replace(/\/$/, "");
+/** Resolve the agents base URL, or throw if it isn't configured (no public fallback). */
+function agentBase(): string {
+  const raw = import.meta.env.VITE_FORM_AGENT_URL as string | undefined;
+  if (!raw) {
+    throw new Error(
+      "The AI assistant isn't configured. Set VITE_FORM_AGENT_URL to the luke-agents base URL.",
+    );
+  }
+  return raw.replace(/\/$/, "");
+}
 
 export type EmailAgentResult = {
   doc: EmailDoc;
@@ -71,7 +79,10 @@ function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
  *  - retries use exponential backoff + jitter within a total deadline;
  *  - an optional caller `signal` cancels everything (→ {@link AgentCancelledError}).
  */
-async function postWithRetry<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+async function postWithRetry<T>(path: string, body: unknown, tenant?: string, signal?: AbortSignal): Promise<T> {
+  const base = agentBase(); // throws (no public fallback) if unconfigured
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (tenant) headers["X-Tenant-Id"] = tenant; // tenant-scoped egress (#32/#33)
   const deadline = Date.now() + TOTAL_DEADLINE_MS;
 
   for (let attempt = 1; ; attempt++) {
@@ -85,9 +96,9 @@ async function postWithRetry<T>(path: string, body: unknown, signal?: AbortSigna
     let res: Response | null = null;
     let networkErr: unknown = null;
     try {
-      res = await fetch(`${AGENT_URL}${path}`, {
+      res = await fetch(`${base}${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
         signal: timeoutCtl.signal,
       });
@@ -144,12 +155,13 @@ export function generateEmail(
   message: string,
   doc: EmailDoc | null,
   title?: string,
-  userId?: string,
+  tenant?: string,
   signal?: AbortSignal,
 ): Promise<EmailAgentResult> {
   return postWithRetry<EmailAgentResult>(
     "/agents/email/chat",
-    { message, doc, title, user_id: userId, consent: true },
+    { message, doc, title, consent: true }, // no client user id — the tenant scopes the call
+    tenant,
     signal,
   );
 }
@@ -169,15 +181,13 @@ export type TestDataResult = {
 export function generateTestData(
   doc: EmailDoc,
   count = 1,
-  userId?: string,
+  tenant?: string,
   signal?: AbortSignal,
 ): Promise<TestDataResult> {
   return postWithRetry<TestDataResult>(
     "/agents/email/testdata",
-    { doc, count, user_id: userId },
+    { doc, count }, // no client user id — the tenant scopes the call
+    tenant,
     signal,
   );
 }
-
-/** The luke-agents base URL (so callers can show a "waking up" hint). */
-export const AGENT_BASE_URL = AGENT_URL;

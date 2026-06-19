@@ -11,8 +11,14 @@ function htmlRes(status: number) {
 }
 
 describe("formAgentApi (#40)", () => {
-  beforeEach(() => vi.clearAllMocks());
-  afterEach(() => vi.unstubAllGlobals());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv("VITE_FORM_AGENT_URL", "https://agents.test"); // configured base (#32)
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it("retries a 502 cold start (with backoff) then returns the parsed result", async () => {
     const fetchMock = vi
@@ -63,6 +69,27 @@ describe("formAgentApi (#40)", () => {
     await expect(generateSchema("hi", EMPTY, undefined, undefined, ac.signal)).rejects.toBeInstanceOf(
       AgentCancelledError,
     );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the tenant header and no client user id (#32)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { schema: EMPTY, title: "x", brain: "b" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generateSchema("hi", EMPTY, "T", "tenant-acme");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://agents.test/agents/form/chat");
+    expect(init.headers["X-Tenant-Id"]).toBe("tenant-acme");
+    expect(JSON.parse(init.body)).not.toHaveProperty("user_id");
+  });
+
+  it("fails fast (no public fallback) when VITE_FORM_AGENT_URL is unset (#32)", async () => {
+    vi.stubEnv("VITE_FORM_AGENT_URL", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generateSchema("hi", EMPTY)).rejects.toThrow(/isn.?t configured|VITE_FORM_AGENT_URL/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

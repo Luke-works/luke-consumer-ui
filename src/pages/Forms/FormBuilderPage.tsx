@@ -870,7 +870,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     setAiTestError(null);
     try {
       const schema = JSON.parse(currentSchemaJson()) as BuilderSchemaLike;
-      const { datasets } = await generateTestData(schema, "valid", genCount, form.name, me ?? undefined);
+      const { datasets } = await generateTestData(schema, "valid", genCount, form.name, tenant ?? undefined);
       if (datasets.length) {
         setPosAiSets(datasets);
         setPosSel(0);
@@ -917,7 +917,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
         message,
         JSON.parse(currentSchemaJson()) as BuilderSchemaLike,
         form.name,
-        me ?? undefined,
+        tenant ?? undefined,
       );
       await saveDraft(tenant, formId, JSON.stringify(result.schema));
       setTestOpen(false);

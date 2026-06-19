@@ -63,7 +63,7 @@ export default function EmailAiAssistPanel({
     // After a few seconds, hint that the free-tier service may be waking up.
     const coldTimer = setTimeout(() => setColdHint(true), 5000);
     try {
-      const result = await generateEmail(msg, doc, templateName, session?.userId, controller.signal);
+      const result = await generateEmail(msg, doc, templateName, session?.tenant ?? undefined, controller.signal);
       setBrain(result.brain);
       const n = result.doc?.blocks?.length ?? 0;
       const text = result.reply?.trim() || `Done — the email now has ${n} block${n === 1 ? "" : "s"}.`;

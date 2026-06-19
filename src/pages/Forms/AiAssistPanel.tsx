@@ -63,7 +63,7 @@ export default function AiAssistPanel({
     // After a few seconds, hint that the free-tier service may be waking up.
     const coldTimer = setTimeout(() => setColdHint(true), 5000);
     try {
-      const result = await generateSchema(msg, schema ?? EMPTY, formName, session?.userId, controller.signal);
+      const result = await generateSchema(msg, schema ?? EMPTY, formName, session?.tenant ?? undefined, controller.signal);
       setBrain(result.brain);
       const n = result.schema.root?.length ?? 0;
       const text = result.reply?.trim() || `Done — the form now has ${n} field${n === 1 ? "" : "s"}.`;
