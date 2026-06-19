@@ -10,6 +10,7 @@ import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import FormsList from "./pages/Forms/FormsList";
+import EmailTemplatesList from "./pages/EmailTemplates/EmailTemplatesList";
 import Email from "./pages/Email/Email";
 import Phone from "./pages/Phone/Phone";
 import Profile from "./pages/Account/Profile";
@@ -24,6 +25,8 @@ const FormResponses = lazy(() => import("./pages/Forms/FormResponses"));
 const FormEmbed = lazy(() => import("./pages/Forms/FormEmbed"));
 const FormInstancesList = lazy(() => import("./pages/Forms/FormInstancesList"));
 const FormInbox = lazy(() => import("./pages/Forms/FormInbox"));
+// Code-split the email-template builder (react-email render) to its own chunk.
+const EmailTemplateBuilderPage = lazy(() => import("./pages/EmailTemplates/EmailTemplateBuilderPage"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import OnboardingGate from "./components/auth/OnboardingGate";
@@ -53,6 +56,22 @@ export default function App() {
               {/* Email — gated behind the EMAIL capability (read to view). */}
               <Route element={<CapabilityRoute code={EMAIL} />}>
                 <Route path="/email" element={<Email />} />
+                {/* Email Templates — list + AI-chat builder, behind the same EMAIL gate. */}
+                <Route path="/email-templates" element={<EmailTemplatesList />} />
+                <Route
+                  path="/email-templates/:id"
+                  element={
+                    <Suspense
+                      fallback={
+                        <div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">
+                          Loading builder…
+                        </div>
+                      }
+                    >
+                      <EmailTemplateBuilderPage />
+                    </Suspense>
+                  }
+                />
               </Route>
               <Route path="/phone" element={<Phone />} />
               <Route path="/account/profile" element={<Profile />} />

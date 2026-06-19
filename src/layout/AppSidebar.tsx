@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { ChevronDownIcon, GridIcon, HorizontaLDots, ListIcon, LockIcon, MailIcon, PhoneIcon } from "../icons";
-import { FileText, Inbox } from "lucide-react";
+import { FileText, Inbox, Mail, MailPlus } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { canRead, EMAIL, FORMS } from "../lib/capabilities";
@@ -24,10 +24,18 @@ const FORMS_ITEM: NavItem = {
     { name: "Form Inbox", path: "/forms/inbox", icon: <Inbox className="size-4" /> },
   ],
 };
+const EMAIL_ITEM: NavItem = {
+  icon: <MailIcon />,
+  name: "Email",
+  subItems: [
+    { name: "Email Setup", path: "/email", icon: <Mail className="size-4" /> },
+    { name: "Email Templates", path: "/email-templates", icon: <MailPlus className="size-4" /> },
+  ],
+};
 const navItems: NavItem[] = [
   DASHBOARD_ITEM,
   FORMS_ITEM,
-  { icon: <MailIcon />, name: "Email", path: "/email" },
+  EMAIL_ITEM,
   { icon: <PhoneIcon />, name: "Phone", path: "/phone" },
 ];
 
