@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
 import { ChevronLeft, LayoutList, Columns2, FolderTree } from "lucide-react";
 import DataTable from "../../components/tables/DataTable";
+import TruncationNotice from "../../components/common/TruncationNotice";
 import InstanceDetail, { STATE_BADGE } from "./InstanceDetail";
 import { pidOf } from "./TracePanel";
 import { listForms } from "../../lib/formsApi";
@@ -27,6 +28,7 @@ const def = createColumnHelper<FormRow & { total: number; subs: number; last: nu
 
 export default function InstancesPanel({ tenant, definitionCode }: { tenant: string; definitionCode?: string }) {
   const [rows, setRows] = useState<FormInstance[]>([]);
+  const [total, setTotal] = useState(0);
   const [forms, setForms] = useState<FormRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,8 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
     Promise.all([listInstances(tenant), listForms(tenant)])
       .then(([insts, fs]) => {
         if (!active) return;
-        setRows(insts);
+        setRows(insts.items);
+        setTotal(insts.total);
         setForms(fs.map((f) => ({ id: f.id, code: f.code, name: f.name })));
         setLoading(false);
       })
@@ -160,11 +163,16 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
     </div>
   );
 
+  // The list is fetched with a hard server cap (#52). Surface it so a capped
+  // view (and the per-form counts derived from it) doesn't silently hide rows.
+  const notice = <TruncationNotice shown={rows.length} total={total} noun="submissions" />;
+
   // ── LIST ───────────────────────────────────────────────────────────────────
   if (view === "list" || definitionCode) {
     return (
       <>
         {switcher}
+        {notice}
         {detail ? (
           detailFor(detail, () => setDetail(null))
         ) : (
@@ -187,6 +195,7 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
     return (
       <>
         {switcher}
+        {notice}
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,460px)]">
           <DataTable
             columns={instanceColumns(true)}
@@ -214,6 +223,7 @@ export default function InstancesPanel({ tenant, definitionCode }: { tenant: str
   return (
     <>
       {switcher}
+      {notice}
       {!selectedDef ? (
         <DataTable
           columns={definitionColumns}

@@ -128,17 +128,50 @@ export async function getInstanceByToken(tenant: string, token: string): Promise
   return toView(await req<ApiView>(tenant, `${BASE}/by-token/${seg(token)}`));
 }
 
-/** All instances for the tenant, optionally filtered by form code or state. */
+/** A page of instances. `total` is the full server-side count; `items` is the
+ *  bounded page actually returned (see {@link INSTANCE_PAGE_MAX}). */
+export type InstancePage = {
+  items: FormInstance[];
+  total: number;
+  firstResult: number;
+  maxResults: number;
+};
+
+/** Hard page cap enforced by the backend (FormInstanceController.MAX_PAGE, #52).
+ *  Requesting more is silently clamped to this, so callers should treat a result
+ *  of this size as "possibly truncated" and surface it (compare items vs total). */
+export const INSTANCE_PAGE_MAX = 200;
+
+/** A page of instances for the tenant, optionally filtered by form code or state.
+ *  The endpoint is paged + size-capped server-side (#52) rather than returning the
+ *  whole (monotonically growing) tenant history — read `total` to detect when more
+ *  rows exist than were returned. */
 export async function listInstances(
   tenant: string,
-  filter: { definitionCode?: string; state?: InstanceState } = {},
-): Promise<FormInstance[]> {
+  filter: {
+    definitionCode?: string;
+    state?: InstanceState;
+    firstResult?: number;
+    maxResults?: number;
+  } = {},
+): Promise<InstancePage> {
   const qs = new URLSearchParams();
   if (filter.definitionCode) qs.set("definitionCode", filter.definitionCode);
   if (filter.state) qs.set("state", filter.state);
-  const q = qs.toString();
-  const list = await req<ApiInstance[]>(tenant, `${BASE}${q ? `?${q}` : ""}`);
-  return list.map(toInstance);
+  if (filter.firstResult != null) qs.set("firstResult", String(filter.firstResult));
+  qs.set("maxResults", String(filter.maxResults ?? INSTANCE_PAGE_MAX));
+  const body = await req<{
+    items: ApiInstance[];
+    total: number;
+    firstResult: number;
+    maxResults: number;
+  }>(tenant, `${BASE}?${qs.toString()}`);
+  return {
+    items: body.items.map(toInstance),
+    total: body.total,
+    firstResult: body.firstResult,
+    maxResults: body.maxResults,
+  };
 }
 
 /** Partial autosave (merges into the instance's data; moves it to IN_PROGRESS). */

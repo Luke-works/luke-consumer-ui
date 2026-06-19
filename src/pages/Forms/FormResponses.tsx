@@ -5,6 +5,7 @@ import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/FormRenderer";
+import TruncationNotice from "../../components/common/TruncationNotice";
 import {
   getInstance,
   listInstances,
@@ -35,6 +36,7 @@ export default function FormResponses() {
   const tenant = session?.tenant ?? null;
 
   const [rows, setRows] = useState<FormInstance[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<InstanceView | null>(null);
@@ -45,7 +47,7 @@ export default function FormResponses() {
     let active = true;
     setLoading(true);
     listInstances(tenant, { definitionCode: code })
-      .then((list) => { if (active) { setRows(list); setLoading(false); } })
+      .then((page) => { if (active) { setRows(page.items); setTotal(page.total); setLoading(false); } })
       .catch((e: unknown) => { if (active) { setError((e as { message?: string })?.message ?? "Couldn’t load responses."); setLoading(false); } });
     return () => { active = false; };
   }, [tenant, code]);
@@ -112,6 +114,7 @@ export default function FormResponses() {
             <p className="py-10 text-center text-sm text-gray-400">No responses yet.</p>
           ) : (
             <div className="overflow-x-auto">
+              <TruncationNotice shown={rows.length} total={total} noun="responses" />
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-gray-800">
