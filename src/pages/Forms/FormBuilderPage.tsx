@@ -13,6 +13,7 @@ import {
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useDraggable,
@@ -22,7 +23,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
@@ -751,7 +752,12 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     return { parentId, index: Math.max(0, childrenOf(parentId).indexOf(overId)) };
   };
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  // PointerSensor for mouse/touch; KeyboardSensor gives a keyboard reorder path
+  // (focus a grip, Space to lift, arrows to move, Space to drop) — WCAG 2.1.1 (#34).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const onDragStart = (event: DragStartEvent) => {
     const data = event.active.data.current;
