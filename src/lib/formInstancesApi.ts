@@ -96,10 +96,11 @@ function toInstance(i: ApiInstance): FormInstance {
 const toView = (v: ApiView): InstanceView => ({ instance: toInstance(v.instance), schema: v.schema ?? "" });
 
 // ── Requests ─────────────────────────────────────────────────────────────────
-function req<T>(tenant: string, path: string, init: RequestInit = {}, userId?: string): Promise<T> {
+function req<T>(tenant: string, path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
-  if (userId) headers.set("X-User-Id", userId);
+  // Never send X-User-Id from the browser — the auth gateway rejects it in CORS and
+  // strips it (anti-spoof), asserting the user from the session. Matches formsApi.
   return authed<T>(path, tenantInit(tenant, { ...init, headers }));
 }
 
@@ -113,8 +114,8 @@ export type CreateInstanceInput = {
 };
 
 /** Start a fill session for a form's published version (or a specific version). */
-export async function createInstance(tenant: string, input: CreateInstanceInput, userId?: string): Promise<InstanceView> {
-  const v = await req<ApiView>(tenant, BASE, { method: "POST", body: JSON.stringify(input) }, userId);
+export async function createInstance(tenant: string, input: CreateInstanceInput): Promise<InstanceView> {
+  const v = await req<ApiView>(tenant, BASE, { method: "POST", body: JSON.stringify(input) });
   return toView(v);
 }
 

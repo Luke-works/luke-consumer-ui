@@ -23,7 +23,6 @@ export default function FormFill() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
-  const userId = session?.userId ?? undefined;
 
   const [view, setView] = useState<InstanceView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,13 +45,13 @@ export default function FormFill() {
     if (!tenant || !code || created.current) return;
     created.current = true;
     let active = true;
-    createInstance(tenant, { definitionCode: code }, userId)
+    createInstance(tenant, { definitionCode: code })
       .then((v) => { if (active) { setView(v); setLoading(false); } })
       .catch((e: unknown) => {
         if (active) { setError(messageFor(e)); setLoading(false); }
       });
     return () => { active = false; };
-  }, [tenant, code, userId]);
+  }, [tenant, code]);
 
   // On unmount, flush any in-debounce edit so the last keystrokes aren't dropped
   // when the user navigates away within the autosave window.
