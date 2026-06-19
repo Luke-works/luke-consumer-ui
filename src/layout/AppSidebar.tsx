@@ -45,13 +45,14 @@ const AppSidebar: React.FC = () => {
   const location = useLocation();
 
   // Capability-gated nav items are hidden unless the user has at least read access.
-  // Org owners additionally get the Auth & Access admin page.
+  // Access is visible to every authenticated member (so everyone reaches "Manage
+  // My Access"); owner-only sections are gated inside the page.
   const items: NavItem[] = navItems.filter((item) => {
     if (item.name === "Forms") return canRead(session, FORMS);
     if (item.name === "Email") return canRead(session, EMAIL);
     return true;
   });
-  if (session?.tenantAdmin) {
+  if (session) {
     items.push({ icon: <LockIcon />, name: "Access", path: "/access" });
   }
 

@@ -236,6 +236,20 @@ export type CapabilityCatalogItem = {
 
 export type CapabilityGrant = { capabilityCode: string; level: string };
 
+/**
+ * A capability the caller's tenant is subscribed to (active for the org). Shape
+ * mirrors core-engine's SubscribedCapability from /api/my-subscriptions.
+ */
+export type SubscribedCapability = {
+  code: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  route?: string;
+  tier?: string;
+  status: string;
+};
+
 export type Invitation = {
   id: string;
   email: string;
@@ -342,6 +356,11 @@ export function removeUserFromGroup(tenantId: string, userId: string, groupId: s
 
 export function listCapabilities(tenantId: string): Promise<CapabilityCatalogItem[]> {
   return authed("/api/org/capabilities", tenantInit(tenantId));
+}
+
+/** Capabilities active for the caller's tenant (org-level, not capability-gated). */
+export function getMySubscriptions(tenantId: string): Promise<SubscribedCapability[]> {
+  return authed("/api/my-subscriptions", tenantInit(tenantId));
 }
 
 export function getUserCapabilities(tenantId: string, userId: string): Promise<CapabilityGrant[]> {
