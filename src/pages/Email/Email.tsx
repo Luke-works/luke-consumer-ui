@@ -39,7 +39,6 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 export default function Email() {
   const { session } = useAuth();
   const tenant = session?.tenant ?? "";
-  const userId = session?.userId;
   const allowed = canRead(session, EMAIL);
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -66,14 +65,14 @@ export default function Email() {
     setError(null);
     for (let attempt = 1; attempt <= LOAD_ATTEMPTS; attempt++) {
       try {
-        const srv = await emailApi.getEmailServer(tenant, userId, signal);
+        const srv = await emailApi.getEmailServer(tenant, signal);
         if (signal?.aborted) return; // superseded by a newer load — drop the result
         if (srv) {
           setServer(srv);
           setPhase("done");
           return;
         }
-        const v = await emailApi.getVerification(tenant, userId, signal);
+        const v = await emailApi.getVerification(tenant, signal);
         if (signal?.aborted) return;
         if (v && v.status === "PENDING") {
           setPending(v);
@@ -98,7 +97,7 @@ export default function Email() {
         return;
       }
     }
-  }, [tenant, userId, allowed]);
+  }, [tenant, allowed]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -116,7 +115,6 @@ export default function Email() {
       const v = await emailApi.startVerification(
         tenant,
         { orgName: orgName.trim(), email: email.trim() },
-        userId,
       );
       setPending(v);
       setCode("");
@@ -134,7 +132,7 @@ export default function Email() {
     if (code.trim().length < 4) return setError("Enter the code from your email.");
     setBusy(true);
     try {
-      const result = await emailApi.verifyCode(tenant, code.trim(), userId);
+      const result = await emailApi.verifyCode(tenant, code.trim());
       if (result.server) {
         setServer(result.server);
         setPhase("done");
@@ -147,7 +145,7 @@ export default function Email() {
       setInfo("Email verified — finishing setup…");
       for (let attempt = 1; attempt <= 3; attempt++) {
         await delay(800 * attempt);
-        const srv = await emailApi.getEmailServer(tenant, userId).catch(() => null);
+        const srv = await emailApi.getEmailServer(tenant).catch(() => null);
         if (srv) {
           setServer(srv);
           setInfo(null);

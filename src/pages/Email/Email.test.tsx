@@ -71,7 +71,8 @@ describe("Email setup (#33)", () => {
     mocked.getEmailServer.mockResolvedValue(SERVER);
     render(<Email />);
     await waitFor(() => expect(mocked.getEmailServer).toHaveBeenCalled());
-    // 3rd arg is the AbortSignal — the race fix relies on it being passed through.
-    expect(mocked.getEmailServer.mock.calls[0][2]).toBeInstanceOf(AbortSignal);
+    // 2nd arg is the AbortSignal — the race fix relies on it being passed through.
+    // (X-User-Id is no longer threaded from the browser — the auth gateway asserts it.)
+    expect(mocked.getEmailServer.mock.calls[0][1]).toBeInstanceOf(AbortSignal);
   });
 });

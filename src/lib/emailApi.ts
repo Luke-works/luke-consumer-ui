@@ -89,10 +89,12 @@ const toServer = (s: ApiServer): EmailServer => ({
   createdAt: ms(s.createdAt),
 });
 
-function req<T>(tenant: string, path: string, init: RequestInit = {}, userId?: string): Promise<T> {
+function req<T>(tenant: string, path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
-  if (userId) headers.set("X-User-Id", userId);
+  // Never send X-User-Id from the browser: the auth gateway's CORS policy rejects
+  // it and the proxy strips it anti-spoof, asserting the user from the session
+  // instead (it injects X-User-Id when forwarding to core-engine). Matches formsApi.
   return authed<T>(path, tenantInit(tenant, { ...init, headers }));
 }
 
@@ -110,24 +112,21 @@ async function optional<T>(p: Promise<T>): Promise<T | null> {
 export async function startVerification(
   tenant: string,
   input: { orgName: string; email: string },
-  userId?: string,
 ): Promise<Verification> {
   const v = await req<ApiVerification>(
     tenant,
     `${VERIFY_BASE}/start`,
     { method: "POST", body: JSON.stringify(input) },
-    userId,
   );
   return toVerification(v);
 }
 
 /** Confirm the code; on success the tenant's email server is auto-provisioned. */
-export async function verifyCode(tenant: string, code: string, userId?: string): Promise<VerifyResult> {
+export async function verifyCode(tenant: string, code: string): Promise<VerifyResult> {
   const r = await req<{ verification: ApiVerification; server: ApiServer | null; provisioningError: string | null }>(
     tenant,
     `${VERIFY_BASE}/verify`,
     { method: "POST", body: JSON.stringify({ code }) },
-    userId,
   );
   return {
     verification: toVerification(r.verification),
@@ -139,19 +138,17 @@ export async function verifyCode(tenant: string, code: string, userId?: string):
 /** Current verification status, or null if none started. */
 export async function getVerification(
   tenant: string,
-  userId?: string,
   signal?: AbortSignal,
 ): Promise<Verification | null> {
-  const v = await optional(req<ApiVerification>(tenant, VERIFY_BASE, { signal }, userId));
+  const v = await optional(req<ApiVerification>(tenant, VERIFY_BASE, { signal }));
   return v ? toVerification(v) : null;
 }
 
 /** The tenant's provisioned email server, or null if not set up yet. */
 export async function getEmailServer(
   tenant: string,
-  userId?: string,
   signal?: AbortSignal,
 ): Promise<EmailServer | null> {
-  const s = await optional(req<ApiServer>(tenant, SERVER_BASE, { signal }, userId));
+  const s = await optional(req<ApiServer>(tenant, SERVER_BASE, { signal }));
   return s ? toServer(s) : null;
 }
