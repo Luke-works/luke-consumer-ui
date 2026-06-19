@@ -6,6 +6,9 @@ import "flatpickr/dist/flatpickr.css";
 import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";
 import { ThemeProvider } from "./context/ThemeContext.tsx";
+import { initObservability } from "./lib/observability.ts";
+
+initObservability(); // Sentry, only when VITE_SENTRY_DSN is set (no-op otherwise)
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

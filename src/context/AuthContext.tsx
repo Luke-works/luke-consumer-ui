@@ -14,6 +14,7 @@ import type {
   SocialProvider,
   WorkosUser,
 } from "../lib/authApi";
+import { setObservabilityContext } from "../lib/observability";
 
 type SignUpInput = {
   email: string;
@@ -147,6 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionRef = useRef<SessionView | null>(session);
   useEffect(() => {
     sessionRef.current = session;
+    // Tag error reports with the active tenant/user for multi-tenant triage (#23).
+    setObservabilityContext({ tenant: session?.tenant, userId: session?.userId });
   }, [session]);
 
   const refreshSession = useCallback(async (opts?: { fresh?: boolean }) => {

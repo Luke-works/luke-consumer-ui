@@ -26,6 +26,7 @@
     "@react-email/render": "^2.0.9",
     "@react-jvectormap/core": "^1.0.4",
     "@react-jvectormap/world": "^1.1.2",
+    "@sentry/react": "^10.59.0",
     "@tanstack/react-table": "^8.21.3",
     "@tiptap/extension-link": "^3.25.0",
     "@tiptap/pm": "^3.25.0",
