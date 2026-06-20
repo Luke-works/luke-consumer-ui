@@ -12,6 +12,8 @@ type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
+  /** Marks an unbuilt area so it isn't presented as a working feature (#35). */
+  comingSoon?: boolean;
   subItems?: { name: string; path: string; icon?: React.ReactNode; pro?: boolean; new?: boolean }[];
 };
 
@@ -36,7 +38,7 @@ const navItems: NavItem[] = [
   DASHBOARD_ITEM,
   FORMS_ITEM,
   EMAIL_ITEM,
-  { icon: <PhoneIcon />, name: "Phone", path: "/phone" },
+  { icon: <PhoneIcon />, name: "Phone", path: "/phone", comingSoon: true },
 ];
 
 const AppSidebar: React.FC = () => {
@@ -176,7 +178,14 @@ const AppSidebar: React.FC = () => {
                   {nav.icon}
                 </span>
                 {(isExpanded || isHovered || isMobileOpen) && (
-                  <span className="menu-item-text">{nav.name}</span>
+                  <span className="menu-item-text flex items-center gap-2">
+                    {nav.name}
+                    {nav.comingSoon && (
+                      <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                        Soon
+                      </span>
+                    )}
+                  </span>
                 )}
               </Link>
             )

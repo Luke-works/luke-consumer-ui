@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router";
 import { useMutationLock } from "../../hooks/useMutationLock";
@@ -222,7 +222,9 @@ const TYPES_WITH_KEY = new Set<string>(
   formBuilder.entities.filter((e) => e.attributes.some((a) => a.name === "key")).map((e) => e.name)
 );
 
-function SortableField({ id, isActive, onSelect, onUp, onDown, onDelete, children }: {
+// Memoized so a field row only re-renders when its own props change — skipped on
+// unrelated canvas re-renders once its props are stable (#31).
+const SortableField = memo(function SortableField({ id, isActive, onSelect, onUp, onDown, onDelete, children }: {
   id: string; isActive: boolean; onSelect: () => void; onUp: () => void; onDown: () => void; onDelete: () => void; children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({ id });
@@ -257,7 +259,7 @@ function SortableField({ id, isActive, onSelect, onUp, onDown, onDelete, childre
       </div>
     </div>
   );
-}
+});
 
 function Canvas({ children }: { children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: "root" });
@@ -672,8 +674,14 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     }
   });
 
-  // Loose view of the schema entities for parent/child resolution.
-  const ents = schema.entities as Record<string, { type: string; parentId?: string; children?: string[]; attributes: Record<string, unknown> }>;
+  // Loose view of the schema entities for parent/child resolution. Memoized so the
+  // canvas context value + key list are stable across unrelated state changes (palette
+  // keystrokes, panel toggles) and don't rebuild every render (#31).
+  const ents = useMemo(
+    () => schema.entities as Record<string, { type: string; parentId?: string; children?: string[]; attributes: Record<string, unknown> }>,
+    [schema.entities],
+  );
+  const entityKeys = useMemo(() => Object.keys(schema.entities), [schema.entities]);
   const childrenOf = (id?: string) => (id ? ents[id]?.children ?? [] : order);
   const subtree = (id: string, acc = new Set<string>()): Set<string> => {
     acc.add(id);
@@ -1085,7 +1093,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
                   <p className="mt-1 text-sm text-gray-400">{canEdit ? "Drag a field from the left to start building." : "This form has no fields."}</p>
                 </div>
               ) : (
-                <SortableContext items={Object.keys(schema.entities)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={entityKeys} strategy={verticalListSortingStrategy}>
                   <BuilderEntitiesContext.Provider value={ents}>
                     <BuilderEntities builderStore={builderStore} components={entityComponents}>
                       {(props) => (
