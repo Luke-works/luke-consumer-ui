@@ -213,6 +213,45 @@ function PaletteButton({ item }: { item: PaletteItem }) {
   );
 }
 
+// The field palette owns its OWN search state, so typing in it re-renders only the
+// palette — not the Designer/canvas (#31). PALETTE_GROUPS + PaletteButton are
+// module-scope and self-contained, so nothing from the Designer is needed here.
+const FieldPalette = memo(function FieldPalette() {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const groups = q
+    ? PALETTE_GROUPS.map((g) => ({
+        ...g,
+        items: g.items.filter((i) => i.label.toLowerCase().includes(q) || i.type.toLowerCase().includes(q)),
+      })).filter((g) => g.items.length)
+    : PALETTE_GROUPS;
+  return (
+    <div className="sticky top-24 max-h-[calc(100vh-9rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search fields…"
+        className="mb-3 h-9 w-full rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90"
+      />
+      {groups.length === 0 ? (
+        <p className="px-1 py-4 text-center text-xs text-gray-400">No fields match “{query}”.</p>
+      ) : (
+        groups.map((group) => (
+          <div key={group.group} className="mb-4 last:mb-0">
+            <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group.group}</p>
+            <div className="flex flex-col gap-1.5">
+              {group.items.map((item) => (
+                <PaletteButton key={item.type} item={item} />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+});
+
 // Key generation (camelCase from label, made unique) is shared with the schema
 // integrity layer via `sanitizeKey`/`uniqueKey` in lib/formSchema, so add-time
 // keys, manual edits, and AI-applied schemas all agree on what a valid key is.
@@ -386,7 +425,6 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [submitMessage, setSubmitMessage] = useState(() => readSettings(form.schema).submitMessage ?? "");
   const submitMessageRef = useRef(submitMessage);
   useEffect(() => { submitMessageRef.current = submitMessage; }, [submitMessage]);
-  const [paletteQuery, setPaletteQuery] = useState("");
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
@@ -1052,35 +1090,9 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragLabel(null)}>
         <div className={`grid min-h-[520px] grid-cols-1 items-start gap-4 ${canEdit ? "lg:grid-cols-[220px_1fr]" : ""}`}>
-          {/* Palette — only when the user can edit. */}
-          {canEdit && (
-          <div className="sticky top-24 max-h-[calc(100vh-9rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]">
-            <input
-              type="search"
-              value={paletteQuery}
-              onChange={(e) => setPaletteQuery(e.target.value)}
-              placeholder="Search fields…"
-              className="mb-3 h-9 w-full rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90"
-            />
-            {(() => {
-              const q = paletteQuery.trim().toLowerCase();
-              const groups = q
-                ? PALETTE_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(q) || i.type.toLowerCase().includes(q)) })).filter((g) => g.items.length)
-                : PALETTE_GROUPS;
-              if (groups.length === 0) return <p className="px-1 py-4 text-center text-xs text-gray-400">No fields match “{paletteQuery}”.</p>;
-              return groups.map((group) => (
-                <div key={group.group} className="mb-4 last:mb-0">
-                  <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{group.group}</p>
-                  <div className="flex flex-col gap-1.5">
-                    {group.items.map((item) => (
-                      <PaletteButton key={item.type} item={item} />
-                    ))}
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
-          )}
+          {/* Palette — only when the user can edit. Its search state lives inside the
+              component so keystrokes don't re-render the canvas (#31). */}
+          {canEdit && <FieldPalette />}
 
           {/* Canvas — non-interactive when the user only has read access. */}
           <div className="relative">
