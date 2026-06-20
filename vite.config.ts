@@ -21,5 +21,7 @@ export default defineConfig({
     // (formSchema, expression) run fine under it too.
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // e2e/ holds Playwright specs (run via `npm run test:e2e`), not vitest.
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
   },
 });

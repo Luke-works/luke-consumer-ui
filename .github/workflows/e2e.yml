@@ -1,0 +1,40 @@
+# End-to-end tests — drives the real app in a headless browser (Playwright).
+# Hermetic: Playwright starts the Vite dev server and the specs stub all gateway
+# calls, so no backend is needed. Separate from ci.yml so unit checks stay fast.
+name: E2E
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
