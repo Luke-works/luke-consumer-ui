@@ -265,6 +265,7 @@ function FormStep({
             value={orgName}
             onChange={(e) => onOrgName(e.target.value)}
             disabled={busy}
+            autoFocus
           />
         </div>
         <div>
@@ -331,6 +332,7 @@ function CodeStep({
           value={code}
           onChange={(e) => onCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
           disabled={busy}
+          autoFocus
           className="text-center text-lg tracking-[0.5em]"
         />
         {typeof attemptsRemaining === "number" && attemptsRemaining < 5 && (

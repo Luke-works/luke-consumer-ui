@@ -7,7 +7,12 @@ interface ModalProps {
   children: React.ReactNode;
   showCloseButton?: boolean; // New prop to control close button visibility
   isFullscreen?: boolean; // Default to false for backwards compatibility
+  /** Accessible name for the dialog (falls back to a generic label). */
+  ariaLabel?: string;
 }
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -16,22 +21,48 @@ export const Modal: React.FC<ModalProps> = ({
   className,
   showCloseButton = true, // Default to true for backwards compatibility
   isFullscreen = false,
+  ariaLabel = "Dialog",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Accessibility (#34): on open focus the dialog and trap Tab inside it; Esc closes;
+  // restore focus to the trigger on close. Selecting a builder field opens this modal,
+  // so this is also "focus moves to the settings panel on select".
   useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
+    if (!isOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const node = modalRef.current;
+    node?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+      if (event.key === "Tab" && node) {
+        const items = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+          (el) => el.offsetParent !== null,
+        );
+        if (items.length === 0) {
+          event.preventDefault();
+          return;
+        }
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
 
-    if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
-    }
-
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus?.();
     };
   }, [isOpen, onClose]);
 
@@ -59,16 +90,22 @@ export const Modal: React.FC<ModalProps> = ({
         <div
           className="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
           onClick={onClose}
+          aria-hidden="true"
         ></div>
       )}
       <div
         ref={modalRef}
-        className={`${contentClasses}  ${className}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        tabIndex={-1}
+        className={`${contentClasses} outline-none ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {showCloseButton && (
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="absolute right-3 top-3 z-999 flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white sm:right-6 sm:top-6 sm:h-11 sm:w-11"
           >
             <svg

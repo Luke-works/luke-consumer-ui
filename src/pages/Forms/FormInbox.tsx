@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { ChevronLeft, ChevronRight, Columns2, Inbox as InboxIcon, LayoutList } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
@@ -279,6 +279,15 @@ function SplitInbox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input]);
 
+  // Move focus to the reading pane when a task is selected — incl. the auto-select of
+  // the first task on entering split view — so keyboard/AT users land on the content (#34).
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (selected) headingRef.current?.focus();
+    // Key on the task id only — re-focus on a *different* task, not every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.taskId]);
+
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   return (
@@ -347,7 +356,7 @@ function SplitInbox({
           <>
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
               <div className="min-w-0">
-                <h2 className="truncate text-base font-semibold text-gray-800 dark:text-white/90">{selected.name ?? "Task"}</h2>
+                <h2 ref={headingRef} tabIndex={-1} className="truncate text-base font-semibold text-gray-800 outline-none dark:text-white/90">{selected.name ?? "Task"}</h2>
                 <p className="text-xs text-gray-400">Created {fmt(selected.created)} · {who(selected.assignee) ?? "Unassigned"}</p>
               </div>
               <Button size="sm" onClick={onComplete} disabled={completing}>{completing ? "Completing…" : "Complete task"}</Button>
