@@ -18,7 +18,7 @@ const AppHeader: React.FC = () => {
         <Menu className="size-5" />
       </button>
       <Link to="/" className="flex items-center">
-        <LukeflowLogo className="text-[22px]" />
+        <LukeflowLogo size={32} />
       </Link>
     </header>
   );

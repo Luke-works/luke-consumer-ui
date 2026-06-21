@@ -1,5 +1,5 @@
-<svg width="110" height="34" viewBox="0 0 110 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="3" width="38" height="28" rx="7" fill="#465FFF"/>
-  <text x="19" y="23" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="19" font-weight="700" letter-spacing="-0.5" fill="#FFFFFF">Lu</text>
-  <text x="43" y="23" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="19" font-weight="700" letter-spacing="-0.5" fill="#F2F4F7">keflow</text>
+<svg width="116" height="34" viewBox="0 0 116 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="34" height="34" rx="8" fill="#465FFF"/>
+  <text x="17" y="23" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5" fill="#FFFFFF">Lu</text>
+  <text x="42" y="24" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="-0.5" fill="#F2F4F7">keflow</text>
 </svg>

@@ -273,9 +273,9 @@ const AppSidebar: React.FC = () => {
       >
         <Link to="/" className="block shrink-0">
           {isExpanded || isHovered || isMobileOpen ? (
-            <LukeflowLogo className="text-[26px]" />
+            <LukeflowLogo size={34} />
           ) : (
-            <LukeflowLogo iconOnly className="text-[22px]" />
+            <LukeflowLogo iconOnly size={32} />
           )}
         </Link>
       </div>
