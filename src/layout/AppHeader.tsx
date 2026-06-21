@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Menu } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
+import LukeflowLogo from "../components/branding/LukeflowLogo";
 
 // Mobile-only bar: the desktop navbar is gone (its controls moved to the sidebar
 // footer). On small screens this just provides a way to open the sidebar drawer.
@@ -17,8 +18,7 @@ const AppHeader: React.FC = () => {
         <Menu className="size-5" />
       </button>
       <Link to="/" className="flex items-center">
-        <img className="dark:hidden" src="/images/logo/logo.svg" alt="Lukeflow" height={28} />
-        <img className="hidden dark:block" src="/images/logo/logo-dark.svg" alt="Lukeflow" height={28} />
+        <LukeflowLogo className="text-[22px]" />
       </Link>
     </header>
   );
