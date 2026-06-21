@@ -3,7 +3,7 @@
 // (X-Tenant-Id) and gated by the EMAIL capability server-side (GET = read,
 // mutations = read-write). We store only the lightweight EmailDoc JSON + the
 // Postmark template alias — Postmark owns the rendered HTML.
-import { authed, tenantInit } from "./authApi";
+import { authed, tenantInit, asArray } from "./authApi";
 
 const BASE = "/api/email-templates";
 const seg = (s: string) => encodeURIComponent(s);
@@ -135,7 +135,7 @@ function req<T>(tenant: string, path: string, init: RequestInit = {}): Promise<T
 /** Live templates (or trash when deleted=true). latestVersion is not resolved here. */
 export async function listTemplates(tenant: string, deleted = false): Promise<StoredTemplate[]> {
   const list = await req<ApiTemplate[]>(tenant, `${BASE}?deleted=${deleted}`);
-  return list.map((t) => toTemplate(t));
+  return asArray<ApiTemplate>(list).map((t) => toTemplate(t));
 }
 
 /** A single template with its latest version number resolved (for the builder). */
@@ -184,7 +184,7 @@ export async function checkIn(
 
 export async function listVersions(tenant: string, id: string): Promise<TemplateVersion[]> {
   const vs = await req<ApiVersion[]>(tenant, `${BASE}/${seg(id)}/versions`);
-  return vs.map(toVersion);
+  return asArray<ApiVersion>(vs).map(toVersion);
 }
 
 /** Re-push a checked-in version's doc to Postmark. */
@@ -215,7 +215,7 @@ export async function cloneTemplate(tenant: string, id: string): Promise<StoredT
 
 export async function getAudit(tenant: string, id: string): Promise<AuditEvent[]> {
   const list = await req<ApiAudit[]>(tenant, `${BASE}/${seg(id)}/audit`);
-  return list.map(toAudit);
+  return asArray<ApiAudit>(list).map(toAudit);
 }
 
 /** Send a test email through the published Postmark template (reuses the send path). */

@@ -5,7 +5,7 @@
 // X-User-Id (the auth gateway forbids it). Org endpoints additionally require the
 // caller to be a tenant-admin. Mirrors the request/error/timestamp conventions of
 // emailApi.ts / formsApi.ts.
-import { authed, tenantInit } from "./authApi";
+import { authed, tenantInit, asArray } from "./authApi";
 
 const BASE = "/api/access-requests";
 const MINE = "/api/my-access-requests";
@@ -96,7 +96,7 @@ export async function createAccessRequest(
 /** The caller's own requests (any status), newest first. */
 export async function listMyAccessRequests(tenant: string): Promise<AccessRequest[]> {
   const list = await req<ApiAccessRequest[]>(tenant, MINE);
-  return list.map(toAccessRequest);
+  return asArray<ApiAccessRequest>(list).map(toAccessRequest);
 }
 
 /** Cancel the caller's OWN pending request (403 if not owner, 409 if not PENDING). */
@@ -111,7 +111,7 @@ export async function listOrgAccessRequests(
   status: AccessRequestStatus = "PENDING",
 ): Promise<AccessRequest[]> {
   const list = await req<ApiAccessRequest[]>(tenant, `${ORG}?status=${seg(status)}`);
-  return list.map(toAccessRequest);
+  return asArray<ApiAccessRequest>(list).map(toAccessRequest);
 }
 
 /** Approve a request, granting access (owners only). Optional level overrides the requested level. */

@@ -67,6 +67,13 @@ async function parse<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+/** Coerce an API result to an array. A list endpoint whose body arrives empty (e.g. a
+ *  dropped/empty response that parse() turns into {}) would otherwise crash callers on
+ *  .map/.filter; treat any non-array as an empty list so the page renders empty instead. */
+export function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 export async function register(input: {
   email: string;
   password: string;
@@ -306,8 +313,8 @@ export function addMember(
   );
 }
 
-export function listOrgUsers(tenantId: string): Promise<OrgMember[]> {
-  return authed("/api/org/users", tenantInit(tenantId));
+export async function listOrgUsers(tenantId: string): Promise<OrgMember[]> {
+  return asArray<OrgMember>(await authed("/api/org/users", tenantInit(tenantId)));
 }
 
 export function setUserRole(
@@ -326,8 +333,8 @@ export function setUserRole(
   );
 }
 
-export function listGroups(tenantId: string): Promise<OrgGroup[]> {
-  return authed("/api/org/candidate-groups", tenantInit(tenantId));
+export async function listGroups(tenantId: string): Promise<OrgGroup[]> {
+  return asArray<OrgGroup>(await authed("/api/org/candidate-groups", tenantInit(tenantId)));
 }
 
 export function createGroup(tenantId: string, name: string): Promise<OrgGroup> {
@@ -355,17 +362,17 @@ export function removeUserFromGroup(tenantId: string, userId: string, groupId: s
   );
 }
 
-export function listCapabilities(tenantId: string): Promise<CapabilityCatalogItem[]> {
-  return authed("/api/org/capabilities", tenantInit(tenantId));
+export async function listCapabilities(tenantId: string): Promise<CapabilityCatalogItem[]> {
+  return asArray<CapabilityCatalogItem>(await authed("/api/org/capabilities", tenantInit(tenantId)));
 }
 
 /** Capabilities active for the caller's tenant (org-level, not capability-gated). */
-export function getMySubscriptions(tenantId: string): Promise<SubscribedCapability[]> {
-  return authed("/api/my-subscriptions", tenantInit(tenantId));
+export async function getMySubscriptions(tenantId: string): Promise<SubscribedCapability[]> {
+  return asArray<SubscribedCapability>(await authed("/api/my-subscriptions", tenantInit(tenantId)));
 }
 
-export function getUserCapabilities(tenantId: string, userId: string): Promise<CapabilityGrant[]> {
-  return authed(`/api/org/users/${seg(userId)}/capabilities`, tenantInit(tenantId));
+export async function getUserCapabilities(tenantId: string, userId: string): Promise<CapabilityGrant[]> {
+  return asArray<CapabilityGrant>(await authed(`/api/org/users/${seg(userId)}/capabilities`, tenantInit(tenantId)));
 }
 
 export function setUserCapability(

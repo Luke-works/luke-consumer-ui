@@ -6,7 +6,7 @@
 // Authed calls send Authorization: Bearer + X-Tenant-Id (NEVER X-User-Id — the gateway
 // forbids it and asserts the user from the session). The public /api/public/sign/** calls
 // send NO auth/tenant headers — the unguessable token in the path is the sole auth.
-import { ApiError, getAccessToken, refresh } from "./authApi";
+import { ApiError, getAccessToken, refresh, asArray } from "./authApi";
 
 const BASE = (
   import.meta.env.VITE_SIGNATURES_API_URL ||
@@ -170,7 +170,7 @@ export async function createSignature(
 /** The tenant's requests, newest first. */
 export async function listSignatures(tenant: string): Promise<SignatureRequest[]> {
   const list = await reqJson<ApiSignature[]>(tenant, "/api/signatures");
-  return list.map(toSignature);
+  return asArray<ApiSignature>(list).map(toSignature);
 }
 
 /** A single request + its IP-stamped audit trail. */

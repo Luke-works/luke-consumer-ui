@@ -2,7 +2,7 @@
 // (/api/form-definitions/** → core-engine proxy → capability-engine). Every call
 // is tenant-scoped (X-Tenant-Id) and gated by the FORMS capability server-side
 // (GET = read, mutations = read-write). This replaces the old browser-local store.
-import { authed, tenantInit } from "./authApi";
+import { authed, tenantInit, asArray } from "./authApi";
 
 const BASE = "/api/form-definitions";
 const seg = (s: string) => encodeURIComponent(s);
@@ -118,7 +118,7 @@ function req<T>(tenant: string, path: string, init: RequestInit = {}): Promise<T
 /** Live forms (or trash when deleted=true). latestVersion is not resolved here. */
 export async function listForms(tenant: string, deleted = false, signal?: AbortSignal): Promise<StoredForm[]> {
   const list = await req<ApiForm[]>(tenant, `${BASE}?deleted=${deleted}`, { signal });
-  return list.map((f) => toForm(f));
+  return asArray<ApiForm>(list).map((f) => toForm(f));
 }
 
 /** A single form with its latest version number resolved (for the builder). */
@@ -157,7 +157,7 @@ export async function checkIn(tenant: string, id: string, schema: string, publis
 
 export async function listVersions(tenant: string, id: string): Promise<FormArtifact[]> {
   const vs = await req<ApiVersion[]>(tenant, `${BASE}/${seg(id)}/versions`);
-  return vs.map(toArtifact);
+  return asArray<ApiVersion>(vs).map(toArtifact);
 }
 
 export function publishVersion(tenant: string, id: string, version: number): Promise<unknown> {
@@ -205,7 +205,7 @@ export async function cloneForm(tenant: string, id: string): Promise<StoredForm>
 
 export async function getAudit(tenant: string, id: string): Promise<AuditEvent[]> {
   const list = await req<ApiAudit[]>(tenant, `${BASE}/${seg(id)}/audit`);
-  return list.map(toAudit);
+  return asArray<ApiAudit>(list).map(toAudit);
 }
 
 /** Mint an opaque, signed embed token for a published form (for the iframe). */
