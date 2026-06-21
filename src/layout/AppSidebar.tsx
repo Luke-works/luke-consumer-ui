@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { ChevronDownIcon, GridIcon, HorizontaLDots, ListIcon, LockIcon, MailIcon, PhoneIcon } from "../icons";
-import { FileText, Inbox, Mail, MailPlus } from "lucide-react";
+import { FileText, Inbox, Mail, MailPlus, PenLine } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { canRead, EMAIL, FORMS } from "../lib/capabilities";
+import { canRead, EMAIL, FORMS, SIGNATURES } from "../lib/capabilities";
 import SidebarFooter from "./SidebarFooter";
 
 type NavItem = {
@@ -34,10 +34,16 @@ const EMAIL_ITEM: NavItem = {
     { name: "Email Templates", path: "/email-templates", icon: <MailPlus className="size-4" /> },
   ],
 };
+const SIGNATURES_ITEM: NavItem = {
+  icon: <PenLine className="size-5" />,
+  name: "Signatures",
+  path: "/signatures",
+};
 const navItems: NavItem[] = [
   DASHBOARD_ITEM,
   FORMS_ITEM,
   EMAIL_ITEM,
+  SIGNATURES_ITEM,
   { icon: <PhoneIcon />, name: "Phone", path: "/phone", comingSoon: true },
 ];
 
@@ -52,6 +58,7 @@ const AppSidebar: React.FC = () => {
   const items: NavItem[] = navItems.filter((item) => {
     if (item.name === "Forms") return canRead(session, FORMS);
     if (item.name === "Email") return canRead(session, EMAIL);
+    if (item.name === "Signatures") return canRead(session, SIGNATURES);
     return true;
   });
   if (session) {

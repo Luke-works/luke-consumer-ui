@@ -17,7 +17,9 @@ export type Verification = {
   email: string;
   domain: string;
   orgName: string;
-  attemptsRemaining: number;
+  /** Tries left on the active code. `undefined` = unknown (e.g. a thin response) —
+   *  distinct from a real 0 ("locked out"), so the UI must not treat absent as 0. */
+  attemptsRemaining?: number;
   expiresAt?: number;
 };
 
@@ -71,7 +73,10 @@ const toVerification = (v: ApiVerification): Verification => ({
   email: v.email,
   domain: v.domain,
   orgName: v.orgName,
-  attemptsRemaining: v.attemptsRemaining ?? 0,
+  // Keep a real value (including 0 = locked out); only a genuinely-absent field
+  // becomes undefined. Defaulting absent→0 wrongly disabled "Verify & finish" and
+  // showed "No attempts left" whenever a response arrived thin/empty.
+  attemptsRemaining: typeof v.attemptsRemaining === "number" ? v.attemptsRemaining : undefined,
   expiresAt: ms(v.expiresAt),
 });
 

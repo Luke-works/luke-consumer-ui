@@ -27,11 +27,14 @@ const FormInstancesList = lazy(() => import("./pages/Forms/FormInstancesList"));
 const FormInbox = lazy(() => import("./pages/Forms/FormInbox"));
 // Code-split the email-template builder (react-email render) to its own chunk.
 const EmailTemplateBuilderPage = lazy(() => import("./pages/EmailTemplates/EmailTemplateBuilderPage"));
+// Code-split the signature pages (react-pdf + pdf.js) to their own chunk.
+const SignaturesList = lazy(() => import("./pages/Signatures/SignaturesList"));
+const SignPage = lazy(() => import("./pages/Signatures/SignPage"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import OnboardingGate from "./components/auth/OnboardingGate";
 import CapabilityRoute from "./components/auth/CapabilityRoute";
-import { EMAIL, FORMS } from "./lib/capabilities";
+import { EMAIL, FORMS, SIGNATURES } from "./lib/capabilities";
 import { loadFreeEmailDomains } from "./lib/emailDomains";
 
 if (!import.meta.env.VITE_AUTH_API_URL) {
@@ -72,6 +75,17 @@ export default function App() {
                       }
                     >
                       <EmailTemplateBuilderPage />
+                    </Suspense>
+                  }
+                />
+              </Route>
+              {/* Signatures — gated behind the SIGNATURES capability (read to view, write to send). */}
+              <Route element={<CapabilityRoute code={SIGNATURES} />}>
+                <Route
+                  path="/signatures"
+                  element={
+                    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                      <SignaturesList />
                     </Suspense>
                   }
                 />
@@ -151,6 +165,16 @@ export default function App() {
             element={
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
                 <FormEmbed />
+              </Suspense>
+            }
+          />
+
+          {/* Public signing page — no auth; the unguessable sign token is the auth. */}
+          <Route
+            path="/sign/:token"
+            element={
+              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                <SignPage />
               </Suspense>
             }
           />

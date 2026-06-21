@@ -78,8 +78,8 @@ export default function Email() {
         if (signal?.aborted) return;
         if (v && v.status === "PENDING") {
           setPending(v);
-          setEmail(v.email);
-          setOrgName(v.orgName);
+          if (v.email) setEmail(v.email);
+          if (v.orgName) setOrgName(v.orgName);
           setPhase("code");
           return;
         }
@@ -120,7 +120,9 @@ export default function Email() {
       );
       setPending(v);
       setCode("");
-      setInfo(`We sent a 6-digit code to ${v.email}.`);
+      // Fall back to the address the user just entered if the response is thin
+      // (so we never render "…code to undefined").
+      setInfo(`We sent a 6-digit code to ${v.email ?? email.trim()}.`);
       setPhase("code");
     } catch (e) {
       setError(messageOf(e));
