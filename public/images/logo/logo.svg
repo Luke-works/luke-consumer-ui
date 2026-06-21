@@ -1,5 +1,8 @@
-<svg width="116" height="34" viewBox="0 0 116 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="0" y="0" width="34" height="34" rx="8" fill="#465FFF"/>
-  <text x="17" y="23" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5" fill="#FFFFFF">Lu</text>
-  <text x="42" y="24" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="-0.5" fill="#1D2939">keflow</text>
+<svg width="154" height="32" viewBox="0 0 154 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M0 8.42105C0 3.77023 3.77023 0 8.42105 0H23.5789C28.2298 0 32 3.77023 32 8.42105V23.5789C32 28.2298 28.2298 32 23.5789 32H8.42105C3.77023 32 0 28.2298 0 23.5789V8.42105Z" fill="#465FFF"/>
+  <path d="M10 9V20C10 21.1046 10.8954 22 12 22H23" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="10" cy="9" r="2.6" fill="white"/>
+  <circle cx="10" cy="22" r="2.6" fill="#465FFF" stroke="white" stroke-width="2.2"/>
+  <circle cx="23" cy="22" r="2.6" fill="white"/>
+  <text x="42" y="21" font-family="Anek Telugu, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="600" letter-spacing="-0.2" fill="#1D2939">Lukeflow</text>
 </svg>
