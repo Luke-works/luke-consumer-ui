@@ -196,6 +196,10 @@ interface SettingsPanelProps {
 }
 declare function SettingsPanel({ builder, editors }: SettingsPanelProps): react.JSX.Element;
 
+declare function NodePreview({ entity }: {
+    entity: SchemaEntity;
+}): react.JSX.Element | null;
+
 /**
  * @lukeflow/form-builder — the reference React form builder for @lukeflow/form-core.
  *
@@ -207,4 +211,4 @@ declare function SettingsPanel({ builder, editors }: SettingsPanelProps): react.
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, FormBuilder, type FormBuilderProps, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };
+export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, FormBuilder, type FormBuilderProps, NodePreview, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };

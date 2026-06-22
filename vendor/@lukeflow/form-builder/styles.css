@@ -95,23 +95,24 @@
 .lf-node[data-depth] > .lf-node-list { margin-left: 16px; border-left: 1px dashed var(--lf-border, #d9d9d9); padding-left: 8px; }
 .lf-node-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 4px 6px;
   border: 1px solid transparent;
   border-radius: var(--lf-radius, 6px);
 }
 .lf-node-row.is-selected { border-color: var(--lf-primary, #2563eb); background: var(--lf-tint, #eff6ff); }
-.lf-node-grip { cursor: grab; color: var(--lf-muted, #6b7280); user-select: none; line-height: 1; padding: 0 2px; }
+.lf-node-grip { cursor: grab; color: var(--lf-muted, #6b7280); user-select: none; line-height: 1; padding: 2px; }
 .lf-node-grip:active { cursor: grabbing; }
 .lf-node-row.is-drop-before { box-shadow: inset 0 2px 0 0 var(--lf-primary, #2563eb); }
 .lf-node-row.is-drop-after { box-shadow: inset 0 -2px 0 0 var(--lf-primary, #2563eb); }
 .lf-node-row.is-drop-into { background: var(--lf-tint, #eff6ff); border-color: var(--lf-primary, #2563eb); }
+.lf-node-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
 .lf-node-select {
-  flex: 1;
-  display: flex;
+  display: inline-flex;
   align-items: baseline;
   gap: 8px;
+  padding: 0;
   background: none;
   border: none;
   text-align: left;
@@ -119,6 +120,25 @@
 }
 .lf-node-label { font-weight: 500; }
 .lf-node-type { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
+
+/* Inline field preview (read-only, non-interactive). */
+.lf-node-preview { pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
+.lf-pv-input {
+  width: 100%;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--lf-muted, #6b7280);
+  background: var(--lf-bg, #fff);
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+}
+.lf-pv-check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--lf-muted, #6b7280); }
+.lf-pv-choices { display: flex; flex-direction: column; gap: 2px; }
+.lf-pv-file, .lf-pv-sign { padding: 6px 8px; font-size: 0.8rem; color: var(--lf-muted, #6b7280); border: 1px dashed var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
+.lf-pv-btn { align-self: flex-start; padding: 4px 12px; font: inherit; color: var(--lf-primary, #2563eb); background: none; border: 1px solid var(--lf-primary, #2563eb); border-radius: var(--lf-radius, 6px); }
+.lf-pv-heading { font-weight: 600; font-size: 1rem; color: var(--lf-text, #1a1a1a); }
+.lf-pv-muted { font-size: 0.85rem; color: var(--lf-muted, #6b7280); }
+.lf-pv-hr { width: 100%; border: none; border-top: 1px solid var(--lf-border, #d9d9d9); margin: 4px 0; }
 .lf-node-actions { display: flex; gap: 2px; }
 .lf-node-actions button {
   width: 24px; height: 24px;
