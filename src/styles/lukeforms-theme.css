@@ -164,6 +164,15 @@
   box-shadow: 0 0 0 1px var(--color-brand-400, #7592ff);
   background: var(--lf-tint);
 }
+.lf-builder .lf-node-grip {
+  font-size: 1rem;
+  color: var(--color-gray-300, #d0d5dd);
+  opacity: 0;
+  transition: opacity .15s, color .15s;
+}
+.lf-builder .lf-node-row:hover .lf-node-grip,
+.lf-builder .lf-node-row.is-selected .lf-node-grip { opacity: 1; }
+.lf-builder .lf-node-grip:hover { color: var(--color-gray-500, #667085); }
 .lf-builder .lf-node-label { font-weight: 600; font-size: 0.9375rem; color: var(--lf-text); }
 .lf-builder .lf-node-type {
   font-size: 0.6875rem;

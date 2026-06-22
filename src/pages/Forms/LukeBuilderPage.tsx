@@ -25,10 +25,12 @@ import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import {
   checkIn,
+  checkout,
   discardDraft,
   getForm,
   latestVersion,
   publishVersion,
+  release,
   saveDraft,
   type FormStatus,
   type StoredForm,
@@ -102,6 +104,18 @@ export default function LukeBuilderPage() {
       active = false;
     };
   }, [tenant, id, reloadKey, navigate]);
+
+  // Acquire the advisory edit lock on open and release it on leave — the backend
+  // gates draft saves on the lock, so without this every autosave returns "Save failed".
+  // A 409 (someone else holds it) is tolerated: editing still works, the save may fail
+  // until taken over, matching the classic designer's behavior.
+  useEffect(() => {
+    if (!tenant || !id || !canEdit) return;
+    checkout(tenant, id).catch(() => {}); // 409 → another holder; non-fatal
+    return () => {
+      void release(tenant, id);
+    };
+  }, [tenant, id, canEdit]);
 
   const initialSchema = useMemo(() => (form ? parseSchema(form.schema) : EMPTY), [form]);
 

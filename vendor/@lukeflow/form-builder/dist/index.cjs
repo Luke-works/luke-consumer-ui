@@ -769,6 +769,7 @@ function Palette({ builder, extra }) {
             draggable: true,
             onDragStart: (e) => {
               e.dataTransfer.effectAllowed = "copy";
+              e.dataTransfer.setData("text/plain", p.type);
               dnd.begin({ kind: "new", type: p.type, label: p.label });
             },
             onDragEnd: dnd.end,
@@ -810,16 +811,25 @@ function Node({
       {
         className: `lf-node-row${selected ? " is-selected" : ""}${over ? ` is-drop-${over}` : ""}`,
         "data-drop": over ?? void 0,
-        draggable: true,
-        onDragStart: (e) => {
-          e.dataTransfer.effectAllowed = "move";
-          dnd.begin({ kind: "move", id });
-        },
-        onDragEnd: dnd.end,
         onDragOver: (e) => dnd.overNode(e, id, isContainer),
         onDragLeave: dnd.leave,
         onDrop: (e) => dnd.dropNode(e, id, parentId, index, isContainer),
         children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+            "span",
+            {
+              className: "lf-node-grip",
+              "aria-label": `Drag ${labelOf(entity)}`,
+              draggable: true,
+              onDragStart: (e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", id);
+                dnd.begin({ kind: "move", id });
+              },
+              onDragEnd: dnd.end,
+              children: "\u283F"
+            }
+          ),
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", className: "lf-node-select", "aria-pressed": selected, onClick: () => builder.select(id), children: [
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-node-label", children: labelOf(entity) }),
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-node-type", children: entity.type })
