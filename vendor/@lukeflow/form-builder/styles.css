@@ -11,10 +11,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--lf-space, 12px);
-  font-family: var(--lf-font, system-ui, sans-serif);
+  /* Inherit the host app's font by default (themeable via --lf-font); never force one. */
+  font-family: var(--lf-font, inherit);
   color: var(--lf-text, #1a1a1a);
   /* Darken muted text within the builder so it clears WCAG AA (4.5:1) even on the
-     light-blue selected-row / drop-target tint (#eff6ff), where #6b7280 falls to 4.44. */
+     light selected-row / drop-target tint (--lf-tint), where #6b7280 falls to 4.44. */
   --lf-muted: #565e6b;
 }
 
@@ -100,11 +101,11 @@
   border: 1px solid transparent;
   border-radius: var(--lf-radius, 6px);
 }
-.lf-node-row.is-selected { border-color: var(--lf-primary, #2563eb); background: #eff6ff; }
+.lf-node-row.is-selected { border-color: var(--lf-primary, #2563eb); background: var(--lf-tint, #eff6ff); }
 .lf-node-row[draggable="true"] { cursor: grab; }
 .lf-node-row.is-drop-before { box-shadow: inset 0 2px 0 0 var(--lf-primary, #2563eb); }
 .lf-node-row.is-drop-after { box-shadow: inset 0 -2px 0 0 var(--lf-primary, #2563eb); }
-.lf-node-row.is-drop-into { background: #eff6ff; border-color: var(--lf-primary, #2563eb); }
+.lf-node-row.is-drop-into { background: var(--lf-tint, #eff6ff); border-color: var(--lf-primary, #2563eb); }
 .lf-node-select {
   flex: 1;
   display: flex;
@@ -135,7 +136,7 @@
   font-size: 0.8rem;
   text-align: center;
 }
-.lf-dropzone.is-over { border-color: var(--lf-primary, #2563eb); background: #eff6ff; color: var(--lf-primary, #2563eb); }
+.lf-dropzone.is-over { border-color: var(--lf-primary, #2563eb); background: var(--lf-tint, #eff6ff); color: var(--lf-primary, #2563eb); }
 
 /* ── Settings panel + tabs ─────────────────────────────────────────────────── */
 .lf-settings {

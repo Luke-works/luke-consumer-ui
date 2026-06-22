@@ -12,6 +12,7 @@
 import { FormRenderer as LukeRenderer } from "@lukeflow/form-react";
 import type { FormData, FormSchema } from "@lukeflow/form-core";
 import "@lukeflow/form-react/styles.css";
+import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
 
 function parseSchema(schema: string | FormSchema): FormSchema {
   if (typeof schema !== "string") return schema;

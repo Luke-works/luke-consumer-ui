@@ -19,6 +19,7 @@ import { useNavigate, useParams } from "react-router";
 import { FormBuilder } from "@lukeflow/form-builder";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
+import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
 import { readSubmitMessage, type FormSchema } from "@lukeflow/form-core";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
