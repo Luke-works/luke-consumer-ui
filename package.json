@@ -14,9 +14,9 @@
   "dependencies": {
     "@coltorapps/builder": "^0.2.4",
     "@coltorapps/builder-react": "^0.2.4",
-    "@lukeflow/form-core": "file:../luke-forms/packages/form-core",
-    "@lukeflow/form-react": "file:../luke-forms/packages/form-react",
-    "@lukeflow/form-builder": "file:../luke-forms/packages/form-builder",
+    "@lukeflow/form-core": "file:./vendor/@lukeflow/form-core",
+    "@lukeflow/form-react": "file:./vendor/@lukeflow/form-react",
+    "@lukeflow/form-builder": "file:./vendor/@lukeflow/form-builder",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -80,9 +80,9 @@
     "vitest": "^4.1.8"
   },
   "overrides": {
-    "@lukeflow/form-core": "file:../luke-forms/packages/form-core",
-    "@lukeflow/form-react": "file:../luke-forms/packages/form-react",
-    "@lukeflow/form-builder": "file:../luke-forms/packages/form-builder",
+    "@lukeflow/form-core": "file:./vendor/@lukeflow/form-core",
+    "@lukeflow/form-react": "file:./vendor/@lukeflow/form-react",
+    "@lukeflow/form-builder": "file:./vendor/@lukeflow/form-builder",
     "react-helmet-async": {
       "react": "^16.8.0 || ^17 || ^18 || ^19"
     },
