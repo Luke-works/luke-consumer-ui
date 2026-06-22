@@ -20,6 +20,8 @@ import AccessManagement from "./pages/Access/AccessManagement";
 
 // Code-split the form designer (builder + zod) to its own route chunk.
 const FormBuilderPage = lazy(() => import("./pages/Forms/FormBuilderPage"));
+// Staged next-gen designer powered by @lukeflow/form-builder (cutover preview).
+const LukeBuilderPage = lazy(() => import("./pages/Forms/LukeBuilderPage"));
 const FormFill = lazy(() => import("./pages/Forms/FormFill"));
 const FormResponses = lazy(() => import("./pages/Forms/FormResponses"));
 const FormEmbed = lazy(() => import("./pages/Forms/FormEmbed"));
@@ -129,6 +131,21 @@ export default function App() {
                       }
                     >
                       <FormBuilderPage />
+                    </Suspense>
+                  }
+                />
+                {/* Staged next-gen designer (cutover preview) — @lukeflow/form-builder. */}
+                <Route
+                  path="/forms/:id/build-v2"
+                  element={
+                    <Suspense
+                      fallback={
+                        <div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">
+                          Loading designer…
+                        </div>
+                      }
+                    >
+                      <LukeBuilderPage />
                     </Suspense>
                   }
                 />

@@ -1,0 +1,212 @@
+/**
+ * Default stylesheet for @lukeflow/form-react. Import once:  import "@lukeflow/form-react/styles.css";
+ * Theme by overriding the --lf-* design tokens (globally in your CSS, or per-form via
+ * the <FormRenderer theme={{ "--lf-primary": "#0a7" }} /> prop).
+ */
+.lf-form {
+  --lf-primary: #2563eb;
+  --lf-text: #111827;
+  --lf-muted: #6b7280;
+  --lf-border: #d1d5db;
+  --lf-error: #dc2626;
+  --lf-bg: #ffffff;
+  --lf-radius: 6px;
+  --lf-space: 12px;
+  --lf-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  color: var(--lf-text);
+  font-family: var(--lf-font);
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space);
+}
+
+.lf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lf-label {
+  font-weight: 600;
+}
+.lf-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.lf-form select,
+.lf-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg);
+  font: inherit;
+  color: inherit;
+  width: 100%;
+}
+.lf-form input:focus,
+.lf-form select:focus,
+.lf-form textarea:focus {
+  outline: 2px solid var(--lf-primary);
+  outline-offset: 1px;
+}
+.lf-form [aria-invalid="true"] {
+  border-color: var(--lf-error);
+}
+.lf-desc {
+  color: var(--lf-muted);
+  font-size: 12px;
+  margin: 0;
+}
+.lf-error {
+  color: var(--lf-error);
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+.lf-tooltip {
+  color: var(--lf-muted);
+  cursor: help;
+}
+
+.lf-group {
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  padding: var(--lf-space);
+}
+.lf-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+
+.lf-container {
+  border-left: 3px solid var(--lf-border);
+  padding-left: var(--lf-space);
+}
+.lf-container-label {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.lf-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  padding: 4px;
+}
+.lf-tag {
+  background: var(--lf-primary);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  display: inline-flex;
+  gap: 4px;
+  font-size: 12px;
+}
+.lf-tag button {
+  background: none;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+}
+
+.lf-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.lf-affix {
+  color: var(--lf-muted);
+}
+
+.lf-grid table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.lf-grid th,
+.lf-grid td {
+  border: 1px solid var(--lf-border);
+  padding: 6px 8px;
+  text-align: left;
+}
+.lf-grid-aggregates td {
+  font-weight: 700;
+  background: #f9fafb;
+}
+
+.lf-search-select {
+  position: relative;
+}
+.lf-search-list {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--lf-bg);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  max-height: 220px;
+  overflow: auto;
+}
+.lf-search-list li[role="option"] {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.lf-search-list li[role="option"]:hover,
+.lf-search-list li.is-active {
+  background: #f3f4f6;
+}
+
+.lf-wizard-steps {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--lf-space);
+}
+.lf-wizard-steps li {
+  color: var(--lf-muted);
+}
+.lf-wizard-steps .is-active {
+  color: var(--lf-primary);
+  font-weight: 700;
+}
+.lf-wizard-nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: var(--lf-space);
+}
+.lf-wizard-progress {
+  color: var(--lf-muted);
+  margin-left: auto;
+}
+
+.lf-submit,
+.lf-wizard-next {
+  background: var(--lf-primary);
+  color: #fff;
+  border: 0;
+  border-radius: var(--lf-radius);
+  padding: 8px 16px;
+  cursor: pointer;
+  font: inherit;
+}
+.lf-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.lf-wizard-back,
+.lf-row-add,
+.lf-row-remove {
+  border: 1px solid var(--lf-border);
+  background: var(--lf-bg);
+  border-radius: var(--lf-radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+}

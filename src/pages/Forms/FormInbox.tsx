@@ -6,7 +6,7 @@ import Button from "../../components/ui/button/Button";
 import DataTable, { type ManualTable } from "../../components/tables/DataTable";
 import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
-import FormRenderer from "../../components/formBuilder/FormRenderer";
+import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import { completeTask, getInbox, type InboxTask } from "../../lib/formInboxApi";
 import { getInstance, type InstanceView } from "../../lib/formInstancesApi";
 import { isAbortError } from "../../lib/abort";

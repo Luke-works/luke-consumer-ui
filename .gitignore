@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Vendored @lukeflow built packages are consumed by the CI build (file: deps),
+# so their dist MUST be committed despite the blanket `dist` rule above.
+!vendor/@lukeflow/**/dist
+!vendor/@lukeflow/**/dist/**
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

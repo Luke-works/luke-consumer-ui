@@ -5,7 +5,7 @@ import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
-import FormRenderer from "../../components/formBuilder/FormRenderer";
+import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import {
   getInstance,
   INSTANCE_PAGE_MAX,

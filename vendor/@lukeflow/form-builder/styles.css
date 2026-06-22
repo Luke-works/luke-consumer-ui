@@ -1,0 +1,195 @@
+/**
+ * @lukeflow/form-builder optional stylesheet.
+ *
+ * Reuses the design tokens declared by `@lukeflow/form-react/styles.css` (--lf-*),
+ * so import that first. Purely presentational — the builder is fully functional
+ * unstyled; this just makes the palette, tabbed settings, canvas tree, drop zones,
+ * and problems panel usable out of the box. Override any token or class to theme it.
+ */
+
+.lf-builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space, 12px);
+  font-family: var(--lf-font, system-ui, sans-serif);
+  color: var(--lf-text, #1a1a1a);
+  /* Darken muted text within the builder so it clears WCAG AA (4.5:1) even on the
+     light-blue selected-row / drop-target tint (#eff6ff), where #6b7280 falls to 4.44. */
+  --lf-muted: #565e6b;
+}
+
+/* ── Toolbar ───────────────────────────────────────────────────────────────── */
+.lf-builder-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--lf-border, #d9d9d9);
+}
+.lf-builder-toolbar button {
+  padding: 4px 10px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  cursor: pointer;
+}
+.lf-builder-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.lf-problems-badge {
+  margin-left: auto;
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.lf-problems-badge.is-ok { color: var(--lf-muted, #6b7280); }
+.lf-problems-badge.is-warning { background: #fff7ed; color: #b45309; }
+.lf-problems-badge.is-error { background: #fef2f2; color: var(--lf-error, #dc2626); }
+
+/* ── Three-pane body ───────────────────────────────────────────────────────── */
+.lf-builder-body {
+  display: grid;
+  grid-template-columns: 200px 1fr 320px;
+  gap: var(--lf-space, 12px);
+  align-items: start;
+}
+
+/* ── Palette ───────────────────────────────────────────────────────────────── */
+.lf-palette { display: flex; flex-direction: column; gap: 8px; }
+.lf-palette h4 { margin: 0; font-size: 0.85rem; }
+.lf-palette-search {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+}
+.lf-palette-group { display: flex; flex-direction: column; gap: 4px; }
+.lf-palette-group-title {
+  margin: 6px 0 2px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lf-muted, #6b7280);
+}
+.lf-palette-item {
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  cursor: grab;
+}
+.lf-palette-item:hover { border-color: var(--lf-primary, #2563eb); }
+
+/* ── Canvas tree ───────────────────────────────────────────────────────────── */
+.lf-canvas {
+  min-height: 120px;
+  padding: 8px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+}
+.lf-node-list { list-style: none; margin: 0; padding: 0; }
+.lf-node[data-depth] > .lf-node-list { margin-left: 16px; border-left: 1px dashed var(--lf-border, #d9d9d9); padding-left: 8px; }
+.lf-node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--lf-radius, 6px);
+}
+.lf-node-row.is-selected { border-color: var(--lf-primary, #2563eb); background: #eff6ff; }
+.lf-node-row[draggable="true"] { cursor: grab; }
+.lf-node-row.is-drop-before { box-shadow: inset 0 2px 0 0 var(--lf-primary, #2563eb); }
+.lf-node-row.is-drop-after { box-shadow: inset 0 -2px 0 0 var(--lf-primary, #2563eb); }
+.lf-node-row.is-drop-into { background: #eff6ff; border-color: var(--lf-primary, #2563eb); }
+.lf-node-select {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+.lf-node-label { font-weight: 500; }
+.lf-node-type { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
+.lf-node-actions { display: flex; gap: 2px; }
+.lf-node-actions button {
+  width: 24px; height: 24px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  cursor: pointer;
+}
+.lf-node-actions button:disabled { opacity: 0.4; cursor: default; }
+.lf-dropzone {
+  margin: 4px 0 4px 16px;
+  padding: 10px;
+  border: 1px dashed var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  color: var(--lf-muted, #6b7280);
+  font-size: 0.8rem;
+  text-align: center;
+}
+.lf-dropzone.is-over { border-color: var(--lf-primary, #2563eb); background: #eff6ff; color: var(--lf-primary, #2563eb); }
+
+/* ── Settings panel + tabs ─────────────────────────────────────────────────── */
+.lf-settings {
+  padding: 8px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+}
+.lf-settings h4 { margin: 0 0 8px; font-size: 0.85rem; }
+.lf-settings-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--lf-border, #d9d9d9); margin-bottom: 8px; }
+.lf-settings-tab {
+  padding: 4px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--lf-muted, #6b7280);
+}
+.lf-settings-tab.is-active { color: var(--lf-primary, #2563eb); border-bottom-color: var(--lf-primary, #2563eb); }
+.lf-settings-panel { display: flex; flex-direction: column; gap: 10px; }
+.lf-setting-wrap { display: flex; flex-direction: column; gap: 2px; }
+.lf-setting { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; }
+.lf-setting-inline { flex-direction: row; align-items: center; gap: 6px; }
+.lf-setting-label { font-weight: 500; }
+.lf-setting input, .lf-setting select, .lf-setting textarea {
+  padding: 4px 6px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  font: inherit;
+}
+.lf-setting-inline input { order: -1; }
+.lf-setting-hint { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
+.lf-code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.75rem; }
+.lf-expr-error { font-size: 0.7rem; color: var(--lf-error, #dc2626); }
+.lf-setting [aria-invalid="true"] { border-color: var(--lf-error, #dc2626); }
+
+.lf-settings-logic { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 8px; }
+.lf-settings-logic legend { font-size: 0.75rem; font-weight: 600; padding: 0 4px; }
+.lf-logic-rule { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 6px; font-size: 0.75rem; }
+.lf-logic-add { margin-top: 4px; padding: 3px 8px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); background: var(--lf-bg, #fff); cursor: pointer; }
+
+.lf-settings-minion, .lf-settings-params { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.lf-settings-minion legend, .lf-settings-params legend { font-size: 0.75rem; font-weight: 600; padding: 0 4px; }
+.lf-param-row { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; }
+.lf-param-row input, .lf-param-row select { flex: 1; min-width: 0; }
+.lf-param-add { align-self: flex-start; padding: 3px 8px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); background: var(--lf-bg, #fff); cursor: pointer; }
+
+/* ── Problems + preview ────────────────────────────────────────────────────── */
+.lf-empty { color: var(--lf-muted, #6b7280); font-size: 0.8rem; }
+.lf-problems { border-top: 1px solid var(--lf-border, #d9d9d9); padding-top: 8px; }
+.lf-problems ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.lf-problem button { background: none; border: none; text-align: left; cursor: pointer; font-size: 0.8rem; }
+.lf-problem.is-error { color: var(--lf-error, #dc2626); }
+.lf-problem.is-warning { color: #b45309; }
+.lf-problem-code { font-family: ui-monospace, monospace; font-size: 0.7rem; opacity: 0.8; }
+.lf-builder-preview { padding: 12px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }

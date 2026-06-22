@@ -15,7 +15,7 @@ import Input from "../../components/form/input/InputField";
 import { PlusIcon, ListIcon, TrashBinIcon, TimeIcon, CopyIcon, BoxIcon, PaperPlaneIcon, EyeIcon } from "../../icons";
 import { useForms, type StoredForm, type FormStatus } from "../../lib/formsStore";
 import { listVersions, publishVersion, restoreVersion, type FormArtifact } from "../../lib/formsApi";
-const FormRenderer = lazy(() => import("../../components/formBuilder/FormRenderer"));
+const FormRenderer = lazy(() => import("../../components/formBuilder/LukeFormRenderer"));
 
 const STATUS_BADGE: Record<FormStatus, string> = {
   draft: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
