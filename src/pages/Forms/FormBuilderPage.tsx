@@ -55,7 +55,7 @@ import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import { formBuilder, PALETTE_GROUPS, CONTAINER_TYPES, type PaletteItem } from "../../components/formBuilder/formBuilder";
 import { attributesComponents, entityComponents, BuilderEntitiesContext } from "../../components/formBuilder/components";
-import FormRenderer from "../../components/formBuilder/FormRenderer";
+import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import AiAssistPanel from "./AiAssistPanel";
 import CapabilityBuildingAnimation from "./CapabilityBuildingAnimation";
 import { generateSchema, generateTestData, type BuilderSchemaLike, type TestDataset } from "../../lib/formAgentApi";

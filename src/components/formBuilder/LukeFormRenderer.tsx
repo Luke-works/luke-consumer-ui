@@ -27,6 +27,9 @@ export default function LukeFormRenderer({
   initialValues,
   onSubmit,
   onChange,
+  onResult,
+  autoSubmitSignal,
+  playback,
   readOnly = false,
   submitting = false,
 }: {
@@ -34,6 +37,9 @@ export default function LukeFormRenderer({
   initialValues?: Record<string, unknown>;
   onSubmit?: (data: Record<string, unknown>) => void;
   onChange?: (data: Record<string, unknown>) => void;
+  onResult?: (result: { ok: boolean; errorCount: number; errorKeys: string[] }) => void;
+  autoSubmitSignal?: number;
+  playback?: { steps: { key: string; value: unknown }[]; signal: number; speed?: number };
   readOnly?: boolean;
   submitting?: boolean;
 }) {
@@ -44,6 +50,9 @@ export default function LukeFormRenderer({
       initialValues={initialValues as FormData | undefined}
       onSubmit={onSubmit}
       onChange={onChange ? (data: FormData) => onChange(data) : undefined}
+      onResult={onResult ? (r) => onResult({ ok: r.ok, errorCount: r.errorCount, errorKeys: [...r.errorKeys] }) : undefined}
+      autoSubmitSignal={autoSubmitSignal}
+      playback={playback}
       readOnly={readOnly}
     />
   );
