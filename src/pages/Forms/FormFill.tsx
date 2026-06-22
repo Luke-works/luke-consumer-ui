@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
-import FormRenderer from "../../components/formBuilder/FormRenderer";
+import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readSubmitMessage } from "../../lib/formSchema";
 import {

@@ -12,7 +12,7 @@ vi.mock("../../context/AuthContext", () => ({
 vi.mock("../../components/common/PageMeta", () => ({ default: () => null }));
 vi.mock("../../components/formBuilder/SubmissionSuccess", () => ({ default: () => null }));
 // Stub the renderer so a click fires the autosave onChange with no real form fields.
-vi.mock("../../components/formBuilder/FormRenderer", () => ({
+vi.mock("../../components/formBuilder/LukeFormRenderer", () => ({
   default: ({ onChange }: { onChange: (d: Record<string, unknown>) => void }) => (
     <button type="button" onClick={() => onChange({ field: "value" })}>
       fire-change

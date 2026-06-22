@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, Eye, GitBranch, Workflow } from "lucide-react";
 import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
-import FormRenderer from "../../components/formBuilder/FormRenderer";
+import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import TracePanel, { pidOf } from "./TracePanel";
 import { listVersions, type FormArtifact } from "../../lib/formsApi";
 import { getInstance, STATE_LABEL, type FormInstance, type InstanceState } from "../../lib/formInstancesApi";
