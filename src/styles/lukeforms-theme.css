@@ -320,6 +320,9 @@
 .lf-modal-body .lf-settings-tabs { background: var(--color-white, #fff); margin: 0 -1.5rem 1rem; padding: 0.875rem 1.5rem 0; }
 .dark .lf-modal-body .lf-settings-tabs { background: var(--color-gray-800, #1d2939); }
 .lf-modal-body .lf-settings-panel { gap: 1rem 1.5rem; }
+/* The grouped-toggles box — a very light, brand-neutral surface. */
+.lf-builder .lf-checkbox-group { background: var(--color-gray-50, #f9fafb); border-color: var(--color-gray-200, #e4e7ec); }
+.dark .lf-builder .lf-checkbox-group { background: rgba(255, 255, 255, 0.02); border-color: var(--color-gray-700, #344054); }
 /* The settings card sits flush in the modal (the modal already frames it). */
 .lf-modal-body .lf-settings.lf-settings { position: static; top: auto; border: none; padding: 0; background: transparent; }
 

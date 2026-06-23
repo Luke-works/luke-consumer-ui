@@ -343,18 +343,28 @@ function SettingsPanel({ builder, editors }) {
       },
       g.tab
     )) }),
-    /* @__PURE__ */ jsx("div", { className: "lf-settings-panel", role: "tabpanel", "aria-label": `${active?.label ?? ""} settings`, children: active?.editors.map((ed) => {
-      const ctx = {
-        entity,
-        schema: builder.schema,
-        fieldKeys,
-        value: ed.attribute ? entity.attributes[ed.attribute] : void 0,
-        setValue: ed.attribute ? (v) => patch({ [ed.attribute]: v }) : () => {
-        },
-        patch
+    /* @__PURE__ */ jsx("div", { className: "lf-settings-panel", role: "tabpanel", "aria-label": `${active?.label ?? ""} settings`, children: (() => {
+      const editorsHere = active?.editors ?? [];
+      const isToggle = (ed) => ed.control === "checkbox" || ed.control === "exclude";
+      const renderEditor = (ed) => {
+        const ctx = {
+          entity,
+          schema: builder.schema,
+          fieldKeys,
+          value: ed.attribute ? entity.attributes[ed.attribute] : void 0,
+          setValue: ed.attribute ? (v) => patch({ [ed.attribute]: v }) : () => {
+          },
+          patch
+        };
+        return /* @__PURE__ */ jsx(Control, { editor: ed, ctx, builder, id, entity }, ed.id);
       };
-      return /* @__PURE__ */ jsx(Control, { editor: ed, ctx, builder, id, entity }, ed.id);
-    }) })
+      const toggles = editorsHere.filter(isToggle);
+      const rest = editorsHere.filter((ed) => !isToggle(ed));
+      return /* @__PURE__ */ jsxs(Fragment, { children: [
+        rest.map(renderEditor),
+        toggles.length > 0 && /* @__PURE__ */ jsx("div", { className: "lf-checkbox-group", role: "group", "aria-label": "Toggles", children: toggles.map(renderEditor) })
+      ] });
+    })() })
   ] });
 }
 function Control({

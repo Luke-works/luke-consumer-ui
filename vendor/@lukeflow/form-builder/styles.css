@@ -222,6 +222,19 @@
 }
 .lf-setting-inline input { order: -1; }
 .lf-setting-hint { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
+
+/* All the on/off toggles in a tab, gathered into one very light rounded box. */
+.lf-checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 8px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: calc(var(--lf-radius, 6px) + 2px);
+  background: rgba(127, 127, 127, 0.05);
+}
+.lf-checkbox-group .lf-setting-wrap { gap: 1px; }
+.lf-checkbox-group .lf-setting-inline { font-size: 0.8rem; }
 .lf-code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.75rem; }
 /* Collapsible JS editor + insert-token autofill. */
 .lf-js { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
@@ -335,6 +348,7 @@
 .lf-modal-body .lf-settings-panel > .lf-settings-minion,
 .lf-modal-body .lf-settings-panel > .lf-settings-params,
 .lf-modal-body .lf-settings-panel > .lf-js,
+.lf-modal-body .lf-settings-panel > .lf-checkbox-group,
 .lf-modal-body .lf-settings-panel > .lf-setting-wrap:has(textarea),
 .lf-modal-body .lf-settings-panel > .lf-setting-wrap:has(.lf-code) {
   grid-column: 1 / -1;
