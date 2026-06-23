@@ -89,7 +89,7 @@ declare const ATTRIBUTE_TABS: ReadonlyArray<{
  * `options` is the choice-list editor; `expression`/`js` are the safe-expression
  * and trusted-JS code editors; `custom` defers entirely to the editor's `render`.
  */
-type AttributeControl = "text" | "number" | "checkbox" | "textarea" | "select" | "options" | "tags" | "expression" | "js" | "logic" | "dataSource" | "asyncValidation" | "custom";
+type AttributeControl = "text" | "number" | "checkbox" | "textarea" | "select" | "options" | "tags" | "expression" | "js" | "logic" | "dataSource" | "asyncValidation" | "exclude" | "custom";
 /** The runtime context handed to a custom editor `render` (and used internally by controls). */
 interface AttributeEditorContext {
     /** The selected entity being edited. */

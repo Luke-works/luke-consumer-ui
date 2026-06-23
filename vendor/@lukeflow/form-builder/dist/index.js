@@ -194,7 +194,7 @@ function createDefaultAttributeEditors() {
     { id: "maxSize", tab: "data", attribute: "maxSize", label: "Max size (MB)", control: "number", order: 36, when: oneOf("file") },
     { id: "minRows", tab: "data", attribute: "minRows", label: "Min rows", control: "number", order: 40, when: grid },
     { id: "maxRows", tab: "data", attribute: "maxRows", label: "Max rows", control: "number", order: 41, when: grid },
-    { id: "persistent", tab: "data", attribute: "persistent", label: "Include in submission", control: "checkbox", order: 80, when: data, hint: "Uncheck to exclude this field from the saved payload." },
+    { id: "persistent", tab: "data", attribute: "persistent", label: "Exclude from submission", control: "exclude", order: 80, when: data, hint: "Fields are saved by default. Check this to keep this field's value OUT of the saved payload." },
     { id: "clearOnHide", tab: "data", attribute: "clearOnHide", label: "Clear value when hidden", control: "checkbox", order: 81, when: data },
     // ── VALIDATION ─────────────────────────────────────────────────────────────
     { id: "required", tab: "validation", attribute: "required", label: "Required", control: "checkbox", order: 1, when: (e) => data(e) || grid(e) },
@@ -343,6 +343,10 @@ function Control({
       return /* @__PURE__ */ jsx(LogicRules, { builder, id, entity });
     case "checkbox":
       return /* @__PURE__ */ jsx(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, inline: true, children: /* @__PURE__ */ jsx("input", { type: "checkbox", checked: Boolean(ctx.value), onChange: (e) => ctx.setValue(e.target.checked) }) });
+    // Inverted boolean for `persistent`: the field is included by default; CHECKED stores
+    // `persistent: false` (exclude), UNCHECKED clears it (back to the default-included).
+    case "exclude":
+      return /* @__PURE__ */ jsx(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, inline: true, children: /* @__PURE__ */ jsx("input", { type: "checkbox", checked: ctx.value === false, onChange: (e) => ctx.setValue(e.target.checked ? false : void 0) }) });
     case "number":
       return /* @__PURE__ */ jsx(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx(
         "input",

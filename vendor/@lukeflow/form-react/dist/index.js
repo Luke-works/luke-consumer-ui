@@ -483,7 +483,18 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ jsx4(SignatureField, { a11y, value: fs.value, disabled, onChange: set });
         break;
       default:
-        control = /* @__PURE__ */ jsx4("input", { type: inputType(entity.type), ...a11y, ...inputProps, value: asText(fs.value), onChange: (e) => set(e.target.value) });
+        control = /* @__PURE__ */ jsx4(
+          TextControl,
+          {
+            type: inputType(entity.type),
+            a11y,
+            extra: inputProps,
+            mask: typeof a.inputMask === "string" ? a.inputMask : "",
+            clearable: Boolean(a.clearable) && !disabled,
+            value: fs.value,
+            onChange: set
+          }
+        );
     }
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
   const hideLabel = Boolean(a.hideLabel);
@@ -495,6 +506,11 @@ function Field({ entity, fs, ctx }) {
       /* @__PURE__ */ jsx4(Tooltip, { text: tooltipText(a) })
     ] }),
     control,
+    (Boolean(a.showCharCount) || Boolean(a.showWordCount)) && /* @__PURE__ */ jsxs("p", { className: "lf-count", "aria-live": "off", children: [
+      a.showCharCount ? `${asText(fs.value).length} characters` : "",
+      a.showCharCount && a.showWordCount ? " \xB7 " : "",
+      a.showWordCount ? `${wordCount(asText(fs.value))} words` : ""
+    ] }),
     descId && /* @__PURE__ */ jsx4("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
     error && /* @__PURE__ */ jsx4("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
     !error && ctx.asyncErrors[key] && /* @__PURE__ */ jsx4("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
@@ -887,6 +903,49 @@ function SearchSelect({
       ))
     ] })
   ] });
+}
+function TextControl({
+  type,
+  a11y,
+  extra,
+  mask,
+  clearable,
+  value,
+  onChange
+}) {
+  const v = asText(value);
+  const handle = (raw) => onChange(mask ? applyMask(raw, mask) : raw);
+  const showClear = clearable && v !== "";
+  const input = /* @__PURE__ */ jsx4("input", { type, ...a11y, ...extra, value: v, onChange: (e) => handle(e.target.value) });
+  if (!clearable) return input;
+  return /* @__PURE__ */ jsxs("span", { className: "lf-input-wrap", children: [
+    input,
+    showClear && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: "\xD7" })
+  ] });
+}
+function applyMask(raw, mask) {
+  const data = [];
+  for (const c of raw) if (/[0-9A-Za-z]/.test(c)) data.push(c);
+  let out = "";
+  let di = 0;
+  for (const m of mask) {
+    if (di >= data.length) break;
+    if (m === "9" || m === "a" || m === "*") {
+      const re = m === "9" ? /[0-9]/ : m === "a" ? /[A-Za-z]/ : /[0-9A-Za-z]/;
+      while (di < data.length && !re.test(data[di])) di++;
+      if (di < data.length) {
+        out += data[di];
+        di++;
+      }
+    } else {
+      out += m;
+    }
+  }
+  return out;
+}
+function wordCount(s) {
+  const t = s.trim();
+  return t ? t.split(/\s+/).length : 0;
 }
 function TagsInput({
   a11y,
