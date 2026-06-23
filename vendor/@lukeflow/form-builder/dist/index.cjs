@@ -1138,15 +1138,18 @@ function SettingsModal({ builder, editors }) {
   const entity = id ? builder.schema.entities[id] : void 0;
   const open = Boolean(id && entity);
   const dialogRef = (0, import_react4.useRef)(null);
+  const select = builder.select;
   (0, import_react4.useEffect)(() => {
     if (!open) return;
     const onKey = (e) => {
-      if (e.key === "Escape") builder.select(null);
+      if (e.key === "Escape") select(null);
     };
     document.addEventListener("keydown", onKey);
-    dialogRef.current?.focus();
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, builder]);
+  }, [open, select]);
+  (0, import_react4.useEffect)(() => {
+    if (open) dialogRef.current?.focus();
+  }, [open, id]);
   if (!open) return null;
   return (0, import_react_dom.createPortal)(
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
