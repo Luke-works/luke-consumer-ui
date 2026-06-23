@@ -94,6 +94,11 @@
   margin: 0;
   text-align: right;
 }
+/* autoExpand textarea grows with content where supported (progressive enhancement). */
+.lf-autoexpand {
+  field-sizing: content;
+  min-height: 2.5rem;
+}
 /* clearable (×) button */
 .lf-input-wrap {
   position: relative;

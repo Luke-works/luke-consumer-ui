@@ -408,6 +408,8 @@ function Field({ entity, fs, ctx }) {
   if (typeof a.pattern === "string" && a.pattern) inputProps.pattern = a.pattern;
   if (a.autocomplete) inputProps.autoComplete = typeof a.autocompleteToken === "string" ? a.autocompleteToken : "on";
   if (typeof a.tabIndex === "number") inputProps.tabIndex = a.tabIndex;
+  if (a.spellcheck !== void 0) inputProps.spellCheck = Boolean(a.spellcheck);
+  if (a.autofocus) inputProps.autoFocus = true;
   const numProps = {};
   if (typeof a.min === "number") numProps.min = a.min;
   if (typeof a.max === "number") numProps.max = a.max;
@@ -463,6 +465,7 @@ function Field({ entity, fs, ctx }) {
           {
             ...a11y,
             ...inputProps,
+            className: a.autoExpand ? "lf-autoexpand" : void 0,
             rows: typeof a.rows === "number" ? a.rows : void 0,
             value: asText(fs.value),
             onChange: (e) => set(e.target.value)

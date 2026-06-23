@@ -310,6 +310,32 @@
   border-radius: var(--lf-radius, 6px);
 }
 .lf-modal-close:hover { color: var(--lf-text, #1a1a1a); }
-.lf-modal-body { padding: 16px; overflow-y: auto; }
+.lf-modal-body { padding: 0 20px 20px; overflow-y: auto; }
 /* The settings card sits flush inside the modal (no double frame). */
 .lf-modal-body .lf-settings { border: none; padding: 0; position: static; top: auto; }
+/* The modal header already names this, so drop the panel's own heading. */
+.lf-modal-body .lf-settings > h4 { display: none; }
+/* Tabs stay visible while the editors scroll. */
+.lf-modal-body .lf-settings-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 -20px 14px;
+  padding: 10px 20px 0;
+  background: var(--lf-bg, #fff);
+}
+/* Organize editors into two columns; wide editors span the full width. */
+.lf-modal-body .lf-settings-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+  align-items: start;
+}
+.lf-modal-body .lf-settings-panel > .lf-settings-logic,
+.lf-modal-body .lf-settings-panel > .lf-settings-minion,
+.lf-modal-body .lf-settings-panel > .lf-settings-params,
+.lf-modal-body .lf-settings-panel > .lf-js,
+.lf-modal-body .lf-settings-panel > .lf-setting-wrap:has(textarea),
+.lf-modal-body .lf-settings-panel > .lf-setting-wrap:has(.lf-code) {
+  grid-column: 1 / -1;
+}

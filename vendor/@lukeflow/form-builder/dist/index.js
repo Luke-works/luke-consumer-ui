@@ -189,6 +189,26 @@ function createDefaultAttributeEditors() {
     { id: "decimalLimit", tab: "data", attribute: "decimalLimit", label: "Decimal places", control: "number", order: 31, when: numeric },
     { id: "delimiter", tab: "data", attribute: "delimiter", label: "Thousands separator", control: "checkbox", order: 32, when: numeric },
     { id: "currencyCode", tab: "data", attribute: "currencyCode", label: "Currency", control: "select", order: 33, when: oneOf("currency"), options: CURRENCY_CODES },
+    { id: "inputMask", tab: "data", attribute: "inputMask", label: "Input mask", control: "text", order: 50, when: textual, hint: "9 = digit, a = letter, * = alphanumeric. e.g. (999) 999-9999" },
+    { id: "clearable", tab: "data", attribute: "clearable", label: "Show clear (\xD7) button", control: "checkbox", order: 51, when: textual },
+    { id: "showCharCount", tab: "data", attribute: "showCharCount", label: "Show character count", control: "checkbox", order: 52, when: textual },
+    { id: "showWordCount", tab: "data", attribute: "showWordCount", label: "Show word count", control: "checkbox", order: 53, when: oneOf("textField", "textarea") },
+    { id: "autoExpand", tab: "data", attribute: "autoExpand", label: "Auto-expand", control: "checkbox", order: 54, when: oneOf("textarea") },
+    { id: "numColumns", tab: "data", attribute: "numColumns", label: "Columns", control: "number", order: 55, when: oneOf("table") },
+    {
+      id: "buttonAction",
+      tab: "data",
+      attribute: "buttonAction",
+      label: "Button action",
+      control: "select",
+      order: 56,
+      when: oneOf("button"),
+      options: [
+        { label: "Submit", value: "submit" },
+        { label: "Reset", value: "reset" },
+        { label: "Button", value: "button" }
+      ]
+    },
     { id: "accept", tab: "data", attribute: "accept", label: "Accepted file types", control: "text", order: 34, when: oneOf("file"), placeholder: "image/*,.pdf" },
     { id: "maxFiles", tab: "data", attribute: "maxFiles", label: "Max files", control: "number", order: 35, when: oneOf("file") },
     { id: "maxSize", tab: "data", attribute: "maxSize", label: "Max size (MB)", control: "number", order: 36, when: oneOf("file") },
@@ -220,6 +240,10 @@ function createDefaultAttributeEditors() {
         { label: "Blur", value: "blur" }
       ]
     },
+    { id: "minWords", tab: "validation", attribute: "minWords", label: "Min words", control: "number", order: 30, when: oneOf("textField", "textarea") },
+    { id: "maxWords", tab: "validation", attribute: "maxWords", label: "Max words", control: "number", order: 31, when: oneOf("textField", "textarea") },
+    { id: "minDate", tab: "validation", attribute: "minDate", label: "Earliest date", control: "text", order: 32, when: oneOf("day", "datetime"), hint: "ISO date, e.g. 2024-01-01" },
+    { id: "maxDate", tab: "validation", attribute: "maxDate", label: "Latest date", control: "text", order: 33, when: oneOf("day", "datetime") },
     { id: "customMessage", tab: "validation", attribute: "customMessage", label: "Custom error message", control: "text", order: 60, when: data },
     {
       id: "asyncValidation",
@@ -236,6 +260,8 @@ function createDefaultAttributeEditors() {
     { id: "tags", tab: "api", attribute: "tags", label: "Field tags", control: "text", order: 10, placeholder: "comma,separated" },
     { id: "tabIndex", tab: "api", attribute: "tabIndex", label: "Tab index", control: "number", order: 20, when: data },
     { id: "autocomplete", tab: "api", attribute: "autocomplete", label: "Autocomplete", control: "checkbox", order: 30, when: textual },
+    { id: "spellcheck", tab: "api", attribute: "spellcheck", label: "Spellcheck", control: "checkbox", order: 31, when: textual },
+    { id: "autofocus", tab: "api", attribute: "autofocus", label: "Autofocus", control: "checkbox", order: 32, when: textual },
     // ── CONDITIONAL ─────────────────────────────────────────────────────────────
     { id: "logic", tab: "conditional", control: "logic", order: 1 },
     { id: "customConditional", tab: "conditional", attribute: "customConditional", label: "Advanced condition (show when\u2026)", control: "expression", order: 10, placeholder: 'country == "US"' },
