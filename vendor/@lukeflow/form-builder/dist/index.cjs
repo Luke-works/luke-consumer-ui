@@ -266,13 +266,14 @@ function createDefaultAttributeEditors() {
     { id: "logic", tab: "conditional", control: "logic", order: 1 },
     { id: "customConditional", tab: "conditional", attribute: "customConditional", label: "Advanced condition (show when\u2026)", control: "expression", order: 10, placeholder: 'country == "US"' },
     { id: "customConditionalJs", tab: "conditional", attribute: "customConditionalJs", label: "Condition (JavaScript)", control: "js", order: 20, placeholder: "show = data.country === 'US';" },
-    // ── LOGIC ─────────────────────────────────────────────────────────────────
-    { id: "calculateValue", tab: "logic", attribute: "calculateValue", label: "Calculated value (expression)", control: "expression", order: 1, when: data, placeholder: "price * quantity" },
-    { id: "calculateValueJs", tab: "logic", attribute: "calculateValueJs", label: "Calculated value", control: "js", order: 2, when: data, placeholder: "value = data.qty * data.price;" },
-    { id: "allowCalculateOverride", tab: "logic", attribute: "allowCalculateOverride", label: "Allow manual override", control: "checkbox", order: 3, when: data },
-    { id: "customDefaultValue", tab: "logic", attribute: "customDefaultValue", label: "Default value (expression)", control: "expression", order: 10, when: data, placeholder: "firstName + ' ' + lastName" },
-    { id: "customValidation", tab: "logic", attribute: "customValidation", label: "Custom validation (expression)", control: "expression", order: 20, when: data, placeholder: "value > 0" },
-    { id: "customValidationJs", tab: "logic", attribute: "customValidationJs", label: "Validation", control: "js", order: 21, when: data, placeholder: "valid = input.length >= 3 ? true : 'Too short';" }
+    // ── DATA: value computation (calculated / default-value) — a Data concern ────
+    { id: "customDefaultValue", tab: "data", attribute: "customDefaultValue", label: "Default value (expression)", control: "expression", order: 11, when: data, placeholder: "firstName + ' ' + lastName" },
+    { id: "calculateValue", tab: "data", attribute: "calculateValue", label: "Calculated value (expression)", control: "expression", order: 70, when: data, placeholder: "price * quantity" },
+    { id: "calculateValueJs", tab: "data", attribute: "calculateValueJs", label: "Calculated value (JavaScript)", control: "js", order: 71, when: data, placeholder: "value = data.qty * data.price;" },
+    { id: "allowCalculateOverride", tab: "data", attribute: "allowCalculateOverride", label: "Allow manual override", control: "checkbox", order: 72, when: data },
+    // ── VALIDATION: custom validation expressions live with the other validators ──
+    { id: "customValidation", tab: "validation", attribute: "customValidation", label: "Custom validation (expression)", control: "expression", order: 62, when: data, placeholder: "value > 0" },
+    { id: "customValidationJs", tab: "validation", attribute: "customValidationJs", label: "Custom validation (JavaScript)", control: "js", order: 63, when: data, placeholder: "valid = input.length >= 3 ? true : 'Too short';" }
   ];
 }
 var defaultAttributeEditors = createDefaultAttributeEditors();
