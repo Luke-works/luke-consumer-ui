@@ -822,7 +822,7 @@ function NodePreview({ entity }) {
       label,
       a.required ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-pv-required", children: " *" }) : null,
       str2(a.tooltip) ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: "lf-tooltip", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-tooltip-icon", children: " \u24D8" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
       ] }) : null
     ] }),
@@ -1254,6 +1254,16 @@ function SettingsModal({ builder, editors }) {
   const open = Boolean(id && entity);
   const dialogRef = (0, import_react4.useRef)(null);
   const select = builder.select;
+  const snapshot = (0, import_react4.useRef)(null);
+  const schema = builder.schema;
+  (0, import_react4.useEffect)(() => {
+    if (open) snapshot.current = schema;
+  }, [open, id]);
+  const saveClose = () => select(null);
+  const discardClose = () => {
+    if (snapshot.current) builder.setSchema(snapshot.current);
+    select(null);
+  };
   (0, import_react4.useEffect)(() => {
     if (!open) return;
     const onKey = (e) => {
@@ -1272,12 +1282,21 @@ function SettingsModal({ builder, editors }) {
       {
         className: "lf-modal-overlay lf-builder",
         onMouseDown: (e) => {
-          if (e.target === e.currentTarget) builder.select(null);
+          if (e.target === e.currentTarget) saveClose();
         },
         children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { ref: dialogRef, className: "lf-modal", role: "dialog", "aria-modal": "true", "aria-label": "Field settings", tabIndex: -1, children: [
           /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "lf-modal-header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "lf-modal-title", children: "Field settings" }),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", className: "lf-modal-close", "aria-label": "Close settings", onClick: () => builder.select(null), children: "\u2715" })
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "lf-modal-actions", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { type: "button", className: "lf-modal-discard", onClick: discardClose, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "lf-modal-x", "aria-hidden": "true", children: "\u2715" }),
+                " Discard & close"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("button", { type: "button", className: "lf-modal-save", onClick: saveClose, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "lf-modal-tick", "aria-hidden": "true", children: "\u2713" }),
+                " Save & close"
+              ] })
+            ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "lf-modal-body", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SettingsPanel, { builder, editors }) })
         ] })

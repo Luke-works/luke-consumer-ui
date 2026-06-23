@@ -360,6 +360,26 @@
   border-bottom: 1px solid var(--lf-border, #d9d9d9);
 }
 .lf-modal-title { font-weight: 600; }
+.lf-modal-actions { display: flex; align-items: center; gap: 8px; }
+.lf-modal-discard,
+.lf-modal-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-radius: var(--lf-radius, 6px);
+  border: 1px solid var(--lf-border, #d9d9d9);
+  cursor: pointer;
+}
+.lf-modal-discard { background: var(--lf-bg, #fff); color: var(--lf-muted, #6b7280); }
+.lf-modal-discard:hover { color: var(--lf-error, #dc2626); border-color: var(--lf-error, #dc2626); }
+.lf-modal-save { background: var(--lf-primary, #2563eb); color: #fff; border-color: var(--lf-primary, #2563eb); }
+.lf-modal-save:hover { filter: brightness(0.95); }
+.lf-modal-tick,
+.lf-modal-x { font-weight: 700; }
 .lf-modal-close {
   width: 28px; height: 28px;
   border: none;

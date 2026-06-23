@@ -814,7 +814,7 @@ function asArray(value) {
 function Tooltip({ text }) {
   if (!text) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "\u24D8" }),
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "lf-tooltip-bubble", "aria-hidden": "true", children: text })
   ] });
 }

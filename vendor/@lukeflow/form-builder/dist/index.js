@@ -796,7 +796,7 @@ function NodePreview({ entity }) {
       label,
       a.required ? /* @__PURE__ */ jsx2("span", { className: "lf-pv-required", children: " *" }) : null,
       str2(a.tooltip) ? /* @__PURE__ */ jsxs2("span", { className: "lf-tooltip", children: [
-        /* @__PURE__ */ jsx2("span", { className: "lf-tooltip-icon", children: " \u24D8" }),
+        /* @__PURE__ */ jsx2("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
         /* @__PURE__ */ jsx2("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
       ] }) : null
     ] }),
@@ -1228,6 +1228,16 @@ function SettingsModal({ builder, editors }) {
   const open = Boolean(id && entity);
   const dialogRef = useRef4(null);
   const select = builder.select;
+  const snapshot = useRef4(null);
+  const schema = builder.schema;
+  useEffect2(() => {
+    if (open) snapshot.current = schema;
+  }, [open, id]);
+  const saveClose = () => select(null);
+  const discardClose = () => {
+    if (snapshot.current) builder.setSchema(snapshot.current);
+    select(null);
+  };
   useEffect2(() => {
     if (!open) return;
     const onKey = (e) => {
@@ -1246,12 +1256,21 @@ function SettingsModal({ builder, editors }) {
       {
         className: "lf-modal-overlay lf-builder",
         onMouseDown: (e) => {
-          if (e.target === e.currentTarget) builder.select(null);
+          if (e.target === e.currentTarget) saveClose();
         },
         children: /* @__PURE__ */ jsxs4("div", { ref: dialogRef, className: "lf-modal", role: "dialog", "aria-modal": "true", "aria-label": "Field settings", tabIndex: -1, children: [
           /* @__PURE__ */ jsxs4("div", { className: "lf-modal-header", children: [
             /* @__PURE__ */ jsx4("span", { className: "lf-modal-title", children: "Field settings" }),
-            /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-modal-close", "aria-label": "Close settings", onClick: () => builder.select(null), children: "\u2715" })
+            /* @__PURE__ */ jsxs4("div", { className: "lf-modal-actions", children: [
+              /* @__PURE__ */ jsxs4("button", { type: "button", className: "lf-modal-discard", onClick: discardClose, children: [
+                /* @__PURE__ */ jsx4("span", { className: "lf-modal-x", "aria-hidden": "true", children: "\u2715" }),
+                " Discard & close"
+              ] }),
+              /* @__PURE__ */ jsxs4("button", { type: "button", className: "lf-modal-save", onClick: saveClose, children: [
+                /* @__PURE__ */ jsx4("span", { className: "lf-modal-tick", "aria-hidden": "true", children: "\u2713" }),
+                " Save & close"
+              ] })
+            ] })
           ] }),
           /* @__PURE__ */ jsx4("div", { className: "lf-modal-body", children: /* @__PURE__ */ jsx4(SettingsPanel, { builder, editors }) })
         ] })

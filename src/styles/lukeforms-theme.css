@@ -320,6 +320,9 @@
 .lf-modal-body .lf-settings-tabs { background: var(--color-white, #fff); margin: 0 -1.5rem 1rem; padding: 0.875rem 1.5rem 0; }
 .dark .lf-modal-body .lf-settings-tabs { background: var(--color-gray-800, #1d2939); }
 .lf-modal-body .lf-settings-panel { gap: 1rem 1.5rem; }
+/* Save / Discard action buttons in the modal header. */
+.lf-modal-discard, .lf-modal-save { height: 2.25rem; padding: 0 0.9rem; border-radius: 0.5rem; }
+.dark .lf-modal-discard { background: transparent; color: var(--color-gray-400, #98a2b3); border-color: var(--color-gray-700, #344054); }
 /* The grouped-toggles box — a very light, brand-neutral surface. */
 .lf-builder .lf-checkbox-group { background: var(--color-gray-50, #f9fafb); border-color: var(--color-gray-200, #e4e7ec); }
 .dark .lf-builder .lf-checkbox-group { background: rgba(255, 255, 255, 0.02); border-color: var(--color-gray-700, #344054); }
