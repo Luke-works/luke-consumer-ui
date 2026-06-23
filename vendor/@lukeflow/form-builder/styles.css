@@ -120,6 +120,17 @@
 }
 .lf-node-label { font-weight: 500; }
 .lf-node-type { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
+.lf-node-row.is-hidden { opacity: 0.55; }
+.lf-node-badge {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lf-border, #d9d9d9);
+  color: var(--lf-muted, #6b7280);
+}
 
 /* Inline field preview (read-only, non-interactive) — mirrors the rendered field. */
 .lf-node-preview { pointer-events: none; display: flex; flex-direction: column; gap: 4px; }

@@ -933,11 +933,12 @@ function Node({
   const children = entity.children ?? [];
   const isContainer = Boolean(REGISTRY4.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
+  const hidden = Boolean(entity.attributes?.hidden);
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("li", { className: "lf-node", "data-depth": depth, children: [
     /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
       "div",
       {
-        className: `lf-node-row${selected ? " is-selected" : ""}${over ? ` is-drop-${over}` : ""}`,
+        className: `lf-node-row${selected ? " is-selected" : ""}${over ? ` is-drop-${over}` : ""}${hidden ? " is-hidden" : ""}`,
         "data-drop": over ?? void 0,
         onDragOver: (e) => dnd.overNode(e, id, isContainer),
         onDragLeave: dnd.leave,
@@ -961,7 +962,8 @@ function Node({
           /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "lf-node-body", onClick: () => builder.select(id), children: [
             /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("button", { type: "button", className: "lf-node-select", "aria-pressed": selected, "aria-label": `Edit ${labelOf(entity)}`, onClick: () => builder.select(id), children: [
               isContainer && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "lf-node-label", children: labelOf(entity) }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "lf-node-type", children: entity.type })
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "lf-node-type", children: entity.type }),
+              hidden && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "lf-node-badge", children: "Hidden" })
             ] }),
             !isContainer && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "lf-node-preview", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(NodePreview, { entity }) })
           ] }),
