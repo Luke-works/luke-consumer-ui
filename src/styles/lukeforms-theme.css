@@ -95,10 +95,14 @@
   color: var(--lf-text);
   margin: 0 0 0.5rem;
 }
+/* Spacing goes on the WRAP (not the input) so the relative wrapper stays the same height
+   as the input — otherwise the absolutely-centered search icon drops below center. */
+.lf-builder .lf-palette-search-wrap { margin-bottom: 0.75rem; }
+.lf-builder .lf-palette-search-icon { left: 0.75rem; color: var(--color-gray-400, #98a2b3); }
 .lf-builder .lf-palette-search {
   height: 2.25rem;
-  margin-bottom: 0.75rem;
-  padding: 0 0.75rem;
+  /* reserve the left gutter for the search icon + the right gutter for the clear button */
+  padding: 0 2rem 0 2.25rem;
   font-size: 0.875rem;
   background: transparent;
   border: 1px solid var(--lf-border);
@@ -292,11 +296,23 @@
 .lf-builder .lf-logic-then input:focus,
 .lf-builder .lf-logic-then select:focus,
 .lf-builder .lf-logic-test-input:focus,
-.lf-builder .lf-opt-row input:focus {
+.lf-builder .lf-opt-row input:focus,
+.lf-builder .lf-opt-json:focus {
   outline: none;
   border-color: var(--color-brand-300, #9cb9ff);
   box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.15);
 }
+/* Options: Rows/JSON toggle + JSON list editor. */
+.lf-builder .lf-opt-mode { border-color: var(--lf-border); border-radius: 0.5rem; }
+.lf-builder .lf-opt-mode-btn + .lf-opt-mode-btn { border-left-color: var(--lf-border); }
+.lf-builder .lf-opt-mode-btn.is-active { background: var(--color-brand-500, #465fff); color: #fff; }
+.lf-builder .lf-opt-json {
+  color: var(--lf-text);
+  background: var(--lf-bg);
+  border: 1px solid var(--lf-border);
+  border-radius: 0.5rem;
+}
+.lf-builder .lf-opt-json-apply { background: var(--color-brand-500, #465fff); border-radius: 0.5rem; }
 .lf-builder .lf-setting-hint { font-size: 0.6875rem; color: var(--color-gray-400, #98a2b3); }
 .lf-builder .lf-settings-logic,
 .lf-builder .lf-settings-minion,

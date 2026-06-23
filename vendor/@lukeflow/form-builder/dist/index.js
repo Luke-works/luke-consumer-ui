@@ -670,32 +670,99 @@ function ParamsEditor({
 }
 function OptionsControl({ editor, ctx }) {
   const [rows, setRows] = useState2(() => readOptionRows(ctx.value));
+  const [mode, setMode] = useState2("rows");
+  const [draft, setDraft] = useState2("");
+  const [jsonError, setJsonError] = useState2(null);
   const sig = JSON.stringify(ctx.value ?? null);
   const lastSig = useRef2(sig);
+  const lastId = useRef2(ctx.entity.id);
   useEffect(() => {
-    if (sig !== lastSig.current) {
+    if (lastId.current !== ctx.entity.id) {
+      lastId.current = ctx.entity.id;
       lastSig.current = sig;
       setRows(readOptionRows(ctx.value));
+      setMode("rows");
+      setDraft("");
+      setJsonError(null);
+    } else if (sig !== lastSig.current) {
+      lastSig.current = sig;
+      const next = readOptionRows(ctx.value);
+      setRows(next);
+      if (mode === "rows") setDraft(rowsToJson(next));
+      setJsonError(null);
     }
   }, [sig, ctx.entity.id]);
+  const normalize = (next) => next.filter((o) => o.label.trim() || o.value.trim()).map((o) => ({ label: o.label, value: o.value.trim() || o.label.trim() }));
   const commit = (next) => {
     setRows(next);
-    const opts = next.filter((o) => o.label.trim() || o.value.trim()).map((o) => ({ label: o.label, value: o.value.trim() || o.label.trim() }));
+    const opts = normalize(next);
     const persisted = opts.length ? opts : void 0;
     lastSig.current = JSON.stringify(persisted ?? null);
     ctx.setValue(persisted);
+    return opts;
   };
-  const setAt = (i, patch) => commit(rows.map((r, j) => j === i ? { ...r, ...patch } : r));
+  const setLabel = (i, label) => commit(rows.map((r, j) => j === i ? { label, value: r.value && r.value !== r.label ? r.value : label } : r));
+  const openJson = () => {
+    setDraft(rowsToJson(rows));
+    setJsonError(null);
+    setMode("json");
+  };
+  const applyJson = () => {
+    const parsed = parseOptionsJson(draft);
+    if (!parsed.ok) {
+      setJsonError(parsed.error);
+      return;
+    }
+    setJsonError(null);
+    const stored = commit(parsed.rows);
+    setRows(stored);
+    setDraft(rowsToJson(stored));
+  };
   return /* @__PURE__ */ jsxs2("div", { className: "lf-setting-wrap", children: [
-    /* @__PURE__ */ jsx2("span", { className: "lf-setting-label", children: editor.label ?? "Options" }),
-    /* @__PURE__ */ jsxs2("div", { className: "lf-options", children: [
+    /* @__PURE__ */ jsxs2("div", { className: "lf-options-head", children: [
+      /* @__PURE__ */ jsx2("span", { className: "lf-setting-label", children: editor.label ?? "Options" }),
+      /* @__PURE__ */ jsxs2("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options edit mode", children: [
+        /* @__PURE__ */ jsx2("button", { type: "button", className: `lf-opt-mode-btn${mode === "rows" ? " is-active" : ""}`, "aria-pressed": mode === "rows", onClick: () => setMode("rows"), children: "Rows" }),
+        /* @__PURE__ */ jsx2("button", { type: "button", className: `lf-opt-mode-btn${mode === "json" ? " is-active" : ""}`, "aria-pressed": mode === "json", onClick: openJson, children: "JSON" })
+      ] })
+    ] }),
+    mode === "rows" ? /* @__PURE__ */ jsxs2("div", { className: "lf-options", children: [
       rows.length === 0 && /* @__PURE__ */ jsx2("p", { className: "lf-empty", children: "No options yet." }),
-      rows.map((o, i) => /* @__PURE__ */ jsxs2("div", { className: "lf-opt-row", role: "group", "aria-label": `Option ${i + 1}`, children: [
-        /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1} label`, className: "lf-opt-label", value: o.label, placeholder: "Label", onChange: (e) => setAt(i, { label: e.target.value }) }),
-        /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1} value`, className: "lf-opt-value", value: o.value, placeholder: "Value", onChange: (e) => setAt(i, { value: e.target.value }) }),
+      rows.map((o, i) => /* @__PURE__ */ jsxs2("div", { className: "lf-opt-row", children: [
+        /* @__PURE__ */ jsx2(
+          "input",
+          {
+            "aria-label": `Option ${i + 1}`,
+            className: "lf-opt-label",
+            value: o.label,
+            placeholder: "Option",
+            title: o.value && o.value !== o.label ? `Stored value: ${o.value} (edit in JSON)` : void 0,
+            onChange: (e) => setLabel(i, e.target.value)
+          }
+        ),
         /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => commit(rows.filter((_, j) => j !== i)), children: /* @__PURE__ */ jsx2(IconX, { size: 13 }) })
       ] }, i)),
       /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-add", onClick: () => commit([...rows, { label: `Option ${rows.length + 1}`, value: "" }]), children: "+ Add option" })
+    ] }) : /* @__PURE__ */ jsxs2("div", { className: "lf-options-json", children: [
+      /* @__PURE__ */ jsx2(
+        "textarea",
+        {
+          className: "lf-opt-json",
+          "aria-label": "Options as JSON",
+          spellCheck: false,
+          rows: Math.min(14, Math.max(4, draft.split("\n").length + 1)),
+          value: draft,
+          onChange: (e) => {
+            setDraft(e.target.value);
+            if (jsonError) setJsonError(null);
+          }
+        }
+      ),
+      jsonError && /* @__PURE__ */ jsx2("p", { className: "lf-opt-json-error", role: "alert", children: jsonError }),
+      /* @__PURE__ */ jsxs2("div", { className: "lf-opt-json-foot", children: [
+        /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-json-apply", onClick: applyJson, children: "Apply" }),
+        /* @__PURE__ */ jsx2("span", { className: "lf-opt-json-hint", children: 'A JSON array \u2014 "Label" or { "label": "\u2026", "value": "\u2026" }.' })
+      ] })
     ] }),
     editor.hint && /* @__PURE__ */ jsx2("span", { className: "lf-setting-hint", children: editor.hint })
   ] });
@@ -707,6 +774,44 @@ function readOptionRows(raw) {
     const obj = o;
     return { label: String(obj.label ?? obj.value ?? ""), value: String(obj.value ?? "") };
   });
+}
+function rowsToJson(rows) {
+  const arr = rows.map((r) => !r.value.trim() || r.value === r.label ? r.label : { label: r.label, value: r.value });
+  return JSON.stringify(arr, null, 2);
+}
+function parseOptionsJson(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, rows: [] };
+  let data2;
+  try {
+    data2 = JSON.parse(trimmed);
+  } catch (e) {
+    return { ok: false, error: `Invalid JSON: ${e.message}` };
+  }
+  if (!Array.isArray(data2)) return { ok: false, error: "Expected a JSON array of options." };
+  const rows = [];
+  for (let i = 0; i < data2.length; i++) {
+    const item = data2[i];
+    if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") {
+      const s = String(item);
+      rows.push({ label: s, value: s });
+    } else if (item && typeof item === "object" && !Array.isArray(item)) {
+      const obj = item;
+      if (!isPrimitive(obj.label) || !isPrimitive(obj.value)) {
+        return { ok: false, error: `Item ${i + 1}: label and value must be a string, number, or boolean.` };
+      }
+      const label = obj.label != null ? String(obj.label) : obj.value != null ? String(obj.value) : "";
+      const value = obj.value != null ? String(obj.value) : label;
+      if (!label && !value) return { ok: false, error: `Item ${i + 1} has no label or value.` };
+      rows.push({ label, value });
+    } else {
+      return { ok: false, error: `Item ${i + 1} must be a string or an object.` };
+    }
+  }
+  return { ok: true, rows };
+}
+function isPrimitive(x) {
+  return x == null || typeof x === "string" || typeof x === "number" || typeof x === "boolean";
 }
 function Labeled({
   label,
