@@ -1510,6 +1510,7 @@ function Node({
   const isContainer = Boolean(REGISTRY4.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
+  const childCols = (entity.type === "columns" || entity.type === "table") && children.length > 1 ? Math.min(6, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
   return /* @__PURE__ */ jsxs5("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ jsx5(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ jsxs5(
@@ -1554,7 +1555,7 @@ function Node({
       }
     ),
     isContainer && /* @__PURE__ */ jsxs5("div", { className: "lf-node-children", children: [
-      children.length > 0 && /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", children: children.map((cid, i) => /* @__PURE__ */ jsx5(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
+      children.length > 0 && /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", "data-cols": childCols || void 0, style: childCols ? { display: "grid", gridTemplateColumns: `repeat(${childCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0, children: children.map((cid, i) => /* @__PURE__ */ jsx5(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
       /* @__PURE__ */ jsx5(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
     ] }),
     over === "after" && /* @__PURE__ */ jsx5(DropIndicator, { pos: "after" })
