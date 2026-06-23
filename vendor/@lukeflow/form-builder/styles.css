@@ -59,12 +59,34 @@
 /* ── Palette ───────────────────────────────────────────────────────────────── */
 .lf-palette { display: flex; flex-direction: column; gap: 8px; }
 .lf-palette h4 { margin: 0; font-size: 0.85rem; }
+/* Search bar: a rounded field with a search icon and an inline clear button. */
+.lf-palette-search-wrap { position: relative; display: flex; align-items: center; }
+.lf-palette-search-icon { position: absolute; left: 10px; color: var(--lf-muted, #6b7280); pointer-events: none; }
 .lf-palette-search {
   width: 100%;
-  padding: 4px 8px;
+  padding: 7px 28px 7px 30px;
   border: 1px solid var(--lf-border, #d9d9d9);
-  border-radius: var(--lf-radius, 6px);
+  border-radius: 999px;
+  background: var(--lf-bg, #fff);
+  font: inherit;
+  font-size: 0.82rem;
 }
+.lf-palette-search:focus { outline: none; border-color: var(--lf-primary, #2563eb); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.lf-palette-search-clear {
+  position: absolute;
+  right: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--lf-border, #d9d9d9);
+  color: var(--lf-text, #1a1a1a);
+  cursor: pointer;
+}
+.lf-palette-search-clear:hover { background: var(--lf-muted, #6b7280); color: #fff; }
 .lf-palette-group { display: flex; flex-direction: column; gap: 4px; }
 .lf-palette-group-title {
   margin: 6px 0 2px;
@@ -74,14 +96,21 @@
   color: var(--lf-muted, #6b7280);
 }
 .lf-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   text-align: left;
   padding: 6px 10px;
   border: 1px solid var(--lf-border, #d9d9d9);
   border-radius: var(--lf-radius, 6px);
   background: var(--lf-bg, #fff);
   cursor: grab;
+  font: inherit;
 }
 .lf-palette-item:hover { border-color: var(--lf-primary, #2563eb); }
+.lf-palette-item:hover .lf-palette-item-icon { color: var(--lf-primary, #2563eb); }
+.lf-palette-item-icon { display: inline-flex; flex: 0 0 auto; color: var(--lf-muted, #6b7280); }
+.lf-palette-item-label { min-width: 0; }
 
 /* ── Canvas tree ───────────────────────────────────────────────────────────── */
 .lf-canvas {
@@ -197,12 +226,16 @@
 .lf-pv-hr { width: 100%; border: none; border-top: 1px solid var(--lf-border, #d9d9d9); margin: 4px 0; }
 .lf-node-actions { display: flex; gap: 2px; }
 .lf-node-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 24px; height: 24px;
   border: 1px solid var(--lf-border, #d9d9d9);
   border-radius: var(--lf-radius, 6px);
   background: var(--lf-bg, #fff);
   cursor: pointer;
 }
+.lf-icon { display: block; }
 .lf-node-actions button:disabled { opacity: 0.4; cursor: default; }
 .lf-dropzone {
   margin: 4px 0 4px 16px;
@@ -319,6 +352,9 @@
   padding: 0 4px;
 }
 .lf-logic-cond-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   height: 30px;
   border: 1px solid var(--lf-border, #d9d9d9);
@@ -327,10 +363,31 @@
   color: var(--lf-muted, #6b7280);
   cursor: pointer;
 }
+.lf-logic-cond-remove:hover { color: var(--lf-error, #dc2626); border-color: var(--lf-error, #dc2626); }
 .lf-logic-add-cond { align-self: flex-start; font-size: 0.72rem; font-weight: 500; color: var(--lf-primary, #2563eb); background: none; border: none; cursor: pointer; padding: 0; }
 .lf-logic-then { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); font-size: 0.8rem; }
 .lf-logic-then-label { font-weight: 600; }
-.lf-logic-rule-remove { margin-left: auto; font-size: 0.72rem; color: var(--lf-error, #dc2626); background: none; border: none; cursor: pointer; }
+/* Per-rule action bar: bordered Reset / Save / Remove buttons (with native tooltips). */
+.lf-logic-rule-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); }
+.lf-logic-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 500;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  color: var(--lf-text, #1a1a1a);
+  cursor: pointer;
+}
+.lf-logic-reset:hover { border-color: var(--lf-primary, #2563eb); color: var(--lf-primary, #2563eb); }
+.lf-logic-save { border-color: var(--lf-primary, #2563eb); background: var(--lf-primary, #2563eb); color: #fff; }
+.lf-logic-save:hover { filter: brightness(0.95); }
+.lf-logic-remove { margin-left: auto; }
+.lf-logic-remove:hover { border-color: var(--lf-error, #dc2626); color: var(--lf-error, #dc2626); }
 .lf-logic-add { align-self: flex-start; padding: 5px 12px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); background: var(--lf-bg, #fff); cursor: pointer; font-size: 0.78rem; }
 /* Per-condition AND/OR connector (mix to build a == 1 and b == 2 or c == 3). */
 .lf-logic-conn {

@@ -209,6 +209,43 @@
   opacity: 1;
   visibility: visible;
 }
+/* The PORTALED bubble (the form's tooltip) — fixed-positioned to escape any clipping
+   ancestor, with a rotated-square arrow placed by inline `left`. */
+.lf-tooltip-bubble--portal {
+  z-index: 2147483600;
+  width: max-content;
+  max-width: 260px;
+  padding: 9px 13px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1d2939;
+  border: 1px solid #d0d5dd;
+  box-shadow: 0 10px 26px rgba(16, 24, 40, 0.18);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+}
+.lf-tooltip-arrow {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  transform: translateX(-50%) rotate(45deg);
+  background: #ffffff;
+  border: 1px solid #d0d5dd;
+}
+.lf-tooltip-bubble--portal.is-top .lf-tooltip-arrow {
+  bottom: -6px;
+  border-top: none;
+  border-left: none;
+}
+.lf-tooltip-bubble--portal.is-bottom .lf-tooltip-arrow {
+  top: -6px;
+  border-bottom: none;
+  border-right: none;
+}
 
 .lf-group {
   border: 1px solid var(--lf-border);
@@ -356,11 +393,16 @@ button.lf-panel-head { cursor: pointer; }
   font-size: 12px;
 }
 .lf-tag button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: 0;
   color: #fff;
   cursor: pointer;
+  padding: 0;
 }
+.lf-x { display: block; }
 
 .lf-number {
   display: inline-flex;
@@ -487,6 +529,24 @@ button.lf-panel-head { cursor: pointer; }
 .lf-search-select {
   position: relative;
 }
+.lf-search-select > input { padding-right: 30px; }
+.lf-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lf-muted);
+  cursor: pointer;
+}
+.lf-search-clear:hover { background: var(--lf-border); color: var(--lf-text); }
 .lf-search-list {
   position: absolute;
   z-index: 10;

@@ -47,7 +47,8 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-import { useState as useState3, useEffect as useEffect2, useRef as useRef2, useCallback as useCallback2 } from "react";
+import { useState as useState3, useEffect as useEffect2, useLayoutEffect, useRef as useRef2, useCallback as useCallback2 } from "react";
+import { createPortal } from "react-dom";
 import {
   createDefaultFieldTypeRegistry,
   evaluateVisibility,
@@ -137,6 +138,17 @@ var FormErrorBoundary = class extends Component {
 
 // src/FormRenderer.tsx
 import { jsx as jsx4, jsxs } from "react/jsx-runtime";
+function scrollOptionIntoView(id) {
+  if (typeof document === "undefined") return;
+  const el = document.getElementById(id);
+  try {
+    el?.scrollIntoView({ block: "nearest" });
+  } catch {
+  }
+}
+function XGlyph() {
+  return /* @__PURE__ */ jsx4("svg", { className: "lf-x", viewBox: "0 0 24 24", width: "12", height: "12", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ jsx4("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
+}
 function FormRenderer(props) {
   const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", theme, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
   const formClass = ["lf-form", className].filter(Boolean).join(" ");
@@ -455,7 +467,11 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "select":
-        control = /* @__PURE__ */ jsxs("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
+        control = a.searchable && readDataSource2(a) ? (
+          // Searchable + Minion-backed → server-side type-ahead (re-queries as you type),
+          // so a value beyond the first page is still findable (unlike a static filter).
+          /* @__PURE__ */ jsx4(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
+        ) : a.searchable ? /* @__PURE__ */ jsx4(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ jsxs("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
           !fs.isRequired && /* @__PURE__ */ jsx4("option", { value: "", children: ph ?? "" }),
           fieldOptions.map((o) => /* @__PURE__ */ jsx4("option", { value: o.value, children: ctx.t(o.label) }, o.value))
         ] });
@@ -811,11 +827,73 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 function Tooltip({ text }) {
+  const ref = useRef2(null);
+  const [anchor, setAnchor] = useState3(null);
+  useEffect2(() => {
+    if (!anchor || typeof window === "undefined") return;
+    const dismiss = () => setAnchor(null);
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
+    };
+  }, [anchor]);
   if (!text) return null;
-  return /* @__PURE__ */ jsxs("span", { className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, children: [
+  const show = () => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setAnchor({ cx: r.left + r.width / 2, top: r.top, bottom: r.bottom });
+  };
+  const hide = () => setAnchor(null);
+  return /* @__PURE__ */ jsxs("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
     /* @__PURE__ */ jsx4("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
-    /* @__PURE__ */ jsx4("span", { className: "lf-tooltip-bubble", "aria-hidden": "true", children: text })
+    anchor && /* @__PURE__ */ jsx4(TooltipBubble, { text, anchor })
   ] });
+}
+function TooltipBubble({ text, anchor }) {
+  const ref = useRef2(null);
+  const [box, setBox] = useState3(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof window === "undefined") return;
+    const b = el.getBoundingClientRect();
+    const M = 8;
+    let place = "top";
+    let top = anchor.top - b.height - 10;
+    if (top < M) {
+      place = "bottom";
+      top = anchor.bottom + 10;
+    }
+    let left = anchor.cx - b.width / 2;
+    left = Math.max(M, Math.min(left, window.innerWidth - b.width - M));
+    let arrow = anchor.cx - left;
+    if (arrow > b.width - 12) {
+      left += arrow - (b.width - 12);
+      arrow = b.width - 12;
+    } else if (arrow < 12) {
+      left -= 12 - arrow;
+      arrow = 12;
+    }
+    setBox({ left, top, place, arrow });
+  }, [anchor, text]);
+  return createPortal(
+    /* @__PURE__ */ jsxs(
+      "span",
+      {
+        ref,
+        className: `lf-tooltip-bubble--portal is-${box?.place ?? "top"}`,
+        role: "tooltip",
+        style: { position: "fixed", left: box?.left ?? anchor.cx, top: box?.top ?? anchor.top, visibility: box ? "visible" : "hidden" },
+        children: [
+          text,
+          /* @__PURE__ */ jsx4("span", { className: "lf-tooltip-arrow", style: { left: box?.arrow ?? 0 } })
+        ]
+      }
+    ),
+    document.body
+  );
 }
 function SearchSelect({
   a11y,
@@ -837,7 +915,14 @@ function SearchSelect({
   const [selectedLabel, setSelectedLabel] = useState3("");
   const [active, setActive] = useState3(-1);
   const timer = useRef2(null);
+  const blurTimer = useRef2(null);
+  const clearBlur = () => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    blurTimer.current = null;
+  };
+  useEffect2(() => () => clearBlur(), []);
   const choose = (o) => {
+    clearBlur();
     setValue(o.value);
     setSelectedLabel(o.label);
     setQuery("");
@@ -845,6 +930,9 @@ function SearchSelect({
     setActive(-1);
   };
   const optionId = (i) => `${a11y.id}-opt-${i}`;
+  useEffect2(() => {
+    if (open && active >= 0) scrollOptionIntoView(optionId(active));
+  }, [active, open]);
   useEffect2(() => {
     if (!client || !ds || !open) return;
     if (timer.current) clearTimeout(timer.current);
@@ -872,6 +960,7 @@ function SearchSelect({
       setActive((i) => Math.min(i + 1, options2.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      setOpen(true);
       setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter") {
       if (open && active >= 0 && options2[active]) {
@@ -897,14 +986,19 @@ function SearchSelect({
         placeholder,
         value: display,
         disabled,
-        onFocus: () => setOpen(true),
+        onFocus: () => {
+          clearBlur();
+          setOpen(true);
+        },
         onChange: (e) => {
           setQuery(e.target.value);
           setOpen(true);
           setActive(-1);
         },
         onKeyDown,
-        onBlur: () => setTimeout(() => setOpen(false), 150)
+        onBlur: () => {
+          blurTimer.current = setTimeout(() => setOpen(false), 150);
+        }
       }
     ),
     open && (loading || options2.length > 0) && /* @__PURE__ */ jsxs("ul", { id: listId, role: "listbox", className: "lf-search-list", children: [
@@ -927,6 +1021,107 @@ function SearchSelect({
     ] })
   ] });
 }
+function SearchableSelect({
+  a11y,
+  options: options2,
+  value,
+  setValue,
+  placeholder,
+  required,
+  disabled,
+  t
+}) {
+  const [query, setQuery] = useState3("");
+  const [open, setOpen] = useState3(false);
+  const [active, setActive] = useState3(-1);
+  const blurTimer = useRef2(null);
+  const selected = options2.find((o) => o.value === asText(value));
+  const q = query.trim().toLowerCase();
+  const filtered = q ? options2.filter((o) => t(o.label).toLowerCase().includes(q) || o.value.toLowerCase().includes(q)) : options2;
+  const listId = `${a11y.id}-listbox`;
+  const optionId = (i) => `${a11y.id}-opt-${i}`;
+  const clearBlur = () => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    blurTimer.current = null;
+  };
+  useEffect2(() => () => clearBlur(), []);
+  useEffect2(() => {
+    if (open && active >= 0) scrollOptionIntoView(optionId(active));
+  }, [active, open]);
+  const choose = (o) => {
+    clearBlur();
+    setValue(o.value);
+    setQuery("");
+    setOpen(false);
+    setActive(-1);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (open && active >= 0 && filtered[active]) {
+        e.preventDefault();
+        choose(filtered[active]);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setActive(-1);
+    }
+  };
+  const display = open ? query : selected ? t(selected.label) : asText(value);
+  const showClear = !disabled && !required && asText(value) !== "" && !open;
+  return /* @__PURE__ */ jsxs("div", { className: "lf-search-select", children: [
+    /* @__PURE__ */ jsx4(
+      "input",
+      {
+        ...a11y,
+        role: "combobox",
+        "aria-expanded": open,
+        "aria-controls": listId,
+        "aria-autocomplete": "list",
+        "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
+        autoComplete: "off",
+        placeholder: placeholder ?? (required ? void 0 : "Search\u2026"),
+        value: display,
+        onFocus: () => {
+          clearBlur();
+          setOpen(true);
+        },
+        onChange: (e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          setActive(-1);
+        },
+        onKeyDown,
+        onBlur: () => {
+          blurTimer.current = setTimeout(() => setOpen(false), 150);
+        }
+      }
+    ),
+    showClear && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-search-clear", "aria-label": "Clear", onMouseDown: (e) => e.preventDefault(), onClick: () => setValue(""), children: /* @__PURE__ */ jsx4(XGlyph, {}) }),
+    open && filtered.length > 0 && /* @__PURE__ */ jsx4("ul", { id: listId, role: "listbox", className: "lf-search-list", children: filtered.map((o, i) => /* @__PURE__ */ jsx4(
+      "li",
+      {
+        id: optionId(i),
+        role: "option",
+        "aria-selected": o.value === asText(value),
+        className: i === active ? "is-active" : void 0,
+        onMouseDown: (e) => {
+          e.preventDefault();
+          choose(o);
+        },
+        children: t(o.label)
+      },
+      o.value
+    )) })
+  ] });
+}
 function TextControl({
   type,
   a11y,
@@ -943,7 +1138,7 @@ function TextControl({
   if (!clearable) return input;
   return /* @__PURE__ */ jsxs("span", { className: "lf-input-wrap", children: [
     input,
-    showClear && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: "\xD7" })
+    showClear && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ jsx4(XGlyph, {}) })
   ] });
 }
 function applyMask(raw, mask) {
@@ -987,7 +1182,7 @@ function TagsInput({
   return /* @__PURE__ */ jsxs("div", { className: "lf-tags", children: [
     tags.map((t) => /* @__PURE__ */ jsxs("span", { className: "lf-tag", children: [
       t,
-      /* @__PURE__ */ jsx4("button", { type: "button", "aria-label": `Remove ${t}`, disabled, onClick: () => onChange(tags.filter((x) => x !== t)), children: "\xD7" })
+      /* @__PURE__ */ jsx4("button", { type: "button", "aria-label": `Remove ${t}`, disabled, onClick: () => onChange(tags.filter((x) => x !== t)), children: /* @__PURE__ */ jsx4(XGlyph, {}) })
     ] }, t)),
     /* @__PURE__ */ jsx4(
       "input",
