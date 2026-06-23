@@ -242,7 +242,7 @@ function createDefaultAttributeEditors() {
     { id: "showCharCount", tab: "data", attribute: "showCharCount", label: "Show character count", control: "checkbox", order: 52, when: textual },
     { id: "showWordCount", tab: "data", attribute: "showWordCount", label: "Show word count", control: "checkbox", order: 53, when: oneOf("textField", "textarea") },
     { id: "autoExpand", tab: "data", attribute: "autoExpand", label: "Auto-expand", control: "checkbox", order: 54, when: oneOf("textarea") },
-    { id: "numColumns", tab: "data", attribute: "numColumns", label: "Columns", control: "number", order: 55, when: oneOf("table") },
+    { id: "numColumns", tab: "data", attribute: "numColumns", label: "Number of columns", control: "number", order: 55, when: oneOf("table", "columns"), hint: "How many equal columns to lay children out in." },
     {
       id: "buttonAction",
       tab: "data",
@@ -257,6 +257,7 @@ function createDefaultAttributeEditors() {
         { label: "Button", value: "button" }
       ]
     },
+    { id: "allowType", tab: "data", attribute: "allowType", label: "Allow typed signature", control: "checkbox", order: 33, when: oneOf("signature"), hint: "Let the signer type their name (rendered in a script font) instead of drawing." },
     { id: "accept", tab: "data", attribute: "accept", label: "Accepted file types", control: "text", order: 34, when: oneOf("file"), placeholder: "image/*,.pdf" },
     { id: "maxFiles", tab: "data", attribute: "maxFiles", label: "Max files", control: "number", order: 35, when: oneOf("file") },
     { id: "maxSize", tab: "data", attribute: "maxSize", label: "Max size (MB)", control: "number", order: 36, when: oneOf("file") },
@@ -1270,6 +1271,17 @@ var ICONS = {
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("line", { x1: "8", y1: "8", x2: "16", y2: "8", ...S }),
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("line", { x1: "8", y1: "12", x2: "16", y2: "12", ...S }),
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("line", { x1: "8", y1: "16", x2: "13", y2: "16", ...S })
+  ] }),
+  array: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M7 4H4v16h3", ...S }),
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M17 4h3v16h-3", ...S }),
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "9.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "12", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "14.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" })
+  ] }),
+  map: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M8.5 4C6.5 4 6.5 6 6.5 8s0 4-2 4c2 0 2 2 2 4s0 4 2 4", ...S }),
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M15.5 4c2 0 2 2 2 4s0 4 2 4c-2 0-2 2-2 4s0 4-2 4", ...S })
   ] })
 };
 var GENERIC = /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
@@ -1311,14 +1323,16 @@ var PALETTE_GROUPS = [
       { type: "day", label: "Date" },
       { type: "tags", label: "Tags" },
       { type: "file", label: "File Upload" },
-      { type: "signature", label: "Signature" }
+      { type: "signature", label: "Signature" },
+      { type: "dataGrid", label: "Data Grid" },
+      { type: "editGrid", label: "Edit Grid" }
     ]
   },
   {
     group: "Layout",
     items: [
       { type: "panel", label: "Panel" },
-      { type: "columns", label: "Columns" },
+      { type: "columns", label: "Columns", defaults: { numColumns: 2 } },
       { type: "tabs", label: "Tabs" },
       { type: "table", label: "Table", defaults: { numColumns: 2 } },
       { type: "well", label: "Well" },
@@ -1331,8 +1345,10 @@ var PALETTE_GROUPS = [
   {
     group: "Data",
     items: [
-      { type: "dataGrid", label: "Data Grid" },
-      { type: "editGrid", label: "Edit Grid" }
+      // Data carriers — hold structured data for form mechanics (logic/calculate). They
+      // render nothing in the live form but stay in scope and the submission payload.
+      { type: "array", label: "Array" },
+      { type: "map", label: "Map" }
     ]
   },
   {
@@ -1411,7 +1427,21 @@ function CanvasDndProvider({ builder, children }) {
 }
 function Canvas({ builder }) {
   const { schema } = builder;
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "lf-canvas", "aria-label": "Form canvas", children: schema.root.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(RootDropzone, { empty: true }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) }) });
+  const dnd = useDnd();
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "lf-canvas", "aria-label": "Form canvas", children: schema.root.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(RootDropzone, { empty: true }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+    dnd.dragging && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      "div",
+      {
+        className: `lf-dropzone lf-dropzone--edge${dnd.overEmpty === ROOT ? " is-over" : ""}`,
+        "aria-label": "Insert at the top",
+        onDragOver: (e) => dnd.overEmptyContainer(e, ROOT),
+        onDragLeave: dnd.leave,
+        onDrop: (e) => dnd.dropIntoEmpty(e, ROOT),
+        children: "Insert at the top"
+      }
+    ),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
+  ] }) });
 }
 function Node({
   id,
@@ -1429,7 +1459,7 @@ function Node({
   const isContainer = Boolean(REGISTRY4.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("li", { className: "lf-node", "data-depth": depth, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
       "div",
@@ -1472,25 +1502,28 @@ function Node({
         ]
       }
     ),
-    isContainer && (children.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("ol", { className: "lf-node-list", children: children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ContainerDropzone, { containerId: id, label: labelOf(entity) })),
+    isContainer && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "lf-node-children", children: [
+      children.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("ol", { className: "lf-node-list", children: children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
+    ] }),
     over === "after" && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(DropIndicator, { pos: "after" })
   ] });
 }
 function DropIndicator({ pos }) {
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `lf-drop-indicator is-${pos}`, "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "lf-drop-dot" }) });
 }
-function ContainerDropzone({ containerId, label }) {
+function ContainerDropzone({ containerId, label, compact, index }) {
   const dnd = useDnd();
   const active = dnd.overEmpty === containerId;
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
     "div",
     {
-      className: `lf-dropzone${active ? " is-over" : ""}`,
+      className: `lf-dropzone${compact ? " lf-dropzone--compact" : ""}${active ? " is-over" : ""}`,
       "aria-label": `Drop into ${label}`,
       onDragOver: (e) => dnd.overEmptyContainer(e, containerId),
       onDragLeave: dnd.leave,
-      onDrop: (e) => dnd.dropIntoEmpty(e, containerId),
-      children: "Drop fields here"
+      onDrop: (e) => dnd.dropIntoEmpty(e, containerId, index),
+      children: compact ? `+ Add field into ${label}` : "Drop fields here"
     }
   );
 }
@@ -1520,13 +1553,16 @@ function useCanvasDnd(builder) {
   const source = (0, import_react3.useRef)(null);
   const [over, setOver] = (0, import_react3.useState)(null);
   const [overEmpty, setOverEmpty] = (0, import_react3.useState)(null);
+  const [dragging, setDragging] = (0, import_react3.useState)(false);
   const begin = (src) => {
     source.current = src;
+    setDragging(true);
   };
   const end = () => {
     source.current = null;
     setOver(null);
     setOverEmpty(null);
+    setDragging(false);
   };
   const leave = () => {
   };
@@ -1535,6 +1571,11 @@ function useCanvasDnd(builder) {
     if (!s) return false;
     if (s.kind === "move" && s.id === targetId) return false;
     return true;
+  };
+  const cannotDropInto = (containerId) => {
+    const s = source.current;
+    if (!s || s.kind !== "move" || containerId === ROOT) return false;
+    return s.id === containerId || isDescendant(builder.schema, s.id, containerId);
   };
   const posFor = (e, isContainer) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1571,23 +1612,33 @@ function useCanvasDnd(builder) {
     end();
   };
   const overEmptyContainer = (e, containerId) => {
-    if (!source.current) return;
+    if (!source.current || cannotDropInto(containerId)) return;
     e.preventDefault();
     setOver(null);
     setOverEmpty(containerId);
   };
-  const dropIntoEmpty = (e, containerId) => {
+  const dropIntoEmpty = (e, containerId, index = 0) => {
     e.preventDefault();
     const s = source.current;
-    if (!s) return end();
-    place(s, containerId === ROOT ? null : containerId, 0);
+    if (!s || cannotDropInto(containerId)) return end();
+    place(s, containerId === ROOT ? null : containerId, index);
     end();
   };
   const place = (s, parentId, index) => {
     if (s.kind === "new") builder.addField(s.type, { label: s.label, ...s.defaults ?? {} }, { parentId, index });
     else builder.moveField(s.id, { parentId, index });
   };
-  return { over, overEmpty, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty };
+  return { over, overEmpty, dragging, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty };
+}
+function isDescendant(schema, ancestorId, maybeId) {
+  const stack = [...schema.entities[ancestorId]?.children ?? []];
+  while (stack.length) {
+    const id = stack.pop();
+    if (!id) continue;
+    if (id === maybeId) return true;
+    for (const c of schema.entities[id]?.children ?? []) stack.push(c);
+  }
+  return false;
 }
 function locate(schema, id) {
   const rootIdx = (schema.root ?? []).indexOf(id);
@@ -1659,6 +1710,7 @@ var FormBuilder = (0, import_react4.forwardRef)(function FormBuilder2({ initialS
 function PreviewModal({ schema, onClose, notify }) {
   const [view, setView] = (0, import_react4.useState)("form");
   const [copied, setCopied] = (0, import_react4.useState)(false);
+  const [submitResult, setSubmitResult] = (0, import_react4.useState)(null);
   const dialogRef = (0, import_react4.useRef)(null);
   const copyTimer = (0, import_react4.useRef)(null);
   const json = (0, import_react4.useMemo)(() => JSON.stringify(schema, null, 2), [schema]);
@@ -1702,7 +1754,30 @@ function PreviewModal({ schema, onClose, notify }) {
           /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close preview", title: "Close", onClick: onClose, children: "\u2715" })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_form_react.FormRenderer, { schema }) }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("pre", { className: "lf-json", "data-testid": "preview-json", children: json }) })
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          import_form_react.FormRenderer,
+          {
+            schema,
+            onResult: (r) => setSubmitResult({ ok: r.ok, errorKeys: r.errorKeys }),
+            onSubmit: (data2) => setSubmitResult({ ok: true, data: data2 })
+          }
+        ) }),
+        submitResult && (submitResult.ok ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lf-preview-result is-ok", role: "status", "data-testid": "preview-result", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { children: "\u2713 Valid \u2014 submission payload" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("pre", { className: "lf-json", children: JSON.stringify(submitResult.data ?? {}, null, 2) })
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lf-preview-result is-error", role: "status", "data-testid": "preview-result", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("strong", { children: [
+            "\u2715 ",
+            submitResult.errorKeys?.length ?? 0,
+            " field(s) need attention"
+          ] }),
+          submitResult.errorKeys && submitResult.errorKeys.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "lf-preview-result-keys", children: [
+            " \u2014 ",
+            submitResult.errorKeys.join(", ")
+          ] })
+        ] }))
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("pre", { className: "lf-json", "data-testid": "preview-json", children: json }) })
     ] }) }),
     document.body
   );

@@ -318,17 +318,17 @@ button.lf-panel-head { cursor: pointer; }
   flex-direction: column;
   gap: var(--lf-space);
 }
-/* columns → side by side; table → grid (column count via inline style). */
-.lf-container[data-type="columns"] > .lf-container-children {
-  flex-direction: row;
-  flex-wrap: wrap;
+/* columns + table → N equal columns (count via inline grid-template-columns); drop the
+   generic left accent bar/indent (like panel/tabs) so the grid reads cleanly. */
+.lf-container[data-type="columns"],
+.lf-container[data-type="table"] {
+  border-left: none;
+  padding-left: 0;
 }
-.lf-container[data-type="columns"] > .lf-container-children > * {
-  flex: 1 1 0;
-  min-width: 140px;
-}
+.lf-container[data-type="columns"] > .lf-container-children,
 .lf-container[data-type="table"] > .lf-container-children {
   display: grid;
+  gap: var(--lf-space);
 }
 /* Tabs. */
 .lf-tabs { border-left: none; padding-left: 0; }
@@ -486,6 +486,20 @@ button.lf-panel-head { cursor: pointer; }
 
 /* ── Signature pad ─────────────────────────────────────────────────────────── */
 .lf-signature { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+/* Draw / Type mode toggle (shown when allowType). */
+.lf-signature-modes { display: inline-flex; border: 1px solid var(--lf-border); border-radius: 999px; overflow: hidden; }
+.lf-signature-mode { padding: 4px 14px; border: none; background: var(--lf-bg); color: var(--lf-muted); font: inherit; font-size: 13px; cursor: pointer; }
+.lf-signature-mode.is-active { background: var(--lf-primary); color: #fff; }
+.lf-signature-mode:disabled { opacity: 0.6; cursor: default; }
+.lf-signature-typed {
+  width: 100%;
+  max-width: 420px;
+  padding: 8px 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  font: inherit;
+}
+.lf-signature-pad[data-mode="type"] { cursor: default; }
 .lf-signature-padwrap { position: relative; width: 100%; max-width: 420px; }
 .lf-signature-pad {
   width: 100%;

@@ -217,7 +217,7 @@ function createDefaultAttributeEditors() {
     { id: "showCharCount", tab: "data", attribute: "showCharCount", label: "Show character count", control: "checkbox", order: 52, when: textual },
     { id: "showWordCount", tab: "data", attribute: "showWordCount", label: "Show word count", control: "checkbox", order: 53, when: oneOf("textField", "textarea") },
     { id: "autoExpand", tab: "data", attribute: "autoExpand", label: "Auto-expand", control: "checkbox", order: 54, when: oneOf("textarea") },
-    { id: "numColumns", tab: "data", attribute: "numColumns", label: "Columns", control: "number", order: 55, when: oneOf("table") },
+    { id: "numColumns", tab: "data", attribute: "numColumns", label: "Number of columns", control: "number", order: 55, when: oneOf("table", "columns"), hint: "How many equal columns to lay children out in." },
     {
       id: "buttonAction",
       tab: "data",
@@ -232,6 +232,7 @@ function createDefaultAttributeEditors() {
         { label: "Button", value: "button" }
       ]
     },
+    { id: "allowType", tab: "data", attribute: "allowType", label: "Allow typed signature", control: "checkbox", order: 33, when: oneOf("signature"), hint: "Let the signer type their name (rendered in a script font) instead of drawing." },
     { id: "accept", tab: "data", attribute: "accept", label: "Accepted file types", control: "text", order: 34, when: oneOf("file"), placeholder: "image/*,.pdf" },
     { id: "maxFiles", tab: "data", attribute: "maxFiles", label: "Max files", control: "number", order: 35, when: oneOf("file") },
     { id: "maxSize", tab: "data", attribute: "maxSize", label: "Max size (MB)", control: "number", order: 36, when: oneOf("file") },
@@ -1245,6 +1246,17 @@ var ICONS = {
     /* @__PURE__ */ jsx4("line", { x1: "8", y1: "8", x2: "16", y2: "8", ...S }),
     /* @__PURE__ */ jsx4("line", { x1: "8", y1: "12", x2: "16", y2: "12", ...S }),
     /* @__PURE__ */ jsx4("line", { x1: "8", y1: "16", x2: "13", y2: "16", ...S })
+  ] }),
+  array: /* @__PURE__ */ jsxs3(Fragment2, { children: [
+    /* @__PURE__ */ jsx4("path", { d: "M7 4H4v16h3", ...S }),
+    /* @__PURE__ */ jsx4("path", { d: "M17 4h3v16h-3", ...S }),
+    /* @__PURE__ */ jsx4("circle", { cx: "9.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
+    /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
+    /* @__PURE__ */ jsx4("circle", { cx: "14.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" })
+  ] }),
+  map: /* @__PURE__ */ jsxs3(Fragment2, { children: [
+    /* @__PURE__ */ jsx4("path", { d: "M8.5 4C6.5 4 6.5 6 6.5 8s0 4-2 4c2 0 2 2 2 4s0 4 2 4", ...S }),
+    /* @__PURE__ */ jsx4("path", { d: "M15.5 4c2 0 2 2 2 4s0 4 2 4c-2 0-2 2-2 4s0 4-2 4", ...S })
   ] })
 };
 var GENERIC = /* @__PURE__ */ jsxs3(Fragment2, { children: [
@@ -1256,7 +1268,7 @@ function paletteIcon(type) {
 }
 
 // src/Canvas.tsx
-import { jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
+import { Fragment as Fragment3, jsx as jsx5, jsxs as jsxs4 } from "react/jsx-runtime";
 var REGISTRY4 = createDefaultFieldTypeRegistry4();
 var OPTS = { options: ["Option 1", "Option 2"] };
 var PALETTE_GROUPS = [
@@ -1286,14 +1298,16 @@ var PALETTE_GROUPS = [
       { type: "day", label: "Date" },
       { type: "tags", label: "Tags" },
       { type: "file", label: "File Upload" },
-      { type: "signature", label: "Signature" }
+      { type: "signature", label: "Signature" },
+      { type: "dataGrid", label: "Data Grid" },
+      { type: "editGrid", label: "Edit Grid" }
     ]
   },
   {
     group: "Layout",
     items: [
       { type: "panel", label: "Panel" },
-      { type: "columns", label: "Columns" },
+      { type: "columns", label: "Columns", defaults: { numColumns: 2 } },
       { type: "tabs", label: "Tabs" },
       { type: "table", label: "Table", defaults: { numColumns: 2 } },
       { type: "well", label: "Well" },
@@ -1306,8 +1320,10 @@ var PALETTE_GROUPS = [
   {
     group: "Data",
     items: [
-      { type: "dataGrid", label: "Data Grid" },
-      { type: "editGrid", label: "Edit Grid" }
+      // Data carriers — hold structured data for form mechanics (logic/calculate). They
+      // render nothing in the live form but stay in scope and the submission payload.
+      { type: "array", label: "Array" },
+      { type: "map", label: "Map" }
     ]
   },
   {
@@ -1386,7 +1402,21 @@ function CanvasDndProvider({ builder, children }) {
 }
 function Canvas({ builder }) {
   const { schema } = builder;
-  return /* @__PURE__ */ jsx5("div", { className: "lf-canvas", "aria-label": "Form canvas", children: schema.root.length === 0 ? /* @__PURE__ */ jsx5(RootDropzone, { empty: true }) : /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx5(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) }) });
+  const dnd = useDnd();
+  return /* @__PURE__ */ jsx5("div", { className: "lf-canvas", "aria-label": "Form canvas", children: schema.root.length === 0 ? /* @__PURE__ */ jsx5(RootDropzone, { empty: true }) : /* @__PURE__ */ jsxs4(Fragment3, { children: [
+    dnd.dragging && /* @__PURE__ */ jsx5(
+      "div",
+      {
+        className: `lf-dropzone lf-dropzone--edge${dnd.overEmpty === ROOT ? " is-over" : ""}`,
+        "aria-label": "Insert at the top",
+        onDragOver: (e) => dnd.overEmptyContainer(e, ROOT),
+        onDragLeave: dnd.leave,
+        onDrop: (e) => dnd.dropIntoEmpty(e, ROOT),
+        children: "Insert at the top"
+      }
+    ),
+    /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx5(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
+  ] }) });
 }
 function Node({
   id,
@@ -1404,7 +1434,7 @@ function Node({
   const isContainer = Boolean(REGISTRY4.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
-  return /* @__PURE__ */ jsxs4("li", { className: "lf-node", "data-depth": depth, children: [
+  return /* @__PURE__ */ jsxs4("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ jsx5(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ jsxs4(
       "div",
@@ -1447,25 +1477,28 @@ function Node({
         ]
       }
     ),
-    isContainer && (children.length > 0 ? /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", children: children.map((cid, i) => /* @__PURE__ */ jsx5(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }) : /* @__PURE__ */ jsx5(ContainerDropzone, { containerId: id, label: labelOf(entity) })),
+    isContainer && /* @__PURE__ */ jsxs4("div", { className: "lf-node-children", children: [
+      children.length > 0 && /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", children: children.map((cid, i) => /* @__PURE__ */ jsx5(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
+      /* @__PURE__ */ jsx5(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
+    ] }),
     over === "after" && /* @__PURE__ */ jsx5(DropIndicator, { pos: "after" })
   ] });
 }
 function DropIndicator({ pos }) {
   return /* @__PURE__ */ jsx5("div", { className: `lf-drop-indicator is-${pos}`, "aria-hidden": "true", children: /* @__PURE__ */ jsx5("span", { className: "lf-drop-dot" }) });
 }
-function ContainerDropzone({ containerId, label }) {
+function ContainerDropzone({ containerId, label, compact, index }) {
   const dnd = useDnd();
   const active = dnd.overEmpty === containerId;
   return /* @__PURE__ */ jsx5(
     "div",
     {
-      className: `lf-dropzone${active ? " is-over" : ""}`,
+      className: `lf-dropzone${compact ? " lf-dropzone--compact" : ""}${active ? " is-over" : ""}`,
       "aria-label": `Drop into ${label}`,
       onDragOver: (e) => dnd.overEmptyContainer(e, containerId),
       onDragLeave: dnd.leave,
-      onDrop: (e) => dnd.dropIntoEmpty(e, containerId),
-      children: "Drop fields here"
+      onDrop: (e) => dnd.dropIntoEmpty(e, containerId, index),
+      children: compact ? `+ Add field into ${label}` : "Drop fields here"
     }
   );
 }
@@ -1495,13 +1528,16 @@ function useCanvasDnd(builder) {
   const source = useRef3(null);
   const [over, setOver] = useState3(null);
   const [overEmpty, setOverEmpty] = useState3(null);
+  const [dragging, setDragging] = useState3(false);
   const begin = (src) => {
     source.current = src;
+    setDragging(true);
   };
   const end = () => {
     source.current = null;
     setOver(null);
     setOverEmpty(null);
+    setDragging(false);
   };
   const leave = () => {
   };
@@ -1510,6 +1546,11 @@ function useCanvasDnd(builder) {
     if (!s) return false;
     if (s.kind === "move" && s.id === targetId) return false;
     return true;
+  };
+  const cannotDropInto = (containerId) => {
+    const s = source.current;
+    if (!s || s.kind !== "move" || containerId === ROOT) return false;
+    return s.id === containerId || isDescendant(builder.schema, s.id, containerId);
   };
   const posFor = (e, isContainer) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1546,23 +1587,33 @@ function useCanvasDnd(builder) {
     end();
   };
   const overEmptyContainer = (e, containerId) => {
-    if (!source.current) return;
+    if (!source.current || cannotDropInto(containerId)) return;
     e.preventDefault();
     setOver(null);
     setOverEmpty(containerId);
   };
-  const dropIntoEmpty = (e, containerId) => {
+  const dropIntoEmpty = (e, containerId, index = 0) => {
     e.preventDefault();
     const s = source.current;
-    if (!s) return end();
-    place(s, containerId === ROOT ? null : containerId, 0);
+    if (!s || cannotDropInto(containerId)) return end();
+    place(s, containerId === ROOT ? null : containerId, index);
     end();
   };
   const place = (s, parentId, index) => {
     if (s.kind === "new") builder.addField(s.type, { label: s.label, ...s.defaults ?? {} }, { parentId, index });
     else builder.moveField(s.id, { parentId, index });
   };
-  return { over, overEmpty, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty };
+  return { over, overEmpty, dragging, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty };
+}
+function isDescendant(schema, ancestorId, maybeId) {
+  const stack = [...schema.entities[ancestorId]?.children ?? []];
+  while (stack.length) {
+    const id = stack.pop();
+    if (!id) continue;
+    if (id === maybeId) return true;
+    for (const c of schema.entities[id]?.children ?? []) stack.push(c);
+  }
+  return false;
 }
 function locate(schema, id) {
   const rootIdx = (schema.root ?? []).indexOf(id);
@@ -1581,7 +1632,7 @@ function labelOf(e) {
 }
 
 // src/FormBuilder.tsx
-import { Fragment as Fragment3, jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
+import { Fragment as Fragment4, jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
 var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
@@ -1634,6 +1685,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
 function PreviewModal({ schema, onClose, notify }) {
   const [view, setView] = useState4("form");
   const [copied, setCopied] = useState4(false);
+  const [submitResult, setSubmitResult] = useState4(null);
   const dialogRef = useRef4(null);
   const copyTimer = useRef4(null);
   const json = useMemo3(() => JSON.stringify(schema, null, 2), [schema]);
@@ -1677,7 +1729,30 @@ function PreviewModal({ schema, onClose, notify }) {
           /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close preview", title: "Close", onClick: onClose, children: "\u2715" })
         ] })
       ] }),
-      /* @__PURE__ */ jsx6("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ jsx6("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx6(FormRenderer, { schema }) }) : /* @__PURE__ */ jsx6("pre", { className: "lf-json", "data-testid": "preview-json", children: json }) })
+      /* @__PURE__ */ jsx6("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ jsxs5(Fragment4, { children: [
+        /* @__PURE__ */ jsx6("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx6(
+          FormRenderer,
+          {
+            schema,
+            onResult: (r) => setSubmitResult({ ok: r.ok, errorKeys: r.errorKeys }),
+            onSubmit: (data2) => setSubmitResult({ ok: true, data: data2 })
+          }
+        ) }),
+        submitResult && (submitResult.ok ? /* @__PURE__ */ jsxs5("div", { className: "lf-preview-result is-ok", role: "status", "data-testid": "preview-result", children: [
+          /* @__PURE__ */ jsx6("strong", { children: "\u2713 Valid \u2014 submission payload" }),
+          /* @__PURE__ */ jsx6("pre", { className: "lf-json", children: JSON.stringify(submitResult.data ?? {}, null, 2) })
+        ] }) : /* @__PURE__ */ jsxs5("div", { className: "lf-preview-result is-error", role: "status", "data-testid": "preview-result", children: [
+          /* @__PURE__ */ jsxs5("strong", { children: [
+            "\u2715 ",
+            submitResult.errorKeys?.length ?? 0,
+            " field(s) need attention"
+          ] }),
+          submitResult.errorKeys && submitResult.errorKeys.length > 0 && /* @__PURE__ */ jsxs5("span", { className: "lf-preview-result-keys", children: [
+            " \u2014 ",
+            submitResult.errorKeys.join(", ")
+          ] })
+        ] }))
+      ] }) : /* @__PURE__ */ jsx6("pre", { className: "lf-json", "data-testid": "preview-json", children: json }) })
     ] }) }),
     document.body
   );
@@ -1782,7 +1857,7 @@ function SettingsModal({ builder, editors, notify }) {
               "Field settings",
               dirty ? /* @__PURE__ */ jsx6("span", { className: "lf-modal-dirty", children: " \u2022 Unsaved changes" }) : null
             ] }),
-            /* @__PURE__ */ jsx6("div", { className: "lf-modal-actions", children: dirty ? /* @__PURE__ */ jsxs5(Fragment3, { children: [
+            /* @__PURE__ */ jsx6("div", { className: "lf-modal-actions", children: dirty ? /* @__PURE__ */ jsxs5(Fragment4, { children: [
               /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--discard", "aria-label": "Discard & close", title: "Discard & close", onClick: () => setConfirmDiscard(true), children: /* @__PURE__ */ jsx6(IconX, {}) }),
               /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--save", "aria-label": "Save & close", title: "Save & close", onClick: () => saveClose(true), children: /* @__PURE__ */ jsx6(IconCheck, {}) })
             ] }) : /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close", title: "Close", onClick: close, children: /* @__PURE__ */ jsx6(IconX, {}) }) })

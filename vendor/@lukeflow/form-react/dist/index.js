@@ -178,10 +178,14 @@ function FormRenderer(props) {
   }, [form.engine]);
   const focusFirstError = useCallback2(
     (errorKeys) => {
-      const firstKey = errorKeys[0];
-      const id = firstKey ? form.getField(firstKey)?.entityId : void 0;
-      if (id && typeof document !== "undefined") {
-        requestAnimationFrame(() => document.getElementById(id)?.focus());
+      if (typeof document === "undefined") return;
+      for (const key of errorKeys) {
+        const id = form.getField(key)?.entityId;
+        const el = id ? document.getElementById(id) : null;
+        if (el) {
+          requestAnimationFrame(() => el.focus());
+          return;
+        }
       }
     },
     [form]
@@ -269,6 +273,7 @@ function FormRenderer(props) {
       className: formClass,
       theme,
       onSubmit,
+      onResult,
       onEvent
     }
   ) : /* @__PURE__ */ jsxs("form", { noValidate: true, className: formClass, style: theme, onSubmit: handleSubmit, children: [
@@ -288,6 +293,7 @@ function FormWizardView({
   className,
   theme,
   onSubmit,
+  onResult,
   onEvent
 }) {
   const [index, setIndex] = useState3(0);
@@ -323,6 +329,7 @@ function FormWizardView({
   const submit = (e) => {
     e.preventDefault();
     const report = form.validate();
+    onResult?.({ ok: report.ok, errorCount: report.errorKeys.length, errorKeys: report.errorKeys });
     if (report.ok) {
       setShowErrors(false);
       const data = form.collect();
@@ -357,6 +364,7 @@ function RenderEntity({ id, schema, ctx }) {
   if (!entity) return null;
   const fs = ctx.form.state.fields[id];
   if (fs && !fs.isVisible) return null;
+  if (entity.type === "array" || entity.type === "map") return null;
   const ft = ctx.reg.get(entity.type);
   if (ft?.isGrid)
     return entity.type === "editGrid" ? /* @__PURE__ */ jsx4(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ jsx4(GridField, { entity, fs, ctx, schema });
@@ -365,7 +373,13 @@ function RenderEntity({ id, schema, ctx }) {
     if (entity.type === "tabs") return /* @__PURE__ */ jsx4(TabsContainer, { entity, schema, ctx });
     if (entity.type === "panel" || entity.type === "well" || entity.type === "fieldset")
       return /* @__PURE__ */ jsx4(PanelBox, { entity, schema, ctx });
-    const cols = entity.type === "table" ? Math.min(6, Math.max(1, Number(entity.attributes?.numColumns) || 2)) : void 0;
+    let cols;
+    if (entity.type === "table" || entity.type === "columns") {
+      const raw = Number(entity.attributes?.numColumns);
+      const declared = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2;
+      const childCount = entity.children?.length ?? 0;
+      cols = childCount <= 1 ? 1 : Math.min(6, Math.max(1, declared));
+    }
     const childStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : void 0;
     return /* @__PURE__ */ jsxs("div", { className: "lf-container", "data-type": entity.type, children: [
       labelText(entity.attributes) && /* @__PURE__ */ jsx4("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
@@ -502,7 +516,7 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ jsx4(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
         break;
       case "signature":
-        control = /* @__PURE__ */ jsx4(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0 });
+        control = /* @__PURE__ */ jsx4(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
         break;
       default:
         control = /* @__PURE__ */ jsx4(
@@ -1300,15 +1314,35 @@ function SignatureField({
   value,
   disabled,
   onChange,
-  penColor
+  penColor,
+  allowType
 }) {
   const canvasRef = useRef2(null);
   const drawing = useRef2(false);
   const painted = useRef2("");
   const dataUrl = typeof value === "string" ? value : "";
   const [hasInk, setHasInk] = useState3(Boolean(dataUrl));
+  const [mode, setMode] = useState3("draw");
+  const [typed, setTyped] = useState3("");
   const color = penColor || "#111827";
   const context = () => canvasRef.current?.getContext("2d") ?? null;
+  const drawTyped = (name) => {
+    const canvas = canvasRef.current;
+    const ctx = context();
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const trimmed = name.trim();
+    if (trimmed) {
+      ctx.fillStyle = color;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.font = '64px "Segoe Script", "Brush Script MT", "Snell Roundhand", cursive';
+      ctx.fillText(trimmed, canvas.width / 2, canvas.height / 2);
+    }
+    painted.current = "";
+    setHasInk(Boolean(trimmed));
+    onChange(trimmed ? canvas.toDataURL("image/png") : "");
+  };
   useEffect2(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -1342,7 +1376,7 @@ function SignatureField({
     return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
   };
   const onDown = (e) => {
-    if (disabled) return;
+    if (disabled || mode === "type") return;
     const ctx = context();
     if (!ctx) return;
     drawing.current = true;
@@ -1391,10 +1425,35 @@ function SignatureField({
     const ctx = context();
     if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     painted.current = "";
+    setTyped("");
     setHasInk(false);
     onChange("");
   };
+  const switchMode = (next) => {
+    if (next === mode) return;
+    setMode(next);
+  };
+  const typedTimer = useRef2(null);
+  useEffect2(() => () => {
+    if (typedTimer.current) clearTimeout(typedTimer.current);
+  }, []);
+  const onTypedChange = (name) => {
+    setTyped(name);
+    if (typedTimer.current) clearTimeout(typedTimer.current);
+    typedTimer.current = setTimeout(() => drawTyped(name), 180);
+  };
+  const flushTyped = () => {
+    if (typedTimer.current) {
+      clearTimeout(typedTimer.current);
+      typedTimer.current = null;
+    }
+    drawTyped(typed);
+  };
   return /* @__PURE__ */ jsxs("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
+    allowType && /* @__PURE__ */ jsxs("div", { className: "lf-signature-modes", role: "tablist", "aria-label": "Signature mode", children: [
+      /* @__PURE__ */ jsx4("button", { type: "button", role: "tab", "aria-selected": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
+      /* @__PURE__ */ jsx4("button", { type: "button", role: "tab", "aria-selected": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
+    ] }),
     /* @__PURE__ */ jsxs("div", { className: "lf-signature-padwrap", children: [
       /* @__PURE__ */ jsx4(
         "canvas",
@@ -1405,17 +1464,31 @@ function SignatureField({
           "aria-invalid": a11y["aria-invalid"],
           "aria-describedby": a11y["aria-describedby"],
           className: "lf-signature-pad",
+          "data-mode": mode,
           width: 600,
           height: 200,
-          tabIndex: disabled ? -1 : 0,
+          tabIndex: disabled || mode === "type" ? -1 : 0,
           onPointerDown: onDown,
           onPointerMove: onMove,
           onPointerUp: onUp,
           onPointerCancel: onUp
         }
       ),
-      !hasInk && /* @__PURE__ */ jsx4("span", { className: "lf-signature-hint", "aria-hidden": "true", children: disabled ? "" : "Sign here" })
+      !hasInk && /* @__PURE__ */ jsx4("span", { className: "lf-signature-hint", "aria-hidden": "true", children: disabled ? "" : mode === "type" ? "Type your name below" : "Sign here" })
     ] }),
+    allowType && mode === "type" && /* @__PURE__ */ jsx4(
+      "input",
+      {
+        type: "text",
+        className: "lf-signature-typed",
+        "aria-label": "Typed signature name",
+        placeholder: "Type your full name",
+        value: typed,
+        disabled,
+        onChange: (e) => onTypedChange(e.target.value),
+        onBlur: flushTyped
+      }
+    ),
     !disabled && hasInk && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-signature-clear", onClick: clear, children: "Clear" })
   ] });
 }

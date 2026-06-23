@@ -1516,6 +1516,22 @@ function clampPasses(maxPasses) {
 }
 
 // src/engine/fieldTypes.ts
+function deepSameValue(a, b) {
+  if (defaultSameValue(a, b)) return true;
+  if (a == null || b == null || typeof a !== "object" || typeof b !== "object") return false;
+  const aArr = Array.isArray(a);
+  if (aArr !== Array.isArray(b)) return false;
+  if (aArr) {
+    const ba = b;
+    const aa = a;
+    return aa.length === ba.length && aa.every((x, i) => deepSameValue(x, ba[i]));
+  }
+  const ao = a;
+  const bo = b;
+  const ka = Object.keys(ao);
+  const kb = Object.keys(bo);
+  return ka.length === kb.length && ka.every((k) => Object.prototype.hasOwnProperty.call(bo, k) && deepSameValue(ao[k], bo[k]));
+}
 function stringType(name, valueType = "string") {
   return {
     name,
@@ -1551,7 +1567,9 @@ function arrayType(name, valueType = "array") {
     valueType,
     coerce: (v) => Array.isArray(v) ? v : v == null || v === "" ? [] : [v],
     empty: () => [],
-    compare: (a, b) => defaultSameValue(a, b)
+    // Structural so an array of OBJECTS (a data carrier) doesn't churn each settle pass;
+    // for arrays of primitives this matches defaultSameValue exactly.
+    compare: (a, b) => deepSameValue(a, b)
   };
 }
 function gridType(name) {
@@ -1563,6 +1581,17 @@ function gridType(name) {
     coerce: (v) => Array.isArray(v) ? v.filter((r) => r != null && typeof r === "object") : [],
     empty: () => [],
     compare: (a, b) => defaultSameValue(a, b)
+  };
+}
+function objectType(name) {
+  return {
+    name,
+    valueType: "object",
+    coerce: (v) => v != null && typeof v === "object" && !Array.isArray(v) ? v : {},
+    empty: () => ({}),
+    // Structural compare so a calculated/logic-set map quiesces when unchanged (a
+    // reference compare never would, churning to the maxPasses cap).
+    compare: (a, b) => deepSameValue(a, b)
   };
 }
 function noneType(name, kind) {
@@ -1591,7 +1620,7 @@ var STRING_TYPES = [
 ];
 var DATE_TYPES = ["day", "datetime"];
 var NUMBER_TYPES = ["number", "currency"];
-var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField"];
+var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField", "array"];
 var GRID_TYPES = ["dataGrid", "editGrid"];
 var CONTAINER_TYPES = ["panel", "columns", "fieldset", "well", "table", "tabs", "container", "wizard", "page"];
 var STATIC_TYPES = ["button", "heading", "content", "htmlElement", "html", "divider", "hr"];
@@ -1604,6 +1633,7 @@ function createDefaultFieldTypeRegistry() {
   add(boolType("checkbox"));
   for (const name of ARRAY_TYPES) add(arrayType(name));
   add(arrayType("file", "file"));
+  add(objectType("map"));
   for (const name of GRID_TYPES) add(gridType(name));
   for (const name of CONTAINER_TYPES) add(noneType(name, "container"));
   for (const name of STATIC_TYPES) add(noneType(name, "static"));
