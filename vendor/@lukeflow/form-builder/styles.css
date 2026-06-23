@@ -257,10 +257,56 @@
 .lf-expr-error { font-size: 0.7rem; color: var(--lf-error, #dc2626); }
 .lf-setting [aria-invalid="true"] { border-color: var(--lf-error, #dc2626); }
 
-.lf-settings-logic { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 8px; }
+.lf-settings-logic { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 10px; display: flex; flex-direction: column; gap: 10px; }
 .lf-settings-logic legend { font-size: 0.75rem; font-weight: 600; padding: 0 4px; }
-.lf-logic-rule { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 6px; font-size: 0.75rem; }
-.lf-logic-add { margin-top: 4px; padding: 3px 8px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); background: var(--lf-bg, #fff); cursor: pointer; }
+/* Each rule is a bordered card. */
+.lf-logic-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: calc(var(--lf-radius, 6px) + 2px);
+  background: rgba(127, 127, 127, 0.04);
+}
+.lf-logic-when-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
+.lf-logic-cond { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Bigger dropdowns. */
+.lf-logic-cond select,
+.lf-logic-cond input,
+.lf-logic-join-sel,
+.lf-logic-then select {
+  min-height: 36px;
+  padding: 5px 9px;
+  font-size: 0.8rem;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  color: var(--lf-text, #1a1a1a);
+}
+.lf-logic-cond select { min-width: 120px; }
+.lf-logic-cond input { flex: 1; min-width: 96px; }
+.lf-logic-join {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--lf-primary, #2563eb);
+  padding: 0 4px;
+}
+.lf-logic-cond-remove {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  color: var(--lf-muted, #6b7280);
+  cursor: pointer;
+}
+.lf-logic-add-cond { align-self: flex-start; font-size: 0.72rem; font-weight: 500; color: var(--lf-primary, #2563eb); background: none; border: none; cursor: pointer; padding: 0; }
+.lf-logic-then { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); font-size: 0.8rem; }
+.lf-logic-then-label { font-weight: 600; }
+.lf-logic-rule-remove { margin-left: auto; font-size: 0.72rem; color: var(--lf-error, #dc2626); background: none; border: none; cursor: pointer; }
+.lf-logic-add { align-self: flex-start; padding: 5px 12px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); background: var(--lf-bg, #fff); cursor: pointer; font-size: 0.78rem; }
 
 .lf-settings-minion, .lf-settings-params { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 .lf-settings-minion legend, .lf-settings-params legend { font-size: 0.75rem; font-weight: 600; padding: 0 4px; }

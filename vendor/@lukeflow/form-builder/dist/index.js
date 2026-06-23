@@ -641,57 +641,87 @@ var LOGIC_OPS = [
 var LOGIC_ACTIONS = ["show", "hide", "require", "optional", "enable", "disable", "setValue"];
 var WHEN_RE = /^\s*([A-Za-z_$][\w$]*)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$/;
 function LogicRules({ builder, id, entity }) {
-  const rules = Array.isArray(entity.attributes.logic) ? entity.attributes.logic : [];
-  const parsed = rules.map(parseRule);
   const fields = otherFieldKeys(builder.schema, id);
+  const readRules = () => Array.isArray(entity.attributes.logic) ? entity.attributes.logic.map(parseRule) : [];
+  const [parsed, setParsed] = useState2(readRules);
+  useEffect(() => setParsed(readRules()), [id]);
   const commit = (next) => {
+    setParsed(next);
     const logic = next.map((s) => ({
-      when: buildWhen(s.field, s.op, s.value),
+      when: buildWhen(s),
       action: s.action,
       ...s.action === "setValue" ? { value: toLiteral(s.setTo) } : {}
     }));
     builder.updateAttributes(id, { logic });
   };
   const setRule = (i, p) => commit(parsed.map((r, j) => j === i ? { ...r, ...p } : r));
+  const setCond = (i, j, p) => setRule(i, { conds: parsed[i].conds.map((c, k) => k === j ? { ...c, ...p } : c) });
   return /* @__PURE__ */ jsxs("fieldset", { className: "lf-settings-logic", children: [
     /* @__PURE__ */ jsx("legend", { children: "Conditional rules" }),
     parsed.length === 0 && /* @__PURE__ */ jsx("p", { className: "lf-empty", children: "No rules." }),
     parsed.map((r, i) => /* @__PURE__ */ jsxs("div", { className: "lf-logic-rule", role: "group", "aria-label": `Rule ${i + 1}`, children: [
-      /* @__PURE__ */ jsx("span", { children: "When" }),
-      /* @__PURE__ */ jsxs("select", { "aria-label": `Rule ${i + 1} field`, value: r.field, onChange: (e) => setRule(i, { field: e.target.value }), children: [
-        /* @__PURE__ */ jsx("option", { value: "" }),
-        fields.map((f) => /* @__PURE__ */ jsx("option", { value: f, children: f }, f))
+      /* @__PURE__ */ jsxs("div", { className: "lf-logic-when-head", children: [
+        /* @__PURE__ */ jsx("span", { className: "lf-logic-when", children: "When" }),
+        r.conds.length > 1 && /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsxs("select", { className: "lf-logic-join-sel", "aria-label": `Rule ${i + 1} match`, value: r.join, onChange: (e) => setRule(i, { join: e.target.value }), children: [
+            /* @__PURE__ */ jsx("option", { value: "and", children: "all of (AND)" }),
+            /* @__PURE__ */ jsx("option", { value: "or", children: "any of (OR)" })
+          ] }),
+          /* @__PURE__ */ jsx("span", { children: "of these:" })
+        ] })
       ] }),
-      /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} operator`, value: r.op, onChange: (e) => setRule(i, { op: e.target.value }), children: LOGIC_OPS.map((o) => /* @__PURE__ */ jsx("option", { value: o.op, children: o.label }, o.op)) }),
-      /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} value`, value: r.value, onChange: (e) => setRule(i, { value: e.target.value }) }),
-      /* @__PURE__ */ jsx("span", { children: "\u2192" }),
-      /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ jsx("option", { value: act, children: act }, act)) }),
-      r.action === "setValue" && /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} set value`, value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) }),
-      /* @__PURE__ */ jsx("button", { type: "button", "aria-label": `Remove rule ${i + 1}`, onClick: () => commit(parsed.filter((_, j) => j !== i)), children: "\u2715" })
+      r.conds.map((c, j) => /* @__PURE__ */ jsxs("div", { className: "lf-logic-cond", children: [
+        j > 0 && /* @__PURE__ */ jsx("span", { className: "lf-logic-join", children: r.join === "and" ? "AND" : "OR" }),
+        /* @__PURE__ */ jsxs("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} field`, value: c.field, onChange: (e) => setCond(i, j, { field: e.target.value }), children: [
+          /* @__PURE__ */ jsx("option", { value: "" }),
+          fields.map((f) => /* @__PURE__ */ jsx("option", { value: f, children: f }, f))
+        ] }),
+        /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} operator`, value: c.op, onChange: (e) => setCond(i, j, { op: e.target.value }), children: LOGIC_OPS.map((o) => /* @__PURE__ */ jsx("option", { value: o.op, children: o.label }, o.op)) }),
+        /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} condition ${j + 1} value`, value: c.value, onChange: (e) => setCond(i, j, { value: e.target.value }) }),
+        r.conds.length > 1 && /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-cond-remove", "aria-label": `Remove condition ${j + 1} of rule ${i + 1}`, onClick: () => setRule(i, { conds: r.conds.filter((_, k) => k !== j) }), children: "\xD7" })
+      ] }, j)),
+      /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-add-cond", onClick: () => setRule(i, { conds: [...r.conds, emptyCond()] }), children: "+ Add condition" }),
+      /* @__PURE__ */ jsxs("div", { className: "lf-logic-then", children: [
+        /* @__PURE__ */ jsx("span", { className: "lf-logic-then-label", children: "\u2192 then" }),
+        /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ jsx("option", { value: act, children: act }, act)) }),
+        r.action === "setValue" && /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} set value`, placeholder: "value", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) }),
+        /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-rule-remove", "aria-label": `Remove rule ${i + 1}`, onClick: () => commit(parsed.filter((_, j) => j !== i)), children: "Remove rule" })
+      ] })
     ] }, i)),
-    /* @__PURE__ */ jsx(
-      "button",
-      {
-        type: "button",
-        className: "lf-logic-add",
-        onClick: () => commit([...parsed, { field: fields[0] ?? "", op: "==", value: "", action: "show", setTo: "" }]),
-        children: "Add rule"
-      }
-    )
+    /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-add", onClick: () => commit([...parsed, { join: "and", conds: [{ field: fields[0] ?? "", op: "==", value: "" }], action: "show", setTo: "" }]), children: "Add rule" })
   ] });
 }
+function emptyCond() {
+  return { field: "", op: "==", value: "" };
+}
+function parseCond(s) {
+  const m = WHEN_RE.exec(s.trim());
+  return { field: m?.[1] ?? "", op: m?.[2] ?? "==", value: m ? unLiteral(m[3] ?? "") : "" };
+}
 function parseRule(r) {
-  const m = typeof r.when === "string" ? WHEN_RE.exec(r.when) : null;
+  const when = typeof r.when === "string" ? r.when : "";
+  let join = "and";
+  let parts;
+  if (/\sor\s/.test(when) && !/\sand\s/.test(when)) {
+    join = "or";
+    parts = when.split(/\s+or\s+/);
+  } else if (/\sand\s/.test(when)) {
+    join = "and";
+    parts = when.split(/\s+and\s+/);
+  } else {
+    parts = when ? [when] : [];
+  }
+  const conds = parts.map(parseCond);
   return {
-    field: m?.[1] ?? "",
-    op: m?.[2] ?? "==",
-    value: m ? unLiteral(m[3] ?? "") : "",
+    join,
+    conds: conds.length ? conds : [emptyCond()],
     action: typeof r.action === "string" ? r.action : "show",
     setTo: typeof r.value === "string" ? unLiteral(r.value) : ""
   };
 }
-function buildWhen(field, op, value) {
-  return field ? `${field} ${op} ${toLiteral(value)}` : "";
+function buildWhen(rule) {
+  const exprs = rule.conds.filter((c) => c.field).map((c) => `${c.field} ${c.op} ${toLiteral(c.value)}`);
+  return exprs.join(` ${rule.join} `);
 }
 function toLiteral(v) {
   if (v === "true" || v === "false") return v;
