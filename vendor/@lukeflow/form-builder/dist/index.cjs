@@ -757,16 +757,23 @@ var LOGIC_OPS = [
   { op: ">=", label: "at least" },
   { op: "<=", label: "at most" }
 ];
-var LOGIC_ACTIONS = ["show", "hide", "require", "optional", "enable", "disable", "setValue"];
-var ACTION_LABELS = {
-  show: "Show field",
-  hide: "Hide field",
-  require: "Make required",
-  optional: "Make optional",
-  enable: "Enable field",
-  disable: "Disable field",
-  setValue: "Set value"
+var ACTION_PROPERTIES = [
+  { key: "visibility", label: "Visibility", options: [{ label: "Visible", action: "show" }, { label: "Hidden", action: "hide" }] },
+  { key: "required", label: "Required state", options: [{ label: "Required", action: "require" }, { label: "Optional", action: "optional" }] },
+  { key: "enabled", label: "Enabled state", options: [{ label: "Enabled", action: "enable" }, { label: "Disabled", action: "disable" }] },
+  { key: "value", label: "Value", options: [] }
+  // special: setValue + a literal/field value
+];
+var ACTION_TO_PROPERTY = {
+  show: "visibility",
+  hide: "visibility",
+  require: "required",
+  optional: "required",
+  enable: "enabled",
+  disable: "enabled",
+  setValue: "value"
 };
+var propertyOf = (action) => ACTION_TO_PROPERTY[action] ?? "visibility";
 var WHEN_RE = /^\s*([A-Za-z_$][\w$]*)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$/;
 var _lrUid = 0;
 var lrUid = () => `lr${++_lrUid}`;
@@ -891,12 +898,27 @@ function LogicRules({ builder, id, entity }) {
           ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-then", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-then-label", children: "\u2192 then" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: act, children: ACTION_LABELS[act] ?? capitalize(act) }, act)) }),
-          r.action === "setValue" && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-then-label", children: "\u2192 then set" }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+            "select",
+            {
+              className: "lf-logic-prop",
+              "aria-label": `Rule ${i + 1} property`,
+              value: propertyOf(r.action),
+              onChange: (e) => {
+                const prop = ACTION_PROPERTIES.find((p) => p.key === e.target.value);
+                if (!prop) return;
+                if (prop.key === "value") setRule(i, { action: "setValue", setSource: r.setSource ?? "literal", setTo: "" });
+                else setRule(i, { action: prop.options[0].action });
+              },
+              children: ACTION_PROPERTIES.map((p) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: p.key, children: p.label }, p.key))
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-then-eq", "aria-hidden": "true", children: "=" }),
+          r.action === "setValue" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} value source`, value: r.setSource ?? "literal", onChange: (e) => setRule(i, { setSource: e.target.value, setTo: "" }), children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "literal", children: "to a value" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "field", children: "to field" })
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "literal", children: "a value" }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "field", children: "another field" })
             ] }),
             r.setSource === "field" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} set value`, value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }), children: [
               /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "" }),
@@ -906,7 +928,7 @@ function LogicRules({ builder, id, entity }) {
               ] }),
               fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: f, children: meta[f]?.label ?? capitalize(f) }, f))
             ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "lf-logic-setval", "aria-label": `Rule ${i + 1} set value`, placeholder: "value to set", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) })
-          ] })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: (ACTION_PROPERTIES.find((p) => p.key === propertyOf(r.action))?.options ?? []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: o.action, children: o.label }, o.action)) })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-rule-actions", children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", className: "lf-logic-btn lf-logic-reset", title: "Reset this rule to its default", "aria-label": `Reset rule ${i + 1}`, onClick: () => resetRule(i), children: [
@@ -941,16 +963,20 @@ function condText(c, meta) {
 function ruleSummary(r, meta) {
   const n = r.raw != null ? 1 : r.conds.filter((c) => c.field).length;
   const conds = n === 0 ? "always" : `${n} condition${n === 1 ? "" : "s"}`;
-  let out = ACTION_LABELS[r.action] ?? capitalize(r.action);
+  let out;
   if (r.action === "setValue") {
     const to = r.setSource === "field" ? meta[r.setTo]?.label ?? r.setTo : r.setTo;
-    out = `Set value = ${to || "\u2014"}`;
+    out = `Set Value = ${to || "\u2014"}`;
+  } else {
+    const prop = ACTION_PROPERTIES.find((p) => p.key === propertyOf(r.action));
+    const valLabel = prop?.options.find((o) => o.action === r.action)?.label ?? capitalize(r.action);
+    out = `Set ${prop?.label ?? "property"} = ${valLabel}`;
   }
   return `When ${conds} \u2192 ${out}`;
 }
 function parseRule(r, typeByKey) {
   const when = typeof r.when === "string" ? r.when : "";
-  const action = typeof r.action === "string" ? r.action : "show";
+  const action = typeof r.action === "string" && r.action in ACTION_TO_PROPERTY ? r.action : "show";
   let setSource = "literal";
   let setTo = "";
   if (action === "setValue" && typeof r.value === "string") {
@@ -961,6 +987,8 @@ function parseRule(r, typeByKey) {
     } else {
       setTo = unLiteral(r.value);
     }
+  } else if (action === "setValue" && (typeof r.value === "number" || typeof r.value === "boolean")) {
+    setTo = String(r.value);
   }
   if (!when.trim()) return { id: lrUid(), conds: [emptyCond()], action, setTo, setSource, collapsed: true };
   const parts = splitConds(when);

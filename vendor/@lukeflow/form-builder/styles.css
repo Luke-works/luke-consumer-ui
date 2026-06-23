@@ -383,6 +383,7 @@
 .lf-logic-add-cond { align-self: flex-start; font-size: 0.72rem; font-weight: 500; color: var(--lf-primary, #2563eb); background: none; border: none; cursor: pointer; padding: 0; }
 .lf-logic-then { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); font-size: 0.8rem; }
 .lf-logic-then-label { font-weight: 600; }
+.lf-logic-then-eq { font-weight: 700; color: var(--lf-muted, #6b7280); padding: 0 1px; }
 /* Per-rule action bar: bordered Reset / Save / Remove buttons (with native tooltips). */
 .lf-logic-rule-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); }
 .lf-logic-btn {
