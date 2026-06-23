@@ -713,7 +713,11 @@ function NodePreview({ entity }) {
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-pv-field", "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
     /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: "lf-pv-fieldlabel", children: [
       label,
-      a.required ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-pv-required", children: " *" }) : null
+      a.required ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-pv-required", children: " *" }) : null,
+      str2(a.tooltip) ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: "lf-tooltip", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-tooltip-icon", children: " \u24D8" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
+      ] }) : null
     ] }),
     control,
     desc ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-pv-desc", children: desc }) : null
@@ -722,12 +726,14 @@ function NodePreview({ entity }) {
 function previewControl(entity) {
   const a = entity.attributes;
   const ph = str2(a.placeholder);
+  const dv = a.defaultValue != null && a.defaultValue !== "" ? String(a.defaultValue) : "";
+  const ph2 = dv ? void 0 : ph;
   switch (entity.type) {
     case "textarea":
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("textarea", { className: "lf-pv-input", disabled: true, rows: typeof a.rows === "number" ? a.rows : 2, placeholder: ph });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("textarea", { className: "lf-pv-input", disabled: true, rows: typeof a.rows === "number" ? a.rows : 2, value: dv, placeholder: ph2 });
     case "number":
     case "currency":
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "lf-pv-input", disabled: true, type: "number", placeholder: ph || (entity.type === "currency" ? "0.00" : "") });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 || (entity.type === "currency" ? "0.00" : "") });
     case "checkbox":
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "lf-pv-check", children: [
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "checkbox", disabled: true, defaultChecked: Boolean(a.defaultChecked) }),
@@ -764,7 +770,7 @@ function previewControl(entity) {
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "lf-pv-sign", children: "\u270E Signature" });
     case "tags":
     case "tagsField":
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "lf-pv-input", disabled: true, placeholder: ph || "Add tags\u2026" });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "lf-pv-input", disabled: true, value: dv, placeholder: dv ? void 0 : ph || "Add tags\u2026" });
     case "button":
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { className: "lf-pv-btn", type: "button", disabled: true, children: str2(a.label) || "Button" });
     case "heading":
@@ -777,7 +783,7 @@ function previewControl(entity) {
     case "hr":
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("hr", { className: "lf-pv-hr" });
     default:
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "lf-pv-input", disabled: true, type: "text", placeholder: ph });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { className: "lf-pv-input", disabled: true, type: "text", value: dv, placeholder: ph2 });
   }
 }
 function str2(v) {

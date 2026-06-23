@@ -141,6 +141,8 @@
 .lf-pv-required { color: var(--lf-error, #dc2626); }
 .lf-pv-desc { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
 .lf-pv-static { display: flex; flex-direction: column; gap: 4px; }
+/* The preview is non-interactive, but the tooltip should still reveal on hover. */
+.lf-node-preview .lf-tooltip { pointer-events: auto; }
 .lf-pv-input {
   width: 100%;
   padding: 4px 8px;
