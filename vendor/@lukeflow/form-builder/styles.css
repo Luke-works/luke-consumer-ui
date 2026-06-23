@@ -381,9 +381,13 @@
 .lf-logic-iconbtn--ok:hover { border-color: #16a34a; color: #16a34a; }
 .lf-logic-iconbtn--danger:hover { border-color: var(--lf-error, #dc2626); color: var(--lf-error, #dc2626); }
 .lf-logic-add-cond { align-self: flex-start; font-size: 0.72rem; font-weight: 500; color: var(--lf-primary, #2563eb); background: none; border: none; cursor: pointer; padding: 0; }
-.lf-logic-then { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); font-size: 0.8rem; }
-.lf-logic-then-label { font-weight: 600; }
+.lf-logic-then { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); font-size: 0.8rem; }
+.lf-logic-then-label { font-weight: 600; padding-top: 7px; }
 .lf-logic-then-eq { font-weight: 700; color: var(--lf-muted, #6b7280); padding: 0 1px; }
+/* A rule can do several actions — each on its own row. */
+.lf-logic-actions-list { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 0; }
+.lf-logic-action { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lf-logic-action-set { font-size: 0.72rem; font-weight: 600; color: var(--lf-muted, #6b7280); }
 /* Per-rule action bar: bordered Reset / Save / Remove buttons (with native tooltips). */
 .lf-logic-rule-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); }
 .lf-logic-btn {
