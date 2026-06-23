@@ -53,6 +53,8 @@ declare function useFormBuilder(initialSchema?: FormSchema): UseFormBuilderResul
 interface PaletteItem {
     type: string;
     label: string;
+    /** Seed attributes applied when this field is added (e.g. starter options). */
+    defaults?: Record<string, unknown>;
 }
 
 /**

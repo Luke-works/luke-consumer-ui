@@ -370,9 +370,12 @@ function RenderEntity({ id, schema, ctx }) {
   if (ft?.isGrid) return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(GridField, { entity, fs, ctx, schema });
   if (ft?.isStatic) return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Static, { entity });
   if (ft?.isContainer) {
+    if (entity.type === "tabs") return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(TabsContainer, { entity, schema, ctx });
+    const cols = entity.type === "table" ? Math.min(6, Math.max(1, Number(entity.attributes?.numColumns) || 2)) : void 0;
+    const childStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : void 0;
     return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "lf-container", "data-type": entity.type, children: [
       labelText(entity.attributes) && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
-      (entity.children ?? []).map((cid) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(RenderEntity, { id: cid, schema, ctx }, cid))
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(RenderEntity, { id: cid, schema, ctx }, cid)) })
     ] });
   }
   if (!fs) return null;
@@ -397,6 +400,17 @@ function Field({ entity, fs, ctx }) {
     "aria-required": fs.isRequired ? true : void 0,
     "aria-describedby": [descId, errId].filter(Boolean).join(" ") || void 0
   };
+  const ph = typeof a.placeholder === "string" ? a.placeholder : void 0;
+  const inputProps = {};
+  if (ph) inputProps.placeholder = ph;
+  if (typeof a.maxLength === "number") inputProps.maxLength = a.maxLength;
+  if (typeof a.minLength === "number") inputProps.minLength = a.minLength;
+  if (typeof a.pattern === "string" && a.pattern) inputProps.pattern = a.pattern;
+  if (a.autocomplete) inputProps.autoComplete = typeof a.autocompleteToken === "string" ? a.autocompleteToken : "on";
+  if (typeof a.tabIndex === "number") inputProps.tabIndex = a.tabIndex;
+  const numProps = {};
+  if (typeof a.min === "number") numProps.min = a.min;
+  if (typeof a.max === "number") numProps.max = a.max;
   const Custom = ctx.components[entity.type];
   if (!Custom && entity.type === "radio") {
     return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("label", { className: "lf-option", children: [
@@ -444,11 +458,20 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { type: "checkbox", ...a11y, checked: Boolean(fs.value), onChange: (e) => set(e.target.checked) });
         break;
       case "textarea":
-        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("textarea", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value) });
+        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+          "textarea",
+          {
+            ...a11y,
+            ...inputProps,
+            rows: typeof a.rows === "number" ? a.rows : void 0,
+            value: asText(fs.value),
+            onChange: (e) => set(e.target.value)
+          }
+        );
         break;
       case "select":
         control = /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
-          !fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "" }),
+          !fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: "", children: ph ?? "" }),
           fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: o.value, children: ctx.t(o.label) }, o.value))
         ] });
         break;
@@ -458,8 +481,9 @@ function Field({ entity, fs, ctx }) {
           NumberInput,
           {
             a11y,
+            extra: { ...inputProps, ...numProps },
             value: fs.value,
-            currency: entity.type === "currency" ? typeof a.currency === "string" ? a.currency : "USD" : void 0,
+            currency: entity.type === "currency" ? typeof a.currency === "string" ? a.currency : typeof a.currencyCode === "string" ? a.currencyCode : "USD" : void 0,
             prefix: typeof a.prefix === "string" ? a.prefix : void 0,
             suffix: typeof a.suffix === "string" ? a.suffix : void 0,
             onChange: set
@@ -467,10 +491,11 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "searchSelect":
-        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled });
+        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph });
         break;
       case "tags":
-        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set });
+      case "tagsField":
+        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set, placeholder: ph });
         break;
       case "file":
         control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
@@ -479,10 +504,13 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SignatureField, { a11y, value: fs.value, disabled, onChange: set });
         break;
       default:
-        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { type: inputType(entity.type), ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value) });
+        control = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { type: inputType(entity.type), ...a11y, ...inputProps, value: asText(fs.value), onChange: (e) => set(e.target.value) });
     }
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "lf-field", "data-type": entity.type, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("label", { htmlFor: id, className: "lf-label", children: [
+  const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
+  const hideLabel = Boolean(a.hideLabel);
+  const fieldClass = ["lf-field", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("label", { htmlFor: id, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
       ctx.t(labelText(a) ?? key),
       fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { "aria-hidden": "true", children: " *" }),
       /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Tooltip, { text: tooltipText(a) })
@@ -623,11 +651,49 @@ function GridCell({
 }
 function Static({ entity }) {
   const a = entity.attributes ?? {};
-  const text = labelText(a) ?? labelText(a, "content") ?? "";
-  if (entity.type === "heading") return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: "lf-heading", children: text });
+  if (entity.type === "heading") return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: "lf-heading", children: labelText(a) ?? "" });
   if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("hr", { className: "lf-divider" });
+  if (entity.type === "button") {
+    const action = a.buttonAction === "reset" ? "reset" : a.buttonAction === "button" ? "button" : "submit";
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: action, className: "lf-button", "data-action": action, children: labelText(a) ?? "Submit" });
+  }
+  if (entity.type === "content" || entity.type === "html" || entity.type === "htmlElement") {
+    const html = typeof a.content === "string" ? a.content : "";
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: html } });
+  }
+  const text = labelText(a) ?? labelText(a, "content") ?? "";
   if (!text) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "lf-static", "data-type": entity.type, children: text });
+}
+function TabsContainer({ entity, schema, ctx }) {
+  const children = entity.children ?? [];
+  const [active, setActive] = (0, import_react5.useState)(0);
+  const idx = Math.min(active, Math.max(0, children.length - 1));
+  if (children.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "lf-container lf-tabs", "data-type": "tabs" });
+  const tabId = (i) => `${entity.id}-tab-${i}`;
+  const panelId = (i) => `${entity.id}-panel-${i}`;
+  const tabLabel = (cid, i) => {
+    const c = schema.entities[cid];
+    const l = c && typeof c.attributes?.label === "string" && c.attributes.label ? c.attributes.label : `Tab ${i + 1}`;
+    return ctx.t(l);
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "lf-container lf-tabs", "data-type": "tabs", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "lf-tabs-nav", role: "tablist", children: children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+      "button",
+      {
+        type: "button",
+        role: "tab",
+        id: tabId(i),
+        "aria-selected": i === idx,
+        "aria-controls": panelId(i),
+        className: `lf-tab${i === idx ? " is-active" : ""}`,
+        onClick: () => setActive(i),
+        children: tabLabel(cid, i)
+      },
+      cid
+    )) }),
+    children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(RenderEntity, { id: cid, schema, ctx }) }, cid))
+  ] });
 }
 function labelText(a, attr = "label") {
   const v = a?.[attr];
@@ -736,7 +802,8 @@ function SearchSelect({
   value,
   setValue,
   scope,
-  disabled
+  disabled,
+  placeholder
 }) {
   const client = useMinionClient();
   const ds = (0, import_form_core3.readDataSource)(entity.attributes);
@@ -806,6 +873,7 @@ function SearchSelect({
         "aria-autocomplete": "list",
         "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
         autoComplete: "off",
+        placeholder,
         value: display,
         disabled,
         onFocus: () => setOpen(true),
@@ -842,7 +910,8 @@ function TagsInput({
   a11y,
   value,
   disabled,
-  onChange
+  onChange,
+  placeholder
 }) {
   const [draft, setDraft] = (0, import_react5.useState)("");
   const tags = value.map(String);
@@ -861,6 +930,7 @@ function TagsInput({
       {
         ...a11y,
         type: "text",
+        placeholder: tags.length === 0 ? placeholder : void 0,
         value: draft,
         onChange: (e) => setDraft(e.target.value),
         onKeyDown: (e) => {
@@ -878,6 +948,7 @@ function TagsInput({
 }
 function NumberInput({
   a11y,
+  extra,
   value,
   currency,
   prefix,
@@ -905,6 +976,7 @@ function NumberInput({
         type: "text",
         inputMode: "decimal",
         ...a11y,
+        ...extra,
         value: display,
         onFocus: () => setFocused(true),
         onBlur: () => setFocused(false),

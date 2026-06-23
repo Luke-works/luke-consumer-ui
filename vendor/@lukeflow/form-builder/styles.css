@@ -121,8 +121,26 @@
 .lf-node-label { font-weight: 500; }
 .lf-node-type { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
 
-/* Inline field preview (read-only, non-interactive). */
+/* Inline field preview (read-only, non-interactive) — mirrors the rendered field. */
 .lf-node-preview { pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
+.lf-pv-field { display: flex; flex-direction: column; gap: 3px; }
+.lf-pv-field[data-label-position="left"],
+.lf-pv-field[data-label-position="right"] {
+  display: grid;
+  grid-template-columns: minmax(80px, max-content) 1fr;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 3px;
+}
+.lf-pv-field[data-label-position="right"] { grid-template-columns: 1fr minmax(80px, max-content); }
+.lf-pv-field[data-label-position="right"] > .lf-pv-fieldlabel { order: 2; }
+.lf-pv-field[data-label-position="left"] > .lf-pv-desc,
+.lf-pv-field[data-label-position="right"] > .lf-pv-desc { grid-column: 1 / -1; }
+.lf-pv-field[data-hide-label] > .lf-pv-fieldlabel { display: none; }
+.lf-pv-fieldlabel { font-size: 0.8rem; font-weight: 500; color: var(--lf-text, #1a1a1a); }
+.lf-pv-required { color: var(--lf-error, #dc2626); }
+.lf-pv-desc { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
+.lf-pv-static { display: flex; flex-direction: column; gap: 4px; }
 .lf-pv-input {
   width: 100%;
   padding: 4px 8px;

@@ -678,10 +678,27 @@ function NodePreview({ entity }) {
   const a = entity.attributes;
   const ft = REGISTRY3.get(entity.type);
   if (ft?.isContainer) return null;
+  const control = previewControl(entity);
+  if (ft?.isStatic) return /* @__PURE__ */ jsx2("div", { className: "lf-pv-static", children: control });
+  const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
+  const hideLabel = Boolean(a.hideLabel);
+  const label = str2(a.label) || str2(a.key) || entity.type;
+  const desc = str2(a.description);
+  return /* @__PURE__ */ jsxs2("div", { className: "lf-pv-field", "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
+    /* @__PURE__ */ jsxs2("span", { className: "lf-pv-fieldlabel", children: [
+      label,
+      a.required ? /* @__PURE__ */ jsx2("span", { className: "lf-pv-required", children: " *" }) : null
+    ] }),
+    control,
+    desc ? /* @__PURE__ */ jsx2("span", { className: "lf-pv-desc", children: desc }) : null
+  ] });
+}
+function previewControl(entity) {
+  const a = entity.attributes;
   const ph = str2(a.placeholder);
   switch (entity.type) {
     case "textarea":
-      return /* @__PURE__ */ jsx2("textarea", { className: "lf-pv-input", disabled: true, rows: 2, placeholder: ph });
+      return /* @__PURE__ */ jsx2("textarea", { className: "lf-pv-input", disabled: true, rows: typeof a.rows === "number" ? a.rows : 2, placeholder: ph });
     case "number":
     case "currency":
       return /* @__PURE__ */ jsx2("input", { className: "lf-pv-input", disabled: true, type: "number", placeholder: ph || (entity.type === "currency" ? "0.00" : "") });
@@ -720,6 +737,7 @@ function NodePreview({ entity }) {
     case "signature":
       return /* @__PURE__ */ jsx2("div", { className: "lf-pv-sign", children: "\u270E Signature" });
     case "tags":
+    case "tagsField":
       return /* @__PURE__ */ jsx2("input", { className: "lf-pv-input", disabled: true, placeholder: ph || "Add tags\u2026" });
     case "button":
       return /* @__PURE__ */ jsx2("button", { className: "lf-pv-btn", type: "button", disabled: true, children: str2(a.label) || "Button" });
@@ -753,6 +771,7 @@ function readOptions(a) {
 // src/Canvas.tsx
 import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
 var REGISTRY4 = createDefaultFieldTypeRegistry4();
+var OPTS = { options: ["Option 1", "Option 2"] };
 var PALETTE_GROUPS = [
   {
     group: "Basic",
@@ -760,24 +779,26 @@ var PALETTE_GROUPS = [
       { type: "textField", label: "Text" },
       { type: "textarea", label: "Text Area" },
       { type: "number", label: "Number" },
+      { type: "password", label: "Password" },
       { type: "checkbox", label: "Checkbox" },
-      { type: "email", label: "Email" }
-    ]
-  },
-  {
-    group: "Choice",
-    items: [
-      { type: "select", label: "Select" },
-      { type: "radio", label: "Radio" },
-      { type: "selectBoxes", label: "Checkboxes" },
-      { type: "tags", label: "Tags" }
+      { type: "selectBoxes", label: "Select Boxes", defaults: OPTS },
+      { type: "select", label: "Select", defaults: OPTS },
+      { type: "radio", label: "Radio", defaults: OPTS },
+      { type: "button", label: "Button", defaults: { label: "Submit" } }
     ]
   },
   {
     group: "Advanced",
     items: [
+      { type: "email", label: "Email" },
+      { type: "url", label: "URL" },
+      { type: "phoneNumber", label: "Phone Number", defaults: { inputMask: "(999) 999-9999" } },
+      { type: "currency", label: "Currency", defaults: { currencyCode: "USD", decimalLimit: 2 } },
+      { type: "datetime", label: "Date / Time" },
+      { type: "time", label: "Time" },
       { type: "day", label: "Date" },
-      { type: "file", label: "File" },
+      { type: "tags", label: "Tags" },
+      { type: "file", label: "File Upload" },
       { type: "signature", label: "Signature" }
     ]
   },
@@ -785,9 +806,26 @@ var PALETTE_GROUPS = [
     group: "Layout",
     items: [
       { type: "panel", label: "Panel" },
-      { type: "dataGrid", label: "Data Grid" },
-      { type: "page", label: "Page" }
+      { type: "columns", label: "Columns" },
+      { type: "tabs", label: "Tabs" },
+      { type: "table", label: "Table", defaults: { numColumns: 2 } },
+      { type: "well", label: "Well" },
+      { type: "fieldset", label: "Field Set" },
+      { type: "content", label: "Content", defaults: { content: "Add your content here." } },
+      { type: "heading", label: "Heading" },
+      { type: "divider", label: "Divider" }
     ]
+  },
+  {
+    group: "Data",
+    items: [
+      { type: "dataGrid", label: "Data Grid" },
+      { type: "editGrid", label: "Edit Grid" }
+    ]
+  },
+  {
+    group: "Wizard",
+    items: [{ type: "page", label: "Page" }]
   }
 ];
 function Palette({ builder, extra }) {
@@ -828,10 +866,10 @@ function Palette({ builder, extra }) {
             onDragStart: (e) => {
               e.dataTransfer.effectAllowed = "copy";
               e.dataTransfer.setData("text/plain", p.type);
-              dnd.begin({ kind: "new", type: p.type, label: p.label });
+              dnd.begin({ kind: "new", type: p.type, label: p.label, defaults: p.defaults });
             },
             onDragEnd: dnd.end,
-            onClick: () => builder.addField(p.type, { label: p.label }, intoContainer ? { parentId: intoContainer } : void 0),
+            onClick: () => builder.addField(p.type, { label: p.label, ...p.defaults ?? {} }, intoContainer ? { parentId: intoContainer } : void 0),
             children: p.label
           },
           p.type
@@ -889,8 +927,8 @@ function Node({
             }
           ),
           /* @__PURE__ */ jsxs3("div", { className: "lf-node-body", onClick: () => builder.select(id), children: [
-            /* @__PURE__ */ jsxs3("button", { type: "button", className: "lf-node-select", "aria-pressed": selected, onClick: () => builder.select(id), children: [
-              /* @__PURE__ */ jsx3("span", { className: "lf-node-label", children: labelOf(entity) }),
+            /* @__PURE__ */ jsxs3("button", { type: "button", className: "lf-node-select", "aria-pressed": selected, "aria-label": `Edit ${labelOf(entity)}`, onClick: () => builder.select(id), children: [
+              isContainer && /* @__PURE__ */ jsx3("span", { className: "lf-node-label", children: labelOf(entity) }),
               /* @__PURE__ */ jsx3("span", { className: "lf-node-type", children: entity.type })
             ] }),
             !isContainer && /* @__PURE__ */ jsx3("div", { className: "lf-node-preview", "aria-hidden": "true", children: /* @__PURE__ */ jsx3(NodePreview, { entity }) })
@@ -1012,7 +1050,7 @@ function useCanvasDnd(builder) {
     end();
   };
   const place = (s, parentId, index) => {
-    if (s.kind === "new") builder.addField(s.type, { label: s.label }, { parentId, index });
+    if (s.kind === "new") builder.addField(s.type, { label: s.label, ...s.defaults ?? {} }, { parentId, index });
     else builder.moveField(s.id, { parentId, index });
   };
   return { over, overEmpty, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty };

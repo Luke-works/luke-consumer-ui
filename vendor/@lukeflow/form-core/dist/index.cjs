@@ -1593,7 +1593,7 @@ var STRING_TYPES = [
 ];
 var DATE_TYPES = ["day", "datetime"];
 var NUMBER_TYPES = ["number", "currency"];
-var ARRAY_TYPES = ["selectBoxes", "tags"];
+var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField"];
 var GRID_TYPES = ["dataGrid", "editGrid"];
 var CONTAINER_TYPES = ["panel", "columns", "fieldset", "well", "table", "tabs", "container", "wizard", "page"];
 var STATIC_TYPES = ["button", "heading", "content", "htmlElement", "html", "divider", "hr"];

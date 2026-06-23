@@ -30,6 +30,39 @@
 .lf-label {
   font-weight: 600;
 }
+/* Label position (top default / left / right) — honors the `labelPosition` attribute. */
+.lf-field[data-label-position="left"],
+.lf-field[data-label-position="right"] {
+  display: grid;
+  grid-template-columns: minmax(110px, max-content) 1fr;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 4px;
+}
+.lf-field[data-label-position="right"] {
+  grid-template-columns: 1fr minmax(110px, max-content);
+}
+.lf-field[data-label-position="right"] > .lf-label {
+  order: 2;
+}
+.lf-field[data-label-position="left"] > .lf-desc,
+.lf-field[data-label-position="left"] > .lf-error,
+.lf-field[data-label-position="right"] > .lf-desc,
+.lf-field[data-label-position="right"] > .lf-error {
+  grid-column: 1 / -1;
+}
+/* hideLabel: keep the label for assistive tech but hide it visually. */
+.lf-sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 .lf-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .lf-form select,
 .lf-form textarea {
@@ -85,6 +118,66 @@
   font-weight: 700;
   margin-bottom: 6px;
 }
+.lf-container-children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space);
+}
+/* columns → side by side; table → grid (column count via inline style). */
+.lf-container[data-type="columns"] > .lf-container-children {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.lf-container[data-type="columns"] > .lf-container-children > * {
+  flex: 1 1 0;
+  min-width: 140px;
+}
+.lf-container[data-type="table"] > .lf-container-children {
+  display: grid;
+}
+/* Tabs. */
+.lf-tabs { border-left: none; padding-left: 0; }
+.lf-tabs-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--lf-border);
+  margin-bottom: 12px;
+}
+.lf-tab {
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font: inherit;
+  color: var(--lf-muted);
+  cursor: pointer;
+}
+.lf-tab.is-active {
+  color: var(--lf-primary);
+  border-bottom-color: var(--lf-primary);
+}
+
+/* Static nodes. */
+.lf-heading { margin: 4px 0; }
+.lf-divider { border: none; border-top: 1px solid var(--lf-border); margin: 8px 0; }
+.lf-button {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: 1px solid var(--lf-primary);
+  border-radius: var(--lf-radius);
+  background: var(--lf-primary);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.lf-button[data-action="reset"],
+.lf-button[data-action="button"] {
+  background: transparent;
+  color: var(--lf-primary);
+}
+.lf-content > :first-child { margin-top: 0; }
+.lf-content > :last-child { margin-bottom: 0; }
 
 .lf-tags {
   display: flex;
