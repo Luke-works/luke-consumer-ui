@@ -106,7 +106,7 @@ import { createRoot } from "react-dom/client";
 import { FormRenderer } from "@lukeflow/form-react";
 
 // src/SettingsPanel.tsx
-import { useEffect, useMemo as useMemo2, useRef as useRef2, useState as useState2 } from "react";
+import { useEffect, useId, useMemo as useMemo2, useRef as useRef2, useState as useState2 } from "react";
 import {
   parseExpression,
   evaluateExpression,
@@ -192,7 +192,7 @@ function createDefaultAttributeEditors() {
       ]
     },
     // ── DATA ─────────────────────────────────────────────────────────────────
-    { id: "options", tab: "data", attribute: "options", label: "Options", control: "options", order: 1, when: optioned, hint: 'One per line \u2014 "Label|value" or just "Label".' },
+    { id: "options", tab: "data", attribute: "options", label: "Options", control: "options", order: 1, when: optioned, hint: "List = one value per option; Label + Value = a distinct stored value per option." },
     {
       id: "dataSource",
       tab: "data",
@@ -670,42 +670,79 @@ function ParamsEditor({
 }
 function OptionsControl({ editor, ctx }) {
   const [rows, setRows] = useState2(() => readOptionRows(ctx.value));
-  const [mode, setMode] = useState2("rows");
+  const [shape, setShape] = useState2(() => inferShape(readOptionRows(ctx.value)));
+  const [view, setView] = useState2("rows");
   const [draft, setDraft] = useState2("");
   const [jsonError, setJsonError] = useState2(null);
+  const errId = useId();
   const sig = JSON.stringify(ctx.value ?? null);
   const lastSig = useRef2(sig);
   const lastId = useRef2(ctx.entity.id);
+  const dirtyRef = useRef2(false);
+  const pinnedRef = useRef2(false);
+  const shapeRef = useRef2(shape);
+  shapeRef.current = shape;
+  const viewRef = useRef2(view);
+  viewRef.current = view;
+  const seedDraft = (text) => {
+    setDraft(text);
+    dirtyRef.current = false;
+  };
   useEffect(() => {
     if (lastId.current !== ctx.entity.id) {
       lastId.current = ctx.entity.id;
       lastSig.current = sig;
-      setRows(readOptionRows(ctx.value));
-      setMode("rows");
-      setDraft("");
+      pinnedRef.current = false;
+      const next = readOptionRows(ctx.value);
+      setRows(next);
+      setShape(inferShape(next));
+      setView("rows");
+      seedDraft("");
       setJsonError(null);
     } else if (sig !== lastSig.current) {
       lastSig.current = sig;
       const next = readOptionRows(ctx.value);
+      const sh = pinnedRef.current ? shapeRef.current : inferShape(next);
       setRows(next);
-      if (mode === "rows") setDraft(rowsToJson(next));
-      setJsonError(null);
+      setShape(sh);
+      if (viewRef.current === "rows" || !dirtyRef.current) seedDraft(rowsToJson(next, sh));
+      else setJsonError("The options changed elsewhere \u2014 Apply will overwrite that change.");
     }
   }, [sig, ctx.entity.id]);
-  const normalize = (next) => next.filter((o) => o.label.trim() || o.value.trim()).map((o) => ({ label: o.label, value: o.value.trim() || o.label.trim() }));
-  const commit = (next) => {
+  const commit = (next, sh = shape) => {
     setRows(next);
-    const opts = normalize(next);
-    const persisted = opts.length ? opts : void 0;
+    const persisted = serializeOptions(next, sh);
     lastSig.current = JSON.stringify(persisted ?? null);
     ctx.setValue(persisted);
-    return opts;
+    return persisted;
   };
-  const setLabel = (i, label) => commit(rows.map((r, j) => j === i ? { label, value: r.value && r.value !== r.label ? r.value : label } : r));
-  const openJson = () => {
-    setDraft(rowsToJson(rows));
+  const setLabel = (i, label) => commit(rows.map((r, j) => j === i ? { label, value: label } : r));
+  const setField = (i, patch) => commit(rows.map((r, j) => j === i ? { ...r, ...patch } : r));
+  const addRow = () => commit([...rows, { label: `Option ${rows.length + 1}`, value: "" }]);
+  const removeRow = (i) => commit(rows.filter((_, j) => j !== i));
+  const pickShape = (sh) => {
+    if (sh === shape) return;
+    pinnedRef.current = true;
+    setShape(sh);
+    if (view === "json") {
+      const parsed = parseOptionsJson(draft);
+      if (parsed.ok) {
+        const shaped = sh === "list" ? parsed.rows.map((r) => ({ label: r.label, value: r.label })) : parsed.rows;
+        seedDraft(rowsToJson(shaped, sh));
+        setJsonError(null);
+      }
+      return;
+    }
+    const adjusted = sh === "list" ? rows.map((r) => ({ label: r.label, value: r.label })) : rows;
+    const stored = commit(adjusted, sh);
+    seedDraft(rowsToJson(readOptionRows(stored), sh));
     setJsonError(null);
-    setMode("json");
+  };
+  const openJson = () => {
+    if (view === "json") return;
+    seedDraft(rowsToJson(rows, shape));
+    setJsonError(null);
+    setView("json");
   };
   const applyJson = () => {
     const parsed = parseOptionsJson(draft);
@@ -714,54 +751,62 @@ function OptionsControl({ editor, ctx }) {
       return;
     }
     setJsonError(null);
-    const stored = commit(parsed.rows);
-    setRows(stored);
-    setDraft(rowsToJson(stored));
+    const shaped = shape === "list" ? parsed.rows.map((r) => ({ label: r.label, value: r.label })) : parsed.rows;
+    const stored = commit(shaped, shape);
+    const storedRows = readOptionRows(stored);
+    setRows(storedRows);
+    seedDraft(rowsToJson(storedRows, shape));
   };
+  const seg = (active, label, onClick) => /* @__PURE__ */ jsx2("button", { type: "button", className: `lf-opt-mode-btn${active ? " is-active" : ""}`, "aria-pressed": active, onClick, children: label });
   return /* @__PURE__ */ jsxs2("div", { className: "lf-setting-wrap", children: [
     /* @__PURE__ */ jsxs2("div", { className: "lf-options-head", children: [
       /* @__PURE__ */ jsx2("span", { className: "lf-setting-label", children: editor.label ?? "Options" }),
-      /* @__PURE__ */ jsxs2("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options edit mode", children: [
-        /* @__PURE__ */ jsx2("button", { type: "button", className: `lf-opt-mode-btn${mode === "rows" ? " is-active" : ""}`, "aria-pressed": mode === "rows", onClick: () => setMode("rows"), children: "Rows" }),
-        /* @__PURE__ */ jsx2("button", { type: "button", className: `lf-opt-mode-btn${mode === "json" ? " is-active" : ""}`, "aria-pressed": mode === "json", onClick: openJson, children: "JSON" })
+      /* @__PURE__ */ jsxs2("div", { className: "lf-opt-toggles", children: [
+        /* @__PURE__ */ jsxs2("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options shape", children: [
+          seg(shape === "list", "List", () => pickShape("list")),
+          seg(shape === "kv", "Label + Value", () => pickShape("kv"))
+        ] }),
+        /* @__PURE__ */ jsxs2("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options edit mode", children: [
+          seg(view === "rows", "Rows", () => setView("rows")),
+          seg(view === "json", "JSON", openJson)
+        ] })
       ] })
     ] }),
-    mode === "rows" ? /* @__PURE__ */ jsxs2("div", { className: "lf-options", children: [
+    view === "rows" ? /* @__PURE__ */ jsxs2("div", { className: "lf-options", children: [
       rows.length === 0 && /* @__PURE__ */ jsx2("p", { className: "lf-empty", children: "No options yet." }),
-      rows.map((o, i) => /* @__PURE__ */ jsxs2("div", { className: "lf-opt-row", children: [
-        /* @__PURE__ */ jsx2(
-          "input",
-          {
-            "aria-label": `Option ${i + 1}`,
-            className: "lf-opt-label",
-            value: o.label,
-            placeholder: "Option",
-            title: o.value && o.value !== o.label ? `Stored value: ${o.value} (edit in JSON)` : void 0,
-            onChange: (e) => setLabel(i, e.target.value)
-          }
-        ),
-        /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => commit(rows.filter((_, j) => j !== i)), children: /* @__PURE__ */ jsx2(IconX, { size: 13 }) })
-      ] }, i)),
-      /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-add", onClick: () => commit([...rows, { label: `Option ${rows.length + 1}`, value: "" }]), children: "+ Add option" })
+      rows.map(
+        (o, i) => shape === "kv" ? /* @__PURE__ */ jsxs2("div", { className: "lf-opt-row", children: [
+          /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1} label`, className: "lf-opt-label", value: o.label, placeholder: "Label", onChange: (e) => setField(i, { label: e.target.value }) }),
+          /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1} value`, className: "lf-opt-value", value: o.value, placeholder: "Value", onChange: (e) => setField(i, { value: e.target.value }) }),
+          /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => removeRow(i), children: /* @__PURE__ */ jsx2(IconX, { size: 13 }) })
+        ] }, i) : /* @__PURE__ */ jsxs2("div", { className: "lf-opt-row", children: [
+          /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1}`, className: "lf-opt-label", value: o.label, placeholder: "Option", onChange: (e) => setLabel(i, e.target.value) }),
+          /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => removeRow(i), children: /* @__PURE__ */ jsx2(IconX, { size: 13 }) })
+        ] }, i)
+      ),
+      /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-add", onClick: addRow, children: "+ Add option" })
     ] }) : /* @__PURE__ */ jsxs2("div", { className: "lf-options-json", children: [
       /* @__PURE__ */ jsx2(
         "textarea",
         {
           className: "lf-opt-json",
           "aria-label": "Options as JSON",
+          "aria-invalid": jsonError ? true : void 0,
+          "aria-errormessage": jsonError ? errId : void 0,
           spellCheck: false,
           rows: Math.min(14, Math.max(4, draft.split("\n").length + 1)),
           value: draft,
           onChange: (e) => {
+            dirtyRef.current = true;
             setDraft(e.target.value);
             if (jsonError) setJsonError(null);
           }
         }
       ),
-      jsonError && /* @__PURE__ */ jsx2("p", { className: "lf-opt-json-error", role: "alert", children: jsonError }),
+      jsonError && /* @__PURE__ */ jsx2("p", { id: errId, className: "lf-opt-json-error", role: "alert", children: jsonError }),
       /* @__PURE__ */ jsxs2("div", { className: "lf-opt-json-foot", children: [
         /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-json-apply", onClick: applyJson, children: "Apply" }),
-        /* @__PURE__ */ jsx2("span", { className: "lf-opt-json-hint", children: 'A JSON array \u2014 "Label" or { "label": "\u2026", "value": "\u2026" }.' })
+        /* @__PURE__ */ jsx2("span", { className: "lf-opt-json-hint", children: shape === "kv" ? 'A JSON array of { "label": "\u2026", "value": "\u2026" }.' : 'A JSON array of values \u2014 "Option A", "Option B", \u2026' })
       ] })
     ] }),
     editor.hint && /* @__PURE__ */ jsx2("span", { className: "lf-setting-hint", children: editor.hint })
@@ -775,9 +820,20 @@ function readOptionRows(raw) {
     return { label: String(obj.label ?? obj.value ?? ""), value: String(obj.value ?? "") };
   });
 }
-function rowsToJson(rows) {
-  const arr = rows.map((r) => !r.value.trim() || r.value === r.label ? r.label : { label: r.label, value: r.value });
-  return JSON.stringify(arr, null, 2);
+function inferShape(rows) {
+  return rows.some((r) => r.value && r.value !== r.label) ? "kv" : "list";
+}
+function serializeOptions(rows, shape) {
+  const kept = rows.filter((o) => o.label.trim() || o.value.trim());
+  if (!kept.length) return void 0;
+  if (shape === "list") return kept.map((o) => o.label.trim() || o.value.trim());
+  return kept.map((o) => {
+    const value = o.value.trim() || o.label.trim();
+    return { label: o.label.trim() ? o.label : value, value };
+  });
+}
+function rowsToJson(rows, shape) {
+  return JSON.stringify(serializeOptions(rows, shape) ?? [], null, 2);
 }
 function parseOptionsJson(text) {
   const trimmed = text.trim();

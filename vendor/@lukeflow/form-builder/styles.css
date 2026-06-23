@@ -471,7 +471,8 @@
 .lf-opt-remove:hover { border-color: var(--lf-error, #dc2626); color: var(--lf-error, #dc2626); }
 .lf-opt-add { align-self: flex-start; font-size: 0.74rem; font-weight: 500; color: var(--lf-primary, #2563eb); background: none; border: none; cursor: pointer; padding: 2px 0; }
 /* Rows / JSON mode toggle + the JSON list editor. */
-.lf-options-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.lf-options-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+.lf-opt-toggles { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .lf-opt-mode { display: inline-flex; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); overflow: hidden; }
 .lf-opt-mode-btn { border: none; background: none; padding: 3px 11px; font: inherit; font-size: 0.72rem; line-height: 1.4; cursor: pointer; color: var(--lf-muted, #6b7280); }
 .lf-opt-mode-btn + .lf-opt-mode-btn { border-left: 1px solid var(--lf-border, #d9d9d9); }
