@@ -100,18 +100,11 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo3, useState as useState4, useEffect as useEffect2, useRef as useRef4, useImperativeHandle, forwardRef } from "react";
-import { createPortal } from "react-dom";
-import { createRoot } from "react-dom/client";
-import { FormRenderer } from "@lukeflow/form-react";
+import { useMemo as useMemo4, useState as useState10, useEffect as useEffect7, useRef as useRef7, useImperativeHandle, forwardRef } from "react";
+import { createPortal as createPortal3 } from "react-dom";
 
 // src/SettingsPanel.tsx
-import { useEffect, useId, useMemo as useMemo2, useRef as useRef2, useState as useState2 } from "react";
-import {
-  parseExpression,
-  evaluateExpression,
-  createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry2
-} from "@lukeflow/form-core";
+import { useEffect as useEffect4, useState as useState5 } from "react";
 
 // src/attributeEditors.ts
 import { createDefaultFieldTypeRegistry } from "@lukeflow/form-core";
@@ -331,6 +324,12 @@ function editorsByTab(editors) {
   })).filter((g) => g.editors.length > 0);
 }
 
+// src/settings/LogicRules.tsx
+import { useEffect, useMemo as useMemo2, useState as useState2 } from "react";
+import {
+  evaluateExpression
+} from "@lukeflow/form-core";
+
 // src/icons.tsx
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function svg(path, { size = 16, className }) {
@@ -368,523 +367,82 @@ function IconReset(props = {}) {
   );
 }
 
-// src/SettingsPanel.tsx
-import { Fragment as Fragment2, jsx as jsx2, jsxs as jsxs2 } from "react/jsx-runtime";
+// src/settings/util.ts
+import {
+  createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry2
+} from "@lukeflow/form-core";
 var REGISTRY2 = createDefaultFieldTypeRegistry2();
-function SettingsPanel({ builder, editors }) {
-  const id = builder.selectedId;
-  const entity = id ? builder.schema.entities[id] : void 0;
-  const [activeTab, setActiveTab] = useState2("display");
-  const entityType = entity?.type;
-  useEffect(() => {
-    setActiveTab("display");
-  }, [id, entityType]);
-  if (!id || !entity) {
-    return /* @__PURE__ */ jsx2("div", { className: "lf-settings", "aria-label": "Field settings", children: /* @__PURE__ */ jsx2("p", { className: "lf-empty", children: "Select a field to edit its settings." }) });
+function coerceScope(vals, typeByKey) {
+  const out = {};
+  for (const [k, raw] of Object.entries(vals)) {
+    const ft = typeByKey[k] ? REGISTRY2.get(typeByKey[k]) : void 0;
+    if (ft?.valueType === "boolean") out[k] = raw === "true" || raw === "1";
+    else if (ft?.valueType === "number") out[k] = raw.trim() === "" ? "" : Number.isNaN(Number(raw)) ? raw : Number(raw);
+    else if (ft) out[k] = raw;
+    else if (raw === "true" || raw === "false") out[k] = raw === "true";
+    else if (raw.trim() !== "" && !Number.isNaN(Number(raw))) out[k] = Number(raw);
+    else out[k] = raw;
   }
-  const applicable = editorsForEntity(editors, entity, builder.schema);
-  const groups = editorsByTab(applicable);
-  const active = groups.find((g) => g.tab === activeTab) ?? groups[0];
-  const fieldKeys = otherFieldKeys(builder.schema, id);
-  const patch = (p) => builder.updateAttributes(id, p);
-  return /* @__PURE__ */ jsxs2("div", { className: "lf-settings", "aria-label": "Field settings", children: [
-    /* @__PURE__ */ jsxs2("h4", { children: [
-      "Settings \u2014 ",
-      entity.type
-    ] }),
-    /* @__PURE__ */ jsx2("div", { className: "lf-settings-tabs", role: "tablist", "aria-label": "Field settings tabs", children: groups.map((g) => /* @__PURE__ */ jsx2(
-      "button",
-      {
-        type: "button",
-        role: "tab",
-        "aria-selected": active?.tab === g.tab,
-        className: `lf-settings-tab${active?.tab === g.tab ? " is-active" : ""}`,
-        onClick: () => setActiveTab(g.tab),
-        children: g.label
-      },
-      g.tab
-    )) }),
-    /* @__PURE__ */ jsx2("div", { className: "lf-settings-panel", role: "tabpanel", "aria-label": `${active?.label ?? ""} settings`, children: (() => {
-      const editorsHere = active?.editors ?? [];
-      const isToggle = (ed) => ed.control === "checkbox" || ed.control === "exclude";
-      const renderEditor = (ed) => {
-        const ctx = {
-          entity,
-          schema: builder.schema,
-          fieldKeys,
-          value: ed.attribute ? entity.attributes[ed.attribute] : void 0,
-          setValue: ed.attribute ? (v) => patch({ [ed.attribute]: v }) : () => {
-          },
-          patch
-        };
-        return /* @__PURE__ */ jsx2(Control, { editor: ed, ctx, builder, id, entity }, ed.id);
-      };
-      const toggles = editorsHere.filter(isToggle);
-      const rest = editorsHere.filter((ed) => !isToggle(ed));
-      return /* @__PURE__ */ jsxs2(Fragment2, { children: [
-        rest.map(renderEditor),
-        toggles.length > 0 && /* @__PURE__ */ jsx2("div", { className: "lf-checkbox-group", role: "group", "aria-label": "Toggles", children: toggles.map(renderEditor) })
-      ] });
-    })() })
-  ] });
+  return out;
 }
-function Control({
-  editor,
-  ctx,
-  builder,
-  id,
-  entity
-}) {
-  if (editor.render) return /* @__PURE__ */ jsx2(Fragment2, { children: editor.render(ctx) });
-  switch (editor.control) {
-    case "logic":
-      return /* @__PURE__ */ jsx2(LogicRules, { builder, id, entity });
-    case "checkbox":
-      return /* @__PURE__ */ jsx2(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, inline: true, children: /* @__PURE__ */ jsx2("input", { type: "checkbox", checked: Boolean(ctx.value), onChange: (e) => ctx.setValue(e.target.checked) }) });
-    // Inverted boolean for `persistent`: the field is included by default; CHECKED stores
-    // `persistent: false` (exclude), UNCHECKED clears it (back to the default-included).
-    case "exclude":
-      return /* @__PURE__ */ jsx2(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, inline: true, children: /* @__PURE__ */ jsx2("input", { type: "checkbox", checked: ctx.value === false, onChange: (e) => ctx.setValue(e.target.checked ? false : void 0) }) });
-    case "number":
-      return /* @__PURE__ */ jsx2(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx2(
-        "input",
-        {
-          type: "number",
-          value: numStr(ctx.value),
-          placeholder: editor.placeholder,
-          onChange: (e) => ctx.setValue(e.target.value === "" ? void 0 : Number(e.target.value))
-        }
-      ) });
-    case "textarea":
-      return /* @__PURE__ */ jsx2(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx2("textarea", { value: str(ctx.value), placeholder: editor.placeholder, rows: 3, onChange: (e) => ctx.setValue(e.target.value) }) });
-    case "select":
-      return /* @__PURE__ */ jsx2(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsxs2("select", { value: str(ctx.value), onChange: (e) => ctx.setValue(e.target.value), children: [
-        /* @__PURE__ */ jsx2("option", { value: "" }),
-        (editor.options ?? []).map((o) => /* @__PURE__ */ jsx2("option", { value: o.value, children: o.label }, o.value))
-      ] }) });
-    case "options":
-      return /* @__PURE__ */ jsx2(OptionsControl, { editor, ctx });
-    case "tags":
-      return /* @__PURE__ */ jsx2(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx2(
-        "input",
-        {
-          value: Array.isArray(ctx.value) ? ctx.value.join(", ") : str(ctx.value),
-          placeholder: editor.placeholder,
-          onChange: (e) => ctx.setValue(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))
-        }
-      ) });
-    case "dataSource":
-      return /* @__PURE__ */ jsx2(DataSourceControl, { editor, ctx });
-    case "asyncValidation":
-      return /* @__PURE__ */ jsx2(AsyncValidationControl, { editor, ctx });
-    case "expression":
-      return /* @__PURE__ */ jsx2(ExpressionControl, { editor, ctx });
-    case "js":
-      return /* @__PURE__ */ jsx2(JsControl, { editor, ctx });
-    case "text":
-    default:
-      return /* @__PURE__ */ jsx2(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx2("input", { value: str(ctx.value), placeholder: editor.placeholder, onChange: (e) => ctx.setValue(e.target.value) }) });
+function toLiteral(v) {
+  if (v === "true" || v === "false") return v;
+  if (v.trim() !== "" && !Number.isNaN(Number(v)) && String(Number(v)) === v.trim()) return v;
+  return JSON.stringify(v);
+}
+function unLiteral(v) {
+  const t = v.trim();
+  if (t.startsWith('"') && t.endsWith('"') || t.startsWith("'") && t.endsWith("'")) {
+    try {
+      return JSON.parse(t.replace(/^'|'$/g, '"'));
+    } catch {
+      return t.slice(1, -1);
+    }
   }
+  return t;
 }
-function JsControl({ editor, ctx }) {
-  const value = str(ctx.value);
-  const ref = useRef2(null);
-  const [open, setOpen] = useState2(value !== "");
-  const insert2 = (token) => {
-    const el = ref.current;
-    const start = el ? el.selectionStart : value.length;
-    const end = el ? el.selectionEnd : value.length;
-    const next = value.slice(0, start) + token + value.slice(end);
-    ctx.setValue(next);
-    const restore = () => {
-      if (el) {
-        el.focus();
-        const pos = start + token.length;
-        el.setSelectionRange(pos, pos);
-      }
-    };
-    if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
-    else restore();
-  };
-  const outVar = editor.attribute === "customConditionalJs" ? "show" : editor.attribute === "customValidationJs" ? "valid" : "value";
-  const tokens = [`${outVar} = `, ...editor.attribute === "customValidationJs" ? ["input"] : [], ...ctx.fieldKeys.map((k) => `data.${k}`)];
-  return /* @__PURE__ */ jsxs2("details", { className: "lf-js", open, onToggle: (e) => setOpen(e.target.open), children: [
-    /* @__PURE__ */ jsx2("summary", { className: "lf-js-summary", children: editor.label ?? editor.id }),
-    /* @__PURE__ */ jsxs2("div", { className: "lf-js-body", children: [
-      /* @__PURE__ */ jsx2(
-        "textarea",
-        {
-          ref,
-          className: "lf-code",
-          "aria-label": editor.label ?? editor.id,
-          spellCheck: false,
-          value,
-          placeholder: editor.placeholder,
-          rows: 5,
-          onChange: (e) => ctx.setValue(e.target.value)
-        }
-      ),
-      /* @__PURE__ */ jsxs2("div", { className: "lf-js-insert", children: [
-        /* @__PURE__ */ jsx2("span", { className: "lf-js-insert-label", children: "Insert:" }),
-        tokens.map((t) => /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-js-token", title: `Insert ${t.trim()}`, onClick: () => insert2(t), children: t.trim() }, t))
-      ] }),
-      editor.hint && /* @__PURE__ */ jsx2("span", { className: "lf-setting-hint", children: editor.hint })
-    ] })
-  ] });
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
-function ExpressionControl({ editor, ctx }) {
-  const value = str(ctx.value);
-  const parsed = parseExpression(value);
-  const error = parsed.ok ? null : parsed.error;
-  return /* @__PURE__ */ jsx2(
-    Labeled,
-    {
-      label: editor.label ?? editor.id,
-      hint: editor.hint,
-      footer: error ? /* @__PURE__ */ jsx2("span", { className: "lf-expr-error", role: "alert", children: error }) : void 0,
-      children: /* @__PURE__ */ jsx2(
-        "textarea",
-        {
-          className: "lf-code",
-          spellCheck: false,
-          value,
-          placeholder: editor.placeholder,
-          rows: 2,
-          "aria-invalid": error ? true : void 0,
-          onChange: (e) => ctx.setValue(e.target.value)
-        }
-      )
-    }
-  );
-}
-function DataSourceControl({ editor, ctx }) {
-  const ds = ctx.value && typeof ctx.value === "object" ? ctx.value : null;
-  const enabled = ds !== null;
-  const isSearch = ctx.entity.type === "searchSelect";
-  const set = (p) => ctx.setValue({ ...ds ?? {}, ...p });
-  return /* @__PURE__ */ jsxs2("fieldset", { className: "lf-settings-minion", children: [
-    /* @__PURE__ */ jsx2("legend", { children: editor.label ?? "Minion data source" }),
-    /* @__PURE__ */ jsxs2("label", { className: "lf-setting lf-setting-inline", children: [
-      /* @__PURE__ */ jsx2(
-        "input",
-        {
-          type: "checkbox",
-          "aria-label": "Load options from a Minion",
-          checked: enabled,
-          onChange: (e) => ctx.setValue(e.target.checked ? { minion: ds?.minion ?? "" } : void 0)
-        }
-      ),
-      /* @__PURE__ */ jsx2("span", { className: "lf-setting-label", children: "Load options from a Minion" })
-    ] }),
-    editor.hint && /* @__PURE__ */ jsx2("span", { className: "lf-setting-hint", children: editor.hint }),
-    enabled && /* @__PURE__ */ jsxs2(Fragment2, { children: [
-      /* @__PURE__ */ jsx2(Labeled, { label: "Minion operation", children: /* @__PURE__ */ jsx2("input", { value: str(ds?.minion), placeholder: "listCities", onChange: (e) => set({ minion: e.target.value }) }) }),
-      isSearch && /* @__PURE__ */ jsx2(Labeled, { label: "Search param", children: /* @__PURE__ */ jsx2("input", { value: str(ds?.searchParam), placeholder: "q", onChange: (e) => set({ searchParam: e.target.value }) }) }),
-      /* @__PURE__ */ jsx2(Labeled, { label: "Result path", children: /* @__PURE__ */ jsx2("input", { value: str(ds?.resultPath), placeholder: "data", onChange: (e) => set({ resultPath: e.target.value }) }) }),
-      /* @__PURE__ */ jsx2(Labeled, { label: "Label path", children: /* @__PURE__ */ jsx2("input", { value: str(ds?.labelPath), placeholder: "name", onChange: (e) => set({ labelPath: e.target.value }) }) }),
-      /* @__PURE__ */ jsx2(Labeled, { label: "Value path", children: /* @__PURE__ */ jsx2("input", { value: str(ds?.valuePath), placeholder: "id", onChange: (e) => set({ valuePath: e.target.value }) }) }),
-      !isSearch && /* @__PURE__ */ jsx2(Labeled, { label: "Refetch", children: /* @__PURE__ */ jsxs2("select", { value: str(ds?.trigger) || "load", onChange: (e) => set({ trigger: e.target.value }), children: [
-        /* @__PURE__ */ jsx2("option", { value: "load", children: "Once on load" }),
-        /* @__PURE__ */ jsx2("option", { value: "change", children: "When params change" })
-      ] }) }),
-      /* @__PURE__ */ jsx2(
-        ParamsEditor,
-        {
-          legend: "Request params (param \u2190 field)",
-          params: ds?.params,
-          fieldKeys: ctx.fieldKeys,
-          resetKey: `${ctx.entity.id}:dataSource`,
-          onChange: (params) => set({ params })
-        }
-      )
-    ] })
-  ] });
-}
-function AsyncValidationControl({ editor, ctx }) {
-  const av = ctx.value && typeof ctx.value === "object" ? ctx.value : null;
-  const enabled = av !== null;
-  const set = (p) => ctx.setValue({ ...av ?? {}, ...p });
-  return /* @__PURE__ */ jsxs2("fieldset", { className: "lf-settings-minion", children: [
-    /* @__PURE__ */ jsx2("legend", { children: editor.label ?? "Async validation" }),
-    /* @__PURE__ */ jsxs2("label", { className: "lf-setting lf-setting-inline", children: [
-      /* @__PURE__ */ jsx2(
-        "input",
-        {
-          type: "checkbox",
-          "aria-label": "Validate via a Minion",
-          checked: enabled,
-          onChange: (e) => ctx.setValue(e.target.checked ? { minion: av?.minion ?? "" } : void 0)
-        }
-      ),
-      /* @__PURE__ */ jsx2("span", { className: "lf-setting-label", children: "Validate via a Minion" })
-    ] }),
-    editor.hint && /* @__PURE__ */ jsx2("span", { className: "lf-setting-hint", children: editor.hint }),
-    enabled && /* @__PURE__ */ jsxs2(Fragment2, { children: [
-      /* @__PURE__ */ jsx2(Labeled, { label: "Minion operation", children: /* @__PURE__ */ jsx2("input", { value: str(av?.minion), placeholder: "checkEmail", onChange: (e) => set({ minion: e.target.value }) }) }),
-      /* @__PURE__ */ jsx2(Labeled, { label: "Error message", children: /* @__PURE__ */ jsx2("input", { value: str(av?.message), placeholder: "Already taken", onChange: (e) => set({ message: e.target.value }) }) }),
-      /* @__PURE__ */ jsx2(
-        ParamsEditor,
-        {
-          legend: "Extra params (param \u2190 field)",
-          params: av?.params,
-          fieldKeys: ctx.fieldKeys,
-          resetKey: `${ctx.entity.id}:asyncValidation`,
-          onChange: (params) => set({ params })
-        }
-      )
-    ] })
-  ] });
-}
-function ParamsEditor({
-  legend,
-  params,
-  fieldKeys,
-  resetKey,
-  onChange
-}) {
-  const [rows, setRows] = useState2(() => Object.entries(params ?? {}));
-  useEffect(() => {
-    setRows(Object.entries(params ?? {}));
-  }, [resetKey]);
-  const commit = (next) => {
-    setRows(next);
-    const rec = {};
-    for (const [k, v] of next) if (k) rec[k] = v;
-    onChange(Object.keys(rec).length ? rec : void 0);
-  };
-  const setAt = (i, k, v) => commit(rows.map((e, j) => j === i ? [k, v] : e));
-  return /* @__PURE__ */ jsxs2("fieldset", { className: "lf-settings-params", children: [
-    /* @__PURE__ */ jsx2("legend", { children: legend }),
-    rows.length === 0 && /* @__PURE__ */ jsx2("p", { className: "lf-empty", children: "No params." }),
-    rows.map(([k, v], i) => /* @__PURE__ */ jsxs2("div", { className: "lf-param-row", role: "group", "aria-label": `Param ${i + 1}`, children: [
-      /* @__PURE__ */ jsx2("input", { "aria-label": `Param ${i + 1} name`, value: k, placeholder: "param", onChange: (e) => setAt(i, e.target.value, v) }),
-      /* @__PURE__ */ jsx2("span", { children: "\u2190" }),
-      /* @__PURE__ */ jsxs2("select", { "aria-label": `Param ${i + 1} field`, value: v, onChange: (e) => setAt(i, k, e.target.value), children: [
-        /* @__PURE__ */ jsx2("option", { value: "" }),
-        fieldKeys.map((f) => /* @__PURE__ */ jsx2("option", { value: f, children: f }, f))
-      ] }),
-      /* @__PURE__ */ jsx2("button", { type: "button", "aria-label": `Remove param ${i + 1}`, onClick: () => commit(rows.filter((_, j) => j !== i)), children: /* @__PURE__ */ jsx2(IconX, { size: 13 }) })
-    ] }, i)),
-    /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-param-add", onClick: () => commit([...rows, ["", ""]]), children: "Add param" })
-  ] });
-}
-function OptionsControl({ editor, ctx }) {
-  const [rows, setRows] = useState2(() => readOptionRows(ctx.value));
-  const [shape, setShape] = useState2(() => inferShape(readOptionRows(ctx.value)));
-  const [view, setView] = useState2("rows");
-  const [draft, setDraft] = useState2("");
-  const [jsonError, setJsonError] = useState2(null);
-  const errId = useId();
-  const sig = JSON.stringify(ctx.value ?? null);
-  const lastSig = useRef2(sig);
-  const lastId = useRef2(ctx.entity.id);
-  const dirtyRef = useRef2(false);
-  const pinnedRef = useRef2(false);
-  const shapeRef = useRef2(shape);
-  shapeRef.current = shape;
-  const viewRef = useRef2(view);
-  viewRef.current = view;
-  const seedDraft = (text) => {
-    setDraft(text);
-    dirtyRef.current = false;
-  };
-  useEffect(() => {
-    if (lastId.current !== ctx.entity.id) {
-      lastId.current = ctx.entity.id;
-      lastSig.current = sig;
-      pinnedRef.current = false;
-      const next = readOptionRows(ctx.value);
-      setRows(next);
-      setShape(inferShape(next));
-      setView("rows");
-      seedDraft("");
-      setJsonError(null);
-    } else if (sig !== lastSig.current) {
-      lastSig.current = sig;
-      const next = readOptionRows(ctx.value);
-      const sh = pinnedRef.current ? shapeRef.current : inferShape(next);
-      setRows(next);
-      setShape(sh);
-      if (viewRef.current === "rows" || !dirtyRef.current) seedDraft(rowsToJson(next, sh));
-      else setJsonError("The options changed elsewhere \u2014 Apply will overwrite that change.");
-    }
-  }, [sig, ctx.entity.id]);
-  const commit = (next, sh = shape) => {
-    setRows(next);
-    const persisted = serializeOptions(next, sh);
-    lastSig.current = JSON.stringify(persisted ?? null);
-    ctx.setValue(persisted);
-    return persisted;
-  };
-  const setLabel = (i, label) => commit(rows.map((r, j) => j === i ? { label, value: label } : r));
-  const setField = (i, patch) => commit(rows.map((r, j) => j === i ? { ...r, ...patch } : r));
-  const addRow = () => commit([...rows, { label: `Option ${rows.length + 1}`, value: "" }]);
-  const removeRow = (i) => commit(rows.filter((_, j) => j !== i));
-  const pickShape = (sh) => {
-    if (sh === shape) return;
-    pinnedRef.current = true;
-    setShape(sh);
-    if (view === "json") {
-      const parsed = parseOptionsJson(draft);
-      if (parsed.ok) {
-        const shaped = sh === "list" ? parsed.rows.map((r) => ({ label: r.label, value: r.label })) : parsed.rows;
-        seedDraft(rowsToJson(shaped, sh));
-        setJsonError(null);
-      }
-      return;
-    }
-    const adjusted = sh === "list" ? rows.map((r) => ({ label: r.label, value: r.label })) : rows;
-    const stored = commit(adjusted, sh);
-    seedDraft(rowsToJson(readOptionRows(stored), sh));
-    setJsonError(null);
-  };
-  const openJson = () => {
-    if (view === "json") return;
-    seedDraft(rowsToJson(rows, shape));
-    setJsonError(null);
-    setView("json");
-  };
-  const applyJson = () => {
-    const parsed = parseOptionsJson(draft);
-    if (!parsed.ok) {
-      setJsonError(parsed.error);
-      return;
-    }
-    setJsonError(null);
-    const shaped = shape === "list" ? parsed.rows.map((r) => ({ label: r.label, value: r.label })) : parsed.rows;
-    const stored = commit(shaped, shape);
-    const storedRows = readOptionRows(stored);
-    setRows(storedRows);
-    seedDraft(rowsToJson(storedRows, shape));
-  };
-  const seg = (active, label, onClick) => /* @__PURE__ */ jsx2("button", { type: "button", className: `lf-opt-mode-btn${active ? " is-active" : ""}`, "aria-pressed": active, onClick, children: label });
-  return /* @__PURE__ */ jsxs2("div", { className: "lf-setting-wrap", children: [
-    /* @__PURE__ */ jsxs2("div", { className: "lf-options-head", children: [
-      /* @__PURE__ */ jsx2("span", { className: "lf-setting-label", children: editor.label ?? "Options" }),
-      /* @__PURE__ */ jsxs2("div", { className: "lf-opt-toggles", children: [
-        /* @__PURE__ */ jsxs2("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options shape", children: [
-          seg(shape === "list", "List", () => pickShape("list")),
-          seg(shape === "kv", "Label + Value", () => pickShape("kv"))
-        ] }),
-        /* @__PURE__ */ jsxs2("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options edit mode", children: [
-          seg(view === "rows", "Rows", () => setView("rows")),
-          seg(view === "json", "JSON", openJson)
-        ] })
-      ] })
-    ] }),
-    view === "rows" ? /* @__PURE__ */ jsxs2("div", { className: "lf-options", children: [
-      rows.length === 0 && /* @__PURE__ */ jsx2("p", { className: "lf-empty", children: "No options yet." }),
-      rows.map(
-        (o, i) => shape === "kv" ? /* @__PURE__ */ jsxs2("div", { className: "lf-opt-row", children: [
-          /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1} label`, className: "lf-opt-label", value: o.label, placeholder: "Label", onChange: (e) => setField(i, { label: e.target.value }) }),
-          /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1} value`, className: "lf-opt-value", value: o.value, placeholder: "Value", onChange: (e) => setField(i, { value: e.target.value }) }),
-          /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => removeRow(i), children: /* @__PURE__ */ jsx2(IconX, { size: 13 }) })
-        ] }, i) : /* @__PURE__ */ jsxs2("div", { className: "lf-opt-row", children: [
-          /* @__PURE__ */ jsx2("input", { "aria-label": `Option ${i + 1}`, className: "lf-opt-label", value: o.label, placeholder: "Option", onChange: (e) => setLabel(i, e.target.value) }),
-          /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => removeRow(i), children: /* @__PURE__ */ jsx2(IconX, { size: 13 }) })
-        ] }, i)
-      ),
-      /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-add", onClick: addRow, children: "+ Add option" })
-    ] }) : /* @__PURE__ */ jsxs2("div", { className: "lf-options-json", children: [
-      /* @__PURE__ */ jsx2(
-        "textarea",
-        {
-          className: "lf-opt-json",
-          "aria-label": "Options as JSON",
-          "aria-invalid": jsonError ? true : void 0,
-          "aria-errormessage": jsonError ? errId : void 0,
-          spellCheck: false,
-          rows: Math.min(14, Math.max(4, draft.split("\n").length + 1)),
-          value: draft,
-          onChange: (e) => {
-            dirtyRef.current = true;
-            setDraft(e.target.value);
-            if (jsonError) setJsonError(null);
-          }
-        }
-      ),
-      jsonError && /* @__PURE__ */ jsx2("p", { id: errId, className: "lf-opt-json-error", role: "alert", children: jsonError }),
-      /* @__PURE__ */ jsxs2("div", { className: "lf-opt-json-foot", children: [
-        /* @__PURE__ */ jsx2("button", { type: "button", className: "lf-opt-json-apply", onClick: applyJson, children: "Apply" }),
-        /* @__PURE__ */ jsx2("span", { className: "lf-opt-json-hint", children: shape === "kv" ? 'A JSON array of { "label": "\u2026", "value": "\u2026" }.' : 'A JSON array of values \u2014 "Option A", "Option B", \u2026' })
-      ] })
-    ] }),
-    editor.hint && /* @__PURE__ */ jsx2("span", { className: "lf-setting-hint", children: editor.hint })
-  ] });
-}
-function readOptionRows(raw) {
+function optionsOf(a) {
+  const raw = a?.options;
   if (!Array.isArray(raw)) return [];
   return raw.map((o) => {
     if (typeof o === "string") return { label: o, value: o };
     const obj = o;
-    return { label: String(obj.label ?? obj.value ?? ""), value: String(obj.value ?? "") };
+    const value = String(obj.value ?? obj.label ?? "");
+    return { label: String(obj.label ?? obj.value ?? ""), value };
   });
 }
-function inferShape(rows) {
-  return rows.some((r) => r.value && r.value !== r.label) ? "kv" : "list";
+function wordPresent(s, word) {
+  return new RegExp(`(?:^|[^\\w$])${escapeRegExp(word)}(?:$|[^\\w$])`).test(s);
 }
-function serializeOptions(rows, shape) {
-  const kept = rows.filter((o) => o.label.trim() || o.value.trim());
-  if (!kept.length) return void 0;
-  if (shape === "list") return kept.map((o) => o.label.trim() || o.value.trim());
-  return kept.map((o) => {
-    const value = o.value.trim() || o.label.trim();
-    return { label: o.label.trim() ? o.label : value, value };
-  });
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-function rowsToJson(rows, shape) {
-  return JSON.stringify(serializeOptions(rows, shape) ?? [], null, 2);
-}
-function parseOptionsJson(text) {
-  const trimmed = text.trim();
-  if (!trimmed) return { ok: true, rows: [] };
-  let data2;
-  try {
-    data2 = JSON.parse(trimmed);
-  } catch (e) {
-    return { ok: false, error: `Invalid JSON: ${e.message}` };
-  }
-  if (!Array.isArray(data2)) return { ok: false, error: "Expected a JSON array of options." };
-  const rows = [];
-  for (let i = 0; i < data2.length; i++) {
-    const item = data2[i];
-    if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") {
-      const s = String(item);
-      rows.push({ label: s, value: s });
-    } else if (item && typeof item === "object" && !Array.isArray(item)) {
-      const obj = item;
-      if (!isPrimitive(obj.label) || !isPrimitive(obj.value)) {
-        return { ok: false, error: `Item ${i + 1}: label and value must be a string, number, or boolean.` };
-      }
-      const label = obj.label != null ? String(obj.label) : obj.value != null ? String(obj.value) : "";
-      const value = obj.value != null ? String(obj.value) : label;
-      if (!label && !value) return { ok: false, error: `Item ${i + 1} has no label or value.` };
-      rows.push({ label, value });
-    } else {
-      return { ok: false, error: `Item ${i + 1} must be a string or an object.` };
+function otherFieldKeys(schema, selfId) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const [eid, e] of Object.entries(schema.entities ?? {})) {
+    if (eid === selfId) continue;
+    const k = e.attributes?.key;
+    const ft = REGISTRY2.get(e.type);
+    if (typeof k === "string" && k && !seen.has(k) && !ft?.isContainer && !ft?.isStatic) {
+      seen.add(k);
+      out.push(k);
     }
   }
-  return { ok: true, rows };
+  return out;
 }
-function isPrimitive(x) {
-  return x == null || typeof x === "string" || typeof x === "number" || typeof x === "boolean";
+function str(v) {
+  return typeof v === "string" ? v : "";
 }
-function Labeled({
-  label,
-  hint,
-  inline,
-  footer,
-  children
-}) {
-  return /* @__PURE__ */ jsxs2("div", { className: "lf-setting-wrap", children: [
-    /* @__PURE__ */ jsxs2("label", { className: `lf-setting${inline ? " lf-setting-inline" : ""}`, children: [
-      /* @__PURE__ */ jsx2("span", { className: "lf-setting-label", children: label }),
-      children
-    ] }),
-    hint && /* @__PURE__ */ jsx2("span", { className: "lf-setting-hint", children: hint }),
-    footer
-  ] });
+function numStr(v) {
+  return typeof v === "number" && Number.isFinite(v) ? String(v) : "";
 }
+
+// src/settings/LogicRules.tsx
+import { Fragment as Fragment2, jsx as jsx2, jsxs as jsxs2 } from "react/jsx-runtime";
 var LOGIC_OPS = [
   { op: "==", label: "equals" },
   { op: "!=", label: "not equals" },
@@ -1229,104 +787,562 @@ function buildWhen(rule) {
   }
   return out;
 }
-function wordPresent(s, word) {
-  return new RegExp(`(?:^|[^\\w$])${escapeRegExp(word)}(?:$|[^\\w$])`).test(s);
-}
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function coerceScope(vals, typeByKey) {
-  const out = {};
-  for (const [k, raw] of Object.entries(vals)) {
-    const ft = typeByKey[k] ? REGISTRY2.get(typeByKey[k]) : void 0;
-    if (ft?.valueType === "boolean") out[k] = raw === "true" || raw === "1";
-    else if (ft?.valueType === "number") out[k] = raw.trim() === "" ? "" : Number.isNaN(Number(raw)) ? raw : Number(raw);
-    else if (ft) out[k] = raw;
-    else if (raw === "true" || raw === "false") out[k] = raw === "true";
-    else if (raw.trim() !== "" && !Number.isNaN(Number(raw))) out[k] = Number(raw);
-    else out[k] = raw;
-  }
-  return out;
-}
-function toLiteral(v) {
-  if (v === "true" || v === "false") return v;
-  if (v.trim() !== "" && !Number.isNaN(Number(v)) && String(Number(v)) === v.trim()) return v;
-  return JSON.stringify(v);
-}
-function unLiteral(v) {
-  const t = v.trim();
-  if (t.startsWith('"') && t.endsWith('"') || t.startsWith("'") && t.endsWith("'")) {
-    try {
-      return JSON.parse(t.replace(/^'|'$/g, '"'));
-    } catch {
-      return t.slice(1, -1);
+
+// src/settings/OptionsControl.tsx
+import { useEffect as useEffect2, useId, useRef as useRef2, useState as useState3 } from "react";
+import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
+function OptionsControl({ editor, ctx }) {
+  const [rows, setRows] = useState3(() => readOptionRows(ctx.value));
+  const [shape, setShape] = useState3(() => inferShape(readOptionRows(ctx.value)));
+  const [view, setView] = useState3("rows");
+  const [draft, setDraft] = useState3("");
+  const [jsonError, setJsonError] = useState3(null);
+  const errId = useId();
+  const sig = JSON.stringify(ctx.value ?? null);
+  const lastSig = useRef2(sig);
+  const lastId = useRef2(ctx.entity.id);
+  const dirtyRef = useRef2(false);
+  const pinnedRef = useRef2(false);
+  const shapeRef = useRef2(shape);
+  shapeRef.current = shape;
+  const viewRef = useRef2(view);
+  viewRef.current = view;
+  const seedDraft = (text) => {
+    setDraft(text);
+    dirtyRef.current = false;
+  };
+  useEffect2(() => {
+    if (lastId.current !== ctx.entity.id) {
+      lastId.current = ctx.entity.id;
+      lastSig.current = sig;
+      pinnedRef.current = false;
+      const next = readOptionRows(ctx.value);
+      setRows(next);
+      setShape(inferShape(next));
+      setView("rows");
+      seedDraft("");
+      setJsonError(null);
+    } else if (sig !== lastSig.current) {
+      lastSig.current = sig;
+      const next = readOptionRows(ctx.value);
+      const sh = pinnedRef.current ? shapeRef.current : inferShape(next);
+      setRows(next);
+      setShape(sh);
+      if (viewRef.current === "rows" || !dirtyRef.current) seedDraft(rowsToJson(next, sh));
+      else setJsonError("The options changed elsewhere \u2014 Apply will overwrite that change.");
     }
-  }
-  return t;
+  }, [sig, ctx.entity.id]);
+  const commit = (next, sh = shape) => {
+    setRows(next);
+    const persisted = serializeOptions(next, sh);
+    lastSig.current = JSON.stringify(persisted ?? null);
+    ctx.setValue(persisted);
+    return persisted;
+  };
+  const setLabel = (i, label) => commit(rows.map((r, j) => j === i ? { label, value: label } : r));
+  const setField = (i, patch) => commit(rows.map((r, j) => j === i ? { ...r, ...patch } : r));
+  const addRow = () => commit([...rows, { label: `Option ${rows.length + 1}`, value: "" }]);
+  const removeRow = (i) => commit(rows.filter((_, j) => j !== i));
+  const pickShape = (sh) => {
+    if (sh === shape) return;
+    pinnedRef.current = true;
+    setShape(sh);
+    if (view === "json") {
+      const parsed = parseOptionsJson(draft);
+      if (parsed.ok) {
+        const shaped = sh === "list" ? parsed.rows.map((r) => ({ label: r.label, value: r.label })) : parsed.rows;
+        seedDraft(rowsToJson(shaped, sh));
+        setJsonError(null);
+      }
+      return;
+    }
+    const adjusted = sh === "list" ? rows.map((r) => ({ label: r.label, value: r.label })) : rows;
+    const stored = commit(adjusted, sh);
+    seedDraft(rowsToJson(readOptionRows(stored), sh));
+    setJsonError(null);
+  };
+  const openJson = () => {
+    if (view === "json") return;
+    seedDraft(rowsToJson(rows, shape));
+    setJsonError(null);
+    setView("json");
+  };
+  const applyJson = () => {
+    const parsed = parseOptionsJson(draft);
+    if (!parsed.ok) {
+      setJsonError(parsed.error);
+      return;
+    }
+    setJsonError(null);
+    const shaped = shape === "list" ? parsed.rows.map((r) => ({ label: r.label, value: r.label })) : parsed.rows;
+    const stored = commit(shaped, shape);
+    const storedRows = readOptionRows(stored);
+    setRows(storedRows);
+    seedDraft(rowsToJson(storedRows, shape));
+  };
+  const seg = (active, label, onClick) => /* @__PURE__ */ jsx3("button", { type: "button", className: `lf-opt-mode-btn${active ? " is-active" : ""}`, "aria-pressed": active, onClick, children: label });
+  return /* @__PURE__ */ jsxs3("div", { className: "lf-setting-wrap", children: [
+    /* @__PURE__ */ jsxs3("div", { className: "lf-options-head", children: [
+      /* @__PURE__ */ jsx3("span", { className: "lf-setting-label", children: editor.label ?? "Options" }),
+      /* @__PURE__ */ jsxs3("div", { className: "lf-opt-toggles", children: [
+        /* @__PURE__ */ jsxs3("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options shape", children: [
+          seg(shape === "list", "List", () => pickShape("list")),
+          seg(shape === "kv", "Label + Value", () => pickShape("kv"))
+        ] }),
+        /* @__PURE__ */ jsxs3("div", { className: "lf-opt-mode", role: "group", "aria-label": "Options edit mode", children: [
+          seg(view === "rows", "Rows", () => setView("rows")),
+          seg(view === "json", "JSON", openJson)
+        ] })
+      ] })
+    ] }),
+    view === "rows" ? /* @__PURE__ */ jsxs3("div", { className: "lf-options", children: [
+      rows.length === 0 && /* @__PURE__ */ jsx3("p", { className: "lf-empty", children: "No options yet." }),
+      rows.map(
+        (o, i) => shape === "kv" ? /* @__PURE__ */ jsxs3("div", { className: "lf-opt-row", children: [
+          /* @__PURE__ */ jsx3("input", { "aria-label": `Option ${i + 1} label`, className: "lf-opt-label", value: o.label, placeholder: "Label", onChange: (e) => setField(i, { label: e.target.value }) }),
+          /* @__PURE__ */ jsx3("input", { "aria-label": `Option ${i + 1} value`, className: "lf-opt-value", value: o.value, placeholder: "Value", onChange: (e) => setField(i, { value: e.target.value }) }),
+          /* @__PURE__ */ jsx3("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => removeRow(i), children: /* @__PURE__ */ jsx3(IconX, { size: 13 }) })
+        ] }, i) : /* @__PURE__ */ jsxs3("div", { className: "lf-opt-row", children: [
+          /* @__PURE__ */ jsx3("input", { "aria-label": `Option ${i + 1}`, className: "lf-opt-label", value: o.label, placeholder: "Option", onChange: (e) => setLabel(i, e.target.value) }),
+          /* @__PURE__ */ jsx3("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => removeRow(i), children: /* @__PURE__ */ jsx3(IconX, { size: 13 }) })
+        ] }, i)
+      ),
+      /* @__PURE__ */ jsx3("button", { type: "button", className: "lf-opt-add", onClick: addRow, children: "+ Add option" })
+    ] }) : /* @__PURE__ */ jsxs3("div", { className: "lf-options-json", children: [
+      /* @__PURE__ */ jsx3(
+        "textarea",
+        {
+          className: "lf-opt-json",
+          "aria-label": "Options as JSON",
+          "aria-invalid": jsonError ? true : void 0,
+          "aria-errormessage": jsonError ? errId : void 0,
+          spellCheck: false,
+          rows: Math.min(14, Math.max(4, draft.split("\n").length + 1)),
+          value: draft,
+          onChange: (e) => {
+            dirtyRef.current = true;
+            setDraft(e.target.value);
+            if (jsonError) setJsonError(null);
+          }
+        }
+      ),
+      jsonError && /* @__PURE__ */ jsx3("p", { id: errId, className: "lf-opt-json-error", role: "alert", children: jsonError }),
+      /* @__PURE__ */ jsxs3("div", { className: "lf-opt-json-foot", children: [
+        /* @__PURE__ */ jsx3("button", { type: "button", className: "lf-opt-json-apply", onClick: applyJson, children: "Apply" }),
+        /* @__PURE__ */ jsx3("span", { className: "lf-opt-json-hint", children: shape === "kv" ? 'A JSON array of { "label": "\u2026", "value": "\u2026" }.' : 'A JSON array of values \u2014 "Option A", "Option B", \u2026' })
+      ] })
+    ] }),
+    editor.hint && /* @__PURE__ */ jsx3("span", { className: "lf-setting-hint", children: editor.hint })
+  ] });
 }
-function capitalize(s) {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
-function optionsOf(a) {
-  const raw = a?.options;
+function readOptionRows(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.map((o) => {
     if (typeof o === "string") return { label: o, value: o };
     const obj = o;
-    const value = String(obj.value ?? obj.label ?? "");
-    return { label: String(obj.label ?? obj.value ?? ""), value };
+    return { label: String(obj.label ?? obj.value ?? ""), value: String(obj.value ?? "") };
   });
 }
-function otherFieldKeys(schema, selfId) {
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const [eid, e] of Object.entries(schema.entities ?? {})) {
-    if (eid === selfId) continue;
-    const k = e.attributes?.key;
-    const ft = REGISTRY2.get(e.type);
-    if (typeof k === "string" && k && !seen.has(k) && !ft?.isContainer && !ft?.isStatic) {
-      seen.add(k);
-      out.push(k);
+function inferShape(rows) {
+  return rows.some((r) => r.value && r.value !== r.label) ? "kv" : "list";
+}
+function serializeOptions(rows, shape) {
+  const kept = rows.filter((o) => o.label.trim() || o.value.trim());
+  if (!kept.length) return void 0;
+  if (shape === "list") return kept.map((o) => o.label.trim() || o.value.trim());
+  return kept.map((o) => {
+    const value = o.value.trim() || o.label.trim();
+    return { label: o.label.trim() ? o.label : value, value };
+  });
+}
+function rowsToJson(rows, shape) {
+  return JSON.stringify(serializeOptions(rows, shape) ?? [], null, 2);
+}
+function parseOptionsJson(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, rows: [] };
+  let data2;
+  try {
+    data2 = JSON.parse(trimmed);
+  } catch (e) {
+    return { ok: false, error: `Invalid JSON: ${e.message}` };
+  }
+  if (!Array.isArray(data2)) return { ok: false, error: "Expected a JSON array of options." };
+  const rows = [];
+  for (let i = 0; i < data2.length; i++) {
+    const item = data2[i];
+    if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") {
+      const s = String(item);
+      rows.push({ label: s, value: s });
+    } else if (item && typeof item === "object" && !Array.isArray(item)) {
+      const obj = item;
+      if (!isPrimitive(obj.label) || !isPrimitive(obj.value)) {
+        return { ok: false, error: `Item ${i + 1}: label and value must be a string, number, or boolean.` };
+      }
+      const label = obj.label != null ? String(obj.label) : obj.value != null ? String(obj.value) : "";
+      const value = obj.value != null ? String(obj.value) : label;
+      if (!label && !value) return { ok: false, error: `Item ${i + 1} has no label or value.` };
+      rows.push({ label, value });
+    } else {
+      return { ok: false, error: `Item ${i + 1} must be a string or an object.` };
     }
   }
-  return out;
+  return { ok: true, rows };
 }
-function str(v) {
-  return typeof v === "string" ? v : "";
+function isPrimitive(x) {
+  return x == null || typeof x === "string" || typeof x === "number" || typeof x === "boolean";
 }
-function numStr(v) {
-  return typeof v === "number" && Number.isFinite(v) ? String(v) : "";
+
+// src/settings/editors.tsx
+import { useEffect as useEffect3, useRef as useRef3, useState as useState4 } from "react";
+import { parseExpression } from "@lukeflow/form-core";
+import { Fragment as Fragment3, jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+function JsControl({ editor, ctx }) {
+  const value = str(ctx.value);
+  const ref = useRef3(null);
+  const [open, setOpen] = useState4(value !== "");
+  const insert2 = (token) => {
+    const el = ref.current;
+    const start = el ? el.selectionStart : value.length;
+    const end = el ? el.selectionEnd : value.length;
+    const next = value.slice(0, start) + token + value.slice(end);
+    ctx.setValue(next);
+    const restore = () => {
+      if (el) {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+      }
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
+    else restore();
+  };
+  const outVar = editor.attribute === "customConditionalJs" ? "show" : editor.attribute === "customValidationJs" ? "valid" : "value";
+  const tokens = [`${outVar} = `, ...editor.attribute === "customValidationJs" ? ["input"] : [], ...ctx.fieldKeys.map((k) => `data.${k}`)];
+  return /* @__PURE__ */ jsxs4("details", { className: "lf-js", open, onToggle: (e) => setOpen(e.target.open), children: [
+    /* @__PURE__ */ jsx4("summary", { className: "lf-js-summary", children: editor.label ?? editor.id }),
+    /* @__PURE__ */ jsxs4("div", { className: "lf-js-body", children: [
+      /* @__PURE__ */ jsx4(
+        "textarea",
+        {
+          ref,
+          className: "lf-code",
+          "aria-label": editor.label ?? editor.id,
+          spellCheck: false,
+          value,
+          placeholder: editor.placeholder,
+          rows: 5,
+          onChange: (e) => ctx.setValue(e.target.value)
+        }
+      ),
+      /* @__PURE__ */ jsxs4("div", { className: "lf-js-insert", children: [
+        /* @__PURE__ */ jsx4("span", { className: "lf-js-insert-label", children: "Insert:" }),
+        tokens.map((t) => /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-js-token", title: `Insert ${t.trim()}`, onClick: () => insert2(t), children: t.trim() }, t))
+      ] }),
+      editor.hint && /* @__PURE__ */ jsx4("span", { className: "lf-setting-hint", children: editor.hint })
+    ] })
+  ] });
+}
+function ExpressionControl({ editor, ctx }) {
+  const value = str(ctx.value);
+  const parsed = parseExpression(value);
+  const error = parsed.ok ? null : parsed.error;
+  return /* @__PURE__ */ jsx4(
+    Labeled,
+    {
+      label: editor.label ?? editor.id,
+      hint: editor.hint,
+      footer: error ? /* @__PURE__ */ jsx4("span", { className: "lf-expr-error", role: "alert", children: error }) : void 0,
+      children: /* @__PURE__ */ jsx4(
+        "textarea",
+        {
+          className: "lf-code",
+          spellCheck: false,
+          value,
+          placeholder: editor.placeholder,
+          rows: 2,
+          "aria-invalid": error ? true : void 0,
+          onChange: (e) => ctx.setValue(e.target.value)
+        }
+      )
+    }
+  );
+}
+function DataSourceControl({ editor, ctx }) {
+  const ds = ctx.value && typeof ctx.value === "object" ? ctx.value : null;
+  const enabled = ds !== null;
+  const isSearch = ctx.entity.type === "searchSelect";
+  const set = (p) => ctx.setValue({ ...ds ?? {}, ...p });
+  return /* @__PURE__ */ jsxs4("fieldset", { className: "lf-settings-minion", children: [
+    /* @__PURE__ */ jsx4("legend", { children: editor.label ?? "Minion data source" }),
+    /* @__PURE__ */ jsxs4("label", { className: "lf-setting lf-setting-inline", children: [
+      /* @__PURE__ */ jsx4(
+        "input",
+        {
+          type: "checkbox",
+          "aria-label": "Load options from a Minion",
+          checked: enabled,
+          onChange: (e) => ctx.setValue(e.target.checked ? { minion: ds?.minion ?? "" } : void 0)
+        }
+      ),
+      /* @__PURE__ */ jsx4("span", { className: "lf-setting-label", children: "Load options from a Minion" })
+    ] }),
+    editor.hint && /* @__PURE__ */ jsx4("span", { className: "lf-setting-hint", children: editor.hint }),
+    enabled && /* @__PURE__ */ jsxs4(Fragment3, { children: [
+      /* @__PURE__ */ jsx4(Labeled, { label: "Minion operation", children: /* @__PURE__ */ jsx4("input", { value: str(ds?.minion), placeholder: "listCities", onChange: (e) => set({ minion: e.target.value }) }) }),
+      isSearch && /* @__PURE__ */ jsx4(Labeled, { label: "Search param", children: /* @__PURE__ */ jsx4("input", { value: str(ds?.searchParam), placeholder: "q", onChange: (e) => set({ searchParam: e.target.value }) }) }),
+      /* @__PURE__ */ jsx4(Labeled, { label: "Result path", children: /* @__PURE__ */ jsx4("input", { value: str(ds?.resultPath), placeholder: "data", onChange: (e) => set({ resultPath: e.target.value }) }) }),
+      /* @__PURE__ */ jsx4(Labeled, { label: "Label path", children: /* @__PURE__ */ jsx4("input", { value: str(ds?.labelPath), placeholder: "name", onChange: (e) => set({ labelPath: e.target.value }) }) }),
+      /* @__PURE__ */ jsx4(Labeled, { label: "Value path", children: /* @__PURE__ */ jsx4("input", { value: str(ds?.valuePath), placeholder: "id", onChange: (e) => set({ valuePath: e.target.value }) }) }),
+      !isSearch && /* @__PURE__ */ jsx4(Labeled, { label: "Refetch", children: /* @__PURE__ */ jsxs4("select", { value: str(ds?.trigger) || "load", onChange: (e) => set({ trigger: e.target.value }), children: [
+        /* @__PURE__ */ jsx4("option", { value: "load", children: "Once on load" }),
+        /* @__PURE__ */ jsx4("option", { value: "change", children: "When params change" })
+      ] }) }),
+      /* @__PURE__ */ jsx4(
+        ParamsEditor,
+        {
+          legend: "Request params (param \u2190 field)",
+          params: ds?.params,
+          fieldKeys: ctx.fieldKeys,
+          resetKey: `${ctx.entity.id}:dataSource`,
+          onChange: (params) => set({ params })
+        }
+      )
+    ] })
+  ] });
+}
+function AsyncValidationControl({ editor, ctx }) {
+  const av = ctx.value && typeof ctx.value === "object" ? ctx.value : null;
+  const enabled = av !== null;
+  const set = (p) => ctx.setValue({ ...av ?? {}, ...p });
+  return /* @__PURE__ */ jsxs4("fieldset", { className: "lf-settings-minion", children: [
+    /* @__PURE__ */ jsx4("legend", { children: editor.label ?? "Async validation" }),
+    /* @__PURE__ */ jsxs4("label", { className: "lf-setting lf-setting-inline", children: [
+      /* @__PURE__ */ jsx4(
+        "input",
+        {
+          type: "checkbox",
+          "aria-label": "Validate via a Minion",
+          checked: enabled,
+          onChange: (e) => ctx.setValue(e.target.checked ? { minion: av?.minion ?? "" } : void 0)
+        }
+      ),
+      /* @__PURE__ */ jsx4("span", { className: "lf-setting-label", children: "Validate via a Minion" })
+    ] }),
+    editor.hint && /* @__PURE__ */ jsx4("span", { className: "lf-setting-hint", children: editor.hint }),
+    enabled && /* @__PURE__ */ jsxs4(Fragment3, { children: [
+      /* @__PURE__ */ jsx4(Labeled, { label: "Minion operation", children: /* @__PURE__ */ jsx4("input", { value: str(av?.minion), placeholder: "checkEmail", onChange: (e) => set({ minion: e.target.value }) }) }),
+      /* @__PURE__ */ jsx4(Labeled, { label: "Error message", children: /* @__PURE__ */ jsx4("input", { value: str(av?.message), placeholder: "Already taken", onChange: (e) => set({ message: e.target.value }) }) }),
+      /* @__PURE__ */ jsx4(
+        ParamsEditor,
+        {
+          legend: "Extra params (param \u2190 field)",
+          params: av?.params,
+          fieldKeys: ctx.fieldKeys,
+          resetKey: `${ctx.entity.id}:asyncValidation`,
+          onChange: (params) => set({ params })
+        }
+      )
+    ] })
+  ] });
+}
+function ParamsEditor({
+  legend,
+  params,
+  fieldKeys,
+  resetKey,
+  onChange
+}) {
+  const [rows, setRows] = useState4(() => Object.entries(params ?? {}));
+  useEffect3(() => {
+    setRows(Object.entries(params ?? {}));
+  }, [resetKey]);
+  const commit = (next) => {
+    setRows(next);
+    const rec = {};
+    for (const [k, v] of next) if (k) rec[k] = v;
+    onChange(Object.keys(rec).length ? rec : void 0);
+  };
+  const setAt = (i, k, v) => commit(rows.map((e, j) => j === i ? [k, v] : e));
+  return /* @__PURE__ */ jsxs4("fieldset", { className: "lf-settings-params", children: [
+    /* @__PURE__ */ jsx4("legend", { children: legend }),
+    rows.length === 0 && /* @__PURE__ */ jsx4("p", { className: "lf-empty", children: "No params." }),
+    rows.map(([k, v], i) => /* @__PURE__ */ jsxs4("div", { className: "lf-param-row", role: "group", "aria-label": `Param ${i + 1}`, children: [
+      /* @__PURE__ */ jsx4("input", { "aria-label": `Param ${i + 1} name`, value: k, placeholder: "param", onChange: (e) => setAt(i, e.target.value, v) }),
+      /* @__PURE__ */ jsx4("span", { children: "\u2190" }),
+      /* @__PURE__ */ jsxs4("select", { "aria-label": `Param ${i + 1} field`, value: v, onChange: (e) => setAt(i, k, e.target.value), children: [
+        /* @__PURE__ */ jsx4("option", { value: "" }),
+        fieldKeys.map((f) => /* @__PURE__ */ jsx4("option", { value: f, children: f }, f))
+      ] }),
+      /* @__PURE__ */ jsx4("button", { type: "button", "aria-label": `Remove param ${i + 1}`, onClick: () => commit(rows.filter((_, j) => j !== i)), children: /* @__PURE__ */ jsx4(IconX, { size: 13 }) })
+    ] }, i)),
+    /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-param-add", onClick: () => commit([...rows, ["", ""]]), children: "Add param" })
+  ] });
+}
+function Labeled({
+  label,
+  hint,
+  inline,
+  footer,
+  children
+}) {
+  return /* @__PURE__ */ jsxs4("div", { className: "lf-setting-wrap", children: [
+    /* @__PURE__ */ jsxs4("label", { className: `lf-setting${inline ? " lf-setting-inline" : ""}`, children: [
+      /* @__PURE__ */ jsx4("span", { className: "lf-setting-label", children: label }),
+      children
+    ] }),
+    hint && /* @__PURE__ */ jsx4("span", { className: "lf-setting-hint", children: hint }),
+    footer
+  ] });
+}
+
+// src/SettingsPanel.tsx
+import { Fragment as Fragment4, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+function SettingsPanel({ builder, editors }) {
+  const id = builder.selectedId;
+  const entity = id ? builder.schema.entities[id] : void 0;
+  const [activeTab, setActiveTab] = useState5("display");
+  const entityType = entity?.type;
+  useEffect4(() => {
+    setActiveTab("display");
+  }, [id, entityType]);
+  if (!id || !entity) {
+    return /* @__PURE__ */ jsx5("div", { className: "lf-settings", "aria-label": "Field settings", children: /* @__PURE__ */ jsx5("p", { className: "lf-empty", children: "Select a field to edit its settings." }) });
+  }
+  const applicable = editorsForEntity(editors, entity, builder.schema);
+  const groups = editorsByTab(applicable);
+  const active = groups.find((g) => g.tab === activeTab) ?? groups[0];
+  const fieldKeys = otherFieldKeys(builder.schema, id);
+  const patch = (p) => builder.updateAttributes(id, p);
+  return /* @__PURE__ */ jsxs5("div", { className: "lf-settings", "aria-label": "Field settings", children: [
+    /* @__PURE__ */ jsxs5("h4", { children: [
+      "Settings \u2014 ",
+      entity.type
+    ] }),
+    /* @__PURE__ */ jsx5("div", { className: "lf-settings-tabs", role: "tablist", "aria-label": "Field settings tabs", children: groups.map((g) => /* @__PURE__ */ jsx5(
+      "button",
+      {
+        type: "button",
+        role: "tab",
+        "aria-selected": active?.tab === g.tab,
+        className: `lf-settings-tab${active?.tab === g.tab ? " is-active" : ""}`,
+        onClick: () => setActiveTab(g.tab),
+        children: g.label
+      },
+      g.tab
+    )) }),
+    /* @__PURE__ */ jsx5("div", { className: "lf-settings-panel", role: "tabpanel", "aria-label": `${active?.label ?? ""} settings`, children: (() => {
+      const editorsHere = active?.editors ?? [];
+      const isToggle = (ed) => ed.control === "checkbox" || ed.control === "exclude";
+      const renderEditor = (ed) => {
+        const ctx = {
+          entity,
+          schema: builder.schema,
+          fieldKeys,
+          value: ed.attribute ? entity.attributes[ed.attribute] : void 0,
+          setValue: ed.attribute ? (v) => patch({ [ed.attribute]: v }) : () => {
+          },
+          patch
+        };
+        return /* @__PURE__ */ jsx5(Control, { editor: ed, ctx, builder, id, entity }, ed.id);
+      };
+      const toggles = editorsHere.filter(isToggle);
+      const rest = editorsHere.filter((ed) => !isToggle(ed));
+      return /* @__PURE__ */ jsxs5(Fragment4, { children: [
+        rest.map(renderEditor),
+        toggles.length > 0 && /* @__PURE__ */ jsx5("div", { className: "lf-checkbox-group", role: "group", "aria-label": "Toggles", children: toggles.map(renderEditor) })
+      ] });
+    })() })
+  ] });
+}
+function Control({
+  editor,
+  ctx,
+  builder,
+  id,
+  entity
+}) {
+  if (editor.render) return /* @__PURE__ */ jsx5(Fragment4, { children: editor.render(ctx) });
+  switch (editor.control) {
+    case "logic":
+      return /* @__PURE__ */ jsx5(LogicRules, { builder, id, entity });
+    case "checkbox":
+      return /* @__PURE__ */ jsx5(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, inline: true, children: /* @__PURE__ */ jsx5("input", { type: "checkbox", checked: Boolean(ctx.value), onChange: (e) => ctx.setValue(e.target.checked) }) });
+    // Inverted boolean for `persistent`: the field is included by default; CHECKED stores
+    // `persistent: false` (exclude), UNCHECKED clears it (back to the default-included).
+    case "exclude":
+      return /* @__PURE__ */ jsx5(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, inline: true, children: /* @__PURE__ */ jsx5("input", { type: "checkbox", checked: ctx.value === false, onChange: (e) => ctx.setValue(e.target.checked ? false : void 0) }) });
+    case "number":
+      return /* @__PURE__ */ jsx5(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx5(
+        "input",
+        {
+          type: "number",
+          value: numStr(ctx.value),
+          placeholder: editor.placeholder,
+          onChange: (e) => ctx.setValue(e.target.value === "" ? void 0 : Number(e.target.value))
+        }
+      ) });
+    case "textarea":
+      return /* @__PURE__ */ jsx5(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx5("textarea", { value: str(ctx.value), placeholder: editor.placeholder, rows: 3, onChange: (e) => ctx.setValue(e.target.value) }) });
+    case "select":
+      return /* @__PURE__ */ jsx5(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsxs5("select", { value: str(ctx.value), onChange: (e) => ctx.setValue(e.target.value), children: [
+        /* @__PURE__ */ jsx5("option", { value: "" }),
+        (editor.options ?? []).map((o) => /* @__PURE__ */ jsx5("option", { value: o.value, children: o.label }, o.value))
+      ] }) });
+    case "options":
+      return /* @__PURE__ */ jsx5(OptionsControl, { editor, ctx });
+    case "tags":
+      return /* @__PURE__ */ jsx5(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx5(
+        "input",
+        {
+          value: Array.isArray(ctx.value) ? ctx.value.join(", ") : str(ctx.value),
+          placeholder: editor.placeholder,
+          onChange: (e) => ctx.setValue(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))
+        }
+      ) });
+    case "dataSource":
+      return /* @__PURE__ */ jsx5(DataSourceControl, { editor, ctx });
+    case "asyncValidation":
+      return /* @__PURE__ */ jsx5(AsyncValidationControl, { editor, ctx });
+    case "expression":
+      return /* @__PURE__ */ jsx5(ExpressionControl, { editor, ctx });
+    case "js":
+      return /* @__PURE__ */ jsx5(JsControl, { editor, ctx });
+    case "text":
+    default:
+      return /* @__PURE__ */ jsx5(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx5("input", { value: str(ctx.value), placeholder: editor.placeholder, onChange: (e) => ctx.setValue(e.target.value) }) });
+  }
 }
 
 // src/Canvas.tsx
-import { createContext, useContext, useRef as useRef3, useState as useState3 } from "react";
-import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry4 } from "@lukeflow/form-core";
+import { createContext, useContext, useRef as useRef4, useState as useState7 } from "react";
+import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry5 } from "@lukeflow/form-core";
 
 // src/NodePreview.tsx
 import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry3 } from "@lukeflow/form-core";
-import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
+import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 var REGISTRY3 = createDefaultFieldTypeRegistry3();
 function NodePreview({ entity }) {
   const a = entity.attributes;
   const ft = REGISTRY3.get(entity.type);
   if (ft?.isContainer) return null;
   const control = previewControl(entity);
-  if (ft?.isStatic) return /* @__PURE__ */ jsx3("div", { className: "lf-pv-static", children: control });
+  if (ft?.isStatic) return /* @__PURE__ */ jsx6("div", { className: "lf-pv-static", children: control });
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
   const hideLabel = Boolean(a.hideLabel);
   const label = str2(a.label) || str2(a.key) || entity.type;
   const desc = str2(a.description);
-  return /* @__PURE__ */ jsxs3("div", { className: "lf-pv-field", "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
-    /* @__PURE__ */ jsxs3("span", { className: "lf-pv-fieldlabel", children: [
+  return /* @__PURE__ */ jsxs6("div", { className: "lf-pv-field", "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
+    /* @__PURE__ */ jsxs6("span", { className: "lf-pv-fieldlabel", children: [
       label,
-      a.required ? /* @__PURE__ */ jsx3("span", { className: "lf-pv-required", children: " *" }) : null,
-      str2(a.tooltip) ? /* @__PURE__ */ jsxs3("span", { className: "lf-tooltip", children: [
-        /* @__PURE__ */ jsx3("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
-        /* @__PURE__ */ jsx3("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
+      a.required ? /* @__PURE__ */ jsx6("span", { className: "lf-pv-required", children: " *" }) : null,
+      str2(a.tooltip) ? /* @__PURE__ */ jsxs6("span", { className: "lf-tooltip", children: [
+        /* @__PURE__ */ jsx6("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
+        /* @__PURE__ */ jsx6("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
       ] }) : null
     ] }),
     control,
-    desc ? /* @__PURE__ */ jsx3("span", { className: "lf-pv-desc", children: desc }) : null
+    desc ? /* @__PURE__ */ jsx6("span", { className: "lf-pv-desc", children: desc }) : null
   ] });
 }
 function previewControl(entity) {
@@ -1336,22 +1352,22 @@ function previewControl(entity) {
   const ph2 = dv ? void 0 : ph;
   switch (entity.type) {
     case "textarea":
-      return /* @__PURE__ */ jsx3("textarea", { className: "lf-pv-input", disabled: true, rows: typeof a.rows === "number" ? a.rows : 2, value: dv, placeholder: ph2 });
+      return /* @__PURE__ */ jsx6("textarea", { className: "lf-pv-input", disabled: true, rows: typeof a.rows === "number" ? a.rows : 2, value: dv, placeholder: ph2 });
     case "number":
     case "currency":
-      return /* @__PURE__ */ jsx3("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 || (entity.type === "currency" ? "0.00" : "") });
+      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 || (entity.type === "currency" ? "0.00" : "") });
     case "checkbox":
-      return /* @__PURE__ */ jsxs3("label", { className: "lf-pv-check", children: [
-        /* @__PURE__ */ jsx3("input", { type: "checkbox", disabled: true, defaultChecked: Boolean(a.defaultChecked) }),
+      return /* @__PURE__ */ jsxs6("label", { className: "lf-pv-check", children: [
+        /* @__PURE__ */ jsx6("input", { type: "checkbox", disabled: true, defaultChecked: Boolean(a.defaultChecked) }),
         " ",
         str2(a.label) || "Checkbox"
       ] });
     case "select":
     case "searchSelect": {
       const opts = readOptions(a);
-      return /* @__PURE__ */ jsxs3("select", { className: "lf-pv-input", disabled: true, children: [
-        ph ? /* @__PURE__ */ jsx3("option", { children: ph }) : /* @__PURE__ */ jsx3("option", {}),
-        opts.map((o, i) => /* @__PURE__ */ jsx3("option", { children: o.label }, i))
+      return /* @__PURE__ */ jsxs6("select", { className: "lf-pv-input", disabled: true, children: [
+        ph ? /* @__PURE__ */ jsx6("option", { children: ph }) : /* @__PURE__ */ jsx6("option", {}),
+        opts.map((o, i) => /* @__PURE__ */ jsx6("option", { children: o.label }, i))
       ] });
     }
     case "radio":
@@ -1359,37 +1375,37 @@ function previewControl(entity) {
       const opts = readOptions(a);
       const type = entity.type === "radio" ? "radio" : "checkbox";
       const shown = opts.length ? opts : [{ label: "Option 1", value: "1" }, { label: "Option 2", value: "2" }];
-      return /* @__PURE__ */ jsx3("div", { className: "lf-pv-choices", children: shown.slice(0, 4).map((o, i) => /* @__PURE__ */ jsxs3("label", { className: "lf-pv-check", children: [
-        /* @__PURE__ */ jsx3("input", { type, disabled: true }),
+      return /* @__PURE__ */ jsx6("div", { className: "lf-pv-choices", children: shown.slice(0, 4).map((o, i) => /* @__PURE__ */ jsxs6("label", { className: "lf-pv-check", children: [
+        /* @__PURE__ */ jsx6("input", { type, disabled: true }),
         " ",
         o.label
       ] }, i)) });
     }
     case "day":
     case "datetime":
-      return /* @__PURE__ */ jsx3("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date" });
+      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date" });
     case "time":
-      return /* @__PURE__ */ jsx3("input", { className: "lf-pv-input", disabled: true, type: "time" });
+      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "time" });
     case "file":
-      return /* @__PURE__ */ jsx3("div", { className: "lf-pv-file", children: "Choose file\u2026" });
+      return /* @__PURE__ */ jsx6("div", { className: "lf-pv-file", children: "Choose file\u2026" });
     case "signature":
-      return /* @__PURE__ */ jsx3("div", { className: "lf-pv-sign", children: "\u270E Signature" });
+      return /* @__PURE__ */ jsx6("div", { className: "lf-pv-sign", children: "\u270E Signature" });
     case "tags":
     case "tagsField":
-      return /* @__PURE__ */ jsx3("input", { className: "lf-pv-input", disabled: true, value: dv, placeholder: dv ? void 0 : ph || "Add tags\u2026" });
+      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, value: dv, placeholder: dv ? void 0 : ph || "Add tags\u2026" });
     case "button":
-      return /* @__PURE__ */ jsx3("button", { className: "lf-pv-btn", type: "button", disabled: true, children: str2(a.label) || "Button" });
+      return /* @__PURE__ */ jsx6("button", { className: "lf-pv-btn", type: "button", disabled: true, children: str2(a.label) || "Button" });
     case "heading":
-      return /* @__PURE__ */ jsx3("div", { className: "lf-pv-heading", children: str2(a.label) || str2(a.content) || "Heading" });
+      return /* @__PURE__ */ jsx6("div", { className: "lf-pv-heading", children: str2(a.label) || str2(a.content) || "Heading" });
     case "content":
     case "html":
     case "htmlElement":
-      return /* @__PURE__ */ jsx3("div", { className: "lf-pv-muted", children: str2(a.content) || "Content" });
+      return /* @__PURE__ */ jsx6("div", { className: "lf-pv-muted", children: str2(a.content) || "Content" });
     case "divider":
     case "hr":
-      return /* @__PURE__ */ jsx3("hr", { className: "lf-pv-hr" });
+      return /* @__PURE__ */ jsx6("hr", { className: "lf-pv-hr" });
     default:
-      return /* @__PURE__ */ jsx3("input", { className: "lf-pv-input", disabled: true, type: "text", value: dv, placeholder: ph2 });
+      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "text", value: dv, placeholder: ph2 });
   }
 }
 function str2(v) {
@@ -1406,175 +1422,179 @@ function readOptions(a) {
   });
 }
 
+// src/palette.tsx
+import { useState as useState6 } from "react";
+import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry4 } from "@lukeflow/form-core";
+
 // src/paletteIcons.tsx
-import { Fragment as Fragment3, jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+import { Fragment as Fragment5, jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 var S = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round" };
 function Svg({ children }) {
-  return /* @__PURE__ */ jsx4("svg", { className: "lf-palette-icon", viewBox: "0 0 24 24", width: "18", height: "18", "aria-hidden": "true", focusable: "false", children });
+  return /* @__PURE__ */ jsx7("svg", { className: "lf-palette-icon", viewBox: "0 0 24 24", width: "18", height: "18", "aria-hidden": "true", focusable: "false", children });
 }
-var box = /* @__PURE__ */ jsx4("rect", { x: "3", y: "6", width: "18", height: "12", rx: "2", ...S });
+var box = /* @__PURE__ */ jsx7("rect", { x: "3", y: "6", width: "18", height: "12", rx: "2", ...S });
 var ICONS = {
-  textField: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("line", { x1: "4", y1: "9", x2: "20", y2: "9", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "4", y1: "14", x2: "13", y2: "14", ...S })
+  textField: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("line", { x1: "4", y1: "9", x2: "20", y2: "9", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "4", y1: "14", x2: "13", y2: "14", ...S })
   ] }),
-  textarea: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "6", y1: "9", x2: "18", y2: "9", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "6", y1: "12", x2: "18", y2: "12", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "6", y1: "15", x2: "13", y2: "15", ...S })
+  textarea: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "6", y1: "9", x2: "18", y2: "9", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "6", y1: "12", x2: "18", y2: "12", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "6", y1: "15", x2: "13", y2: "15", ...S })
   ] }),
-  email: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "6", width: "18", height: "12", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M4 8l8 6 8-6", ...S })
+  email: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "6", width: "18", height: "12", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M4 8l8 6 8-6", ...S })
   ] }),
-  url: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("path", { d: "M9 13a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M15 11a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1", ...S })
+  url: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("path", { d: "M9 13a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M15 11a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1", ...S })
   ] }),
-  phoneNumber: /* @__PURE__ */ jsx4("path", { d: "M6 3h3l2 5-2 1a11 11 0 0 0 5 5l1-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z", ...S }),
-  password: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "5", y: "10", width: "14", height: "9", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M8 10V8a4 4 0 0 1 8 0v2", ...S })
+  phoneNumber: /* @__PURE__ */ jsx7("path", { d: "M6 3h3l2 5-2 1a11 11 0 0 0 5 5l1-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z", ...S }),
+  password: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "5", y: "10", width: "14", height: "9", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M8 10V8a4 4 0 0 1 8 0v2", ...S })
   ] }),
-  number: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("line", { x1: "9", y1: "4", x2: "7", y2: "20", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "17", y1: "4", x2: "15", y2: "20", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "4", y1: "9", x2: "20", y2: "9", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "4", y1: "15", x2: "20", y2: "15", ...S })
+  number: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("line", { x1: "9", y1: "4", x2: "7", y2: "20", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "17", y1: "4", x2: "15", y2: "20", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "4", y1: "9", x2: "20", y2: "9", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "4", y1: "15", x2: "20", y2: "15", ...S })
   ] }),
-  currency: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("line", { x1: "12", y1: "3", x2: "12", y2: "21", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M16 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H8", ...S })
+  currency: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("line", { x1: "12", y1: "3", x2: "12", y2: "21", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M16 7H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H8", ...S })
   ] }),
-  checkbox: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "4", y: "4", width: "16", height: "16", rx: "3", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M8 12l3 3 5-6", ...S })
+  checkbox: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "4", y: "4", width: "16", height: "16", rx: "3", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M8 12l3 3 5-6", ...S })
   ] }),
-  selectBoxes: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "4", y: "4", width: "7", height: "7", rx: "1.5", ...S }),
-    /* @__PURE__ */ jsx4("rect", { x: "4", y: "14", width: "7", height: "6", rx: "1.5", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M6 7.5l1.5 1.5L10 6", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "14", y1: "7", x2: "20", y2: "7", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "14", y1: "17", x2: "20", y2: "17", ...S })
+  selectBoxes: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "4", y: "4", width: "7", height: "7", rx: "1.5", ...S }),
+    /* @__PURE__ */ jsx7("rect", { x: "4", y: "14", width: "7", height: "6", rx: "1.5", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M6 7.5l1.5 1.5L10 6", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "14", y1: "7", x2: "20", y2: "7", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "14", y1: "17", x2: "20", y2: "17", ...S })
   ] }),
-  select: /* @__PURE__ */ jsxs4(Fragment3, { children: [
+  select: /* @__PURE__ */ jsxs7(Fragment5, { children: [
     box,
-    /* @__PURE__ */ jsx4("path", { d: "M9 11l3 3 3-3", ...S })
+    /* @__PURE__ */ jsx7("path", { d: "M9 11l3 3 3-3", ...S })
   ] }),
-  searchSelect: /* @__PURE__ */ jsxs4(Fragment3, { children: [
+  searchSelect: /* @__PURE__ */ jsxs7(Fragment5, { children: [
     box,
-    /* @__PURE__ */ jsx4("circle", { cx: "11", cy: "11", r: "2.5", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "13", y1: "13", x2: "16", y2: "16", ...S })
+    /* @__PURE__ */ jsx7("circle", { cx: "11", cy: "11", r: "2.5", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "13", y1: "13", x2: "16", y2: "16", ...S })
   ] }),
-  radio: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("circle", { cx: "7", cy: "8", r: "3", ...S }),
-    /* @__PURE__ */ jsx4("circle", { cx: "7", cy: "8", r: "1", fill: "currentColor", stroke: "none" }),
-    /* @__PURE__ */ jsx4("line", { x1: "13", y1: "8", x2: "20", y2: "8", ...S }),
-    /* @__PURE__ */ jsx4("circle", { cx: "7", cy: "16", r: "3", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "13", y1: "16", x2: "20", y2: "16", ...S })
+  radio: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("circle", { cx: "7", cy: "8", r: "3", ...S }),
+    /* @__PURE__ */ jsx7("circle", { cx: "7", cy: "8", r: "1", fill: "currentColor", stroke: "none" }),
+    /* @__PURE__ */ jsx7("line", { x1: "13", y1: "8", x2: "20", y2: "8", ...S }),
+    /* @__PURE__ */ jsx7("circle", { cx: "7", cy: "16", r: "3", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "13", y1: "16", x2: "20", y2: "16", ...S })
   ] }),
-  button: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "8", width: "18", height: "8", rx: "4", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "12", x2: "16", y2: "12", ...S })
+  button: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "8", width: "18", height: "8", rx: "4", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "8", y1: "12", x2: "16", y2: "12", ...S })
   ] }),
-  datetime: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "18", height: "16", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "9", x2: "21", y2: "9", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "3", x2: "8", y2: "7", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "16", y1: "3", x2: "16", y2: "7", ...S })
+  datetime: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "18", height: "16", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "9", x2: "21", y2: "9", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "8", y1: "3", x2: "8", y2: "7", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "16", y1: "3", x2: "16", y2: "7", ...S })
   ] }),
-  day: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "18", height: "16", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "9", x2: "21", y2: "9", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "3", x2: "8", y2: "7", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "16", y1: "3", x2: "16", y2: "7", ...S })
+  day: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "18", height: "16", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "9", x2: "21", y2: "9", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "8", y1: "3", x2: "8", y2: "7", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "16", y1: "3", x2: "16", y2: "7", ...S })
   ] }),
-  time: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "8", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M12 8v4l3 2", ...S })
+  time: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("circle", { cx: "12", cy: "12", r: "8", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M12 8v4l3 2", ...S })
   ] }),
-  tags: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("path", { d: "M4 4h7l9 9-7 7-9-9V4z", ...S }),
-    /* @__PURE__ */ jsx4("circle", { cx: "8", cy: "8", r: "1.3", fill: "currentColor", stroke: "none" })
+  tags: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("path", { d: "M4 4h7l9 9-7 7-9-9V4z", ...S }),
+    /* @__PURE__ */ jsx7("circle", { cx: "8", cy: "8", r: "1.3", fill: "currentColor", stroke: "none" })
   ] }),
-  file: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("path", { d: "M12 16V6m0 0l-4 4m4-4l4 4", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M5 18a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3", ...S })
+  file: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("path", { d: "M12 16V6m0 0l-4 4m4-4l4 4", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M5 18a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3", ...S })
   ] }),
-  signature: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("path", { d: "M3 18c3 0 4-9 6-9s2 6 4 6 2-4 4-4", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "21", x2: "21", y2: "21", ...S })
+  signature: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("path", { d: "M3 18c3 0 4-9 6-9s2 6 4 6 2-4 4-4", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "21", x2: "21", y2: "21", ...S })
   ] }),
-  panel: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "9", x2: "21", y2: "9", ...S })
+  panel: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "9", x2: "21", y2: "9", ...S })
   ] }),
-  well: /* @__PURE__ */ jsx4("rect", { x: "3", y: "6", width: "18", height: "12", rx: "3", ...S }),
-  fieldset: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "6", width: "18", height: "13", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "7", y1: "6", x2: "13", y2: "6", stroke: "var(--lf-bg,#fff)", strokeWidth: "3" })
+  well: /* @__PURE__ */ jsx7("rect", { x: "3", y: "6", width: "18", height: "12", rx: "3", ...S }),
+  fieldset: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "6", width: "18", height: "13", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "7", y1: "6", x2: "13", y2: "6", stroke: "var(--lf-bg,#fff)", strokeWidth: "3" })
   ] }),
-  columns: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "7", height: "14", rx: "1.5", ...S }),
-    /* @__PURE__ */ jsx4("rect", { x: "14", y: "5", width: "7", height: "14", rx: "1.5", ...S })
+  columns: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "7", height: "14", rx: "1.5", ...S }),
+    /* @__PURE__ */ jsx7("rect", { x: "14", y: "5", width: "7", height: "14", rx: "1.5", ...S })
   ] }),
-  tabs: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("path", { d: "M3 8h6l1-2h4l1 2h6", ...S }),
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "8", width: "18", height: "11", rx: "2", ...S })
+  tabs: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("path", { d: "M3 8h6l1-2h4l1 2h6", ...S }),
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "8", width: "18", height: "11", rx: "2", ...S })
   ] }),
-  table: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "10", x2: "21", y2: "10", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "15", x2: "21", y2: "15", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "12", y1: "5", x2: "12", y2: "19", ...S })
+  table: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "10", x2: "21", y2: "10", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "15", x2: "21", y2: "15", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "12", y1: "5", x2: "12", y2: "19", ...S })
   ] }),
-  content: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("line", { x1: "4", y1: "7", x2: "20", y2: "7", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "4", y1: "12", x2: "20", y2: "12", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "4", y1: "17", x2: "14", y2: "17", ...S })
+  content: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("line", { x1: "4", y1: "7", x2: "20", y2: "7", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "4", y1: "12", x2: "20", y2: "12", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "4", y1: "17", x2: "14", y2: "17", ...S })
   ] }),
-  heading: /* @__PURE__ */ jsx4(Fragment3, { children: /* @__PURE__ */ jsx4("path", { d: "M6 5v14M18 5v14M6 12h12", ...S }) }),
-  divider: /* @__PURE__ */ jsx4("line", { x1: "3", y1: "12", x2: "21", y2: "12", ...S }),
-  dataGrid: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "10", x2: "21", y2: "10", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "14.5", x2: "21", y2: "14.5", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "11", y1: "5", x2: "11", y2: "19", ...S })
+  heading: /* @__PURE__ */ jsx7(Fragment5, { children: /* @__PURE__ */ jsx7("path", { d: "M6 5v14M18 5v14M6 12h12", ...S }) }),
+  divider: /* @__PURE__ */ jsx7("line", { x1: "3", y1: "12", x2: "21", y2: "12", ...S }),
+  dataGrid: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "10", x2: "21", y2: "10", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "14.5", x2: "21", y2: "14.5", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "11", y1: "5", x2: "11", y2: "19", ...S })
   ] }),
-  editGrid: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "3", y1: "11", x2: "21", y2: "11", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M14 16l2-2 2 2-2 2h-2v-2z", ...S })
+  editGrid: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "3", y1: "11", x2: "21", y2: "11", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M14 16l2-2 2 2-2 2h-2v-2z", ...S })
   ] }),
-  page: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("rect", { x: "5", y: "3", width: "14", height: "18", rx: "2", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "8", x2: "16", y2: "8", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "12", x2: "16", y2: "12", ...S }),
-    /* @__PURE__ */ jsx4("line", { x1: "8", y1: "16", x2: "13", y2: "16", ...S })
+  page: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("rect", { x: "5", y: "3", width: "14", height: "18", rx: "2", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "8", y1: "8", x2: "16", y2: "8", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "8", y1: "12", x2: "16", y2: "12", ...S }),
+    /* @__PURE__ */ jsx7("line", { x1: "8", y1: "16", x2: "13", y2: "16", ...S })
   ] }),
-  array: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("path", { d: "M7 4H4v16h3", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M17 4h3v16h-3", ...S }),
-    /* @__PURE__ */ jsx4("circle", { cx: "9.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
-    /* @__PURE__ */ jsx4("circle", { cx: "12", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
-    /* @__PURE__ */ jsx4("circle", { cx: "14.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" })
+  array: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("path", { d: "M7 4H4v16h3", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M17 4h3v16h-3", ...S }),
+    /* @__PURE__ */ jsx7("circle", { cx: "9.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
+    /* @__PURE__ */ jsx7("circle", { cx: "12", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" }),
+    /* @__PURE__ */ jsx7("circle", { cx: "14.5", cy: "12", r: "1.1", fill: "currentColor", stroke: "none" })
   ] }),
-  map: /* @__PURE__ */ jsxs4(Fragment3, { children: [
-    /* @__PURE__ */ jsx4("path", { d: "M8.5 4C6.5 4 6.5 6 6.5 8s0 4-2 4c2 0 2 2 2 4s0 4 2 4", ...S }),
-    /* @__PURE__ */ jsx4("path", { d: "M15.5 4c2 0 2 2 2 4s0 4 2 4c-2 0-2 2-2 4s0 4-2 4", ...S })
+  map: /* @__PURE__ */ jsxs7(Fragment5, { children: [
+    /* @__PURE__ */ jsx7("path", { d: "M8.5 4C6.5 4 6.5 6 6.5 8s0 4-2 4c2 0 2 2 2 4s0 4 2 4", ...S }),
+    /* @__PURE__ */ jsx7("path", { d: "M15.5 4c2 0 2 2 2 4s0 4 2 4c-2 0-2 2-2 4s0 4-2 4", ...S })
   ] })
 };
-var GENERIC = /* @__PURE__ */ jsxs4(Fragment3, { children: [
+var GENERIC = /* @__PURE__ */ jsxs7(Fragment5, { children: [
   box,
-  /* @__PURE__ */ jsx4("line", { x1: "7", y1: "12", x2: "14", y2: "12", ...S })
+  /* @__PURE__ */ jsx7("line", { x1: "7", y1: "12", x2: "14", y2: "12", ...S })
 ] });
 function paletteIcon(type) {
-  return /* @__PURE__ */ jsx4(Svg, { children: ICONS[type] ?? GENERIC });
+  return /* @__PURE__ */ jsx7(Svg, { children: ICONS[type] ?? GENERIC });
 }
 
-// src/Canvas.tsx
-import { Fragment as Fragment4, jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+// src/palette.tsx
+import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 var REGISTRY4 = createDefaultFieldTypeRegistry4();
 var OPTS = { options: ["Option 1", "Option 2"] };
 var PALETTE_GROUPS = [
@@ -1639,23 +1659,23 @@ var PALETTE_GROUPS = [
 ];
 function Palette({ builder, extra }) {
   const dnd = useDnd();
-  const [query, setQuery] = useState3("");
+  const [query, setQuery] = useState6("");
   const sel = builder.selectedId ? builder.schema.entities[builder.selectedId] : void 0;
   const intoContainer = sel && REGISTRY4.get(sel.type)?.isContainer ? builder.selectedId : null;
   const groups = extra && extra.length ? [...PALETTE_GROUPS, { group: "Custom", items: extra }] : PALETTE_GROUPS;
   const q = query.trim().toLowerCase();
   const matches = (it) => !q || it.label.toLowerCase().includes(q) || it.type.toLowerCase().includes(q);
-  return /* @__PURE__ */ jsxs5("div", { className: "lf-palette", "aria-label": "Field palette", children: [
-    /* @__PURE__ */ jsxs5("h4", { children: [
+  return /* @__PURE__ */ jsxs8("div", { className: "lf-palette", "aria-label": "Field palette", children: [
+    /* @__PURE__ */ jsxs8("h4", { children: [
       "Add field",
       intoContainer ? ` \u2192 into ${labelOf(sel)}` : ""
     ] }),
-    /* @__PURE__ */ jsxs5("div", { className: "lf-palette-search-wrap", children: [
-      /* @__PURE__ */ jsxs5("svg", { className: "lf-palette-search-icon", viewBox: "0 0 24 24", width: "15", height: "15", "aria-hidden": "true", focusable: "false", children: [
-        /* @__PURE__ */ jsx5("circle", { cx: "11", cy: "11", r: "7", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
-        /* @__PURE__ */ jsx5("line", { x1: "16.5", y1: "16.5", x2: "21", y2: "21", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
+    /* @__PURE__ */ jsxs8("div", { className: "lf-palette-search-wrap", children: [
+      /* @__PURE__ */ jsxs8("svg", { className: "lf-palette-search-icon", viewBox: "0 0 24 24", width: "15", height: "15", "aria-hidden": "true", focusable: "false", children: [
+        /* @__PURE__ */ jsx8("circle", { cx: "11", cy: "11", r: "7", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
+        /* @__PURE__ */ jsx8("line", { x1: "16.5", y1: "16.5", x2: "21", y2: "21", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
       ] }),
-      /* @__PURE__ */ jsx5(
+      /* @__PURE__ */ jsx8(
         "input",
         {
           type: "text",
@@ -1667,14 +1687,14 @@ function Palette({ builder, extra }) {
           onChange: (e) => setQuery(e.target.value)
         }
       ),
-      query && /* @__PURE__ */ jsx5("button", { type: "button", className: "lf-palette-search-clear", "aria-label": "Clear search", onClick: () => setQuery(""), children: /* @__PURE__ */ jsx5(IconX, { size: 13 }) })
+      query && /* @__PURE__ */ jsx8("button", { type: "button", className: "lf-palette-search-clear", "aria-label": "Clear search", onClick: () => setQuery(""), children: /* @__PURE__ */ jsx8(IconX, { size: 13 }) })
     ] }),
     groups.map(({ group, items }) => {
       const visible = items.filter(matches);
       if (visible.length === 0) return null;
-      return /* @__PURE__ */ jsxs5("div", { className: "lf-palette-group", children: [
-        /* @__PURE__ */ jsx5("h5", { className: "lf-palette-group-title", children: group }),
-        visible.map((p) => /* @__PURE__ */ jsxs5(
+      return /* @__PURE__ */ jsxs8("div", { className: "lf-palette-group", children: [
+        /* @__PURE__ */ jsx8("h5", { className: "lf-palette-group-title", children: group }),
+        visible.map((p) => /* @__PURE__ */ jsxs8(
           "button",
           {
             type: "button",
@@ -1688,8 +1708,8 @@ function Palette({ builder, extra }) {
             onDragEnd: dnd.end,
             onClick: () => builder.addField(p.type, { label: p.label, ...p.defaults ?? {} }, intoContainer ? { parentId: intoContainer } : void 0),
             children: [
-              /* @__PURE__ */ jsx5("span", { className: "lf-palette-item-icon", "aria-hidden": "true", children: paletteIcon(p.type) }),
-              /* @__PURE__ */ jsx5("span", { className: "lf-palette-item-label", children: p.label })
+              /* @__PURE__ */ jsx8("span", { className: "lf-palette-item-icon", "aria-hidden": "true", children: paletteIcon(p.type) }),
+              /* @__PURE__ */ jsx8("span", { className: "lf-palette-item-label", children: p.label })
             ]
           },
           `${p.type}:${p.label}`
@@ -1698,15 +1718,19 @@ function Palette({ builder, extra }) {
     })
   ] });
 }
+
+// src/Canvas.tsx
+import { Fragment as Fragment6, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
+var REGISTRY5 = createDefaultFieldTypeRegistry5();
 function CanvasDndProvider({ builder, children }) {
   const dnd = useCanvasDnd(builder);
-  return /* @__PURE__ */ jsx5(DndContext.Provider, { value: dnd, children });
+  return /* @__PURE__ */ jsx9(DndContext.Provider, { value: dnd, children });
 }
 function Canvas({ builder }) {
   const { schema } = builder;
   const dnd = useDnd();
-  return /* @__PURE__ */ jsx5("div", { className: "lf-canvas", "aria-label": "Form canvas", children: schema.root.length === 0 ? /* @__PURE__ */ jsx5(RootDropzone, { empty: true }) : /* @__PURE__ */ jsxs5(Fragment4, { children: [
-    dnd.dragging && /* @__PURE__ */ jsx5(
+  return /* @__PURE__ */ jsx9("div", { className: "lf-canvas", "aria-label": "Form canvas", children: schema.root.length === 0 ? /* @__PURE__ */ jsx9(RootDropzone, { empty: true }) : /* @__PURE__ */ jsxs9(Fragment6, { children: [
+    dnd.dragging && /* @__PURE__ */ jsx9(
       "div",
       {
         className: `lf-dropzone lf-dropzone--edge${dnd.overEmpty === ROOT ? " is-over" : ""}`,
@@ -1717,7 +1741,7 @@ function Canvas({ builder }) {
         children: "Insert at the top"
       }
     ),
-    /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx5(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
+    /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx9(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
   ] }) });
 }
 function Node({
@@ -1733,13 +1757,13 @@ function Node({
   if (!entity) return null;
   const selected = builder.selectedId === id;
   const children = entity.children ?? [];
-  const isContainer = Boolean(REGISTRY4.get(entity.type)?.isContainer);
+  const isContainer = Boolean(REGISTRY5.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
   const childCols = (entity.type === "columns" || entity.type === "table") && children.length > 1 ? Math.min(6, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
-  return /* @__PURE__ */ jsxs5("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
-    over === "before" && /* @__PURE__ */ jsx5(DropIndicator, { pos: "before" }),
-    /* @__PURE__ */ jsxs5(
+  return /* @__PURE__ */ jsxs9("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
+    over === "before" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "before" }),
+    /* @__PURE__ */ jsxs9(
       "div",
       {
         className: `lf-node-row${selected ? " is-selected" : ""}${over === "into" ? " is-drop-into" : ""}${hidden ? " is-hidden" : ""}`,
@@ -1748,7 +1772,7 @@ function Node({
         onDragLeave: dnd.leave,
         onDrop: (e) => dnd.dropNode(e, id, parentId, index, isContainer),
         children: [
-          /* @__PURE__ */ jsx5(
+          /* @__PURE__ */ jsx9(
             "span",
             {
               className: "lf-node-grip",
@@ -1763,37 +1787,37 @@ function Node({
               children: "\u283F"
             }
           ),
-          /* @__PURE__ */ jsxs5("div", { className: "lf-node-body", onClick: () => builder.select(id), children: [
-            /* @__PURE__ */ jsxs5("button", { type: "button", className: "lf-node-select", "aria-pressed": selected, "aria-label": `Edit ${labelOf(entity)}`, onClick: () => builder.select(id), children: [
-              isContainer && /* @__PURE__ */ jsx5("span", { className: "lf-node-label", children: labelOf(entity) }),
-              /* @__PURE__ */ jsx5("span", { className: "lf-node-type", children: entity.type }),
-              hidden && /* @__PURE__ */ jsx5("span", { className: "lf-node-badge", children: "Hidden" })
+          /* @__PURE__ */ jsxs9("div", { className: "lf-node-body", onClick: () => builder.select(id), children: [
+            /* @__PURE__ */ jsxs9("button", { type: "button", className: "lf-node-select", "aria-pressed": selected, "aria-label": `Edit ${labelOf(entity)}`, onClick: () => builder.select(id), children: [
+              isContainer && /* @__PURE__ */ jsx9("span", { className: "lf-node-label", children: labelOf(entity) }),
+              /* @__PURE__ */ jsx9("span", { className: "lf-node-type", children: entity.type }),
+              hidden && /* @__PURE__ */ jsx9("span", { className: "lf-node-badge", children: "Hidden" })
             ] }),
-            !isContainer && /* @__PURE__ */ jsx5("div", { className: "lf-node-preview", "aria-hidden": "true", children: /* @__PURE__ */ jsx5(NodePreview, { entity }) })
+            !isContainer && /* @__PURE__ */ jsx9("div", { className: "lf-node-preview", "aria-hidden": "true", children: /* @__PURE__ */ jsx9(NodePreview, { entity }) })
           ] }),
-          /* @__PURE__ */ jsxs5("span", { className: "lf-node-actions", children: [
-            /* @__PURE__ */ jsx5("button", { type: "button", "aria-label": `Move ${labelOf(entity)} up`, disabled: index === 0, onClick: () => builder.reorderField(parentId, index, index - 1), children: "\u2191" }),
-            /* @__PURE__ */ jsx5("button", { type: "button", "aria-label": `Move ${labelOf(entity)} down`, disabled: index === count - 1, onClick: () => builder.reorderField(parentId, index, index + 1), children: "\u2193" }),
-            /* @__PURE__ */ jsx5("button", { type: "button", "aria-label": `Duplicate ${labelOf(entity)}`, onClick: () => builder.duplicateField(id), children: "\u29C9" }),
-            /* @__PURE__ */ jsx5("button", { type: "button", "aria-label": `Delete ${labelOf(entity)}`, onClick: () => builder.removeField(id), children: /* @__PURE__ */ jsx5(IconX, { size: 13 }) })
+          /* @__PURE__ */ jsxs9("span", { className: "lf-node-actions", children: [
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Move ${labelOf(entity)} up`, disabled: index === 0, onClick: () => builder.reorderField(parentId, index, index - 1), children: "\u2191" }),
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Move ${labelOf(entity)} down`, disabled: index === count - 1, onClick: () => builder.reorderField(parentId, index, index + 1), children: "\u2193" }),
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Duplicate ${labelOf(entity)}`, onClick: () => builder.duplicateField(id), children: "\u29C9" }),
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Delete ${labelOf(entity)}`, onClick: () => builder.removeField(id), children: /* @__PURE__ */ jsx9(IconX, { size: 13 }) })
           ] })
         ]
       }
     ),
-    isContainer && /* @__PURE__ */ jsxs5("div", { className: "lf-node-children", children: [
-      children.length > 0 && /* @__PURE__ */ jsx5("ol", { className: "lf-node-list", "data-cols": childCols || void 0, style: childCols ? { display: "grid", gridTemplateColumns: `repeat(${childCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0, children: children.map((cid, i) => /* @__PURE__ */ jsx5(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
-      /* @__PURE__ */ jsx5(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
+    isContainer && /* @__PURE__ */ jsxs9("div", { className: "lf-node-children", children: [
+      children.length > 0 && /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", "data-cols": childCols || void 0, style: childCols ? { display: "grid", gridTemplateColumns: `repeat(${childCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0, children: children.map((cid, i) => /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
+      /* @__PURE__ */ jsx9(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
     ] }),
-    over === "after" && /* @__PURE__ */ jsx5(DropIndicator, { pos: "after" })
+    over === "after" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "after" })
   ] });
 }
 function DropIndicator({ pos }) {
-  return /* @__PURE__ */ jsx5("div", { className: `lf-drop-indicator is-${pos}`, "aria-hidden": "true", children: /* @__PURE__ */ jsx5("span", { className: "lf-drop-dot" }) });
+  return /* @__PURE__ */ jsx9("div", { className: `lf-drop-indicator is-${pos}`, "aria-hidden": "true", children: /* @__PURE__ */ jsx9("span", { className: "lf-drop-dot" }) });
 }
 function ContainerDropzone({ containerId, label, compact, index }) {
   const dnd = useDnd();
   const active = dnd.overEmpty === containerId;
-  return /* @__PURE__ */ jsx5(
+  return /* @__PURE__ */ jsx9(
     "div",
     {
       className: `lf-dropzone${compact ? " lf-dropzone--compact" : ""}${active ? " is-over" : ""}`,
@@ -1808,7 +1832,7 @@ function ContainerDropzone({ containerId, label, compact, index }) {
 function RootDropzone({ empty }) {
   const dnd = useDnd();
   const active = dnd.overEmpty === ROOT;
-  return /* @__PURE__ */ jsx5(
+  return /* @__PURE__ */ jsx9(
     "div",
     {
       className: `lf-dropzone${active ? " is-over" : ""}`,
@@ -1828,10 +1852,10 @@ function useDnd() {
   return ctx;
 }
 function useCanvasDnd(builder) {
-  const source = useRef3(null);
-  const [over, setOver] = useState3(null);
-  const [overEmpty, setOverEmpty] = useState3(null);
-  const [dragging, setDragging] = useState3(false);
+  const source = useRef4(null);
+  const [over, setOver] = useState7(null);
+  const [overEmpty, setOverEmpty] = useState7(null);
+  const [dragging, setDragging] = useState7(false);
   const begin = (src) => {
     source.current = src;
     setDragging(true);
@@ -1934,65 +1958,20 @@ function labelOf(e) {
   return typeof k === "string" && k ? k : e.id;
 }
 
-// src/FormBuilder.tsx
-import { Fragment as Fragment5, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
-var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
-  const b = useFormBuilder(initialSchema);
-  useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
-  const [showPreview, setShowPreview] = useState4(false);
-  const [toast, setToast] = useState4(null);
-  const editors = useMemo3(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
-  const modal = settings === "modal";
-  useEffect2(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2600);
-    return () => clearTimeout(t);
-  }, [toast]);
-  const onChangeRef = useRef4(onChange);
-  onChangeRef.current = onChange;
-  const mounted = useRef4(false);
-  useEffect2(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
-    onChangeRef.current?.(b.schema);
-  }, [b.schema]);
-  return /* @__PURE__ */ jsxs6("div", { className: `lf-builder ${className ?? ""}`, children: [
-    /* @__PURE__ */ jsxs6("div", { className: "lf-builder-toolbar", children: [
-      /* @__PURE__ */ jsx6("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", children: "Undo" }),
-      /* @__PURE__ */ jsx6("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", children: "Redo" }),
-      /* @__PURE__ */ jsx6("button", { type: "button", onClick: () => setShowPreview(true), children: "Preview" }),
-      /* @__PURE__ */ jsx6(ProblemsBadge, { builder: b })
-    ] }),
-    /* @__PURE__ */ jsxs6(CanvasDndProvider, { builder: b, children: [
-      /* @__PURE__ */ jsxs6("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
-        /* @__PURE__ */ jsx6(Palette, { builder: b, extra: extraFields }),
-        /* @__PURE__ */ jsx6(Canvas, { builder: b }),
-        modal ? aside && /* @__PURE__ */ jsx6("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx6(SettingsPanel, { builder: b, editors })
-      ] }),
-      modal && /* @__PURE__ */ jsx6(SettingsModal, { builder: b, editors, notify: setToast })
-    ] }),
-    showPreview && /* @__PURE__ */ jsx6(PreviewModal, { schema: b.schema, onClose: () => setShowPreview(false), notify: setToast }),
-    /* @__PURE__ */ jsx6(Problems, { builder: b }),
-    toast && createPortal(
-      /* @__PURE__ */ jsxs6("div", { className: "lf-toast lf-builder", role: "status", children: [
-        /* @__PURE__ */ jsx6("span", { className: "lf-toast-tick", "aria-hidden": "true", children: /* @__PURE__ */ jsx6(IconCheck, {}) }),
-        " ",
-        toast
-      ] }),
-      document.body
-    )
-  ] });
-});
+// src/builder/PreviewModal.tsx
+import { useMemo as useMemo3, useState as useState8, useEffect as useEffect5, useRef as useRef5 } from "react";
+import { createPortal } from "react-dom";
+import { createRoot } from "react-dom/client";
+import { FormRenderer } from "@lukeflow/form-react";
+import { Fragment as Fragment7, jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
 function PreviewModal({ schema, onClose, notify }) {
-  const [view, setView] = useState4("form");
-  const [copied, setCopied] = useState4(false);
-  const [submitResult, setSubmitResult] = useState4(null);
-  const dialogRef = useRef4(null);
-  const copyTimer = useRef4(null);
+  const [view, setView] = useState8("form");
+  const [copied, setCopied] = useState8(false);
+  const [submitResult, setSubmitResult] = useState8(null);
+  const dialogRef = useRef5(null);
+  const copyTimer = useRef5(null);
   const json = useMemo3(() => JSON.stringify(schema, null, 2), [schema]);
-  useEffect2(() => {
+  useEffect5(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -2019,21 +1998,21 @@ function PreviewModal({ schema, onClose, notify }) {
     if (!openPreviewWindow(schema)) notify("Pop-up blocked \u2014 allow pop-ups to open the preview in a new tab.");
   };
   return createPortal(
-    /* @__PURE__ */ jsx6("div", { className: "lf-modal-overlay lf-builder", onMouseDown: (e) => e.target === e.currentTarget && onClose(), children: /* @__PURE__ */ jsxs6("div", { ref: dialogRef, className: "lf-modal lf-preview-modal", role: "dialog", "aria-modal": "true", "aria-label": "Form preview", tabIndex: -1, children: [
-      /* @__PURE__ */ jsxs6("div", { className: "lf-modal-header", children: [
-        /* @__PURE__ */ jsx6("span", { className: "lf-modal-title", children: "Preview" }),
-        /* @__PURE__ */ jsxs6("div", { className: "lf-modal-actions", children: [
-          /* @__PURE__ */ jsxs6("div", { className: "lf-seg", role: "tablist", "aria-label": "Preview mode", children: [
-            /* @__PURE__ */ jsx6("button", { type: "button", role: "tab", "aria-selected": view === "form", className: `lf-seg-btn${view === "form" ? " is-active" : ""}`, onClick: () => setView("form"), children: "Form" }),
-            /* @__PURE__ */ jsx6("button", { type: "button", role: "tab", "aria-selected": view === "json", className: `lf-seg-btn${view === "json" ? " is-active" : ""}`, onClick: () => setView("json"), children: "JSON" })
+    /* @__PURE__ */ jsx10("div", { className: "lf-modal-overlay lf-builder", onMouseDown: (e) => e.target === e.currentTarget && onClose(), children: /* @__PURE__ */ jsxs10("div", { ref: dialogRef, className: "lf-modal lf-preview-modal", role: "dialog", "aria-modal": "true", "aria-label": "Form preview", tabIndex: -1, children: [
+      /* @__PURE__ */ jsxs10("div", { className: "lf-modal-header", children: [
+        /* @__PURE__ */ jsx10("span", { className: "lf-modal-title", children: "Preview" }),
+        /* @__PURE__ */ jsxs10("div", { className: "lf-modal-actions", children: [
+          /* @__PURE__ */ jsxs10("div", { className: "lf-seg", role: "tablist", "aria-label": "Preview mode", children: [
+            /* @__PURE__ */ jsx10("button", { type: "button", role: "tab", "aria-selected": view === "form", className: `lf-seg-btn${view === "form" ? " is-active" : ""}`, onClick: () => setView("form"), children: "Form" }),
+            /* @__PURE__ */ jsx10("button", { type: "button", role: "tab", "aria-selected": view === "json", className: `lf-seg-btn${view === "json" ? " is-active" : ""}`, onClick: () => setView("json"), children: "JSON" })
           ] }),
-          view === "json" && /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-modal-ghost", onClick: copyJson, children: copied ? "Copied \u2713" : "Copy" }),
-          /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-modal-ghost", onClick: openInNewTab, children: "Open in new tab \u2197" }),
-          /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close preview", title: "Close", onClick: onClose, children: "\u2715" })
+          view === "json" && /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-modal-ghost", onClick: copyJson, children: copied ? "Copied \u2713" : "Copy" }),
+          /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-modal-ghost", onClick: openInNewTab, children: "Open in new tab \u2197" }),
+          /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close preview", title: "Close", onClick: onClose, children: "\u2715" })
         ] })
       ] }),
-      /* @__PURE__ */ jsx6("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ jsxs6(Fragment5, { children: [
-        /* @__PURE__ */ jsx6("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx6(
+      /* @__PURE__ */ jsx10("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ jsxs10(Fragment7, { children: [
+        /* @__PURE__ */ jsx10("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx10(
           FormRenderer,
           {
             schema,
@@ -2041,21 +2020,21 @@ function PreviewModal({ schema, onClose, notify }) {
             onSubmit: (data2) => setSubmitResult({ ok: true, data: data2 })
           }
         ) }),
-        submitResult && (submitResult.ok ? /* @__PURE__ */ jsxs6("div", { className: "lf-preview-result is-ok", role: "status", "data-testid": "preview-result", children: [
-          /* @__PURE__ */ jsx6("strong", { children: "\u2713 Valid \u2014 submission payload" }),
-          /* @__PURE__ */ jsx6("pre", { className: "lf-json", children: JSON.stringify(submitResult.data ?? {}, null, 2) })
-        ] }) : /* @__PURE__ */ jsxs6("div", { className: "lf-preview-result is-error", role: "status", "data-testid": "preview-result", children: [
-          /* @__PURE__ */ jsxs6("strong", { children: [
+        submitResult && (submitResult.ok ? /* @__PURE__ */ jsxs10("div", { className: "lf-preview-result is-ok", role: "status", "data-testid": "preview-result", children: [
+          /* @__PURE__ */ jsx10("strong", { children: "\u2713 Valid \u2014 submission payload" }),
+          /* @__PURE__ */ jsx10("pre", { className: "lf-json", children: JSON.stringify(submitResult.data ?? {}, null, 2) })
+        ] }) : /* @__PURE__ */ jsxs10("div", { className: "lf-preview-result is-error", role: "status", "data-testid": "preview-result", children: [
+          /* @__PURE__ */ jsxs10("strong", { children: [
             "\u2715 ",
             submitResult.errorKeys?.length ?? 0,
             " field(s) need attention"
           ] }),
-          submitResult.errorKeys && submitResult.errorKeys.length > 0 && /* @__PURE__ */ jsxs6("span", { className: "lf-preview-result-keys", children: [
+          submitResult.errorKeys && submitResult.errorKeys.length > 0 && /* @__PURE__ */ jsxs10("span", { className: "lf-preview-result-keys", children: [
             " \u2014 ",
             submitResult.errorKeys.join(", ")
           ] })
         ] }))
-      ] }) : /* @__PURE__ */ jsx6("pre", { className: "lf-json", "data-testid": "preview-json", children: json }) })
+      ] }) : /* @__PURE__ */ jsx10("pre", { className: "lf-json", "data-testid": "preview-json", children: json }) })
     ] }) }),
     document.body
   );
@@ -2086,7 +2065,7 @@ function openPreviewWindow(schema) {
   });
   doc.body.appendChild(mount);
   const root = createRoot(mount);
-  root.render(/* @__PURE__ */ jsx6(FormRenderer, { schema }));
+  root.render(/* @__PURE__ */ jsx10(FormRenderer, { schema }));
   const teardown = () => {
     try {
       root.unmount();
@@ -2101,16 +2080,21 @@ function openPreviewWindow(schema) {
   window.addEventListener("beforeunload", onOpenerUnload);
   return true;
 }
+
+// src/builder/SettingsModal.tsx
+import { useState as useState9, useEffect as useEffect6, useRef as useRef6 } from "react";
+import { createPortal as createPortal2 } from "react-dom";
+import { Fragment as Fragment8, jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
 function SettingsModal({ builder, editors, notify }) {
   const id = builder.selectedId;
   const entity = id ? builder.schema.entities[id] : void 0;
   const open = Boolean(id && entity);
-  const dialogRef = useRef4(null);
+  const dialogRef = useRef6(null);
   const select = builder.select;
-  const snapshot = useRef4(null);
+  const snapshot = useRef6(null);
   const schema = builder.schema;
-  const [confirmDiscard, setConfirmDiscard] = useState4(false);
-  const openedKey = useRef4(null);
+  const [confirmDiscard, setConfirmDiscard] = useState9(false);
+  const openedKey = useRef6(null);
   const key = open ? id : null;
   if (key !== openedKey.current) {
     openedKey.current = key;
@@ -2128,9 +2112,9 @@ function SettingsModal({ builder, editors, notify }) {
     setConfirmDiscard(false);
     select(null);
   };
-  const latest = useRef4({ saveClose, confirmDiscard });
+  const latest = useRef6({ saveClose, confirmDiscard });
   latest.current = { saveClose, confirmDiscard };
-  useEffect2(() => {
+  useEffect6(() => {
     if (!open) return;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
@@ -2140,12 +2124,12 @@ function SettingsModal({ builder, editors, notify }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
-  useEffect2(() => {
+  useEffect6(() => {
     if (open) dialogRef.current?.focus();
   }, [open, id]);
   if (!open) return null;
-  return createPortal(
-    /* @__PURE__ */ jsx6(
+  return createPortal2(
+    /* @__PURE__ */ jsx11(
       "div",
       {
         className: "lf-modal-overlay lf-builder",
@@ -2154,23 +2138,23 @@ function SettingsModal({ builder, editors, notify }) {
           if (confirmDiscard) return;
           saveClose();
         },
-        children: /* @__PURE__ */ jsxs6("div", { ref: dialogRef, className: "lf-modal", role: "dialog", "aria-modal": "true", "aria-label": "Field settings", tabIndex: -1, children: [
-          /* @__PURE__ */ jsxs6("div", { className: "lf-modal-header", children: [
-            /* @__PURE__ */ jsxs6("span", { className: "lf-modal-title", children: [
+        children: /* @__PURE__ */ jsxs11("div", { ref: dialogRef, className: "lf-modal", role: "dialog", "aria-modal": "true", "aria-label": "Field settings", tabIndex: -1, children: [
+          /* @__PURE__ */ jsxs11("div", { className: "lf-modal-header", children: [
+            /* @__PURE__ */ jsxs11("span", { className: "lf-modal-title", children: [
               "Field settings",
-              dirty ? /* @__PURE__ */ jsx6("span", { className: "lf-modal-dirty", children: " \u2022 Unsaved changes" }) : null
+              dirty ? /* @__PURE__ */ jsx11("span", { className: "lf-modal-dirty", children: " \u2022 Unsaved changes" }) : null
             ] }),
-            /* @__PURE__ */ jsx6("div", { className: "lf-modal-actions", children: dirty ? /* @__PURE__ */ jsxs6(Fragment5, { children: [
-              /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--discard", "aria-label": "Discard & close", title: "Discard & close", onClick: () => setConfirmDiscard(true), children: /* @__PURE__ */ jsx6(IconX, {}) }),
-              /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--save", "aria-label": "Save & close", title: "Save & close", onClick: () => saveClose(true), children: /* @__PURE__ */ jsx6(IconCheck, {}) })
-            ] }) : /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close", title: "Close", onClick: close, children: /* @__PURE__ */ jsx6(IconX, {}) }) })
+            /* @__PURE__ */ jsx11("div", { className: "lf-modal-actions", children: dirty ? /* @__PURE__ */ jsxs11(Fragment8, { children: [
+              /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-iconbtn lf-iconbtn--discard", "aria-label": "Discard & close", title: "Discard & close", onClick: () => setConfirmDiscard(true), children: /* @__PURE__ */ jsx11(IconX, {}) }),
+              /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-iconbtn lf-iconbtn--save", "aria-label": "Save & close", title: "Save & close", onClick: () => saveClose(true), children: /* @__PURE__ */ jsx11(IconCheck, {}) })
+            ] }) : /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close", title: "Close", onClick: close, children: /* @__PURE__ */ jsx11(IconX, {}) }) })
           ] }),
-          /* @__PURE__ */ jsx6("div", { className: "lf-modal-body", children: /* @__PURE__ */ jsx6(SettingsPanel, { builder, editors }) }),
-          confirmDiscard && /* @__PURE__ */ jsx6("div", { className: "lf-confirm-overlay", onMouseDown: (e) => e.target === e.currentTarget && setConfirmDiscard(false), children: /* @__PURE__ */ jsxs6("div", { className: "lf-confirm", role: "alertdialog", "aria-modal": "true", "aria-label": "Discard changes?", children: [
-            /* @__PURE__ */ jsx6("p", { className: "lf-confirm-msg", children: "Are you sure? All your changes for this field will be lost." }),
-            /* @__PURE__ */ jsxs6("div", { className: "lf-confirm-actions", children: [
-              /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-confirm-no", onClick: () => setConfirmDiscard(false), children: "No" }),
-              /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-confirm-yes", onClick: doDiscard, children: "Yes, discard" })
+          /* @__PURE__ */ jsx11("div", { className: "lf-modal-body", children: /* @__PURE__ */ jsx11(SettingsPanel, { builder, editors }) }),
+          confirmDiscard && /* @__PURE__ */ jsx11("div", { className: "lf-confirm-overlay", onMouseDown: (e) => e.target === e.currentTarget && setConfirmDiscard(false), children: /* @__PURE__ */ jsxs11("div", { className: "lf-confirm", role: "alertdialog", "aria-modal": "true", "aria-label": "Discard changes?", children: [
+            /* @__PURE__ */ jsx11("p", { className: "lf-confirm-msg", children: "Are you sure? All your changes for this field will be lost." }),
+            /* @__PURE__ */ jsxs11("div", { className: "lf-confirm-actions", children: [
+              /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-confirm-no", onClick: () => setConfirmDiscard(false), children: "No" }),
+              /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-confirm-yes", onClick: doDiscard, children: "Yes, discard" })
             ] })
           ] }) })
         ] })
@@ -2179,10 +2163,13 @@ function SettingsModal({ builder, editors, notify }) {
     document.body
   );
 }
+
+// src/builder/Problems.tsx
+import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
 function ProblemsBadge({ builder }) {
   const n = builder.problems.length;
-  if (n === 0) return /* @__PURE__ */ jsx6("span", { className: "lf-problems-badge is-ok", children: "No problems" });
-  return /* @__PURE__ */ jsxs6("span", { className: `lf-problems-badge${builder.hasErrors ? " is-error" : " is-warning"}`, children: [
+  if (n === 0) return /* @__PURE__ */ jsx12("span", { className: "lf-problems-badge is-ok", children: "No problems" });
+  return /* @__PURE__ */ jsxs12("span", { className: `lf-problems-badge${builder.hasErrors ? " is-error" : " is-warning"}`, children: [
     n,
     " problem",
     n === 1 ? "" : "s"
@@ -2190,12 +2177,64 @@ function ProblemsBadge({ builder }) {
 }
 function Problems({ builder }) {
   if (builder.problems.length === 0) return null;
-  return /* @__PURE__ */ jsx6("div", { className: "lf-problems", role: "region", "aria-label": "Problems", children: /* @__PURE__ */ jsx6("ul", { children: builder.problems.map((d, i) => /* @__PURE__ */ jsx6("li", { className: `lf-problem is-${d.severity}`, children: /* @__PURE__ */ jsxs6("button", { type: "button", disabled: !d.entityId, onClick: () => d.entityId && builder.select(d.entityId), children: [
-    /* @__PURE__ */ jsx6("span", { className: "lf-problem-code", children: d.code }),
+  return /* @__PURE__ */ jsx12("div", { className: "lf-problems", role: "region", "aria-label": "Problems", children: /* @__PURE__ */ jsx12("ul", { children: builder.problems.map((d, i) => /* @__PURE__ */ jsx12("li", { className: `lf-problem is-${d.severity}`, children: /* @__PURE__ */ jsxs12("button", { type: "button", disabled: !d.entityId, onClick: () => d.entityId && builder.select(d.entityId), children: [
+    /* @__PURE__ */ jsx12("span", { className: "lf-problem-code", children: d.code }),
     " ",
     d.message
   ] }) }, i)) }) });
 }
+
+// src/FormBuilder.tsx
+import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
+var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
+  const b = useFormBuilder(initialSchema);
+  useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
+  const [showPreview, setShowPreview] = useState10(false);
+  const [toast, setToast] = useState10(null);
+  const editors = useMemo4(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
+  const modal = settings === "modal";
+  useEffect7(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const onChangeRef = useRef7(onChange);
+  onChangeRef.current = onChange;
+  const mounted = useRef7(false);
+  useEffect7(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    onChangeRef.current?.(b.schema);
+  }, [b.schema]);
+  return /* @__PURE__ */ jsxs13("div", { className: `lf-builder ${className ?? ""}`, children: [
+    /* @__PURE__ */ jsxs13("div", { className: "lf-builder-toolbar", children: [
+      /* @__PURE__ */ jsx13("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", children: "Undo" }),
+      /* @__PURE__ */ jsx13("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", children: "Redo" }),
+      /* @__PURE__ */ jsx13("button", { type: "button", onClick: () => setShowPreview(true), children: "Preview" }),
+      /* @__PURE__ */ jsx13(ProblemsBadge, { builder: b })
+    ] }),
+    /* @__PURE__ */ jsxs13(CanvasDndProvider, { builder: b, children: [
+      /* @__PURE__ */ jsxs13("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
+        /* @__PURE__ */ jsx13(Palette, { builder: b, extra: extraFields }),
+        /* @__PURE__ */ jsx13(Canvas, { builder: b }),
+        modal ? aside && /* @__PURE__ */ jsx13("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx13(SettingsPanel, { builder: b, editors })
+      ] }),
+      modal && /* @__PURE__ */ jsx13(SettingsModal, { builder: b, editors, notify: setToast })
+    ] }),
+    showPreview && /* @__PURE__ */ jsx13(PreviewModal, { schema: b.schema, onClose: () => setShowPreview(false), notify: setToast }),
+    /* @__PURE__ */ jsx13(Problems, { builder: b }),
+    toast && createPortal3(
+      /* @__PURE__ */ jsxs13("div", { className: "lf-toast lf-builder", role: "status", children: [
+        /* @__PURE__ */ jsx13("span", { className: "lf-toast-tick", "aria-hidden": "true", children: /* @__PURE__ */ jsx13(IconCheck, {}) }),
+        " ",
+        toast
+      ] }),
+      document.body
+    )
+  ] });
+});
 
 // src/index.ts
 var VERSION = "0.1.0-alpha.0";

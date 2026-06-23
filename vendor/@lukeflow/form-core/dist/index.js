@@ -918,7 +918,7 @@ function evaluateVisibility(attributes, scope, opts = {}) {
   return true;
 }
 
-// src/engine/dependencyGraph.ts
+// src/engine/dependencyExtraction.ts
 var SELF_VALUE_IDENT = "value";
 function asExpr(value) {
   return typeof value === "string" && value.trim() ? value : void 0;
@@ -956,6 +956,85 @@ function* entityExpressions(e) {
     yield { source: "conditional.when", expr: literal.when, literalKey: true };
   }
 }
+
+// src/engine/dependencyTopoSort.ts
+function topoSort(keys, outAdj, inAdj, byRank) {
+  const indeg = /* @__PURE__ */ new Map();
+  for (const k of keys) indeg.set(k, inAdj.get(k).length);
+  const order = [];
+  const emitted = /* @__PURE__ */ new Set();
+  const cycles = [];
+  const reportedCycleNodes = /* @__PURE__ */ new Set();
+  const remaining = () => keys.filter((k) => !emitted.has(k));
+  const emit = (k) => {
+    order.push(k);
+    emitted.add(k);
+    for (const to of outAdj.get(k)) {
+      if (!emitted.has(to)) indeg.set(to, (indeg.get(to) ?? 0) - 1);
+    }
+  };
+  while (emitted.size < keys.length) {
+    const ready = remaining().filter((k) => (indeg.get(k) ?? 0) <= 0).sort(byRank);
+    if (ready.length > 0) {
+      emit(ready[0]);
+      continue;
+    }
+    const stuck = remaining();
+    const cycle = findCycle(stuck, outAdj, byRank);
+    if (cycle) {
+      const nodeKey = [...new Set(cycle)].sort().join("|");
+      if (!reportedCycleNodes.has(nodeKey)) {
+        reportedCycleNodes.add(nodeKey);
+        cycles.push({ path: cycle });
+      }
+      const breakAt = [...new Set(cycle)].sort(byRank)[0];
+      emit(breakAt);
+    } else {
+      emit([...stuck].sort(byRank)[0]);
+    }
+  }
+  return { order, cycles };
+}
+function findCycle(nodes, outAdj, byRank) {
+  const inSet = new Set(nodes);
+  const stack = [];
+  const onStack = /* @__PURE__ */ new Set();
+  const visited = /* @__PURE__ */ new Set();
+  const starts = [...nodes].sort(byRank);
+  const dfs = (node) => {
+    stack.push(node);
+    onStack.add(node);
+    visited.add(node);
+    for (const next of outAdj.get(node)) {
+      if (!inSet.has(next)) continue;
+      if (onStack.has(next)) {
+        const idx = stack.indexOf(next);
+        return [...stack.slice(idx), next];
+      }
+      if (!visited.has(next)) {
+        const found = dfs(next);
+        if (found) return found;
+      }
+    }
+    stack.pop();
+    onStack.delete(node);
+    return null;
+  };
+  for (const start of starts) {
+    if (!visited.has(start)) {
+      const found = dfs(start);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+function freezeAdj(adj) {
+  const out = /* @__PURE__ */ new Map();
+  for (const [k, v] of adj) out.set(k, [...v]);
+  return out;
+}
+
+// src/engine/dependencyGraph.ts
 function buildDependencyGraph(schema) {
   const entities = schema?.entities ?? {};
   const treeOrder = orderedIds(schema);
@@ -1043,83 +1122,8 @@ function buildDependencyGraph(schema) {
     diagnostics
   };
 }
-function topoSort(keys, outAdj, inAdj, byRank) {
-  const indeg = /* @__PURE__ */ new Map();
-  for (const k of keys) indeg.set(k, inAdj.get(k).length);
-  const order = [];
-  const emitted = /* @__PURE__ */ new Set();
-  const cycles = [];
-  const reportedCycleNodes = /* @__PURE__ */ new Set();
-  const remaining = () => keys.filter((k) => !emitted.has(k));
-  const emit = (k) => {
-    order.push(k);
-    emitted.add(k);
-    for (const to of outAdj.get(k)) {
-      if (!emitted.has(to)) indeg.set(to, (indeg.get(to) ?? 0) - 1);
-    }
-  };
-  while (emitted.size < keys.length) {
-    const ready = remaining().filter((k) => (indeg.get(k) ?? 0) <= 0).sort(byRank);
-    if (ready.length > 0) {
-      emit(ready[0]);
-      continue;
-    }
-    const stuck = remaining();
-    const cycle = findCycle(stuck, outAdj, byRank);
-    if (cycle) {
-      const nodeKey = [...new Set(cycle)].sort().join("|");
-      if (!reportedCycleNodes.has(nodeKey)) {
-        reportedCycleNodes.add(nodeKey);
-        cycles.push({ path: cycle });
-      }
-      const breakAt = [...new Set(cycle)].sort(byRank)[0];
-      emit(breakAt);
-    } else {
-      emit([...stuck].sort(byRank)[0]);
-    }
-  }
-  return { order, cycles };
-}
-function findCycle(nodes, outAdj, byRank) {
-  const inSet = new Set(nodes);
-  const stack = [];
-  const onStack = /* @__PURE__ */ new Set();
-  const visited = /* @__PURE__ */ new Set();
-  const starts = [...nodes].sort(byRank);
-  const dfs = (node) => {
-    stack.push(node);
-    onStack.add(node);
-    visited.add(node);
-    for (const next of outAdj.get(node)) {
-      if (!inSet.has(next)) continue;
-      if (onStack.has(next)) {
-        const idx = stack.indexOf(next);
-        return [...stack.slice(idx), next];
-      }
-      if (!visited.has(next)) {
-        const found = dfs(next);
-        if (found) return found;
-      }
-    }
-    stack.pop();
-    onStack.delete(node);
-    return null;
-  };
-  for (const start of starts) {
-    if (!visited.has(start)) {
-      const found = dfs(start);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-function freezeAdj(adj) {
-  const out = /* @__PURE__ */ new Map();
-  for (const [k, v] of adj) out.set(k, [...v]);
-  return out;
-}
 
-// src/engine/evaluator.ts
+// src/engine/evaluatorTypes.ts
 var SOURCE_PRIORITY = {
   seed: 0,
   default: 1,
@@ -1133,6 +1137,159 @@ function sourcePriority(source) {
   return SOURCE_PRIORITY[source];
 }
 var DEFAULT_MAX_PASSES = 10;
+
+// src/engine/evaluatorCoercion.ts
+function coerceValue(fieldType, raw) {
+  if (!fieldType) return raw ?? "";
+  try {
+    return fieldType.coerce(raw);
+  } catch {
+    return raw ?? fieldType.empty?.() ?? "";
+  }
+}
+function emptyValue(fieldType) {
+  if (!fieldType) return "";
+  try {
+    return fieldType.empty();
+  } catch {
+    return "";
+  }
+}
+function sameValue(fieldType, a, b) {
+  if (fieldType?.compare) {
+    try {
+      return fieldType.compare(a, b);
+    } catch {
+    }
+  }
+  return defaultSameValue(a, b);
+}
+function defaultSameValue(a, b) {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((x, i) => defaultSameValue(x, b[i]));
+  }
+  if (a == null || b == null || typeof a === "object" || typeof b === "object") return false;
+  const sa = String(a);
+  const sb = String(b);
+  if (sa.trim() !== "" && sb.trim() !== "") {
+    const na = Number(a);
+    const nb = Number(b);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
+  }
+  return sa === sb;
+}
+function asExpr2(value) {
+  return typeof value === "string" && value.trim() ? value : void 0;
+}
+function asBool2(value) {
+  return Boolean(value);
+}
+function clampPasses(maxPasses) {
+  if (typeof maxPasses !== "number" || !Number.isFinite(maxPasses) || maxPasses < 1) {
+    return DEFAULT_MAX_PASSES;
+  }
+  return Math.floor(maxPasses);
+}
+
+// src/engine/evaluatorExpression.ts
+function buildScope(fields) {
+  const scope = /* @__PURE__ */ Object.create(null);
+  for (const [key, field] of fields) scope[key] = field.value;
+  return scope;
+}
+function evaluateScoped(expr, scope, entityId, via, diagnostics) {
+  if (hasHostileIdentifier(expr)) {
+    pushOnce(diagnostics, entityId, via, expr, "blocked unsafe identifier");
+    return void 0;
+  }
+  const parsed = parseExpression(expr);
+  if (!parsed.ok || parsed.expression === null) return void 0;
+  const result = evaluateCompiled(parsed.expression, scope);
+  if (result.ok) return result.value;
+  pushOnce(diagnostics, entityId, via, expr, result.error);
+  return void 0;
+}
+function pushOnce(diagnostics, entityId, via, expr, error) {
+  for (const d of diagnostics) {
+    if (d.code === "expr-runtime-error" && d.entityId === entityId && d.context.via === via && d.context.expression === expr) {
+      return;
+    }
+  }
+  diagnostics.push({
+    code: "expr-runtime-error",
+    severity: "warning",
+    entityId,
+    context: { via, expression: expr, error },
+    message: `Expression in ${via} threw at runtime (treated fail-open): ${error}`
+  });
+}
+
+// src/engine/evaluatorLogic.ts
+function evalLogic(logic, scope, entityId, diagnostics) {
+  const out = { hasSetValue: false };
+  if (!Array.isArray(logic)) return out;
+  for (const rule of logic) {
+    if (!rule || typeof rule !== "object") continue;
+    const when = asExpr2(rule.when);
+    if (when) {
+      const result = evaluateScoped(when, scope, entityId, "logic.when", diagnostics);
+      if (!result) continue;
+    }
+    switch (rule.action) {
+      case "show":
+        out.visible = true;
+        break;
+      case "hide":
+        out.visible = false;
+        break;
+      case "enable":
+        out.disabled = false;
+        break;
+      case "disable":
+        out.disabled = true;
+        break;
+      case "require":
+        out.required = true;
+        break;
+      case "optional":
+        out.required = false;
+        break;
+      case "setValue": {
+        const expr = asExpr2(rule.value);
+        out.hasSetValue = true;
+        out.value = expr ? evaluateScoped(expr, scope, entityId, "logic.value", diagnostics) : void 0;
+        break;
+      }
+    }
+  }
+  return out;
+}
+function resolveVisibility(a, logic, scope, entityId, diagnostics, allowJs, selfValue, runJs) {
+  if (logic.visible !== void 0) return logic.visible;
+  if (asBool2(a.hidden)) return false;
+  const cond = a.conditional;
+  if (cond && typeof cond === "object" && typeof cond.when === "string" && cond.when) {
+    const match = String(scope[cond.when] ?? "") === String(cond.eq ?? "");
+    const shown = cond.show === false ? !match : match;
+    if (!shown) return false;
+  }
+  const customJs = allowJs ? asExpr2(a.customConditionalJs) : void 0;
+  if (customJs) {
+    const r = runJs(customJs, scope, selfValue);
+    if (!r.ok) {
+      pushOnce(diagnostics, entityId, "customConditionalJs", customJs, r.error ?? "JS error");
+      return true;
+    }
+    return Boolean(r.show);
+  }
+  const custom = asExpr2(a.customConditional);
+  if (!custom) return true;
+  const result = evaluateScoped(custom, scope, entityId, "customConditional", diagnostics);
+  return result === void 0 ? true : Boolean(result);
+}
+
+// src/engine/evaluatorModel.ts
 function buildEvalModel(schema, graph, registry) {
   const entities = schema?.entities ?? {};
   const nodes = [];
@@ -1216,6 +1373,8 @@ function seedFields(model, values, source = "seed") {
   }
   return fields;
 }
+
+// src/engine/evaluator.ts
 function evaluate(model, fields, options = {}) {
   return settle(model, fields, model.order, options);
 }
@@ -1369,151 +1528,6 @@ function canWrite(field, incoming) {
   if (field.source !== "user") return true;
   return !field.pinned;
 }
-function evalLogic(logic, scope, entityId, diagnostics) {
-  const out = { hasSetValue: false };
-  if (!Array.isArray(logic)) return out;
-  for (const rule of logic) {
-    if (!rule || typeof rule !== "object") continue;
-    const when = asExpr2(rule.when);
-    if (when) {
-      const result = evaluateScoped(when, scope, entityId, "logic.when", diagnostics);
-      if (!result) continue;
-    }
-    switch (rule.action) {
-      case "show":
-        out.visible = true;
-        break;
-      case "hide":
-        out.visible = false;
-        break;
-      case "enable":
-        out.disabled = false;
-        break;
-      case "disable":
-        out.disabled = true;
-        break;
-      case "require":
-        out.required = true;
-        break;
-      case "optional":
-        out.required = false;
-        break;
-      case "setValue": {
-        const expr = asExpr2(rule.value);
-        out.hasSetValue = true;
-        out.value = expr ? evaluateScoped(expr, scope, entityId, "logic.value", diagnostics) : void 0;
-        break;
-      }
-    }
-  }
-  return out;
-}
-function resolveVisibility(a, logic, scope, entityId, diagnostics, allowJs, selfValue, runJs) {
-  if (logic.visible !== void 0) return logic.visible;
-  if (asBool2(a.hidden)) return false;
-  const cond = a.conditional;
-  if (cond && typeof cond === "object" && typeof cond.when === "string" && cond.when) {
-    const match = String(scope[cond.when] ?? "") === String(cond.eq ?? "");
-    const shown = cond.show === false ? !match : match;
-    if (!shown) return false;
-  }
-  const customJs = allowJs ? asExpr2(a.customConditionalJs) : void 0;
-  if (customJs) {
-    const r = runJs(customJs, scope, selfValue);
-    if (!r.ok) {
-      pushOnce(diagnostics, entityId, "customConditionalJs", customJs, r.error ?? "JS error");
-      return true;
-    }
-    return Boolean(r.show);
-  }
-  const custom = asExpr2(a.customConditional);
-  if (!custom) return true;
-  const result = evaluateScoped(custom, scope, entityId, "customConditional", diagnostics);
-  return result === void 0 ? true : Boolean(result);
-}
-function buildScope(fields) {
-  const scope = /* @__PURE__ */ Object.create(null);
-  for (const [key, field] of fields) scope[key] = field.value;
-  return scope;
-}
-function evaluateScoped(expr, scope, entityId, via, diagnostics) {
-  if (hasHostileIdentifier(expr)) {
-    pushOnce(diagnostics, entityId, via, expr, "blocked unsafe identifier");
-    return void 0;
-  }
-  const parsed = parseExpression(expr);
-  if (!parsed.ok || parsed.expression === null) return void 0;
-  const result = evaluateCompiled(parsed.expression, scope);
-  if (result.ok) return result.value;
-  pushOnce(diagnostics, entityId, via, expr, result.error);
-  return void 0;
-}
-function pushOnce(diagnostics, entityId, via, expr, error) {
-  for (const d of diagnostics) {
-    if (d.code === "expr-runtime-error" && d.entityId === entityId && d.context.via === via && d.context.expression === expr) {
-      return;
-    }
-  }
-  diagnostics.push({
-    code: "expr-runtime-error",
-    severity: "warning",
-    entityId,
-    context: { via, expression: expr, error },
-    message: `Expression in ${via} threw at runtime (treated fail-open): ${error}`
-  });
-}
-function coerceValue(fieldType, raw) {
-  if (!fieldType) return raw ?? "";
-  try {
-    return fieldType.coerce(raw);
-  } catch {
-    return raw ?? fieldType.empty?.() ?? "";
-  }
-}
-function emptyValue(fieldType) {
-  if (!fieldType) return "";
-  try {
-    return fieldType.empty();
-  } catch {
-    return "";
-  }
-}
-function sameValue(fieldType, a, b) {
-  if (fieldType?.compare) {
-    try {
-      return fieldType.compare(a, b);
-    } catch {
-    }
-  }
-  return defaultSameValue(a, b);
-}
-function defaultSameValue(a, b) {
-  if (a === b) return true;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((x, i) => defaultSameValue(x, b[i]));
-  }
-  if (a == null || b == null || typeof a === "object" || typeof b === "object") return false;
-  const sa = String(a);
-  const sb = String(b);
-  if (sa.trim() !== "" && sb.trim() !== "") {
-    const na = Number(a);
-    const nb = Number(b);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
-  }
-  return sa === sb;
-}
-function asExpr2(value) {
-  return typeof value === "string" && value.trim() ? value : void 0;
-}
-function asBool2(value) {
-  return Boolean(value);
-}
-function clampPasses(maxPasses) {
-  if (typeof maxPasses !== "number" || !Number.isFinite(maxPasses) || maxPasses < 1) {
-    return DEFAULT_MAX_PASSES;
-  }
-  return Math.floor(maxPasses);
-}
 
 // src/engine/fieldTypes.ts
 function deepSameValue(a, b) {
@@ -1641,7 +1655,7 @@ function createDefaultFieldTypeRegistry() {
 }
 var defaultFieldTypeRegistry = createDefaultFieldTypeRegistry();
 
-// src/engine/createFormEngine.ts
+// src/engine/engineHelpers.ts
 function coerceWith(fieldType, raw) {
   if (!fieldType) return raw ?? "";
   try {
@@ -1680,6 +1694,8 @@ function parseGridPath(key) {
   const m = GRID_PATH_RE.exec(key);
   return m ? { grid: m[1], row: Number(m[2]), cell: m[3] } : null;
 }
+
+// src/engine/createFormEngine.ts
 var createFormEngine = (factoryOptions = {}) => {
   let model = null;
   let fields = /* @__PURE__ */ new Map();

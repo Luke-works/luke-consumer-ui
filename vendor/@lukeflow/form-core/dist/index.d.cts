@@ -1312,38 +1312,10 @@ declare function evaluateVisibility(attributes: Record<string, unknown> | undefi
 }): boolean;
 
 /**
- * The dependency graph - the static analysis that turns a {@link FormSchema} into
- * the order in which fields must be (re)derived.
- *
- * Every field can derive its value/visibility/required-ness/validity from OTHER
- * fields, through expression-bearing attributes:
- *
- *   - `calculateValue`      - value expression.
- *   - `customConditional`   - visibility expression.
- *   - `customValidation`    - validity expression.
- *   - `customDefaultValue`  - init-value expression.
- *   - `logic[].when`        - each logic rule's gate expression.
- *   - `logic[].value`       - each `setValue` rule's value expression.
- *   - `conditional.when`    - the legacy literal "show when <when> == <eq>"
- *                             rule references a single key directly.
- *
- * For each field B we collect the field KEYS those expressions reference (via the
- * real expr-eval AST walk in {@link expressionVariables} - NOT a regex). A
- * reference from B to A's key means "B depends on A", which we record as a
- * directed edge `A -> B` (A must be settled before B). The engine then:
- *
- *   1. topologically sorts the nodes so each field is derived after its
- *      dependencies, and
- *   2. detects dependency CYCLES (including self-references) - a calc/logic loop
- *      that can't be resolved by a single sweep - reporting each as a
- *      `dependency-cycle` {@link Diagnostic} that names the offending key path.
- *
- * The result is layout-order-independent: the edges depend only on which fields
- * reference which, never on the order entities appear in the schema. Output
- * orderings are made deterministic by breaking ties in TREE order (the schema's
- * {@link orderedIds} traversal), so the same schema always yields the same plan.
- *
- * Pure, tolerant (never throws on malformed input), Coltor-/React-/DOM-free.
+ * The dependency graph's public data model: the {@link DependencySource} tag, a
+ * directed {@link DependencyEdge}, a detected {@link DependencyCycle}, and the built
+ * {@link DependencyGraph} itself. Split out of `dependencyGraph.ts`; re-exported
+ * from there so existing import paths and the package barrel stay unchanged.
  *
  * @packageDocumentation
  */
@@ -1417,6 +1389,52 @@ interface DependencyGraph {
      */
     readonly diagnostics: readonly Diagnostic[];
 }
+
+/**
+ * The dependency graph - the static analysis that turns a {@link FormSchema} into
+ * the order in which fields must be (re)derived.
+ *
+ * Every field can derive its value/visibility/required-ness/validity from OTHER
+ * fields, through expression-bearing attributes:
+ *
+ *   - `calculateValue`      - value expression.
+ *   - `customConditional`   - visibility expression.
+ *   - `customValidation`    - validity expression.
+ *   - `customDefaultValue`  - init-value expression.
+ *   - `logic[].when`        - each logic rule's gate expression.
+ *   - `logic[].value`       - each `setValue` rule's value expression.
+ *   - `conditional.when`    - the legacy literal "show when <when> == <eq>"
+ *                             rule references a single key directly.
+ *
+ * For each field B we collect the field KEYS those expressions reference (via the
+ * real expr-eval AST walk in {@link expressionVariables} - NOT a regex). A
+ * reference from B to A's key means "B depends on A", which we record as a
+ * directed edge `A -> B` (A must be settled before B). The engine then:
+ *
+ *   1. topologically sorts the nodes so each field is derived after its
+ *      dependencies, and
+ *   2. detects dependency CYCLES (including self-references) - a calc/logic loop
+ *      that can't be resolved by a single sweep - reporting each as a
+ *      `dependency-cycle` {@link Diagnostic} that names the offending key path.
+ *
+ * The result is layout-order-independent: the edges depend only on which fields
+ * reference which, never on the order entities appear in the schema. Output
+ * orderings are made deterministic by breaking ties in TREE order (the schema's
+ * {@link orderedIds} traversal), so the same schema always yields the same plan.
+ *
+ * Pure, tolerant (never throws on malformed input), Coltor-/React-/DOM-free.
+ *
+ * This module is the GRAPH-CONSTRUCTION orchestrator; its cohesive pieces live in
+ * sibling modules and are re-exported here so existing import paths and the package
+ * barrel keep resolving unchanged:
+ *
+ *   dependencyGraphTypes — DependencySource/DependencyEdge/DependencyCycle/Graph.
+ *   dependencyExtraction — entityExpressions + the self-value identifier guard.
+ *   dependencyTopoSort   — Kahn's algorithm, cycle finding, adjacency freezing.
+ *
+ * @packageDocumentation
+ */
+
 /**
  * Build the {@link DependencyGraph} for a schema.
  *
@@ -1431,67 +1449,11 @@ interface DependencyGraph {
 declare function buildDependencyGraph(schema: FormSchema): DependencyGraph;
 
 /**
- * The evaluator — pure, deterministic resolution of the derived state of a form:
- * visibility, defaults, calculated values, logic actions (show/hide/enable/
- * disable/require/optional/setValue) and `clearOnHide`. It is the Coltor-free,
- * React-free, DOM-free re-implementation of the tangle of `useEffect`s in
- * `luke-consumer-ui/.../FormRenderer.tsx` (custom-default, calculate + logic
- * setValue, clearOnHide, visibility) as a pure state machine.
- *
- * ──────────────────────────────────────────────────────────────────────────────
- * MODEL
- * ──────────────────────────────────────────────────────────────────────────────
- * The evaluator works over a flat set of FIELDS, one per keyed entity. Each field
- * holds its current value, its provenance (which {@link ValueSource} last wrote
- * it), and its resolved visibility/disabled/required flags. Values are addressed
- * by the entity's KEY (its scope name); the {@link DependencyGraph} (built from the
- * same schema) gives the topological order to derive them in, and the per-key
- * downstream closure used for incremental invalidation.
- *
- * ──────────────────────────────────────────────────────────────────────────────
- * SETTLEMENT
- * ──────────────────────────────────────────────────────────────────────────────
- * Because a `calculateValue`/`logic.setValue` can read a field that a later field
- * in the same sweep just changed, ONE topological pass may not reach a fixpoint.
- * {@link evaluate} sweeps the topo order repeatedly until a pass makes no change
- * (quiescence) or a {@link EvaluatorOptions.maxPasses} cap is hit (oscillation),
- * the latter recorded as a `settlement-not-reached` diagnostic. Churn is gated by
- * the field-type's `compare`, so `2` vs `"2"` is not counted as a change and the
- * sweep stays stable.
- *
- * {@link evaluateIncremental} recomputes only the transitive downstream closure of
- * a set of changed keys (still in topological order, still multi-pass), so an
- * `update` does not re-derive the whole form. By construction the incremental
- * result equals the full {@link evaluate} for the same inputs.
- *
- * ──────────────────────────────────────────────────────────────────────────────
- * VALUE PRECEDENCE (low → high)
- * ──────────────────────────────────────────────────────────────────────────────
- *   seed < default < customDefault < calculate < logicSetValue < user
- *
- * - `default` / `customDefault` are init-only (applied by the engine before the
- *   first evaluate; `customDefault` only when the field is otherwise empty).
- * - `calculate` is continuous, but a `user` edit PINS the field against further
- *   recalculation when `allowCalculateOverride` is set.
- * - `logicSetValue` overrides `calculate` within a pass (matching the reference
- *   renderer, which runs setValue before calculate and lets the later write win),
- *   but never overrides a pinned `user` value.
- * - `clearOnHide` is orthogonal: a field that becomes non-visible is reset to its
- *   type empty (source `clearOnHide`) and UN-pinned, so it can recompute if shown
- *   again.
- *
- * ──────────────────────────────────────────────────────────────────────────────
- * RUNTIME SEMANTICS
- * ──────────────────────────────────────────────────────────────────────────────
- * Expression evaluation is FAIL-OPEN via the safe {@link evaluateExpression}
- * sandbox: a parse/runtime error makes a `customConditional` SHOW, a `logic.when`
- * NOT fire, and a `calculate`/`setValue`/`customDefault` NO-OP — never blanking a
- * field. The sandbox forbids member access, so `__proto__`/`constructor`/`Function`
- * /`process`/`globalThis` can never be reached and cause no prototype pollution.
- * Every runtime failure is recorded as an `expr-runtime-error` diagnostic.
- *
- * Pure: no React/DOM, no I/O, deterministic given its inputs. The evaluator never
- * mutates its input field map — it returns a fresh result.
+ * The evaluator's data model and source-precedence ladder: the working
+ * {@link EvalField} record, the static {@link EvalModel}/{@link EvalNode}, the
+ * {@link EvaluatorOptions} tuning, the {@link SettlementResult} outcome, the
+ * {@link DEFAULT_MAX_PASSES} cap and the {@link sourcePriority} gate. Split out of
+ * `evaluator.ts`; re-exported from there so existing import paths are unchanged.
  *
  * @packageDocumentation
  */
@@ -1598,6 +1560,16 @@ interface SettlementResult {
      */
     trace?: EvalTraceStep[];
 }
+
+/**
+ * The evaluator's static model construction: {@link buildEvalModel} (schema +
+ * dependency graph + registry → the topo-ordered {@link EvalModel}, with grid row
+ * templates) and {@link seedFields} (a fresh working field map from a key → value
+ * map). Pure; reads no live values. Split out of `evaluator.ts`.
+ *
+ * @packageDocumentation
+ */
+
 /**
  * Build the static {@link EvalModel} from a schema, its dependency graph and a
  * field-type registry. Pure; does not read or hold any values.
@@ -1615,6 +1587,100 @@ declare function buildEvalModel(schema: FormSchema, graph: DependencyGraph, regi
  * still tracked (so visibility/flags resolve) but coerce through a pass-through.
  */
 declare function seedFields(model: EvalModel, values: Readonly<Record<string, unknown>>, source?: ValueSource): Map<string, EvalField>;
+
+/**
+ * Field-type coercion helpers and small attribute/value utilities used across the
+ * evaluator — total over a possibly-`undefined` {@link FieldType}, and the numeric-
+ * aware {@link defaultSameValue} that suppresses settlement churn. Split out of
+ * `evaluator.ts` as a cohesive, dependency-light unit; the evaluator re-exports the
+ * public {@link defaultSameValue} from its original module path.
+ *
+ * @packageDocumentation
+ */
+
+/**
+ * The built-in numeric-aware, shallow-array `sameValue`, ported from the reference
+ * renderer. Treats numerically-equal primitives as equal so settlement is stable.
+ */
+declare function defaultSameValue(a: unknown, b: unknown): boolean;
+
+/**
+ * The evaluator — pure, deterministic resolution of the derived state of a form:
+ * visibility, defaults, calculated values, logic actions (show/hide/enable/
+ * disable/require/optional/setValue) and `clearOnHide`. It is the Coltor-free,
+ * React-free, DOM-free re-implementation of the tangle of `useEffect`s in
+ * `luke-consumer-ui/.../FormRenderer.tsx` (custom-default, calculate + logic
+ * setValue, clearOnHide, visibility) as a pure state machine.
+ *
+ * This module is the SETTLEMENT ORCHESTRATOR; its cohesive pieces live in sibling
+ * modules and are re-exported from here so existing `from "./evaluator"` imports and
+ * the package barrel keep resolving unchanged:
+ *
+ *   evaluatorTypes      — EvalField/EvalModel/EvalNode/EvaluatorOptions/Settlement-
+ *                         Result, the source-precedence ladder + DEFAULT_MAX_PASSES.
+ *   evaluatorModel      — buildEvalModel + seedFields (static, value-free).
+ *   evaluatorCoercion   — field-type coercion/empty/sameValue + small utilities.
+ *   evaluatorExpression — null-proto scope + fail-open, sandboxed expression eval.
+ *   evaluatorLogic      — logic-rule folding + visibility resolution.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * MODEL
+ * ──────────────────────────────────────────────────────────────────────────────
+ * The evaluator works over a flat set of FIELDS, one per keyed entity. Each field
+ * holds its current value, its provenance (which {@link ValueSource} last wrote
+ * it), and its resolved visibility/disabled/required flags. Values are addressed
+ * by the entity's KEY (its scope name); the {@link DependencyGraph} (built from the
+ * same schema) gives the topological order to derive them in, and the per-key
+ * downstream closure used for incremental invalidation.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * SETTLEMENT
+ * ──────────────────────────────────────────────────────────────────────────────
+ * Because a `calculateValue`/`logic.setValue` can read a field that a later field
+ * in the same sweep just changed, ONE topological pass may not reach a fixpoint.
+ * {@link evaluate} sweeps the topo order repeatedly until a pass makes no change
+ * (quiescence) or a {@link EvaluatorOptions.maxPasses} cap is hit (oscillation),
+ * the latter recorded as a `settlement-not-reached` diagnostic. Churn is gated by
+ * the field-type's `compare`, so `2` vs `"2"` is not counted as a change and the
+ * sweep stays stable.
+ *
+ * {@link evaluateIncremental} recomputes only the transitive downstream closure of
+ * a set of changed keys (still in topological order, still multi-pass), so an
+ * `update` does not re-derive the whole form. By construction the incremental
+ * result equals the full {@link evaluate} for the same inputs.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * VALUE PRECEDENCE (low → high)
+ * ──────────────────────────────────────────────────────────────────────────────
+ *   seed < default < customDefault < calculate < logicSetValue < user
+ *
+ * - `default` / `customDefault` are init-only (applied by the engine before the
+ *   first evaluate; `customDefault` only when the field is otherwise empty).
+ * - `calculate` is continuous, but a `user` edit PINS the field against further
+ *   recalculation when `allowCalculateOverride` is set.
+ * - `logicSetValue` overrides `calculate` within a pass (matching the reference
+ *   renderer, which runs setValue before calculate and lets the later write win),
+ *   but never overrides a pinned `user` value.
+ * - `clearOnHide` is orthogonal: a field that becomes non-visible is reset to its
+ *   type empty (source `clearOnHide`) and UN-pinned, so it can recompute if shown
+ *   again.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * RUNTIME SEMANTICS
+ * ──────────────────────────────────────────────────────────────────────────────
+ * Expression evaluation is FAIL-OPEN via the safe {@link evaluateExpression}
+ * sandbox: a parse/runtime error makes a `customConditional` SHOW, a `logic.when`
+ * NOT fire, and a `calculate`/`setValue`/`customDefault` NO-OP — never blanking a
+ * field. The sandbox forbids member access, so `__proto__`/`constructor`/`Function`
+ * /`process`/`globalThis` can never be reached and cause no prototype pollution.
+ * Every runtime failure is recorded as an `expr-runtime-error` diagnostic.
+ *
+ * Pure: no React/DOM, no I/O, deterministic given its inputs. The evaluator never
+ * mutates its input field map — it returns a fresh result.
+ *
+ * @packageDocumentation
+ */
+
 /**
  * Fully settle every field: derive visibility, disabled, required, calculated
  * values and logic actions in topological order, sweeping until a fixpoint or the
@@ -1637,11 +1703,6 @@ declare function evaluateIncremental(model: EvalModel, fields: Map<string, EvalF
  * terminates even on a cyclic graph.
  */
 declare function downstreamClosure(model: EvalModel, seeds: Iterable<string>): Set<string>;
-/**
- * The built-in numeric-aware, shallow-array `sameValue`, ported from the reference
- * renderer. Treats numerically-equal primitives as equal so settlement is stable.
- */
-declare function defaultSameValue(a: unknown, b: unknown): boolean;
 
 /**
  * Construction-time options for a {@link FormEngine}.
