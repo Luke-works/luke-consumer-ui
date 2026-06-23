@@ -865,13 +865,15 @@ function Tooltip({ text }) {
   const ref = (0, import_react5.useRef)(null);
   const [anchor, setAnchor] = (0, import_react5.useState)(null);
   (0, import_react5.useEffect)(() => {
-    if (!anchor || typeof window === "undefined") return;
+    if (!anchor) return;
+    const win = ref.current?.ownerDocument?.defaultView;
+    if (!win) return;
     const dismiss = () => setAnchor(null);
-    window.addEventListener("scroll", dismiss, true);
-    window.addEventListener("resize", dismiss);
+    win.addEventListener("scroll", dismiss, true);
+    win.addEventListener("resize", dismiss);
     return () => {
-      window.removeEventListener("scroll", dismiss, true);
-      window.removeEventListener("resize", dismiss);
+      win.removeEventListener("scroll", dismiss, true);
+      win.removeEventListener("resize", dismiss);
     };
   }, [anchor]);
   if (!text) return null;
@@ -884,15 +886,16 @@ function Tooltip({ text }) {
   const hide = () => setAnchor(null);
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
-    anchor && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(TooltipBubble, { text, anchor })
+    anchor && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(TooltipBubble, { text, anchor, doc: ref.current?.ownerDocument ?? null })
   ] });
 }
-function TooltipBubble({ text, anchor }) {
+function TooltipBubble({ text, anchor, doc }) {
   const ref = (0, import_react5.useRef)(null);
   const [box, setBox] = (0, import_react5.useState)(null);
   (0, import_react5.useLayoutEffect)(() => {
     const el = ref.current;
-    if (!el || typeof window === "undefined") return;
+    const win = el?.ownerDocument?.defaultView;
+    if (!el || !win) return;
     const b = el.getBoundingClientRect();
     const M = 8;
     let place = "top";
@@ -902,7 +905,7 @@ function TooltipBubble({ text, anchor }) {
       top = anchor.bottom + 10;
     }
     let left = anchor.cx - b.width / 2;
-    left = Math.max(M, Math.min(left, window.innerWidth - b.width - M));
+    left = Math.max(M, Math.min(left, win.innerWidth - b.width - M));
     let arrow = anchor.cx - left;
     if (arrow > b.width - 12) {
       left += arrow - (b.width - 12);
@@ -913,6 +916,8 @@ function TooltipBubble({ text, anchor }) {
     }
     setBox({ left, top, place, arrow });
   }, [anchor, text]);
+  const target = doc?.body ?? (typeof document !== "undefined" ? document.body : null);
+  if (!target) return null;
   return (0, import_react_dom.createPortal)(
     /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
       "span",
@@ -927,7 +932,7 @@ function TooltipBubble({ text, anchor }) {
         ]
       }
     ),
-    document.body
+    target
   );
 }
 function SearchSelect({

@@ -61,7 +61,7 @@
 .lf-palette h4 { margin: 0; font-size: 0.85rem; }
 /* Search bar: a rounded field with a search icon and an inline clear button. */
 .lf-palette-search-wrap { position: relative; display: flex; align-items: center; }
-.lf-palette-search-icon { position: absolute; left: 10px; color: var(--lf-muted, #6b7280); pointer-events: none; }
+.lf-palette-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); display: block; color: var(--lf-muted, #6b7280); pointer-events: none; }
 .lf-palette-search {
   width: 100%;
   padding: 7px 28px 7px 30px;
@@ -339,32 +339,32 @@
 }
 .lf-logic-when-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; }
 .lf-logic-cond { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-/* Bigger dropdowns. */
-.lf-logic-cond select,
-.lf-logic-cond input,
-.lf-logic-join-sel,
-.lf-logic-then select {
-  min-height: 36px;
-  padding: 5px 9px;
+/* Uniform control height; field / operator / value share the row width equally. */
+.lf-logic-cond > select,
+.lf-logic-cond > input,
+.lf-logic-then select,
+.lf-logic-then input {
+  height: 34px;
+  padding: 0 9px;
   font-size: 0.8rem;
   border: 1px solid var(--lf-border, #d9d9d9);
   border-radius: var(--lf-radius, 6px);
   background: var(--lf-bg, #fff);
   color: var(--lf-text, #1a1a1a);
 }
-.lf-logic-cond select { min-width: 120px; }
-.lf-logic-cond input { flex: 1; min-width: 96px; }
-.lf-logic-join {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--lf-primary, #2563eb);
-  padding: 0 4px;
-}
-.lf-logic-cond-remove {
+.lf-logic-cond > select:not(.lf-logic-conn),
+.lf-logic-cond > input { flex: 1 1 0; min-width: 88px; }
+.lf-logic-conn { flex: 0 0 auto; width: 66px; font-weight: 700; color: var(--lf-primary, #2563eb); }
+.lf-logic-conn-text { flex: 0 0 auto; width: 66px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; color: var(--lf-primary, #2563eb); }
+/* A confirmed (read-only) condition line. */
+.lf-logic-cond.is-readonly { background: rgba(127, 127, 127, 0.05); border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 5px 8px; }
+.lf-logic-cond-text { flex: 1 1 0; min-width: 0; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Small inline icon buttons (tick / pencil / cross) shared by conditions + collapsed rule. */
+.lf-logic-iconbtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   width: 30px;
   height: 30px;
   border: 1px solid var(--lf-border, #d9d9d9);
@@ -373,7 +373,10 @@
   color: var(--lf-muted, #6b7280);
   cursor: pointer;
 }
-.lf-logic-cond-remove:hover { color: var(--lf-error, #dc2626); border-color: var(--lf-error, #dc2626); }
+.lf-logic-iconbtn:hover { border-color: var(--lf-primary, #2563eb); color: var(--lf-primary, #2563eb); }
+.lf-logic-iconbtn:disabled { opacity: 0.45; cursor: default; }
+.lf-logic-iconbtn--ok:hover { border-color: #16a34a; color: #16a34a; }
+.lf-logic-iconbtn--danger:hover { border-color: var(--lf-error, #dc2626); color: var(--lf-error, #dc2626); }
 .lf-logic-add-cond { align-self: flex-start; font-size: 0.72rem; font-weight: 500; color: var(--lf-primary, #2563eb); background: none; border: none; cursor: pointer; padding: 0; }
 .lf-logic-then { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--lf-border, #d9d9d9); font-size: 0.8rem; }
 .lf-logic-then-label { font-weight: 600; }
@@ -426,7 +429,8 @@
 .lf-logic-test-label { font-weight: 600; color: var(--lf-muted, #6b7280); }
 .lf-logic-test-field { display: inline-flex; align-items: center; gap: 5px; }
 .lf-logic-test-key { font-family: ui-monospace, monospace; color: var(--lf-text, #1a1a1a); }
-.lf-logic-test-field input { width: 84px; min-height: 28px; padding: 3px 7px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
+/* The test input auto-sizes to its content (the `size` attr drives width; capped here). */
+.lf-logic-test-input { width: auto; max-width: 220px; min-height: 28px; padding: 3px 7px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); font: inherit; font-size: 0.75rem; }
 .lf-logic-result {
   margin-left: auto;
   font-weight: 700;
@@ -435,6 +439,29 @@
 }
 .lf-logic-result.is-true { color: #166534; background: #ecfdf5; }
 .lf-logic-result.is-false { color: #991b1b; background: #fef2f2; }
+/* Collapsed rule → one-line summary. */
+.lf-logic-rule.is-collapsed { padding: 8px 12px; background: var(--lf-bg, #fff); }
+.lf-logic-summary { display: flex; align-items: center; gap: 8px; }
+.lf-logic-summary-text { flex: 1 1 0; min-width: 0; font-size: 0.8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Structured options editor (select / radio / checkboxes). */
+.lf-options { display: flex; flex-direction: column; gap: 6px; }
+.lf-opt-row { display: flex; align-items: center; gap: 6px; }
+.lf-opt-row input { flex: 1 1 0; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); font: inherit; font-size: 0.8rem; }
+.lf-opt-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  color: var(--lf-muted, #6b7280);
+  cursor: pointer;
+}
+.lf-opt-remove:hover { border-color: var(--lf-error, #dc2626); color: var(--lf-error, #dc2626); }
+.lf-opt-add { align-self: flex-start; font-size: 0.74rem; font-weight: 500; color: var(--lf-primary, #2563eb); background: none; border: none; cursor: pointer; padding: 2px 0; }
 
 /* Circular-action SVG icons + toast tick. */
 .lf-iconbtn .lf-icon { display: block; }

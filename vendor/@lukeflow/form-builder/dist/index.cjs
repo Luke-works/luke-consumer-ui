@@ -367,6 +367,15 @@ function IconCheck(props = {}) {
 function IconX(props = {}) {
   return svg(/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }), props);
 }
+function IconPencil(props = {}) {
+  return svg(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M13.5 7l3 3", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
+    ] }),
+    props
+  );
+}
 function IconReset(props = {}) {
   return svg(
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -479,14 +488,7 @@ function Control({
         (editor.options ?? []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: o.value, children: o.label }, o.value))
       ] }) });
     case "options":
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-        "textarea",
-        {
-          value: optionsToText(ctx.value),
-          rows: 4,
-          onChange: (e) => ctx.setValue(textToOptions(e.target.value))
-        }
-      ) });
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(OptionsControl, { editor, ctx });
     case "tags":
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
         "input",
@@ -691,6 +693,46 @@ function ParamsEditor({
     /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-param-add", onClick: () => commit([...rows, ["", ""]]), children: "Add param" })
   ] });
 }
+function OptionsControl({ editor, ctx }) {
+  const [rows, setRows] = (0, import_react2.useState)(() => readOptionRows(ctx.value));
+  const sig = JSON.stringify(ctx.value ?? null);
+  const lastSig = (0, import_react2.useRef)(sig);
+  (0, import_react2.useEffect)(() => {
+    if (sig !== lastSig.current) {
+      lastSig.current = sig;
+      setRows(readOptionRows(ctx.value));
+    }
+  }, [sig, ctx.entity.id]);
+  const commit = (next) => {
+    setRows(next);
+    const opts = next.filter((o) => o.label.trim() || o.value.trim()).map((o) => ({ label: o.label, value: o.value.trim() || o.label.trim() }));
+    const persisted = opts.length ? opts : void 0;
+    lastSig.current = JSON.stringify(persisted ?? null);
+    ctx.setValue(persisted);
+  };
+  const setAt = (i, patch) => commit(rows.map((r, j) => j === i ? { ...r, ...patch } : r));
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-setting-wrap", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-setting-label", children: editor.label ?? "Options" }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-options", children: [
+      rows.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "lf-empty", children: "No options yet." }),
+      rows.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-opt-row", role: "group", "aria-label": `Option ${i + 1}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Option ${i + 1} label`, className: "lf-opt-label", value: o.label, placeholder: "Label", onChange: (e) => setAt(i, { label: e.target.value }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Option ${i + 1} value`, className: "lf-opt-value", value: o.value, placeholder: "Value", onChange: (e) => setAt(i, { value: e.target.value }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-opt-remove", "aria-label": `Remove option ${i + 1}`, onClick: () => commit(rows.filter((_, j) => j !== i)), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconX, { size: 13 }) })
+      ] }, i)),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-opt-add", onClick: () => commit([...rows, { label: `Option ${rows.length + 1}`, value: "" }]), children: "+ Add option" })
+    ] }),
+    editor.hint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-setting-hint", children: editor.hint })
+  ] });
+}
+function readOptionRows(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((o) => {
+    if (typeof o === "string") return { label: o, value: o };
+    const obj = o;
+    return { label: String(obj.label ?? obj.value ?? ""), value: String(obj.value ?? "") };
+  });
+}
 function Labeled({
   label,
   hint,
@@ -717,6 +759,8 @@ var LOGIC_OPS = [
 ];
 var LOGIC_ACTIONS = ["show", "hide", "require", "optional", "enable", "disable", "setValue"];
 var WHEN_RE = /^\s*([A-Za-z_$][\w$]*)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$/;
+var _lrUid = 0;
+var lrUid = () => `lr${++_lrUid}`;
 function LogicRules({ builder, id, entity }) {
   const fields = otherFieldKeys(builder.schema, id);
   const { meta, typeByKey } = (0, import_react2.useMemo)(() => {
@@ -732,45 +776,42 @@ function LogicRules({ builder, id, entity }) {
     for (const k of Object.keys(meta2)) typeByKey2[k] = meta2[k].type;
     return { meta: meta2, typeByKey: typeByKey2 };
   }, [builder.schema.entities]);
-  const readRules = () => Array.isArray(entity.attributes.logic) ? entity.attributes.logic.map(parseRule) : [];
+  const readRules = () => Array.isArray(entity.attributes.logic) ? entity.attributes.logic.map((r) => parseRule(r, typeByKey)) : [];
   const [parsed, setParsed] = (0, import_react2.useState)(readRules);
   const [testVals, setTestVals] = (0, import_react2.useState)({});
-  const [savedRule, setSavedRule] = (0, import_react2.useState)(null);
   (0, import_react2.useEffect)(() => {
     setParsed(readRules());
     setTestVals({});
-    setSavedRule(null);
   }, [id]);
   const commit = (next) => {
     setParsed(next);
     const logic = next.map((s) => ({
       when: buildWhen(s),
       action: s.action,
-      ...s.action === "setValue" ? { value: toLiteral(s.setTo) } : {}
+      // setValue's value is a LITERAL or the bare key of another field (an expression the
+      // engine evaluates to that field's live value).
+      ...s.action === "setValue" ? { value: s.setSource === "field" ? s.setTo.trim() : toLiteral(s.setTo) } : {}
     }));
+    const prev = Array.isArray(entity.attributes.logic) ? entity.attributes.logic : [];
+    if (JSON.stringify(prev) === JSON.stringify(logic)) return;
     builder.updateAttributes(id, { logic });
   };
   const setRule = (i, p) => commit(parsed.map((r, j) => j === i ? { ...r, ...p } : r));
   const setCond = (i, j, p) => setRule(i, { conds: parsed[i].conds.map((c, k) => k === j ? { ...c, ...p } : c) });
-  const setTest = (i, field, v) => setTestVals((prev) => ({ ...prev, [i]: { ...prev[i] ?? {}, [field]: v } }));
+  const setTest = (ruleId, field, v) => setTestVals((prev) => ({ ...prev, [ruleId]: { ...prev[ruleId] ?? {}, [field]: v } }));
   const removeRule = (i) => {
+    const removedId = parsed[i]?.id;
     commit(parsed.filter((_, j) => j !== i));
-    setTestVals((prev) => {
-      const remapped = {};
-      let n = 0;
-      for (let k = 0; k < parsed.length; k++) {
-        if (k === i) continue;
-        if (prev[k]) remapped[n] = prev[k];
-        n++;
-      }
-      return remapped;
+    if (removedId) setTestVals((prev) => {
+      const { [removedId]: _drop, ...rest } = prev;
+      return rest;
     });
   };
-  const resetRule = (i) => setRule(i, { conds: [{ field: fields[0] ?? "", op: "==", value: "" }], action: "show", setTo: "", raw: void 0 });
+  const resetRule = (i) => setRule(i, { conds: [{ id: lrUid(), field: fields[0] ?? "", op: "==", value: "", editing: true }], action: "show", setTo: "", setSource: "literal", raw: void 0, collapsed: false });
   const saveRule = (i) => {
-    commit(parsed);
-    setSavedRule(i);
-    window.setTimeout(() => setSavedRule((cur) => cur === i ? null : cur), 1200);
+    const kept = parsed[i].conds.filter((c) => c.field);
+    const conds = (kept.length ? kept : parsed[i].conds).map((c) => ({ ...c, editing: false }));
+    setRule(i, { collapsed: true, conds });
   };
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("fieldset", { className: "lf-settings-logic", children: [
     /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("legend", { children: "Conditional rules" }),
@@ -778,56 +819,63 @@ function LogicRules({ builder, id, entity }) {
     parsed.map((r, i) => {
       const usedFields = r.raw != null ? fields.filter((f) => wordPresent(r.raw, f)) : [...new Set(r.conds.map((c) => c.field).filter(Boolean))];
       const when = buildWhen(r);
-      const scope = coerceScope(testVals[i] ?? {}, typeByKey);
+      const scope = coerceScope(testVals[r.id] ?? {}, typeByKey);
       const result = when ? Boolean((0, import_form_core3.evaluateExpression)(when, scope)) : null;
+      if (r.collapsed) {
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "lf-logic-rule is-collapsed", role: "group", "aria-label": `Rule ${i + 1}`, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-summary", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-summary-text", title: ruleSummary(r, meta), children: ruleSummary(r, meta) }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-iconbtn", title: "Edit rule", "aria-label": `Edit rule ${i + 1}`, onClick: () => setRule(i, { collapsed: false }), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconPencil, { size: 14 }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-iconbtn lf-logic-iconbtn--danger", title: "Remove rule", "aria-label": `Remove rule ${i + 1}`, onClick: () => removeRule(i), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconX, { size: 14 }) })
+        ] }) }, r.id);
+      }
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-rule", role: "group", "aria-label": `Rule ${i + 1}`, children: [
         r.raw != null ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-advanced", children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-advanced-label", children: "When (advanced expression)" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-            "textarea",
-            {
-              className: "lf-code",
-              "aria-label": `Rule ${i + 1} expression`,
-              spellCheck: false,
-              rows: 2,
-              value: r.raw,
-              onChange: (e) => setRule(i, { raw: e.target.value })
-            }
-          ),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("textarea", { className: "lf-code", "aria-label": `Rule ${i + 1} expression`, spellCheck: false, rows: 2, value: r.raw, onChange: (e) => setRule(i, { raw: e.target.value }) }),
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-setting-hint", children: "This expression can't be split into simple conditions \u2014 edit it directly." })
         ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "lf-logic-when-head", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-when", children: "When" }) }),
           r.conds.map((c, j) => {
             const opts = c.field ? meta[c.field]?.options ?? [] : [];
-            return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-cond", children: [
-              j > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { className: "lf-logic-conn", "aria-label": `Rule ${i + 1} condition ${j + 1} connector`, value: c.connector ?? "and", onChange: (e) => setCond(i, j, { connector: e.target.value }), children: [
+            const editing = c.editing !== false;
+            return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `lf-logic-cond${editing ? "" : " is-readonly"}`, children: [
+              j > 0 && (editing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { className: "lf-logic-conn", "aria-label": `Rule ${i + 1} condition ${j + 1} connector`, value: c.connector ?? "and", onChange: (e) => setCond(i, j, { connector: e.target.value }), children: [
                 /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "and", children: "AND" }),
                 /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "or", children: "OR" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} field`, value: c.field, onChange: (e) => setCond(i, j, { field: e.target.value, value: "" }), children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "" }),
-                fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: f, children: meta[f]?.label ?? capitalize(f) }, f))
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} operator`, value: c.op, onChange: (e) => setCond(i, j, { op: e.target.value }), children: LOGIC_OPS.map((o) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: o.op, children: o.label }, o.op)) }),
-              opts.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} value`, value: c.value, onChange: (e) => setCond(i, j, { value: e.target.value }), children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "" }),
-                c.value && !opts.some((o) => o.value === c.value) && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("option", { value: c.value, children: [
-                  c.value,
-                  " (not in options)"
+              ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-conn-text", children: c.connector === "or" ? "OR" : "AND" })),
+              editing ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} field`, value: c.field, onChange: (e) => setCond(i, j, { field: e.target.value, value: "" }), children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "" }),
+                  fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: f, children: meta[f]?.label ?? capitalize(f) }, f))
                 ] }),
-                opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: o.value, children: o.label }, o.value))
-              ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Rule ${i + 1} condition ${j + 1} value`, value: c.value, onChange: (e) => setCond(i, j, { value: e.target.value }) }),
-              r.conds.length > 1 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-cond-remove", "aria-label": `Remove condition ${j + 1} of rule ${i + 1}`, onClick: () => setRule(i, { conds: r.conds.filter((_, k) => k !== j) }), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconX, { size: 13 }) })
-            ] }, j);
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} operator`, value: c.op, onChange: (e) => setCond(i, j, { op: e.target.value }), children: LOGIC_OPS.map((o) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: o.op, children: o.label }, o.op)) }),
+                opts.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} value`, value: c.value, onChange: (e) => setCond(i, j, { value: e.target.value }), children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "" }),
+                  c.value && !opts.some((o) => o.value === c.value) && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("option", { value: c.value, children: [
+                    c.value,
+                    " (not in options)"
+                  ] }),
+                  opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: o.value, children: o.label }, o.value))
+                ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Rule ${i + 1} condition ${j + 1} value`, value: c.value, onChange: (e) => setCond(i, j, { value: e.target.value }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-iconbtn lf-logic-iconbtn--ok", title: "Confirm condition", "aria-label": `Confirm condition ${j + 1} of rule ${i + 1}`, disabled: !c.field, onClick: () => setCond(i, j, { editing: false }), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconCheck, { size: 14 }) })
+              ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-cond-text", title: condText(c, meta), children: condText(c, meta) }),
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-iconbtn", title: "Edit condition", "aria-label": `Edit condition ${j + 1} of rule ${i + 1}`, onClick: () => setCond(i, j, { editing: true }), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconPencil, { size: 14 }) })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-iconbtn lf-logic-iconbtn--danger", "aria-label": `Remove condition ${j + 1} of rule ${i + 1}`, title: "Remove condition", onClick: () => setRule(i, { conds: r.conds.filter((_, k) => k !== j) }), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconX, { size: 13 }) })
+            ] }, c.id);
           }),
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-add-cond", onClick: () => setRule(i, { conds: [...r.conds, emptyCond()] }), children: "+ Add condition" })
         ] }),
         usedFields.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-test", role: "group", "aria-label": `Rule ${i + 1} test`, children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-test-label", children: "Test:" }),
-          usedFields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "lf-logic-test-field", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-test-key", children: meta[f]?.label ?? capitalize(f) }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Rule ${i + 1} test ${f}`, value: testVals[i]?.[f] ?? "", onChange: (e) => setTest(i, f, e.target.value) })
-          ] }, f)),
+          usedFields.map((f) => {
+            const v = testVals[r.id]?.[f] ?? "";
+            return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "lf-logic-test-field", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-test-key", children: meta[f]?.label ?? capitalize(f) }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Rule ${i + 1} test ${f}`, className: "lf-logic-test-input", size: Math.max(4, v.length + 1), value: v, onChange: (e) => setTest(r.id, f, e.target.value) })
+            ] }, f);
+          }),
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: `lf-logic-result${result ? " is-true" : " is-false"}`, "aria-live": "polite", children: [
             "\u21D2 ",
             result ? "true" : "false"
@@ -836,46 +884,86 @@ function LogicRules({ builder, id, entity }) {
         /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-then", children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "lf-logic-then-label", children: "\u2192 then" }),
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: act, children: capitalize(act) }, act)) }),
-          r.action === "setValue" && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Rule ${i + 1} set value`, placeholder: "value", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) })
+          r.action === "setValue" && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} value source`, value: r.setSource ?? "literal", onChange: (e) => setRule(i, { setSource: e.target.value, setTo: "" }), children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "literal", children: "to a value" }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "field", children: "to field" })
+            ] }),
+            r.setSource === "field" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { "aria-label": `Rule ${i + 1} set value`, value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }), children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "" }),
+              r.setTo && !fields.includes(r.setTo) && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("option", { value: r.setTo, children: [
+                r.setTo,
+                " (not in fields)"
+              ] }),
+              fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: f, children: meta[f]?.label ?? capitalize(f) }, f))
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { "aria-label": `Rule ${i + 1} set value`, placeholder: "value", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) })
+          ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "lf-logic-rule-actions", children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", className: "lf-logic-btn lf-logic-reset", title: "Reset this rule to its default", "aria-label": `Reset rule ${i + 1}`, onClick: () => resetRule(i), children: [
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconReset, { size: 14 }),
             " Reset"
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", className: "lf-logic-btn lf-logic-save", title: "Save this rule", "aria-label": `Save rule ${i + 1}`, onClick: () => saveRule(i), children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", className: "lf-logic-btn lf-logic-save", title: "Save this rule (collapses it)", "aria-label": `Save rule ${i + 1}`, onClick: () => saveRule(i), children: [
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconCheck, { size: 14 }),
-            " ",
-            savedRule === i ? "Saved" : "Save"
+            " Save"
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", className: "lf-logic-btn lf-logic-remove", title: "Remove this rule", "aria-label": `Remove rule ${i + 1}`, onClick: () => removeRule(i), children: [
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(IconX, { size: 14 }),
             " Remove"
           ] })
         ] })
-      ] }, i);
+      ] }, r.id);
     }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-add", onClick: () => commit([...parsed, { conds: [{ field: fields[0] ?? "", op: "==", value: "" }], action: "show", setTo: "" }]), children: "Add rule" })
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "lf-logic-add", onClick: () => commit([...parsed, { id: lrUid(), conds: [{ id: lrUid(), field: fields[0] ?? "", op: "==", value: "", editing: true }], action: "show", setTo: "", setSource: "literal", collapsed: false }]), children: "Add rule" })
   ] });
 }
 function emptyCond() {
-  return { field: "", op: "==", value: "", connector: "and" };
+  return { id: lrUid(), field: "", op: "==", value: "", connector: "and", editing: true };
 }
-function parseRule(r) {
+function condText(c, meta) {
+  if (!c.field) return "(incomplete)";
+  const field = meta[c.field]?.label ?? capitalize(c.field);
+  const op = LOGIC_OPS.find((o) => o.op === c.op)?.label ?? c.op;
+  const opt = meta[c.field]?.options.find((o) => o.value === c.value);
+  const value = opt ? opt.label : c.value === "" ? "(empty)" : c.value;
+  return `${field} ${op} ${value}`;
+}
+function ruleSummary(r, meta) {
+  const n = r.raw != null ? 1 : r.conds.filter((c) => c.field).length;
+  const conds = n === 0 ? "always" : `${n} condition${n === 1 ? "" : "s"}`;
+  let out = capitalize(r.action);
+  if (r.action === "setValue") {
+    const to = r.setSource === "field" ? meta[r.setTo]?.label ?? r.setTo : r.setTo;
+    out = `Set value = ${to || "\u2014"}`;
+  }
+  return `When ${conds} \u2192 ${out}`;
+}
+function parseRule(r, typeByKey) {
   const when = typeof r.when === "string" ? r.when : "";
   const action = typeof r.action === "string" ? r.action : "show";
-  const setTo = typeof r.value === "string" ? unLiteral(r.value) : "";
-  if (!when.trim()) return { conds: [emptyCond()], action, setTo };
+  let setSource = "literal";
+  let setTo = "";
+  if (action === "setValue" && typeof r.value === "string") {
+    const raw = r.value.trim();
+    if (/^[A-Za-z_$][\w$]*$/.test(raw) && raw !== "true" && raw !== "false" && typeByKey[raw]) {
+      setSource = "field";
+      setTo = raw;
+    } else {
+      setTo = unLiteral(r.value);
+    }
+  }
+  if (!when.trim()) return { id: lrUid(), conds: [emptyCond()], action, setTo, setSource, collapsed: true };
   const parts = splitConds(when);
   const conds = [];
   for (let k = 0; k < parts.length; k += 2) {
     const m = WHEN_RE.exec((parts[k] ?? "").trim());
-    if (!m) return { conds: [], action, setTo, raw: when };
-    const c = { field: m[1] ?? "", op: m[2] ?? "==", value: unLiteral(m[3] ?? "") };
+    if (!m) return { id: lrUid(), conds: [], action, setTo, setSource, raw: when, collapsed: true };
+    const c = { id: lrUid(), field: m[1] ?? "", op: m[2] ?? "==", value: unLiteral(m[3] ?? ""), editing: false };
     if (k > 0) c.connector = parts[k - 1] === "or" ? "or" : "and";
     conds.push(c);
   }
-  return conds.length ? { conds, action, setTo } : { conds: [], action, setTo, raw: when };
+  return conds.length ? { id: lrUid(), conds, action, setTo, setSource, collapsed: true } : { id: lrUid(), conds: [], action, setTo, setSource, raw: when, collapsed: true };
 }
 function splitConds(when) {
   const out = [];
@@ -998,23 +1086,6 @@ function str(v) {
 }
 function numStr(v) {
   return typeof v === "number" && Number.isFinite(v) ? String(v) : "";
-}
-function optionsToText(raw) {
-  if (!Array.isArray(raw)) return "";
-  return raw.map((o) => {
-    if (typeof o === "string") return o;
-    const obj = o;
-    const label = String(obj.label ?? obj.value ?? "");
-    const value = String(obj.value ?? "");
-    return label === value ? label : `${label}|${value}`;
-  }).join("\n");
-}
-function textToOptions(text) {
-  return text.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
-    const [label, value] = line.split("|");
-    const l = (label ?? "").trim();
-    return { label: l, value: (value ?? l).trim() };
-  });
 }
 
 // src/Canvas.tsx
@@ -1364,8 +1435,6 @@ function Palette({ builder, extra }) {
   const groups = extra && extra.length ? [...PALETTE_GROUPS, { group: "Custom", items: extra }] : PALETTE_GROUPS;
   const q = query.trim().toLowerCase();
   const matches = (it) => !q || it.label.toLowerCase().includes(q) || it.type.toLowerCase().includes(q);
-  const listId = (0, import_react3.useId)();
-  const allLabels = [...new Set(groups.flatMap((g) => g.items.map((it) => it.label)))];
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "lf-palette", "aria-label": "Field palette", children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("h4", { children: [
       "Add field",
@@ -1383,14 +1452,12 @@ function Palette({ builder, extra }) {
           className: "lf-palette-search",
           placeholder: "Search fields\u2026",
           "aria-label": "Search fields",
-          list: listId,
           autoComplete: "off",
           value: query,
           onChange: (e) => setQuery(e.target.value)
         }
       ),
-      query && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { type: "button", className: "lf-palette-search-clear", "aria-label": "Clear search", onClick: () => setQuery(""), children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(IconX, { size: 13 }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("datalist", { id: listId, children: allLabels.map((l) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: l }, l)) })
+      query && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("button", { type: "button", className: "lf-palette-search-clear", "aria-label": "Clear search", onClick: () => setQuery(""), children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(IconX, { size: 13 }) })
     ] }),
     groups.map(({ group, items }) => {
       const visible = items.filter(matches);
