@@ -269,18 +269,30 @@
 .lf-builder .lf-settings-minion input,
 .lf-builder .lf-settings-minion select,
 .lf-builder .lf-param-row input,
-.lf-builder .lf-param-row select {
-  min-height: 2.25rem;
+.lf-builder .lf-param-row select,
+.lf-builder .lf-logic-cond > input,
+.lf-builder .lf-logic-cond > select,
+.lf-builder .lf-logic-then input,
+.lf-builder .lf-logic-then select,
+.lf-builder .lf-logic-test-input,
+.lf-builder .lf-logic-advanced textarea,
+.lf-builder .lf-opt-row input {
   padding: 0.375rem 0.625rem;
   font-size: 0.875rem;
   color: var(--lf-text);
-  background: transparent;
+  background: var(--lf-bg);
   border: 1px solid var(--lf-border);
   border-radius: 0.5rem;
 }
 .lf-builder .lf-setting input:focus,
 .lf-builder .lf-setting select:focus,
-.lf-builder .lf-setting textarea:focus {
+.lf-builder .lf-setting textarea:focus,
+.lf-builder .lf-logic-cond > input:focus,
+.lf-builder .lf-logic-cond > select:focus,
+.lf-builder .lf-logic-then input:focus,
+.lf-builder .lf-logic-then select:focus,
+.lf-builder .lf-logic-test-input:focus,
+.lf-builder .lf-opt-row input:focus {
   outline: none;
   border-color: var(--color-brand-300, #9cb9ff);
   box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.15);

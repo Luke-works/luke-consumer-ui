@@ -733,6 +733,15 @@ var LOGIC_OPS = [
   { op: "<=", label: "at most" }
 ];
 var LOGIC_ACTIONS = ["show", "hide", "require", "optional", "enable", "disable", "setValue"];
+var ACTION_LABELS = {
+  show: "Show field",
+  hide: "Hide field",
+  require: "Make required",
+  optional: "Make optional",
+  enable: "Enable field",
+  disable: "Disable field",
+  setValue: "Set value"
+};
 var WHEN_RE = /^\s*([A-Za-z_$][\w$]*)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$/;
 var _lrUid = 0;
 var lrUid = () => `lr${++_lrUid}`;
@@ -858,7 +867,7 @@ function LogicRules({ builder, id, entity }) {
         ] }),
         /* @__PURE__ */ jsxs2("div", { className: "lf-logic-then", children: [
           /* @__PURE__ */ jsx2("span", { className: "lf-logic-then-label", children: "\u2192 then" }),
-          /* @__PURE__ */ jsx2("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ jsx2("option", { value: act, children: capitalize(act) }, act)) }),
+          /* @__PURE__ */ jsx2("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ jsx2("option", { value: act, children: ACTION_LABELS[act] ?? capitalize(act) }, act)) }),
           r.action === "setValue" && /* @__PURE__ */ jsxs2(Fragment2, { children: [
             /* @__PURE__ */ jsxs2("select", { "aria-label": `Rule ${i + 1} value source`, value: r.setSource ?? "literal", onChange: (e) => setRule(i, { setSource: e.target.value, setTo: "" }), children: [
               /* @__PURE__ */ jsx2("option", { value: "literal", children: "to a value" }),
@@ -871,7 +880,7 @@ function LogicRules({ builder, id, entity }) {
                 " (not in fields)"
               ] }),
               fields.map((f) => /* @__PURE__ */ jsx2("option", { value: f, children: meta[f]?.label ?? capitalize(f) }, f))
-            ] }) : /* @__PURE__ */ jsx2("input", { "aria-label": `Rule ${i + 1} set value`, placeholder: "value", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) })
+            ] }) : /* @__PURE__ */ jsx2("input", { className: "lf-logic-setval", "aria-label": `Rule ${i + 1} set value`, placeholder: "value to set", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) })
           ] })
         ] }),
         /* @__PURE__ */ jsxs2("div", { className: "lf-logic-rule-actions", children: [
@@ -907,7 +916,7 @@ function condText(c, meta) {
 function ruleSummary(r, meta) {
   const n = r.raw != null ? 1 : r.conds.filter((c) => c.field).length;
   const conds = n === 0 ? "always" : `${n} condition${n === 1 ? "" : "s"}`;
-  let out = capitalize(r.action);
+  let out = ACTION_LABELS[r.action] ?? capitalize(r.action);
   if (r.action === "setValue") {
     const to = r.setSource === "field" ? meta[r.setTo]?.label ?? r.setTo : r.setTo;
     out = `Set value = ${to || "\u2014"}`;
