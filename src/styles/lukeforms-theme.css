@@ -307,6 +307,17 @@
   padding: 0.3125rem 0.625rem;
 }
 
+/* Settings modal (settings="modal") + AI aside column. */
+.lf-builder .lf-builder-aside { position: sticky; top: 6rem; height: calc(100vh - 9rem); }
+.lf-modal-overlay { z-index: 99999; backdrop-filter: blur(2px); }
+.lf-modal { box-shadow: 0 24px 48px -12px rgba(16, 24, 40, 0.25); border-radius: 1rem; max-width: 520px; }
+.dark .lf-modal { background: var(--color-gray-800, #1d2939); border-color: var(--color-gray-700, #344054); }
+.lf-modal-header { padding: 1rem 1.25rem; }
+.lf-modal-title { font-size: 0.9375rem; font-weight: 600; color: var(--lf-text); }
+.lf-modal-body { padding: 1.25rem 1.25rem 1.5rem; }
+/* The settings card sits flush in the modal (the modal already frames it). */
+.lf-modal-body .lf-settings.lf-settings { position: static; top: auto; border: none; padding: 0; background: transparent; }
+
 /* Problems. */
 .lf-builder .lf-problems-badge { font-size: 0.75rem; font-weight: 500; }
 .lf-builder .lf-problems-badge.is-ok { color: var(--color-gray-400, #98a2b3); }

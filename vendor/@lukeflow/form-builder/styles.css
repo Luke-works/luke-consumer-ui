@@ -215,3 +215,52 @@
 .lf-problem.is-warning { color: #b45309; }
 .lf-problem-code { font-family: ui-monospace, monospace; font-size: 0.7rem; opacity: 0.8; }
 .lf-builder-preview { padding: 12px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
+
+/* ── settings="modal": layout modes + the third-column aside ─────────────────── */
+.lf-builder-body--modal { grid-template-columns: 200px minmax(0, 1fr); }
+.lf-builder-body--modal.lf-builder-body--aside { grid-template-columns: 200px minmax(0, 1fr) 340px; }
+.lf-builder-aside { min-width: 0; }
+
+/* ── Settings modal ──────────────────────────────────────────────────────────── */
+.lf-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(16, 24, 40, 0.45);
+}
+.lf-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--lf-bg, #fff);
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: calc(var(--lf-radius, 6px) * 1.5);
+  box-shadow: 0 20px 48px rgba(16, 24, 40, 0.2);
+}
+.lf-modal:focus { outline: none; }
+.lf-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--lf-border, #d9d9d9);
+}
+.lf-modal-title { font-weight: 600; }
+.lf-modal-close {
+  width: 28px; height: 28px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--lf-muted, #6b7280);
+  border-radius: var(--lf-radius, 6px);
+}
+.lf-modal-close:hover { color: var(--lf-text, #1a1a1a); }
+.lf-modal-body { padding: 16px; overflow-y: auto; }
+/* The settings card sits flush inside the modal (no double frame). */
+.lf-modal-body .lf-settings { border: none; padding: 0; position: static; top: auto; }

@@ -185,9 +185,33 @@ interface FormBuilderProps {
      * defaults and returns the final list. See {@link AttributeEditorsInput}.
      */
     attributeEditors?: AttributeEditorsInput;
+    /**
+     * Where the field settings live:
+     * - `"panel"` (default): an inline third column (palette · canvas · settings).
+     * - `"modal"`: a modal that opens on field-select — frees the third column for
+     *   {@link FormBuilderProps.aside} (e.g. an AI-assist panel).
+     */
+    settings?: "panel" | "modal";
+    /**
+     * Content for the third column (only used with `settings="modal"`). The builder owns
+     * the palette + canvas; the host fills this slot — e.g. an AI assistant tied to its
+     * own backend. The host reads the live schema via {@link FormBuilderProps.onChange}.
+     */
+    aside?: ReactNode;
     className?: string;
 }
-declare function FormBuilder({ initialSchema, onChange, extraFields, attributeEditors, className }: FormBuilderProps): react.JSX.Element;
+/** Imperative handle (via `ref`) for replacing the schema without a remount. */
+interface FormBuilderHandle {
+    /**
+     * Replace the working schema — e.g. apply an AI-generated form — WITHOUT remounting
+     * the builder, so the {@link FormBuilderProps.aside} (an AI panel + its chat) and the
+     * undo history survive (the replace is itself undoable).
+     */
+    setSchema: (schema: FormSchema) => void;
+    /** Read the current working schema. */
+    getSchema: () => FormSchema;
+}
+declare const FormBuilder: react.ForwardRefExoticComponent<FormBuilderProps & react.RefAttributes<FormBuilderHandle>>;
 
 interface SettingsPanelProps {
     builder: UseFormBuilderResult;
@@ -211,4 +235,4 @@ declare function NodePreview({ entity }: {
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, FormBuilder, type FormBuilderProps, NodePreview, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };
+export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, FormBuilder, type FormBuilderHandle, type FormBuilderProps, NodePreview, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };

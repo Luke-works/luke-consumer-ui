@@ -100,7 +100,8 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo2, useState as useState4, useEffect as useEffect2, useRef as useRef3 } from "react";
+import { useMemo as useMemo2, useState as useState4, useEffect as useEffect2, useRef as useRef3, useImperativeHandle, forwardRef } from "react";
+import { createPortal } from "react-dom";
 import { FormRenderer } from "@lukeflow/form-react";
 
 // src/SettingsPanel.tsx
@@ -1034,10 +1035,12 @@ function labelOf(e) {
 
 // src/FormBuilder.tsx
 import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
-function FormBuilder({ initialSchema, onChange, extraFields, attributeEditors, className }) {
+var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
   const b = useFormBuilder(initialSchema);
+  useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = useState4(false);
   const editors = useMemo2(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
+  const modal = settings === "modal";
   const onChangeRef = useRef3(onChange);
   onChangeRef.current = onChange;
   const mounted = useRef3(false);
@@ -1055,13 +1058,51 @@ function FormBuilder({ initialSchema, onChange, extraFields, attributeEditors, c
       /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowPreview((p) => !p), "aria-pressed": showPreview, children: showPreview ? "Edit" : "Preview" }),
       /* @__PURE__ */ jsx4(ProblemsBadge, { builder: b })
     ] }),
-    showPreview ? /* @__PURE__ */ jsx4("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx4(FormRenderer, { schema: b.schema }) }) : /* @__PURE__ */ jsx4(CanvasDndProvider, { builder: b, children: /* @__PURE__ */ jsxs4("div", { className: "lf-builder-body", children: [
-      /* @__PURE__ */ jsx4(Palette, { builder: b, extra: extraFields }),
-      /* @__PURE__ */ jsx4(Canvas, { builder: b }),
-      /* @__PURE__ */ jsx4(SettingsPanel, { builder: b, editors })
-    ] }) }),
+    showPreview ? /* @__PURE__ */ jsx4("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx4(FormRenderer, { schema: b.schema }) }) : /* @__PURE__ */ jsxs4(CanvasDndProvider, { builder: b, children: [
+      /* @__PURE__ */ jsxs4("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
+        /* @__PURE__ */ jsx4(Palette, { builder: b, extra: extraFields }),
+        /* @__PURE__ */ jsx4(Canvas, { builder: b }),
+        modal ? aside && /* @__PURE__ */ jsx4("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx4(SettingsPanel, { builder: b, editors })
+      ] }),
+      modal && /* @__PURE__ */ jsx4(SettingsModal, { builder: b, editors })
+    ] }),
     /* @__PURE__ */ jsx4(Problems, { builder: b })
   ] });
+});
+function SettingsModal({ builder, editors }) {
+  const id = builder.selectedId;
+  const entity = id ? builder.schema.entities[id] : void 0;
+  const open = Boolean(id && entity);
+  const dialogRef = useRef3(null);
+  useEffect2(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") builder.select(null);
+    };
+    document.addEventListener("keydown", onKey);
+    dialogRef.current?.focus();
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, builder]);
+  if (!open) return null;
+  return createPortal(
+    /* @__PURE__ */ jsx4(
+      "div",
+      {
+        className: "lf-modal-overlay lf-builder",
+        onMouseDown: (e) => {
+          if (e.target === e.currentTarget) builder.select(null);
+        },
+        children: /* @__PURE__ */ jsxs4("div", { ref: dialogRef, className: "lf-modal", role: "dialog", "aria-modal": "true", "aria-label": "Field settings", tabIndex: -1, children: [
+          /* @__PURE__ */ jsxs4("div", { className: "lf-modal-header", children: [
+            /* @__PURE__ */ jsx4("span", { className: "lf-modal-title", children: "Field settings" }),
+            /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-modal-close", "aria-label": "Close settings", onClick: () => builder.select(null), children: "\u2715" })
+          ] }),
+          /* @__PURE__ */ jsx4("div", { className: "lf-modal-body", children: /* @__PURE__ */ jsx4(SettingsPanel, { builder, editors }) })
+        ] })
+      }
+    ),
+    document.body
+  );
 }
 function ProblemsBadge({ builder }) {
   const n = builder.problems.length;

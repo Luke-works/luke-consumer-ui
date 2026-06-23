@@ -16,13 +16,15 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { FormBuilder } from "@lukeflow/form-builder";
+import { FormBuilder, type FormBuilderHandle } from "@lukeflow/form-builder";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
-import { readSubmitMessage, type FormSchema } from "@lukeflow/form-core";
+import { camelCaseKeys, readSubmitMessage, type FormSchema } from "@lukeflow/form-core";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
+import AiAssistPanel from "./AiAssistPanel";
+import type { BuilderSchemaLike } from "../../lib/formAgentApi";
 import {
   checkIn,
   checkout,
@@ -71,12 +73,17 @@ export default function LukeBuilderPage() {
   const [status, setStatus] = useState<FormStatus>("draft");
   const [version, setVersion] = useState(0);
   const [submitMessage, setSubmitMessage] = useState("");
+  // Live schema mirrored to the AI panel (which reads it to build/modify the form).
+  const [liveSchema, setLiveSchema] = useState<BuilderSchemaLike | null>(null);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
   const latestRef = useRef<FormSchema | null>(null);
   const submitMsgRef = useRef("");
   const saveTimer = useRef<number | null>(null);
   const unsaved = useRef(false);
+  // Imperative handle: lets the AI apply a new schema WITHOUT remounting the builder,
+  // so the AI panel + its chat history (the `aside`) stay mounted across applies.
+  const builderRef = useRef<FormBuilderHandle>(null);
 
   useEffect(() => {
     if (!tenant || !id) return;
@@ -92,6 +99,7 @@ export default function LukeBuilderPage() {
         setSubmitMessage(sm);
         submitMsgRef.current = sm;
         latestRef.current = null;
+        setLiveSchema(parseSchema(f.schema) as unknown as BuilderSchemaLike);
         setLoading(false);
       })
       .catch(() => {
@@ -157,11 +165,20 @@ export default function LukeBuilderPage() {
   const handleChange = useCallback(
     (schema: FormSchema) => {
       latestRef.current = schema;
+      setLiveSchema(schema as unknown as BuilderSchemaLike); // keep the AI panel's view current
       if (!canEdit) return; // view-only: never persist edits.
       scheduleSave(schema);
     },
     [canEdit, scheduleSave],
   );
+
+  // Apply an AI-generated schema: normalize keys to camelCase (the agent emits snake_case
+  // without our uniqueness guards), push it into the builder via the imperative handle
+  // (no remount → the AI chat survives), and let onChange persist it.
+  const applyAiSchema = useCallback((schema: BuilderSchemaLike) => {
+    const normalized = camelCaseKeys(schema as unknown as FormSchema);
+    builderRef.current?.setSchema(normalized); // fires onChange → mirrors liveSchema + autosaves
+  }, []);
 
   // Flush a pending edit on unmount (best-effort — can't surface UI once gone).
   useEffect(
@@ -259,8 +276,8 @@ export default function LukeBuilderPage() {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-        New builder (preview) — powered by <code>@lukeflow/form-builder</code>. AI assist, “Test the form” and
-        sign-off are not wired here yet; use the classic designer for those.
+        New builder (preview) — powered by <code>@lukeflow/form-builder</code>. “Test the form” and sign-off are
+        not wired here yet; use the classic designer for those.
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -320,9 +337,22 @@ export default function LukeBuilderPage() {
 
       <FormBuilder
         key={`${form.id}-${reloadKey}`}
+        ref={builderRef}
         initialSchema={initialSchema}
         onChange={handleChange}
         attributeEditors={editors}
+        settings="modal"
+        aside={
+          canEdit ? (
+            <AiAssistPanel
+              tenant={tenant}
+              formId={id}
+              formName={form.name}
+              schema={liveSchema}
+              onApplied={applyAiSchema}
+            />
+          ) : undefined
+        }
       />
     </div>
   );
