@@ -346,7 +346,8 @@ function RenderEntity({ id, schema, ctx }) {
   const fs = ctx.form.state.fields[id];
   if (fs && !fs.isVisible) return null;
   const ft = ctx.reg.get(entity.type);
-  if (ft?.isGrid) return /* @__PURE__ */ jsx4(GridField, { entity, fs, ctx, schema });
+  if (ft?.isGrid)
+    return entity.type === "editGrid" ? /* @__PURE__ */ jsx4(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ jsx4(GridField, { entity, fs, ctx, schema });
   if (ft?.isStatic) return /* @__PURE__ */ jsx4(Static, { entity });
   if (ft?.isContainer) {
     if (entity.type === "tabs") return /* @__PURE__ */ jsx4(TabsContainer, { entity, schema, ctx });
@@ -483,7 +484,7 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ jsx4(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
         break;
       case "signature":
-        control = /* @__PURE__ */ jsx4(SignatureField, { a11y, value: fs.value, disabled, onChange: set });
+        control = /* @__PURE__ */ jsx4(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0 });
         break;
       default:
         control = /* @__PURE__ */ jsx4(
@@ -557,6 +558,7 @@ function GridField({
   ctx,
   schema
 }) {
+  const [page, setPage] = useState3(0);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -566,7 +568,6 @@ function GridField({
   const top = ctx.scope;
   const hasAggregates = cells.some((c) => typeof c.attributes?.aggregate === "string");
   const pageSize = Number(entity.attributes?.pageSize) || 0;
-  const [page, setPage] = useState3(0);
   const paged = pageSize > 0 && rows.length > pageSize;
   const pageCount = paged ? Math.ceil(rows.length / pageSize) : 1;
   const safePage = Math.min(page, pageCount - 1);
@@ -1084,12 +1085,200 @@ function SignatureField({
   a11y,
   value,
   disabled,
-  onChange
+  onChange,
+  penColor
 }) {
+  const canvasRef = useRef2(null);
+  const drawing = useRef2(false);
+  const painted = useRef2("");
   const dataUrl = typeof value === "string" ? value : "";
-  return /* @__PURE__ */ jsxs("div", { className: "lf-signature", children: [
-    dataUrl ? /* @__PURE__ */ jsx4("img", { src: dataUrl, alt: "Signature", className: "lf-signature-preview" }) : /* @__PURE__ */ jsx4("canvas", { id: a11y.id, "aria-label": "Signature pad", className: "lf-signature-pad", width: 300, height: 120, tabIndex: disabled ? -1 : 0 }),
-    !disabled && dataUrl && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-signature-clear", onClick: () => onChange(""), children: "Clear" })
+  const [hasInk, setHasInk] = useState3(Boolean(dataUrl));
+  const color = penColor || "#111827";
+  const context = () => canvasRef.current?.getContext("2d") ?? null;
+  useEffect2(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    if (dataUrl) {
+      if (dataUrl === painted.current) return;
+      painted.current = dataUrl;
+      let cancelled = false;
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled || drawing.current || painted.current !== dataUrl) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      };
+      img.src = dataUrl;
+      setHasInk(true);
+      return () => {
+        cancelled = true;
+        img.onload = null;
+      };
+    }
+    painted.current = "";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasInk(false);
+  }, [dataUrl]);
+  const at = (e) => {
+    const canvas = canvasRef.current;
+    const r = canvas.getBoundingClientRect();
+    const sx = r.width ? canvas.width / r.width : 1;
+    const sy = r.height ? canvas.height / r.height : 1;
+    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+  };
+  const onDown = (e) => {
+    if (disabled) return;
+    const ctx = context();
+    if (!ctx) return;
+    drawing.current = true;
+    const p = at(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = color;
+    try {
+      canvasRef.current?.setPointerCapture(e.pointerId);
+    } catch {
+    }
+  };
+  const onMove = (e) => {
+    if (!drawing.current) return;
+    const ctx = context();
+    if (!ctx) return;
+    const p = at(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    if (!hasInk) setHasInk(true);
+  };
+  const onUp = () => {
+    if (!drawing.current) return;
+    drawing.current = false;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    painted.current = url;
+    onChange(url);
+  };
+  const onUpRef = useRef2(onUp);
+  onUpRef.current = onUp;
+  useEffect2(() => {
+    const up = () => {
+      if (drawing.current) onUpRef.current();
+    };
+    if (typeof window === "undefined") return;
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
+  }, []);
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = context();
+    if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    painted.current = "";
+    setHasInk(false);
+    onChange("");
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
+    /* @__PURE__ */ jsxs("div", { className: "lf-signature-padwrap", children: [
+      /* @__PURE__ */ jsx4(
+        "canvas",
+        {
+          id: a11y.id,
+          ref: canvasRef,
+          "aria-label": "Signature pad",
+          "aria-invalid": a11y["aria-invalid"],
+          "aria-describedby": a11y["aria-describedby"],
+          className: "lf-signature-pad",
+          width: 600,
+          height: 200,
+          tabIndex: disabled ? -1 : 0,
+          onPointerDown: onDown,
+          onPointerMove: onMove,
+          onPointerUp: onUp,
+          onPointerCancel: onUp
+        }
+      ),
+      !hasInk && /* @__PURE__ */ jsx4("span", { className: "lf-signature-hint", "aria-hidden": "true", children: disabled ? "" : "Sign here" })
+    ] }),
+    !disabled && hasInk && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-signature-clear", onClick: clear, children: "Clear" })
+  ] });
+}
+function EditGridField({
+  entity,
+  fs,
+  ctx,
+  schema
+}) {
+  const [editing, setEditing] = useState3(null);
+  if (!fs) return null;
+  const key = fs.key;
+  const rows = Array.isArray(fs.value) ? fs.value : [];
+  const cells = childFields(entity, schema);
+  const disabled = ctx.readOnly;
+  const error = ctx.showErrors ? fs.error : null;
+  const top = ctx.scope;
+  const replace = (next) => ctx.form.setValues({ [key]: next }, { markTouched: true });
+  const startAdd = () => setEditing({ index: rows.length, draft: {} });
+  const startEdit = (i) => setEditing({ index: i, draft: { ...rows[i] ?? {} } });
+  const removeRow = (i) => replace(rows.filter((_, k) => k !== i));
+  const commitDraft = () => {
+    if (!editing) return;
+    const row = { ...editing.draft };
+    for (const c of cells) {
+      const ck = cellKey(c);
+      if (ck in row) {
+        const ft = ctx.reg.get(c.type);
+        row[ck] = ft ? ft.coerce(row[ck]) : row[ck];
+      }
+    }
+    const next = rows.slice();
+    if (editing.index >= rows.length) next.push(row);
+    else next[editing.index] = row;
+    replace(next);
+    setEditing(null);
+  };
+  const summary = (row) => cells.map((c) => {
+    const v = row?.[cellKey(c)];
+    return v == null || v === "" ? null : `${labelText(c.attributes) ?? cellKey(c)}: ${asText(v)}`;
+  }).filter(Boolean).join(" \xB7 ");
+  return /* @__PURE__ */ jsxs("div", { className: "lf-edit-grid", "data-type": "editGrid", children: [
+    /* @__PURE__ */ jsx4("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
+    rows.length > 0 && /* @__PURE__ */ jsx4("ul", { className: "lf-eg-rows", children: rows.map((row, i) => /* @__PURE__ */ jsxs("li", { className: "lf-eg-row", children: [
+      /* @__PURE__ */ jsx4("span", { className: "lf-eg-summary", children: summary(row) || /* @__PURE__ */ jsx4("em", { className: "lf-eg-empty", children: "Empty row" }) }),
+      !disabled && !editing && /* @__PURE__ */ jsxs("span", { className: "lf-eg-row-actions", children: [
+        /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-eg-edit", onClick: () => startEdit(i), children: ctx.t("Edit") }),
+        /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-eg-remove", onClick: () => removeRow(i), children: ctx.t("Remove") })
+      ] })
+    ] }, i)) }),
+    editing && /* @__PURE__ */ jsxs("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
+      cells.map((c) => {
+        const ck = cellKey(c);
+        if (!evaluateVisibility(c.attributes, { ...top, ...editing.draft })) return null;
+        const label = labelText(c.attributes) ?? ck;
+        return /* @__PURE__ */ jsxs("label", { className: "lf-eg-cell", children: [
+          /* @__PURE__ */ jsx4("span", { className: "lf-eg-cell-label", children: ctx.t(label) }),
+          /* @__PURE__ */ jsx4(
+            GridCell,
+            {
+              type: c.type,
+              value: editing.draft[ck],
+              disabled: false,
+              options: options(c.attributes),
+              onChange: (v) => setEditing((e) => e ? { ...e, draft: { ...e.draft, [ck]: v } } : e),
+              "aria-label": label
+            }
+          )
+        ] }, c.id);
+      }),
+      /* @__PURE__ */ jsxs("div", { className: "lf-eg-editor-actions", children: [
+        /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-eg-cancel", onClick: () => setEditing(null), children: ctx.t("Cancel") }),
+        /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-eg-save", onClick: commitDraft, children: ctx.t("Save") })
+      ] })
+    ] }),
+    !disabled && !editing && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-row-add", onClick: startAdd, children: ctx.t("Add another") }),
+    error && /* @__PURE__ */ jsx4("p", { role: "alert", className: "lf-error", children: error.message })
   ] });
 }
 

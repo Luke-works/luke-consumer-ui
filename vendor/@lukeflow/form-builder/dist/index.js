@@ -102,6 +102,7 @@ function useFormBuilder(initialSchema = EMPTY) {
 // src/FormBuilder.tsx
 import { useMemo as useMemo2, useState as useState4, useEffect as useEffect2, useRef as useRef4, useImperativeHandle, forwardRef } from "react";
 import { createPortal } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { FormRenderer } from "@lukeflow/form-react";
 
 // src/SettingsPanel.tsx
@@ -1016,10 +1017,11 @@ function Node({
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
   return /* @__PURE__ */ jsxs3("li", { className: "lf-node", "data-depth": depth, children: [
+    over === "before" && /* @__PURE__ */ jsx3(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ jsxs3(
       "div",
       {
-        className: `lf-node-row${selected ? " is-selected" : ""}${over ? ` is-drop-${over}` : ""}${hidden ? " is-hidden" : ""}`,
+        className: `lf-node-row${selected ? " is-selected" : ""}${over === "into" ? " is-drop-into" : ""}${hidden ? " is-hidden" : ""}`,
         "data-drop": over ?? void 0,
         onDragOver: (e) => dnd.overNode(e, id, isContainer),
         onDragLeave: dnd.leave,
@@ -1057,8 +1059,12 @@ function Node({
         ]
       }
     ),
-    isContainer && (children.length > 0 ? /* @__PURE__ */ jsx3("ol", { className: "lf-node-list", children: children.map((cid, i) => /* @__PURE__ */ jsx3(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }) : /* @__PURE__ */ jsx3(ContainerDropzone, { containerId: id, label: labelOf(entity) }))
+    isContainer && (children.length > 0 ? /* @__PURE__ */ jsx3("ol", { className: "lf-node-list", children: children.map((cid, i) => /* @__PURE__ */ jsx3(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }) : /* @__PURE__ */ jsx3(ContainerDropzone, { containerId: id, label: labelOf(entity) })),
+    over === "after" && /* @__PURE__ */ jsx3(DropIndicator, { pos: "after" })
   ] });
+}
+function DropIndicator({ pos }) {
+  return /* @__PURE__ */ jsx3("div", { className: `lf-drop-indicator is-${pos}`, "aria-hidden": "true", children: /* @__PURE__ */ jsx3("span", { className: "lf-drop-dot" }) });
 }
 function ContainerDropzone({ containerId, label }) {
   const dnd = useDnd();
@@ -1187,13 +1193,19 @@ function labelOf(e) {
 }
 
 // src/FormBuilder.tsx
-import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+import { Fragment as Fragment2, jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
 var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = useState4(false);
+  const [toast, setToast] = useState4(null);
   const editors = useMemo2(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
+  useEffect2(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
   const onChangeRef = useRef4(onChange);
   onChangeRef.current = onChange;
   const mounted = useRef4(false);
@@ -1208,21 +1220,104 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
     /* @__PURE__ */ jsxs4("div", { className: "lf-builder-toolbar", children: [
       /* @__PURE__ */ jsx4("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", children: "Undo" }),
       /* @__PURE__ */ jsx4("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", children: "Redo" }),
-      /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowPreview((p) => !p), "aria-pressed": showPreview, children: showPreview ? "Edit" : "Preview" }),
+      /* @__PURE__ */ jsx4("button", { type: "button", onClick: () => setShowPreview(true), children: "Preview" }),
       /* @__PURE__ */ jsx4(ProblemsBadge, { builder: b })
     ] }),
-    showPreview ? /* @__PURE__ */ jsx4("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx4(FormRenderer, { schema: b.schema }) }) : /* @__PURE__ */ jsxs4(CanvasDndProvider, { builder: b, children: [
+    /* @__PURE__ */ jsxs4(CanvasDndProvider, { builder: b, children: [
       /* @__PURE__ */ jsxs4("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
         /* @__PURE__ */ jsx4(Palette, { builder: b, extra: extraFields }),
         /* @__PURE__ */ jsx4(Canvas, { builder: b }),
         modal ? aside && /* @__PURE__ */ jsx4("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx4(SettingsPanel, { builder: b, editors })
       ] }),
-      modal && /* @__PURE__ */ jsx4(SettingsModal, { builder: b, editors })
+      modal && /* @__PURE__ */ jsx4(SettingsModal, { builder: b, editors, notify: setToast })
     ] }),
-    /* @__PURE__ */ jsx4(Problems, { builder: b })
+    showPreview && /* @__PURE__ */ jsx4(PreviewModal, { schema: b.schema, onClose: () => setShowPreview(false), notify: setToast }),
+    /* @__PURE__ */ jsx4(Problems, { builder: b }),
+    toast && createPortal(
+      /* @__PURE__ */ jsxs4("div", { className: "lf-toast lf-builder", role: "status", children: [
+        /* @__PURE__ */ jsx4("span", { className: "lf-toast-tick", "aria-hidden": "true", children: "\u2713" }),
+        " ",
+        toast
+      ] }),
+      document.body
+    )
   ] });
 });
-function SettingsModal({ builder, editors }) {
+function PreviewModal({ schema, onClose, notify }) {
+  const [view, setView] = useState4("form");
+  const [copied, setCopied] = useState4(false);
+  const dialogRef = useRef4(null);
+  const copyTimer = useRef4(null);
+  const json = useMemo2(() => JSON.stringify(schema, null, 2), [schema]);
+  useEffect2(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey, true);
+    dialogRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, [onClose]);
+  const copyJson = () => {
+    const p = navigator.clipboard?.writeText(json);
+    if (!p) return;
+    p.then(() => {
+      setCopied(true);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {
+    });
+  };
+  const openInNewTab = () => {
+    if (!openPreviewWindow(schema)) notify("Pop-up blocked \u2014 allow pop-ups to open the preview in a new tab.");
+  };
+  return createPortal(
+    /* @__PURE__ */ jsx4("div", { className: "lf-modal-overlay lf-builder", onMouseDown: (e) => e.target === e.currentTarget && onClose(), children: /* @__PURE__ */ jsxs4("div", { ref: dialogRef, className: "lf-modal lf-preview-modal", role: "dialog", "aria-modal": "true", "aria-label": "Form preview", tabIndex: -1, children: [
+      /* @__PURE__ */ jsxs4("div", { className: "lf-modal-header", children: [
+        /* @__PURE__ */ jsx4("span", { className: "lf-modal-title", children: "Preview" }),
+        /* @__PURE__ */ jsxs4("div", { className: "lf-modal-actions", children: [
+          /* @__PURE__ */ jsxs4("div", { className: "lf-seg", role: "tablist", "aria-label": "Preview mode", children: [
+            /* @__PURE__ */ jsx4("button", { type: "button", role: "tab", "aria-selected": view === "form", className: `lf-seg-btn${view === "form" ? " is-active" : ""}`, onClick: () => setView("form"), children: "Form" }),
+            /* @__PURE__ */ jsx4("button", { type: "button", role: "tab", "aria-selected": view === "json", className: `lf-seg-btn${view === "json" ? " is-active" : ""}`, onClick: () => setView("json"), children: "JSON" })
+          ] }),
+          view === "json" && /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-modal-ghost", onClick: copyJson, children: copied ? "Copied \u2713" : "Copy" }),
+          /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-modal-ghost", onClick: openInNewTab, children: "Open in new tab \u2197" }),
+          /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close preview", title: "Close", onClick: onClose, children: "\u2715" })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx4("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ jsx4("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ jsx4(FormRenderer, { schema }) }) : /* @__PURE__ */ jsx4("pre", { className: "lf-json", "data-testid": "preview-json", children: json }) })
+    ] }) }),
+    document.body
+  );
+}
+function openPreviewWindow(schema) {
+  if (typeof window === "undefined") return false;
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  const doc = w.document;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Form preview</title></head><body></body></html>');
+  doc.close();
+  for (const node of Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))) {
+    doc.head.appendChild(node.cloneNode(true));
+  }
+  doc.body.style.margin = "0";
+  doc.body.style.padding = "24px";
+  doc.body.style.maxWidth = "720px";
+  const mount = doc.createElement("div");
+  mount.className = "lf-builder";
+  doc.body.appendChild(mount);
+  const root = createRoot(mount);
+  root.render(/* @__PURE__ */ jsx4(FormRenderer, { schema }));
+  w.addEventListener("beforeunload", () => root.unmount());
+  window.addEventListener("beforeunload", () => root.unmount(), { once: true });
+  return true;
+}
+function SettingsModal({ builder, editors, notify }) {
   const id = builder.selectedId;
   const entity = id ? builder.schema.entities[id] : void 0;
   const open = Boolean(id && entity);
@@ -1230,22 +1325,37 @@ function SettingsModal({ builder, editors }) {
   const select = builder.select;
   const snapshot = useRef4(null);
   const schema = builder.schema;
-  useEffect2(() => {
+  const [confirmDiscard, setConfirmDiscard] = useState4(false);
+  const openedKey = useRef4(null);
+  const key = open ? id : null;
+  if (key !== openedKey.current) {
+    openedKey.current = key;
     if (open) snapshot.current = schema;
-  }, [open, id]);
-  const saveClose = () => select(null);
-  const discardClose = () => {
-    if (snapshot.current) builder.setSchema(snapshot.current);
+    if (confirmDiscard) setConfirmDiscard(false);
+  }
+  const dirty = open && snapshot.current != null && snapshot.current !== schema;
+  const close = () => select(null);
+  const saveClose = (explicit = false) => {
+    if (explicit && dirty) notify("Your settings have been successfully updated.");
     select(null);
   };
+  const doDiscard = () => {
+    if (snapshot.current) builder.setSchema(snapshot.current);
+    setConfirmDiscard(false);
+    select(null);
+  };
+  const latest = useRef4({ saveClose, confirmDiscard });
+  latest.current = { saveClose, confirmDiscard };
   useEffect2(() => {
     if (!open) return;
     const onKey = (e) => {
-      if (e.key === "Escape") select(null);
+      if (e.key !== "Escape") return;
+      if (latest.current.confirmDiscard) setConfirmDiscard(false);
+      else latest.current.saveClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, select]);
+  }, [open]);
   useEffect2(() => {
     if (open) dialogRef.current?.focus();
   }, [open, id]);
@@ -1256,23 +1366,29 @@ function SettingsModal({ builder, editors }) {
       {
         className: "lf-modal-overlay lf-builder",
         onMouseDown: (e) => {
-          if (e.target === e.currentTarget) saveClose();
+          if (e.target !== e.currentTarget) return;
+          if (confirmDiscard) return;
+          saveClose();
         },
         children: /* @__PURE__ */ jsxs4("div", { ref: dialogRef, className: "lf-modal", role: "dialog", "aria-modal": "true", "aria-label": "Field settings", tabIndex: -1, children: [
           /* @__PURE__ */ jsxs4("div", { className: "lf-modal-header", children: [
-            /* @__PURE__ */ jsx4("span", { className: "lf-modal-title", children: "Field settings" }),
-            /* @__PURE__ */ jsxs4("div", { className: "lf-modal-actions", children: [
-              /* @__PURE__ */ jsxs4("button", { type: "button", className: "lf-modal-discard", onClick: discardClose, children: [
-                /* @__PURE__ */ jsx4("span", { className: "lf-modal-x", "aria-hidden": "true", children: "\u2715" }),
-                " Discard & close"
-              ] }),
-              /* @__PURE__ */ jsxs4("button", { type: "button", className: "lf-modal-save", onClick: saveClose, children: [
-                /* @__PURE__ */ jsx4("span", { className: "lf-modal-tick", "aria-hidden": "true", children: "\u2713" }),
-                " Save & close"
-              ] })
-            ] })
+            /* @__PURE__ */ jsxs4("span", { className: "lf-modal-title", children: [
+              "Field settings",
+              dirty ? /* @__PURE__ */ jsx4("span", { className: "lf-modal-dirty", children: " \u2022 Unsaved changes" }) : null
+            ] }),
+            /* @__PURE__ */ jsx4("div", { className: "lf-modal-actions", children: dirty ? /* @__PURE__ */ jsxs4(Fragment2, { children: [
+              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--discard", "aria-label": "Discard & close", title: "Discard & close", onClick: () => setConfirmDiscard(true), children: "\u2715" }),
+              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--save", "aria-label": "Save & close", title: "Save & close", onClick: () => saveClose(true), children: "\u2713" })
+            ] }) : /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close", title: "Close", onClick: close, children: "\u2715" }) })
           ] }),
-          /* @__PURE__ */ jsx4("div", { className: "lf-modal-body", children: /* @__PURE__ */ jsx4(SettingsPanel, { builder, editors }) })
+          /* @__PURE__ */ jsx4("div", { className: "lf-modal-body", children: /* @__PURE__ */ jsx4(SettingsPanel, { builder, editors }) }),
+          confirmDiscard && /* @__PURE__ */ jsx4("div", { className: "lf-confirm-overlay", onMouseDown: (e) => e.target === e.currentTarget && setConfirmDiscard(false), children: /* @__PURE__ */ jsxs4("div", { className: "lf-confirm", role: "alertdialog", "aria-modal": "true", "aria-label": "Discard changes?", children: [
+            /* @__PURE__ */ jsx4("p", { className: "lf-confirm-msg", children: "Are you sure? All your changes for this field will be lost." }),
+            /* @__PURE__ */ jsxs4("div", { className: "lf-confirm-actions", children: [
+              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-confirm-no", onClick: () => setConfirmDiscard(false), children: "No" }),
+              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-confirm-yes", onClick: doDiscard, children: "Yes, discard" })
+            ] })
+          ] }) })
         ] })
       }
     ),

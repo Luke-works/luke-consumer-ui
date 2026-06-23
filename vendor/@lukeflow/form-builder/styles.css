@@ -91,8 +91,9 @@
   border-radius: var(--lf-radius, 6px);
   background: var(--lf-bg, #fff);
 }
-.lf-node-list { list-style: none; margin: 0; padding: 0; }
-.lf-node[data-depth] > .lf-node-list { margin-left: 16px; border-left: 1px dashed var(--lf-border, #d9d9d9); padding-left: 8px; }
+.lf-node-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lf-node { position: relative; }
+.lf-node[data-depth] > .lf-node-list { margin: 6px 0 0 16px; border-left: 1px dashed var(--lf-border, #d9d9d9); padding-left: 8px; }
 .lf-node-row {
   display: flex;
   align-items: flex-start;
@@ -104,9 +105,33 @@
 .lf-node-row.is-selected { border-color: var(--lf-primary, #2563eb); background: var(--lf-tint, #eff6ff); }
 .lf-node-grip { cursor: grab; color: var(--lf-muted, #6b7280); user-select: none; line-height: 1; padding: 2px; }
 .lf-node-grip:active { cursor: grabbing; }
-.lf-node-row.is-drop-before { box-shadow: inset 0 2px 0 0 var(--lf-primary, #2563eb); }
-.lf-node-row.is-drop-after { box-shadow: inset 0 -2px 0 0 var(--lf-primary, #2563eb); }
 .lf-node-row.is-drop-into { background: var(--lf-tint, #eff6ff); border-color: var(--lf-primary, #2563eb); }
+
+/* A clear insertion separator placed IN THE GAP between rows (not on a field's edge)
+   so the drop target is unmistakable: a primary-colored bar with a leading ring. */
+.lf-drop-indicator { position: absolute; left: 0; right: 0; height: 0; z-index: 3; pointer-events: none; }
+.lf-drop-indicator.is-before { top: -4px; }
+.lf-drop-indicator.is-after { bottom: -4px; }
+.lf-drop-indicator::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 2px;
+  top: -1.5px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lf-primary, #2563eb);
+}
+.lf-drop-dot {
+  position: absolute;
+  left: 8px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--lf-primary, #2563eb);
+  background: var(--lf-bg, #fff);
+}
 .lf-node-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
 .lf-node-select {
   display: inline-flex;
@@ -360,36 +385,140 @@
   border-bottom: 1px solid var(--lf-border, #d9d9d9);
 }
 .lf-modal-title { font-weight: 600; }
+.lf-modal-dirty { font-weight: 500; font-size: 0.78rem; color: #b45309; }
 .lf-modal-actions { display: flex; align-items: center; gap: 8px; }
-.lf-modal-discard,
-.lf-modal-save {
+
+/* Circular icon actions (✓ save / ✕ discard / ✕ close). */
+.lf-iconbtn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  background: var(--lf-bg, #fff);
+  color: var(--lf-muted, #6b7280);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.12s ease, background 0.12s ease;
+}
+.lf-iconbtn:hover { transform: translateY(-1px); }
+.lf-iconbtn:focus-visible { outline: 2px solid var(--lf-primary, #2563eb); outline-offset: 2px; }
+.lf-iconbtn--save { background: var(--lf-primary, #2563eb); border-color: var(--lf-primary, #2563eb); color: #fff; }
+.lf-iconbtn--save:hover { filter: brightness(0.95); }
+.lf-iconbtn--discard { color: var(--lf-error, #dc2626); border-color: var(--lf-error, #dc2626); }
+.lf-iconbtn--discard:hover { background: var(--lf-error, #dc2626); color: #fff; }
+.lf-iconbtn--close:hover { color: var(--lf-text, #1a1a1a); border-color: var(--lf-muted, #6b7280); }
+
+/* Ghost text actions used in the preview modal header. */
+.lf-modal-ghost {
   padding: 6px 12px;
   font: inherit;
   font-size: 0.82rem;
-  font-weight: 500;
   border-radius: var(--lf-radius, 6px);
   border: 1px solid var(--lf-border, #d9d9d9);
+  background: var(--lf-bg, #fff);
+  color: var(--lf-text, #1a1a1a);
   cursor: pointer;
 }
-.lf-modal-discard { background: var(--lf-bg, #fff); color: var(--lf-muted, #6b7280); }
-.lf-modal-discard:hover { color: var(--lf-error, #dc2626); border-color: var(--lf-error, #dc2626); }
-.lf-modal-save { background: var(--lf-primary, #2563eb); color: #fff; border-color: var(--lf-primary, #2563eb); }
-.lf-modal-save:hover { filter: brightness(0.95); }
-.lf-modal-tick,
-.lf-modal-x { font-weight: 700; }
-.lf-modal-close {
-  width: 28px; height: 28px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--lf-muted, #6b7280);
-  border-radius: var(--lf-radius, 6px);
-}
-.lf-modal-close:hover { color: var(--lf-text, #1a1a1a); }
+.lf-modal-ghost:hover { border-color: var(--lf-primary, #2563eb); color: var(--lf-primary, #2563eb); }
+
+/* Segmented Form / JSON switch. */
+.lf-seg { display: inline-flex; border: 1px solid var(--lf-border, #d9d9d9); border-radius: 999px; overflow: hidden; }
+.lf-seg-btn { padding: 5px 14px; border: none; background: var(--lf-bg, #fff); color: var(--lf-muted, #6b7280); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.lf-seg-btn.is-active { background: var(--lf-primary, #2563eb); color: #fff; }
+
 .lf-modal-body { padding: 0 20px 20px; overflow-y: auto; }
+/* Preview modal: roomier, and a readable JSON view. */
+.lf-preview-modal { max-width: 820px; }
+.lf-preview-modal .lf-modal-body { padding-top: 16px; }
+.lf-json {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: rgba(127, 127, 127, 0.05);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  max-height: 60vh;
+}
+
+/* Confirm-discard dialog (nested over the settings modal). */
+.lf-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(16, 24, 40, 0.4);
+  border-radius: inherit;
+}
+.lf-confirm {
+  width: 100%;
+  max-width: 360px;
+  padding: 18px 18px 16px;
+  background: var(--lf-bg, #fff);
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: calc(var(--lf-radius, 6px) * 1.5);
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.24);
+}
+.lf-confirm-msg { margin: 0 0 16px; font-size: 0.88rem; color: var(--lf-text, #1a1a1a); }
+.lf-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.lf-confirm-no {
+  padding: 6px 14px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  font: inherit;
+  cursor: pointer;
+}
+.lf-confirm-yes {
+  padding: 6px 14px;
+  border: 1px solid var(--lf-error, #dc2626);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-error, #dc2626);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Success toast (portaled). */
+.lf-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.28);
+}
+.lf-toast-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
 /* The settings card sits flush inside the modal (no double frame). */
 .lf-modal-body .lf-settings { border: none; padding: 0; position: static; top: auto; }
 /* The modal header already names this, so drop the panel's own heading. */
