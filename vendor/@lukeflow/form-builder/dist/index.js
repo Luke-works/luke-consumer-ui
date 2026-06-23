@@ -109,6 +109,7 @@ import { FormRenderer } from "@lukeflow/form-react";
 import { useEffect, useRef as useRef2, useState as useState2 } from "react";
 import {
   parseExpression,
+  evaluateExpression,
   createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry2
 } from "@lukeflow/form-core";
 
@@ -169,6 +170,27 @@ function createDefaultAttributeEditors() {
     { id: "customClass", tab: "display", attribute: "customClass", label: "Custom CSS class", control: "text", order: 60 },
     { id: "hidden", tab: "display", attribute: "hidden", label: "Hidden", control: "checkbox", order: 70 },
     { id: "disabled", tab: "display", attribute: "disabled", label: "Disabled", control: "checkbox", order: 80, when: data },
+    // Panel-like containers: collapse + a color theme for different purposes.
+    { id: "collapsible", tab: "display", attribute: "collapsible", label: "Collapsible", control: "checkbox", order: 90, appliesTo: ["panel", "well", "fieldset"] },
+    { id: "collapsed", tab: "display", attribute: "collapsed", label: "Initially collapsed", control: "checkbox", order: 91, appliesTo: ["panel", "well", "fieldset"], when: (e) => Boolean(e.attributes?.collapsible) },
+    {
+      id: "panelTheme",
+      tab: "display",
+      attribute: "theme",
+      label: "Color theme",
+      control: "select",
+      order: 92,
+      appliesTo: ["panel", "well", "fieldset"],
+      hint: "Tint the panel header/border to signal its purpose.",
+      options: [
+        { label: "Primary", value: "primary" },
+        { label: "Secondary", value: "secondary" },
+        { label: "Info", value: "info" },
+        { label: "Success", value: "success" },
+        { label: "Warning", value: "warning" },
+        { label: "Danger", value: "danger" }
+      ]
+    },
     // ── DATA ─────────────────────────────────────────────────────────────────
     { id: "options", tab: "data", attribute: "options", label: "Options", control: "options", order: 1, when: optioned, hint: 'One per line \u2014 "Label|value" or just "Label".' },
     {
@@ -643,9 +665,18 @@ var LOGIC_ACTIONS = ["show", "hide", "require", "optional", "enable", "disable",
 var WHEN_RE = /^\s*([A-Za-z_$][\w$]*)\s*(==|!=|>=|<=|>|<)\s*(.+?)\s*$/;
 function LogicRules({ builder, id, entity }) {
   const fields = otherFieldKeys(builder.schema, id);
+  const typeByKey = {};
+  for (const e of Object.values(builder.schema.entities ?? {})) {
+    const k = e.attributes?.key;
+    if (typeof k === "string" && k) typeByKey[k] = e.type;
+  }
   const readRules = () => Array.isArray(entity.attributes.logic) ? entity.attributes.logic.map(parseRule) : [];
   const [parsed, setParsed] = useState2(readRules);
-  useEffect(() => setParsed(readRules()), [id]);
+  const [testVals, setTestVals] = useState2({});
+  useEffect(() => {
+    setParsed(readRules());
+    setTestVals({});
+  }, [id]);
   const commit = (next) => {
     setParsed(next);
     const logic = next.map((s) => ({
@@ -657,76 +688,177 @@ function LogicRules({ builder, id, entity }) {
   };
   const setRule = (i, p) => commit(parsed.map((r, j) => j === i ? { ...r, ...p } : r));
   const setCond = (i, j, p) => setRule(i, { conds: parsed[i].conds.map((c, k) => k === j ? { ...c, ...p } : c) });
+  const setTest = (i, field, v) => setTestVals((prev) => ({ ...prev, [i]: { ...prev[i] ?? {}, [field]: v } }));
+  const removeRule = (i) => {
+    commit(parsed.filter((_, j) => j !== i));
+    setTestVals((prev) => {
+      const remapped = {};
+      let n = 0;
+      for (let k = 0; k < parsed.length; k++) {
+        if (k === i) continue;
+        if (prev[k]) remapped[n] = prev[k];
+        n++;
+      }
+      return remapped;
+    });
+  };
   return /* @__PURE__ */ jsxs("fieldset", { className: "lf-settings-logic", children: [
     /* @__PURE__ */ jsx("legend", { children: "Conditional rules" }),
     parsed.length === 0 && /* @__PURE__ */ jsx("p", { className: "lf-empty", children: "No rules." }),
-    parsed.map((r, i) => /* @__PURE__ */ jsxs("div", { className: "lf-logic-rule", role: "group", "aria-label": `Rule ${i + 1}`, children: [
-      /* @__PURE__ */ jsxs("div", { className: "lf-logic-when-head", children: [
-        /* @__PURE__ */ jsx("span", { className: "lf-logic-when", children: "When" }),
-        r.conds.length > 1 && /* @__PURE__ */ jsxs(Fragment, { children: [
-          /* @__PURE__ */ jsxs("select", { className: "lf-logic-join-sel", "aria-label": `Rule ${i + 1} match`, value: r.join, onChange: (e) => setRule(i, { join: e.target.value }), children: [
-            /* @__PURE__ */ jsx("option", { value: "and", children: "all of (AND)" }),
-            /* @__PURE__ */ jsx("option", { value: "or", children: "any of (OR)" })
-          ] }),
-          /* @__PURE__ */ jsx("span", { children: "of these:" })
-        ] })
-      ] }),
-      r.conds.map((c, j) => /* @__PURE__ */ jsxs("div", { className: "lf-logic-cond", children: [
-        j > 0 && /* @__PURE__ */ jsx("span", { className: "lf-logic-join", children: r.join === "and" ? "AND" : "OR" }),
-        /* @__PURE__ */ jsxs("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} field`, value: c.field, onChange: (e) => setCond(i, j, { field: e.target.value }), children: [
-          /* @__PURE__ */ jsx("option", { value: "" }),
-          fields.map((f) => /* @__PURE__ */ jsx("option", { value: f, children: f }, f))
+    parsed.map((r, i) => {
+      const usedFields = r.raw != null ? fields.filter((f) => wordPresent(r.raw, f)) : [...new Set(r.conds.map((c) => c.field).filter(Boolean))];
+      const when = buildWhen(r);
+      const scope = coerceScope(testVals[i] ?? {}, typeByKey);
+      const result = when ? Boolean(evaluateExpression(when, scope)) : null;
+      return /* @__PURE__ */ jsxs("div", { className: "lf-logic-rule", role: "group", "aria-label": `Rule ${i + 1}`, children: [
+        r.raw != null ? /* @__PURE__ */ jsxs("div", { className: "lf-logic-advanced", children: [
+          /* @__PURE__ */ jsx("span", { className: "lf-logic-advanced-label", children: "When (advanced expression)" }),
+          /* @__PURE__ */ jsx(
+            "textarea",
+            {
+              className: "lf-code",
+              "aria-label": `Rule ${i + 1} expression`,
+              spellCheck: false,
+              rows: 2,
+              value: r.raw,
+              onChange: (e) => setRule(i, { raw: e.target.value })
+            }
+          ),
+          /* @__PURE__ */ jsx("span", { className: "lf-setting-hint", children: "This expression can't be split into simple conditions \u2014 edit it directly." })
+        ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+          /* @__PURE__ */ jsx("div", { className: "lf-logic-when-head", children: /* @__PURE__ */ jsx("span", { className: "lf-logic-when", children: "When" }) }),
+          r.conds.map((c, j) => /* @__PURE__ */ jsxs("div", { className: "lf-logic-cond", children: [
+            j > 0 && /* @__PURE__ */ jsxs("select", { className: "lf-logic-conn", "aria-label": `Rule ${i + 1} condition ${j + 1} connector`, value: c.connector ?? "and", onChange: (e) => setCond(i, j, { connector: e.target.value }), children: [
+              /* @__PURE__ */ jsx("option", { value: "and", children: "AND" }),
+              /* @__PURE__ */ jsx("option", { value: "or", children: "OR" })
+            ] }),
+            /* @__PURE__ */ jsxs("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} field`, value: c.field, onChange: (e) => setCond(i, j, { field: e.target.value }), children: [
+              /* @__PURE__ */ jsx("option", { value: "" }),
+              fields.map((f) => /* @__PURE__ */ jsx("option", { value: f, children: f }, f))
+            ] }),
+            /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} operator`, value: c.op, onChange: (e) => setCond(i, j, { op: e.target.value }), children: LOGIC_OPS.map((o) => /* @__PURE__ */ jsx("option", { value: o.op, children: o.label }, o.op)) }),
+            /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} condition ${j + 1} value`, value: c.value, onChange: (e) => setCond(i, j, { value: e.target.value }) }),
+            r.conds.length > 1 && /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-cond-remove", "aria-label": `Remove condition ${j + 1} of rule ${i + 1}`, onClick: () => setRule(i, { conds: r.conds.filter((_, k) => k !== j) }), children: "\xD7" })
+          ] }, j)),
+          /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-add-cond", onClick: () => setRule(i, { conds: [...r.conds, emptyCond()] }), children: "+ Add condition" })
         ] }),
-        /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} condition ${j + 1} operator`, value: c.op, onChange: (e) => setCond(i, j, { op: e.target.value }), children: LOGIC_OPS.map((o) => /* @__PURE__ */ jsx("option", { value: o.op, children: o.label }, o.op)) }),
-        /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} condition ${j + 1} value`, value: c.value, onChange: (e) => setCond(i, j, { value: e.target.value }) }),
-        r.conds.length > 1 && /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-cond-remove", "aria-label": `Remove condition ${j + 1} of rule ${i + 1}`, onClick: () => setRule(i, { conds: r.conds.filter((_, k) => k !== j) }), children: "\xD7" })
-      ] }, j)),
-      /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-add-cond", onClick: () => setRule(i, { conds: [...r.conds, emptyCond()] }), children: "+ Add condition" }),
-      /* @__PURE__ */ jsxs("div", { className: "lf-logic-then", children: [
-        /* @__PURE__ */ jsx("span", { className: "lf-logic-then-label", children: "\u2192 then" }),
-        /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ jsx("option", { value: act, children: act }, act)) }),
-        r.action === "setValue" && /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} set value`, placeholder: "value", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) }),
-        /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-rule-remove", "aria-label": `Remove rule ${i + 1}`, onClick: () => commit(parsed.filter((_, j) => j !== i)), children: "Remove rule" })
-      ] })
-    ] }, i)),
-    /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-add", onClick: () => commit([...parsed, { join: "and", conds: [{ field: fields[0] ?? "", op: "==", value: "" }], action: "show", setTo: "" }]), children: "Add rule" })
+        usedFields.length > 0 && /* @__PURE__ */ jsxs("div", { className: "lf-logic-test", role: "group", "aria-label": `Rule ${i + 1} test`, children: [
+          /* @__PURE__ */ jsx("span", { className: "lf-logic-test-label", children: "Test:" }),
+          usedFields.map((f) => /* @__PURE__ */ jsxs("label", { className: "lf-logic-test-field", children: [
+            /* @__PURE__ */ jsx("span", { className: "lf-logic-test-key", children: f }),
+            /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} test ${f}`, value: testVals[i]?.[f] ?? "", onChange: (e) => setTest(i, f, e.target.value) })
+          ] }, f)),
+          /* @__PURE__ */ jsxs("span", { className: `lf-logic-result${result ? " is-true" : " is-false"}`, "aria-live": "polite", children: [
+            "\u21D2 ",
+            result ? "true" : "false"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "lf-logic-then", children: [
+          /* @__PURE__ */ jsx("span", { className: "lf-logic-then-label", children: "\u2192 then" }),
+          /* @__PURE__ */ jsx("select", { "aria-label": `Rule ${i + 1} action`, value: r.action, onChange: (e) => setRule(i, { action: e.target.value }), children: LOGIC_ACTIONS.map((act) => /* @__PURE__ */ jsx("option", { value: act, children: act }, act)) }),
+          r.action === "setValue" && /* @__PURE__ */ jsx("input", { "aria-label": `Rule ${i + 1} set value`, placeholder: "value", value: r.setTo, onChange: (e) => setRule(i, { setTo: e.target.value }) }),
+          /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-rule-remove", "aria-label": `Remove rule ${i + 1}`, onClick: () => removeRule(i), children: "Remove rule" })
+        ] })
+      ] }, i);
+    }),
+    /* @__PURE__ */ jsx("button", { type: "button", className: "lf-logic-add", onClick: () => commit([...parsed, { conds: [{ field: fields[0] ?? "", op: "==", value: "" }], action: "show", setTo: "" }]), children: "Add rule" })
   ] });
 }
 function emptyCond() {
-  return { field: "", op: "==", value: "" };
-}
-function parseCond(s) {
-  const m = WHEN_RE.exec(s.trim());
-  return { field: m?.[1] ?? "", op: m?.[2] ?? "==", value: m ? unLiteral(m[3] ?? "") : "" };
+  return { field: "", op: "==", value: "", connector: "and" };
 }
 function parseRule(r) {
   const when = typeof r.when === "string" ? r.when : "";
-  let join = "and";
-  let parts;
-  if (/\sor\s/.test(when) && !/\sand\s/.test(when)) {
-    join = "or";
-    parts = when.split(/\s+or\s+/);
-  } else if (/\sand\s/.test(when)) {
-    join = "and";
-    parts = when.split(/\s+and\s+/);
-  } else {
-    parts = when ? [when] : [];
+  const action = typeof r.action === "string" ? r.action : "show";
+  const setTo = typeof r.value === "string" ? unLiteral(r.value) : "";
+  if (!when.trim()) return { conds: [emptyCond()], action, setTo };
+  const parts = splitConds(when);
+  const conds = [];
+  for (let k = 0; k < parts.length; k += 2) {
+    const m = WHEN_RE.exec((parts[k] ?? "").trim());
+    if (!m) return { conds: [], action, setTo, raw: when };
+    const c = { field: m[1] ?? "", op: m[2] ?? "==", value: unLiteral(m[3] ?? "") };
+    if (k > 0) c.connector = parts[k - 1] === "or" ? "or" : "and";
+    conds.push(c);
   }
-  const conds = parts.map(parseCond);
-  return {
-    join,
-    conds: conds.length ? conds : [emptyCond()],
-    action: typeof r.action === "string" ? r.action : "show",
-    setTo: typeof r.value === "string" ? unLiteral(r.value) : ""
-  };
+  return conds.length ? { conds, action, setTo } : { conds: [], action, setTo, raw: when };
+}
+function splitConds(when) {
+  const out = [];
+  let token = "";
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < when.length; i++) {
+    const ch = when[i];
+    if (quote) {
+      token += ch;
+      if (ch === quote && when[i - 1] !== "\\") quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      token += ch;
+      continue;
+    }
+    if (ch === "(") {
+      depth++;
+      token += ch;
+      continue;
+    }
+    if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+      token += ch;
+      continue;
+    }
+    if (depth === 0) {
+      const m = /^\s+(and|or)\s+/.exec(when.slice(i));
+      if (m) {
+        out.push(token);
+        out.push(m[1]);
+        token = "";
+        i += m[0].length - 1;
+        continue;
+      }
+    }
+    token += ch;
+  }
+  out.push(token);
+  return out;
 }
 function buildWhen(rule) {
-  const exprs = rule.conds.filter((c) => c.field).map((c) => `${c.field} ${c.op} ${toLiteral(c.value)}`);
-  return exprs.join(` ${rule.join} `);
+  if (rule.raw != null) return rule.raw;
+  const valid = rule.conds.filter((c) => c.field);
+  if (valid.length === 0) return "";
+  let out = `${valid[0].field} ${valid[0].op} ${toLiteral(valid[0].value)}`;
+  for (let k = 1; k < valid.length; k++) {
+    const c = valid[k];
+    const conn = c.connector === "or" ? "or" : "and";
+    out += ` ${conn} ${c.field} ${c.op} ${toLiteral(c.value)}`;
+  }
+  return out;
+}
+function wordPresent(s, word) {
+  return new RegExp(`(?:^|[^\\w$])${escapeRegExp(word)}(?:$|[^\\w$])`).test(s);
+}
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function coerceScope(vals, typeByKey) {
+  const out = {};
+  for (const [k, raw] of Object.entries(vals)) {
+    const ft = typeByKey[k] ? REGISTRY2.get(typeByKey[k]) : void 0;
+    if (ft?.valueType === "boolean") out[k] = raw === "true" || raw === "1";
+    else if (ft?.valueType === "number") out[k] = raw.trim() === "" ? "" : Number.isNaN(Number(raw)) ? raw : Number(raw);
+    else if (ft) out[k] = raw;
+    else if (raw === "true" || raw === "false") out[k] = raw === "true";
+    else if (raw.trim() !== "" && !Number.isNaN(Number(raw))) out[k] = Number(raw);
+    else out[k] = raw;
+  }
+  return out;
 }
 function toLiteral(v) {
   if (v === "true" || v === "false") return v;
-  if (v.trim() !== "" && !Number.isNaN(Number(v))) return v;
+  if (v.trim() !== "" && !Number.isNaN(Number(v)) && String(Number(v)) === v.trim()) return v;
   return JSON.stringify(v);
 }
 function unLiteral(v) {
@@ -1194,6 +1326,12 @@ function labelOf(e) {
 
 // src/FormBuilder.tsx
 import { Fragment as Fragment2, jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+function IconCheck() {
+  return /* @__PURE__ */ jsx4("svg", { className: "lf-icon", viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ jsx4("path", { d: "M20 6L9 17l-5-5", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
+}
+function IconX() {
+  return /* @__PURE__ */ jsx4("svg", { className: "lf-icon", viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ jsx4("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
+}
 var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
@@ -1235,7 +1373,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
     /* @__PURE__ */ jsx4(Problems, { builder: b }),
     toast && createPortal(
       /* @__PURE__ */ jsxs4("div", { className: "lf-toast lf-builder", role: "status", children: [
-        /* @__PURE__ */ jsx4("span", { className: "lf-toast-tick", "aria-hidden": "true", children: "\u2713" }),
+        /* @__PURE__ */ jsx4("span", { className: "lf-toast-tick", "aria-hidden": "true", children: /* @__PURE__ */ jsx4(IconCheck, {}) }),
         " ",
         toast
       ] }),
@@ -1305,16 +1443,34 @@ function openPreviewWindow(schema) {
   for (const node of Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))) {
     doc.head.appendChild(node.cloneNode(true));
   }
-  doc.body.style.margin = "0";
-  doc.body.style.padding = "24px";
-  doc.body.style.maxWidth = "720px";
+  Object.assign(doc.body.style, { margin: "0", padding: "40px 16px", background: "#f3f4f6", minHeight: "100vh", boxSizing: "border-box" });
   const mount = doc.createElement("div");
-  mount.className = "lf-builder";
+  mount.className = "lf-preview-page";
+  Object.assign(mount.style, {
+    maxWidth: "640px",
+    margin: "0 auto",
+    padding: "28px",
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    boxShadow: "0 10px 30px rgba(16, 24, 40, 0.08)",
+    boxSizing: "border-box"
+  });
   doc.body.appendChild(mount);
   const root = createRoot(mount);
   root.render(/* @__PURE__ */ jsx4(FormRenderer, { schema }));
-  w.addEventListener("beforeunload", () => root.unmount());
-  window.addEventListener("beforeunload", () => root.unmount(), { once: true });
+  const teardown = () => {
+    try {
+      root.unmount();
+    } catch {
+    }
+  };
+  const onOpenerUnload = () => teardown();
+  w.addEventListener("beforeunload", () => {
+    teardown();
+    window.removeEventListener("beforeunload", onOpenerUnload);
+  });
+  window.addEventListener("beforeunload", onOpenerUnload);
   return true;
 }
 function SettingsModal({ builder, editors, notify }) {
@@ -1377,9 +1533,9 @@ function SettingsModal({ builder, editors, notify }) {
               dirty ? /* @__PURE__ */ jsx4("span", { className: "lf-modal-dirty", children: " \u2022 Unsaved changes" }) : null
             ] }),
             /* @__PURE__ */ jsx4("div", { className: "lf-modal-actions", children: dirty ? /* @__PURE__ */ jsxs4(Fragment2, { children: [
-              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--discard", "aria-label": "Discard & close", title: "Discard & close", onClick: () => setConfirmDiscard(true), children: "\u2715" }),
-              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--save", "aria-label": "Save & close", title: "Save & close", onClick: () => saveClose(true), children: "\u2713" })
-            ] }) : /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close", title: "Close", onClick: close, children: "\u2715" }) })
+              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--discard", "aria-label": "Discard & close", title: "Discard & close", onClick: () => setConfirmDiscard(true), children: /* @__PURE__ */ jsx4(IconX, {}) }),
+              /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--save", "aria-label": "Save & close", title: "Save & close", onClick: () => saveClose(true), children: /* @__PURE__ */ jsx4(IconCheck, {}) })
+            ] }) : /* @__PURE__ */ jsx4("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close", title: "Close", onClick: close, children: /* @__PURE__ */ jsx4(IconX, {}) }) })
           ] }),
           /* @__PURE__ */ jsx4("div", { className: "lf-modal-body", children: /* @__PURE__ */ jsx4(SettingsPanel, { builder, editors }) }),
           confirmDiscard && /* @__PURE__ */ jsx4("div", { className: "lf-confirm-overlay", onMouseDown: (e) => e.target === e.currentTarget && setConfirmDiscard(false), children: /* @__PURE__ */ jsxs4("div", { className: "lf-confirm", role: "alertdialog", "aria-modal": "true", "aria-label": "Discard changes?", children: [

@@ -226,6 +226,52 @@
   border-left: 3px solid var(--lf-border);
   padding-left: var(--lf-space);
 }
+
+/* ── Panel / well / fieldset: color themes + collapse ──────────────────────── */
+.lf-panel {
+  border-left: none;
+  padding-left: 0;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  overflow: hidden;
+}
+.lf-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  color: var(--lf-text);
+  background: rgba(127, 127, 127, 0.06);
+  border: none;
+  border-bottom: 1px solid var(--lf-border);
+}
+button.lf-panel-head { cursor: pointer; }
+.lf-panel[data-collapsed] .lf-panel-head { border-bottom: none; }
+.lf-panel-caret { font-size: 0.7rem; color: var(--lf-muted); }
+.lf-panel-title { flex: 1; min-width: 0; }
+.lf-panel-body { padding: 14px; }
+/* `hidden` must win over .lf-container-children's display:flex (author CSS beats the UA
+   [hidden] rule otherwise), so a collapsed panel body actually hides. */
+.lf-panel-body[hidden] { display: none; }
+/* Theme tints — colored header + matching border, for signalling purpose. */
+.lf-panel--primary { border-color: var(--lf-primary); }
+.lf-panel--primary > .lf-panel-head { background: var(--lf-primary); color: #fff; border-bottom-color: var(--lf-primary); }
+.lf-panel--primary .lf-panel-caret { color: #fff; }
+.lf-panel--info { border-color: #3b82f6; }
+.lf-panel--info > .lf-panel-head { background: #eff6ff; color: #1e40af; border-bottom-color: #bfdbfe; }
+.lf-panel--success { border-color: #16a34a; }
+.lf-panel--success > .lf-panel-head { background: #ecfdf5; color: #166534; border-bottom-color: #bbf7d0; }
+.lf-panel--warning { border-color: #d97706; }
+.lf-panel--warning > .lf-panel-head { background: #fffbeb; color: #92400e; border-bottom-color: #fde68a; }
+.lf-panel--danger { border-color: #dc2626; }
+.lf-panel--danger > .lf-panel-head { background: #fef2f2; color: #991b1b; border-bottom-color: #fecaca; }
+.lf-panel--secondary { border-color: #6b7280; }
+.lf-panel--secondary > .lf-panel-head { background: #f3f4f6; color: #374151; border-bottom-color: #e5e7eb; }
 .lf-container-label {
   font-weight: 700;
   margin-bottom: 6px;

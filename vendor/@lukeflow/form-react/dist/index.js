@@ -351,6 +351,8 @@ function RenderEntity({ id, schema, ctx }) {
   if (ft?.isStatic) return /* @__PURE__ */ jsx4(Static, { entity });
   if (ft?.isContainer) {
     if (entity.type === "tabs") return /* @__PURE__ */ jsx4(TabsContainer, { entity, schema, ctx });
+    if (entity.type === "panel" || entity.type === "well" || entity.type === "fieldset")
+      return /* @__PURE__ */ jsx4(PanelBox, { entity, schema, ctx });
     const cols = entity.type === "table" ? Math.min(6, Math.max(1, Number(entity.attributes?.numColumns) || 2)) : void 0;
     const childStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : void 0;
     return /* @__PURE__ */ jsxs("div", { className: "lf-container", "data-type": entity.type, children: [
@@ -663,6 +665,23 @@ function Static({ entity }) {
   const text = labelText(a) ?? labelText(a, "content") ?? "";
   if (!text) return null;
   return /* @__PURE__ */ jsx4("div", { className: "lf-static", "data-type": entity.type, children: text });
+}
+var PANEL_THEMES = /* @__PURE__ */ new Set(["default", "primary", "secondary", "info", "success", "warning", "danger"]);
+function PanelBox({ entity, schema, ctx }) {
+  const a = entity.attributes ?? {};
+  const collapsible = Boolean(a.collapsible);
+  const [open, setOpen] = useState3(!(collapsible && a.collapsed));
+  const raw = typeof a.theme === "string" ? a.theme : "";
+  const theme = PANEL_THEMES.has(raw) ? raw : "default";
+  const title = labelText(a);
+  const bodyId = `${entity.id}-panel-body`;
+  return /* @__PURE__ */ jsxs("section", { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
+    collapsible ? /* @__PURE__ */ jsxs("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
+      /* @__PURE__ */ jsx4("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
+      /* @__PURE__ */ jsx4("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
+    ] }) : title && /* @__PURE__ */ jsx4("div", { className: "lf-panel-head", children: /* @__PURE__ */ jsx4("span", { className: "lf-panel-title", children: ctx.t(title) }) }),
+    /* @__PURE__ */ jsx4("div", { id: bodyId, className: "lf-container-children lf-panel-body", hidden: !open, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx4(RenderEntity, { id: cid, schema, ctx }, cid)) })
+  ] });
 }
 function TabsContainer({ entity, schema, ctx }) {
   const children = entity.children ?? [];

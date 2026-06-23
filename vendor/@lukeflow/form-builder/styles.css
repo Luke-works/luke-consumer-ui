@@ -332,6 +332,46 @@
 .lf-logic-then-label { font-weight: 600; }
 .lf-logic-rule-remove { margin-left: auto; font-size: 0.72rem; color: var(--lf-error, #dc2626); background: none; border: none; cursor: pointer; }
 .lf-logic-add { align-self: flex-start; padding: 5px 12px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); background: var(--lf-bg, #fff); cursor: pointer; font-size: 0.78rem; }
+/* Per-condition AND/OR connector (mix to build a == 1 and b == 2 or c == 3). */
+.lf-logic-conn {
+  min-width: 64px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--lf-primary, #2563eb);
+}
+/* Advanced (non-decomposable) expression editor. */
+.lf-logic-advanced { display: flex; flex-direction: column; gap: 4px; }
+.lf-logic-advanced-label { font-size: 0.75rem; font-weight: 600; }
+.lf-logic-advanced textarea { width: 100%; }
+/* Live result: sample inputs + a true/false badge. */
+.lf-logic-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 10px;
+  margin-top: 2px;
+  border: 1px dashed var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: rgba(127, 127, 127, 0.04);
+  font-size: 0.75rem;
+}
+.lf-logic-test-label { font-weight: 600; color: var(--lf-muted, #6b7280); }
+.lf-logic-test-field { display: inline-flex; align-items: center; gap: 5px; }
+.lf-logic-test-key { font-family: ui-monospace, monospace; color: var(--lf-text, #1a1a1a); }
+.lf-logic-test-field input { width: 84px; min-height: 28px; padding: 3px 7px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
+.lf-logic-result {
+  margin-left: auto;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.lf-logic-result.is-true { color: #166534; background: #ecfdf5; }
+.lf-logic-result.is-false { color: #991b1b; background: #fef2f2; }
+
+/* Circular-action SVG icons + toast tick. */
+.lf-iconbtn .lf-icon { display: block; }
+.lf-toast-tick .lf-icon { width: 12px; height: 12px; }
 
 .lf-settings-minion, .lf-settings-params { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 .lf-settings-minion legend, .lf-settings-params legend { font-size: 0.75rem; font-weight: 600; padding: 0 4px; }
