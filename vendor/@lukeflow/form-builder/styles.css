@@ -223,6 +223,24 @@
 .lf-setting-inline input { order: -1; }
 .lf-setting-hint { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
 .lf-code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.75rem; }
+/* Collapsible JS editor + insert-token autofill. */
+.lf-js { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
+.lf-js-summary { padding: 6px 9px; font-size: 0.8rem; font-weight: 500; cursor: pointer; user-select: none; }
+.lf-js-body { padding: 0 9px 9px; display: flex; flex-direction: column; gap: 6px; }
+.lf-js-body > .lf-code { width: 100%; }
+.lf-js-insert { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.lf-js-insert-label { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
+.lf-js-token {
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: 4px;
+  background: var(--lf-bg, #fff);
+  color: var(--lf-text, #1a1a1a);
+  cursor: pointer;
+}
+.lf-js-token:hover { border-color: var(--lf-primary, #2563eb); color: var(--lf-primary, #2563eb); }
 .lf-expr-error { font-size: 0.7rem; color: var(--lf-error, #dc2626); }
 .lf-setting [aria-invalid="true"] { border-color: var(--lf-error, #dc2626); }
 
@@ -265,7 +283,7 @@
 }
 .lf-modal {
   width: 100%;
-  max-width: 600px;
+  max-width: 900px;
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;

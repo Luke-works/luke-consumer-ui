@@ -310,7 +310,7 @@
 /* Settings modal (settings="modal") + AI aside column. */
 .lf-builder .lf-builder-aside { position: sticky; top: 6rem; height: calc(100vh - 9rem); }
 .lf-modal-overlay { z-index: 99999; backdrop-filter: blur(2px); }
-.lf-modal { box-shadow: 0 24px 48px -12px rgba(16, 24, 40, 0.25); border-radius: 1rem; max-width: 680px; }
+.lf-modal { box-shadow: 0 24px 48px -12px rgba(16, 24, 40, 0.25); border-radius: 1rem; max-width: 1020px; }
 .dark .lf-modal { background: var(--color-gray-800, #1d2939); border-color: var(--color-gray-700, #344054); }
 .lf-modal-header { padding: 1rem 1.25rem; }
 .lf-modal-title { font-size: 0.9375rem; font-weight: 600; color: var(--lf-text); }

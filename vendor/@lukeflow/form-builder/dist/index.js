@@ -100,12 +100,12 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo2, useState as useState4, useEffect as useEffect2, useRef as useRef3, useImperativeHandle, forwardRef } from "react";
+import { useMemo as useMemo2, useState as useState4, useEffect as useEffect2, useRef as useRef4, useImperativeHandle, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { FormRenderer } from "@lukeflow/form-react";
 
 // src/SettingsPanel.tsx
-import { useEffect, useState as useState2 } from "react";
+import { useEffect, useRef as useRef2, useState as useState2 } from "react";
 import {
   parseExpression,
   createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry2
@@ -390,21 +390,57 @@ function Control({
     case "expression":
       return /* @__PURE__ */ jsx(ExpressionControl, { editor, ctx });
     case "js":
-      return /* @__PURE__ */ jsx(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx(
-        "textarea",
-        {
-          className: "lf-code",
-          spellCheck: false,
-          value: str(ctx.value),
-          placeholder: editor.placeholder,
-          rows: 2,
-          onChange: (e) => ctx.setValue(e.target.value)
-        }
-      ) });
+      return /* @__PURE__ */ jsx(JsControl, { editor, ctx });
     case "text":
     default:
       return /* @__PURE__ */ jsx(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ jsx("input", { value: str(ctx.value), placeholder: editor.placeholder, onChange: (e) => ctx.setValue(e.target.value) }) });
   }
+}
+function JsControl({ editor, ctx }) {
+  const value = str(ctx.value);
+  const ref = useRef2(null);
+  const [open, setOpen] = useState2(value !== "");
+  const insert2 = (token) => {
+    const el = ref.current;
+    const start = el ? el.selectionStart : value.length;
+    const end = el ? el.selectionEnd : value.length;
+    const next = value.slice(0, start) + token + value.slice(end);
+    ctx.setValue(next);
+    const restore = () => {
+      if (el) {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+      }
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
+    else restore();
+  };
+  const outVar = editor.attribute === "customConditionalJs" ? "show" : editor.attribute === "customValidationJs" ? "valid" : "value";
+  const tokens = [`${outVar} = `, ...editor.attribute === "customValidationJs" ? ["input"] : [], ...ctx.fieldKeys.map((k) => `data.${k}`)];
+  return /* @__PURE__ */ jsxs("details", { className: "lf-js", open, onToggle: (e) => setOpen(e.target.open), children: [
+    /* @__PURE__ */ jsx("summary", { className: "lf-js-summary", children: editor.label ?? editor.id }),
+    /* @__PURE__ */ jsxs("div", { className: "lf-js-body", children: [
+      /* @__PURE__ */ jsx(
+        "textarea",
+        {
+          ref,
+          className: "lf-code",
+          "aria-label": editor.label ?? editor.id,
+          spellCheck: false,
+          value,
+          placeholder: editor.placeholder,
+          rows: 5,
+          onChange: (e) => ctx.setValue(e.target.value)
+        }
+      ),
+      /* @__PURE__ */ jsxs("div", { className: "lf-js-insert", children: [
+        /* @__PURE__ */ jsx("span", { className: "lf-js-insert-label", children: "Insert:" }),
+        tokens.map((t) => /* @__PURE__ */ jsx("button", { type: "button", className: "lf-js-token", title: `Insert ${t.trim()}`, onClick: () => insert2(t), children: t.trim() }, t))
+      ] }),
+      editor.hint && /* @__PURE__ */ jsx("span", { className: "lf-setting-hint", children: editor.hint })
+    ] })
+  ] });
 }
 function ExpressionControl({ editor, ctx }) {
   const value = str(ctx.value);
@@ -672,7 +708,7 @@ function textToOptions(text) {
 }
 
 // src/Canvas.tsx
-import { createContext, useContext, useRef as useRef2, useState as useState3 } from "react";
+import { createContext, useContext, useRef as useRef3, useState as useState3 } from "react";
 import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry4 } from "@lukeflow/form-core";
 
 // src/NodePreview.tsx
@@ -996,7 +1032,7 @@ function useDnd() {
   return ctx;
 }
 function useCanvasDnd(builder) {
-  const source = useRef2(null);
+  const source = useRef3(null);
   const [over, setOver] = useState3(null);
   const [overEmpty, setOverEmpty] = useState3(null);
   const begin = (src) => {
@@ -1092,9 +1128,9 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
   const [showPreview, setShowPreview] = useState4(false);
   const editors = useMemo2(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
-  const onChangeRef = useRef3(onChange);
+  const onChangeRef = useRef4(onChange);
   onChangeRef.current = onChange;
-  const mounted = useRef3(false);
+  const mounted = useRef4(false);
   useEffect2(() => {
     if (!mounted.current) {
       mounted.current = true;
@@ -1124,7 +1160,7 @@ function SettingsModal({ builder, editors }) {
   const id = builder.selectedId;
   const entity = id ? builder.schema.entities[id] : void 0;
   const open = Boolean(id && entity);
-  const dialogRef = useRef3(null);
+  const dialogRef = useRef4(null);
   const select = builder.select;
   useEffect2(() => {
     if (!open) return;

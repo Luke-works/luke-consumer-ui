@@ -416,21 +416,57 @@ function Control({
     case "expression":
       return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExpressionControl, { editor, ctx });
     case "js":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        "textarea",
-        {
-          className: "lf-code",
-          spellCheck: false,
-          value: str(ctx.value),
-          placeholder: editor.placeholder,
-          rows: 2,
-          onChange: (e) => ctx.setValue(e.target.value)
-        }
-      ) });
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(JsControl, { editor, ctx });
     case "text":
     default:
       return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Labeled, { label: editor.label ?? editor.id, hint: editor.hint, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { value: str(ctx.value), placeholder: editor.placeholder, onChange: (e) => ctx.setValue(e.target.value) }) });
   }
+}
+function JsControl({ editor, ctx }) {
+  const value = str(ctx.value);
+  const ref = (0, import_react2.useRef)(null);
+  const [open, setOpen] = (0, import_react2.useState)(value !== "");
+  const insert2 = (token) => {
+    const el = ref.current;
+    const start = el ? el.selectionStart : value.length;
+    const end = el ? el.selectionEnd : value.length;
+    const next = value.slice(0, start) + token + value.slice(end);
+    ctx.setValue(next);
+    const restore = () => {
+      if (el) {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+      }
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
+    else restore();
+  };
+  const outVar = editor.attribute === "customConditionalJs" ? "show" : editor.attribute === "customValidationJs" ? "valid" : "value";
+  const tokens = [`${outVar} = `, ...editor.attribute === "customValidationJs" ? ["input"] : [], ...ctx.fieldKeys.map((k) => `data.${k}`)];
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { className: "lf-js", open, onToggle: (e) => setOpen(e.target.open), children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { className: "lf-js-summary", children: editor.label ?? editor.id }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "lf-js-body", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "textarea",
+        {
+          ref,
+          className: "lf-code",
+          "aria-label": editor.label ?? editor.id,
+          spellCheck: false,
+          value,
+          placeholder: editor.placeholder,
+          rows: 5,
+          onChange: (e) => ctx.setValue(e.target.value)
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "lf-js-insert", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "lf-js-insert-label", children: "Insert:" }),
+        tokens.map((t) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "lf-js-token", title: `Insert ${t.trim()}`, onClick: () => insert2(t), children: t.trim() }, t))
+      ] }),
+      editor.hint && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "lf-setting-hint", children: editor.hint })
+    ] })
+  ] });
 }
 function ExpressionControl({ editor, ctx }) {
   const value = str(ctx.value);
