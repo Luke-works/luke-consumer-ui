@@ -182,7 +182,8 @@ function createDefaultAttributeEditors() {
     { id: "disabled", tab: "display", attribute: "disabled", label: "Disabled", control: "checkbox", order: 80, when: data },
     // ── SETTINGS (structural config for layout containers + static blocks) ──────
     { id: "numColumns", tab: "settings", attribute: "numColumns", label: "Number of columns", control: "number", order: 10, when: oneOf("table", "columns"), hint: "How many equal columns to lay children out in." },
-    { id: "borders", tab: "settings", attribute: "borders", label: "Show borders", control: "checkbox", order: 11, appliesTo: ["columns", "table"], hint: "Draw a border around each column / cell." },
+    { id: "numRows", tab: "settings", attribute: "numRows", label: "Number of rows", control: "number", order: 11, when: oneOf("table"), hint: "Minimum rows in the table grid (more rows are added as fields overflow)." },
+    { id: "borders", tab: "settings", attribute: "borders", label: "Show borders", control: "checkbox", order: 12, appliesTo: ["columns"], hint: "Draw a border around each column." },
     { id: "verticalTabs", tab: "settings", attribute: "verticalTabs", label: "Vertical tabs", control: "checkbox", order: 20, appliesTo: ["tabs"], hint: "Lay the tab strip down the side instead of across the top." },
     { id: "navigation", tab: "settings", attribute: "navigation", label: "Navigation buttons", control: "checkbox", order: 21, appliesTo: ["tabs"], hint: "Add Previous / Next buttons that step through tabs in sequence." },
     { id: "validateBeforeNext", tab: "settings", attribute: "validateBeforeNext", label: "Validate before advancing", control: "checkbox", order: 22, appliesTo: ["tabs"], when: (e) => Boolean(e.attributes?.navigation), hint: "Block a forward move until the current tab's fields are valid." },
@@ -388,6 +389,21 @@ function IconPencil(props = {}) {
     /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("path", { d: "M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
       /* @__PURE__ */ jsx("path", { d: "M13.5 7l3 3", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
+    ] }),
+    props
+  );
+}
+function IconArrowUp(props = {}) {
+  return svg(/* @__PURE__ */ jsx("path", { d: "M12 19V5M5 12l7-7 7 7", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }), props);
+}
+function IconArrowDown(props = {}) {
+  return svg(/* @__PURE__ */ jsx("path", { d: "M12 5v14M5 12l7 7 7-7", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }), props);
+}
+function IconDuplicate(props = {}) {
+  return svg(
+    /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("rect", { x: "9", y: "9", width: "11", height: "11", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
+      /* @__PURE__ */ jsx("path", { d: "M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" })
     ] }),
     props
   );
@@ -1679,7 +1695,7 @@ var PALETTE_GROUPS = [
       { type: "panel", label: "Panel" },
       { type: "columns", label: "Columns", defaults: { numColumns: 2 } },
       { type: "tabs", label: "Tabs" },
-      { type: "table", label: "Table", defaults: { numColumns: 2 } },
+      { type: "table", label: "Table", defaults: { numColumns: 2, numRows: 2 } },
       { type: "well", label: "Well" },
       { type: "fieldset", label: "Field Set" },
       { type: "content", label: "Content", defaults: { content: "Add your content here." } },
@@ -1788,20 +1804,17 @@ function CanvasDndProvider({ builder, children }) {
 function Canvas({ builder }) {
   const { schema } = builder;
   const dnd = useDnd();
-  return /* @__PURE__ */ jsx9("div", { className: "lf-canvas", "aria-label": "Form canvas", children: schema.root.length === 0 ? /* @__PURE__ */ jsx9(RootDropzone, { empty: true }) : /* @__PURE__ */ jsxs9(Fragment6, { children: [
-    dnd.dragging && /* @__PURE__ */ jsx9(
-      "div",
-      {
-        className: `lf-dropzone lf-dropzone--edge${dnd.overEmpty === ROOT ? " is-over" : ""}`,
-        "aria-label": "Insert at the top",
-        onDragOver: (e) => dnd.overEmptyContainer(e, ROOT),
-        onDragLeave: dnd.leave,
-        onDrop: (e) => dnd.dropIntoEmpty(e, ROOT),
-        children: "Insert at the top"
-      }
-    ),
-    /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx9(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
-  ] }) });
+  return /* @__PURE__ */ jsx9(
+    "div",
+    {
+      className: `lf-canvas${dnd.dragging ? " is-dragging" : ""}${dnd.overEmpty === ROOT ? " is-drop" : ""}`,
+      "aria-label": "Form canvas",
+      onDragOver: (e) => dnd.overEmptyContainer(e, ROOT),
+      onDragLeave: dnd.leave,
+      onDrop: (e) => dnd.dropIntoEmpty(e, ROOT, schema.root.length),
+      children: schema.root.length === 0 ? /* @__PURE__ */ jsx9("p", { className: "lf-canvas-empty", children: "Add a field to begin \u2014 drag one from the palette, or click it." }) : /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx9(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
+    }
+  );
 }
 function Node({
   id,
@@ -1820,8 +1833,10 @@ function Node({
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
   const colLayout = entity.type === "columns" || entity.type === "table";
-  const numCols = colLayout ? Math.min(6, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
-  const borderedCols = colLayout && Boolean(entity.attributes?.borders);
+  const colCap = entity.type === "table" ? 12 : 6;
+  const numCols = colLayout ? Math.min(colCap, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
+  const numRows = entity.type === "table" ? Math.max(0, Math.round(Number(entity.attributes?.numRows)) || 0) : 0;
+  const borderedCols = entity.type === "table" || entity.type === "columns" && Boolean(entity.attributes?.borders);
   const offGrid = (cid) => {
     const c = builder.schema.entities[cid];
     return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden));
@@ -1833,9 +1848,15 @@ function Node({
       {
         className: `lf-node-row${selected ? " is-selected" : ""}${over === "into" ? " is-drop-into" : ""}${hidden ? " is-hidden" : ""}`,
         "data-drop": over ?? void 0,
-        onDragOver: (e) => dnd.overNode(e, id, isContainer),
+        onDragOver: (e) => {
+          e.stopPropagation();
+          dnd.overNode(e, id, isContainer);
+        },
         onDragLeave: dnd.leave,
-        onDrop: (e) => dnd.dropNode(e, id, parentId, index, isContainer),
+        onDrop: (e) => {
+          e.stopPropagation();
+          dnd.dropNode(e, id, parentId, index, isContainer);
+        },
         children: [
           /* @__PURE__ */ jsx9(
             "span",
@@ -1861,36 +1882,59 @@ function Node({
             !isContainer && /* @__PURE__ */ jsx9("div", { className: "lf-node-preview", "aria-hidden": "true", children: /* @__PURE__ */ jsx9(NodePreview, { entity }) })
           ] }),
           /* @__PURE__ */ jsxs9("span", { className: "lf-node-actions", children: [
-            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Move ${labelOf(entity)} up`, disabled: index === 0, onClick: () => builder.reorderField(parentId, index, index - 1), children: "\u2191" }),
-            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Move ${labelOf(entity)} down`, disabled: index === count - 1, onClick: () => builder.reorderField(parentId, index, index + 1), children: "\u2193" }),
-            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Duplicate ${labelOf(entity)}`, onClick: () => builder.duplicateField(id), children: "\u29C9" }),
-            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Delete ${labelOf(entity)}`, onClick: () => builder.removeField(id), children: /* @__PURE__ */ jsx9(IconX, { size: 13 }) })
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Move ${labelOf(entity)} up`, disabled: index === 0, onClick: () => builder.reorderField(parentId, index, index - 1), children: /* @__PURE__ */ jsx9(IconArrowUp, { size: 15 }) }),
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Move ${labelOf(entity)} down`, disabled: index === count - 1, onClick: () => builder.reorderField(parentId, index, index + 1), children: /* @__PURE__ */ jsx9(IconArrowDown, { size: 15 }) }),
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Duplicate ${labelOf(entity)}`, onClick: () => builder.duplicateField(id), children: /* @__PURE__ */ jsx9(IconDuplicate, { size: 15 }) }),
+            /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Delete ${labelOf(entity)}`, onClick: () => builder.removeField(id), children: /* @__PURE__ */ jsx9(IconX, { size: 15 }) })
           ] })
         ]
       }
     ),
-    isContainer && /* @__PURE__ */ jsxs9("div", { className: "lf-node-children", children: [
-      children.length > 0 && (() => {
-        const gridIds = colLayout ? children.filter((cid) => !offGrid(cid)) : children;
-        const belowIds = colLayout ? children.filter(offGrid) : [];
-        const gridCols = colLayout && children.length > 1 ? numCols : 0;
-        const nodeOf = (cid) => /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: children.indexOf(cid), count: children.length, builder, depth: depth + 1 }, cid);
-        return /* @__PURE__ */ jsxs9(Fragment6, { children: [
-          /* @__PURE__ */ jsx9(
-            "ol",
-            {
-              className: `lf-node-list${borderedCols ? " lf-node-list--bordered" : ""}`,
-              "data-cols": gridCols || void 0,
-              style: gridCols ? { display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0,
-              children: gridIds.map(nodeOf)
-            }
-          ),
-          belowIds.length > 0 && /* @__PURE__ */ jsx9("ol", { className: "lf-node-list lf-node-list--offgrid", children: belowIds.map(nodeOf) })
-        ] });
-      })(),
-      entity.type === "tabs" && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-add-tab", onClick: () => builder.addField("panel", { label: `Tab ${children.length + 1}` }, { parentId: id }), children: "+ Add tab" }),
-      /* @__PURE__ */ jsx9(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
-    ] }),
+    isContainer && /* @__PURE__ */ jsxs9(
+      "div",
+      {
+        className: `lf-node-children${dnd.overEmpty === id ? " is-drop" : ""}`,
+        onDragOver: (e) => {
+          e.stopPropagation();
+          dnd.overEmptyContainer(e, id);
+        },
+        onDragLeave: dnd.leave,
+        onDrop: (e) => {
+          e.stopPropagation();
+          dnd.dropIntoEmpty(e, id, children.length);
+        },
+        children: [
+          entity.type === "table" && children.length > 0 && (() => {
+            const cols = numCols;
+            const rows = Math.max(numRows, Math.ceil(children.length / cols), 1);
+            return /* @__PURE__ */ jsx9("ol", { className: "lf-node-list lf-node-table", "data-cols": cols, style: { display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, alignItems: "stretch" }, children: Array.from({ length: rows * cols }, (_, i) => {
+              const cid = children[i];
+              return cid ? /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid) : /* @__PURE__ */ jsx9("li", { className: "lf-node-cell-empty", "aria-hidden": "true" }, `empty-${i}`);
+            }) });
+          })(),
+          entity.type !== "table" && children.length > 0 && (() => {
+            const gridIds = colLayout ? children.filter((cid) => !offGrid(cid)) : children;
+            const belowIds = colLayout ? children.filter(offGrid) : [];
+            const gridCols = colLayout && children.length > 1 ? numCols : 0;
+            const nodeOf = (cid) => /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: children.indexOf(cid), count: children.length, builder, depth: depth + 1 }, cid);
+            return /* @__PURE__ */ jsxs9(Fragment6, { children: [
+              /* @__PURE__ */ jsx9(
+                "ol",
+                {
+                  className: `lf-node-list${borderedCols ? " lf-node-list--bordered" : ""}`,
+                  "data-cols": gridCols || void 0,
+                  style: gridCols ? { display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0,
+                  children: gridIds.map(nodeOf)
+                }
+              ),
+              belowIds.length > 0 && /* @__PURE__ */ jsx9("ol", { className: "lf-node-list lf-node-list--offgrid", children: belowIds.map(nodeOf) })
+            ] });
+          })(),
+          entity.type === "tabs" && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-add-tab", onClick: () => builder.addField("panel", { label: `Tab ${children.length + 1}` }, { parentId: id }), children: "+ Add tab" }),
+          /* @__PURE__ */ jsx9(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
+        ]
+      }
+    ),
     over === "after" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "after" })
   ] });
 }
@@ -1905,25 +1949,16 @@ function ContainerDropzone({ containerId, label, compact, index }) {
     {
       className: `lf-dropzone${compact ? " lf-dropzone--compact" : ""}${active ? " is-over" : ""}`,
       "aria-label": `Drop into ${label}`,
-      onDragOver: (e) => dnd.overEmptyContainer(e, containerId),
+      onDragOver: (e) => {
+        e.stopPropagation();
+        dnd.overEmptyContainer(e, containerId);
+      },
       onDragLeave: dnd.leave,
-      onDrop: (e) => dnd.dropIntoEmpty(e, containerId, index),
+      onDrop: (e) => {
+        e.stopPropagation();
+        dnd.dropIntoEmpty(e, containerId, index);
+      },
       children: compact ? `+ Add field into ${label}` : "Drop fields here"
-    }
-  );
-}
-function RootDropzone({ empty }) {
-  const dnd = useDnd();
-  const active = dnd.overEmpty === ROOT;
-  return /* @__PURE__ */ jsx9(
-    "div",
-    {
-      className: `lf-dropzone${active ? " is-over" : ""}`,
-      "aria-label": "Drop into form",
-      onDragOver: (e) => dnd.overEmptyContainer(e, ROOT),
-      onDragLeave: dnd.leave,
-      onDrop: (e) => dnd.dropIntoEmpty(e, ROOT),
-      children: empty ? "Add a field to begin." : "Drop fields here"
     }
   );
 }

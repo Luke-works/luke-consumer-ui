@@ -114,12 +114,17 @@
 
 /* ── Canvas tree ───────────────────────────────────────────────────────────── */
 .lf-canvas {
-  min-height: 120px;
+  min-height: 160px;
   padding: 8px;
   border: 1px solid var(--lf-border, #d9d9d9);
   border-radius: var(--lf-radius, 6px);
   background: var(--lf-bg, #fff);
 }
+/* The whole canvas is a drop target — drop anywhere to append to the form root. */
+.lf-canvas.is-drop { outline: 2px dashed var(--lf-primary, #2563eb); outline-offset: -3px; background: rgba(37, 99, 235, 0.03); }
+.lf-canvas-empty { margin: 0; padding: 28px 8px; text-align: center; color: var(--lf-muted, #6b7280); font-size: 0.85rem; }
+/* A container body lights up when a field is dragged anywhere over it (drop = add INTO it). */
+.lf-node-children.is-drop { outline: 2px dashed var(--lf-primary, #2563eb); outline-offset: -2px; background: rgba(37, 99, 235, 0.04); border-radius: var(--lf-radius, 6px); }
 .lf-node-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .lf-node { position: relative; }
 .lf-node[data-depth] > .lf-node-list { margin: 6px 0 0 16px; border-left: 1px dashed var(--lf-border, #d9d9d9); padding-left: 8px; }
@@ -268,6 +273,9 @@
 .lf-node-list[data-cols] > .lf-node > .lf-node-row { border: 1px dashed var(--lf-border, #d9d9d9); background: rgba(127, 127, 127, 0.03); }
 /* `borders` on → solid cell borders in the canvas, mirroring the live form. */
 .lf-node-list--bordered[data-cols] > .lf-node > .lf-node-row { border-style: solid; }
+/* Table: a rows × columns matrix with empty filler cells, mirroring the live <table>. */
+.lf-node-table > .lf-node > .lf-node-row { border-style: solid; }
+.lf-node-cell-empty { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); min-height: 38px; background: rgba(127, 127, 127, 0.02); }
 /* Columns/table children the live form omits (carriers / hidden) — shown stacked below the
    grid so the column split matches the live form, with a hairline to set them apart. */
 .lf-node-list--offgrid { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--lf-border, #d9d9d9); }

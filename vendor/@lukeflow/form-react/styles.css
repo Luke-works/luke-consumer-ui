@@ -383,11 +383,20 @@ button.lf-panel-head { cursor: pointer; }
 .lf-tabs-next { margin-left: auto; }
 .lf-tabs-progress { font-size: 0.85rem; color: var(--lf-muted); }
 
-/* Bordered columns / table — draw a cell border around each child. */
+/* Bordered columns — draw a cell border around each child. */
 .lf-container--bordered > .lf-container-children > * {
   border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius);
   padding: var(--lf-space);
+}
+
+/* Table — a true rows × columns grid rendered as a real <table>. */
+.lf-table { border-collapse: collapse; width: 100%; }
+.lf-table > caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
+.lf-table td {
+  border: 1px solid var(--lf-border);
+  padding: var(--lf-space);
+  vertical-align: top;
 }
 
 /* A fieldset renders as a real <fieldset> — neutralize UA defaults so .lf-panel styling wins. */

@@ -1175,6 +1175,21 @@ function TabsContainer({ entity, schema, ctx, Render }) {
     ] })
   ] });
 }
+function TableGrid({ entity, schema, ctx, Render }) {
+  const a = entity.attributes ?? {};
+  const cols = Math.min(12, Math.max(1, Math.round(Number(a.numColumns)) || 2));
+  const minRows = Math.max(0, Math.round(Number(a.numRows)) || 0);
+  const children = entity.children ?? [];
+  const rows = Math.max(minRows, Math.ceil(children.length / cols), 1);
+  const title = labelText(a);
+  return /* @__PURE__ */ jsxs5("table", { className: "lf-table", "data-type": "table", children: [
+    title && /* @__PURE__ */ jsx9("caption", { className: "lf-container-label", children: ctx.t(title) }),
+    /* @__PURE__ */ jsx9("tbody", { children: Array.from({ length: rows }).map((_, r) => /* @__PURE__ */ jsx9("tr", { children: Array.from({ length: cols }).map((_2, c) => {
+      const cid = children[r * cols + c];
+      return /* @__PURE__ */ jsx9("td", { children: cid ? /* @__PURE__ */ jsx9(Render, { id: cid, schema, ctx }) : null }, c);
+    }) }, r)) })
+  ] });
+}
 function EditGridField({
   entity,
   fs,
@@ -1478,8 +1493,9 @@ function RenderEntity({ id, schema, ctx }) {
     if (entity.type === "tabs") return /* @__PURE__ */ jsx10(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
     if (entity.type === "panel" || entity.type === "well" || entity.type === "fieldset")
       return /* @__PURE__ */ jsx10(PanelBox, { entity, schema, ctx, Render: RenderEntity });
+    if (entity.type === "table") return /* @__PURE__ */ jsx10(TableGrid, { entity, schema, ctx, Render: RenderEntity });
     let cols;
-    if (entity.type === "table" || entity.type === "columns") {
+    if (entity.type === "columns") {
       const raw = Number(entity.attributes?.numColumns);
       const declared = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2;
       const childCount = entity.children?.length ?? 0;

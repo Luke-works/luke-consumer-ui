@@ -321,6 +321,33 @@ function validateSchema(schema) {
       );
     }
   }
+  for (const [id, e] of Object.entries(entities)) {
+    const at = e.attributes;
+    if (!at || at.disabled !== true || at.required !== true || at.hidden === true) continue;
+    const logic = Array.isArray(at.logic) ? at.logic : [];
+    const hasValueSource = logic.some((r) => r.action === "enable" || r.action === "setValue") || at.calculateValue != null || at.calculateValueJs != null || at.customDefaultValue != null || at.defaultValue !== void 0 || at.defaultChecked === true;
+    if (hasValueSource) continue;
+    out.push(
+      diag(
+        "disabled-required",
+        "warning",
+        `Field "${keyOf(id, e)}" is both disabled and required, but nothing supplies a value \u2014 it can never be filled. Enable it with a logic rule (or give it a calculated/default value), or clear one of the two.`,
+        { key: keyOf(id, e) },
+        id
+      )
+    );
+  }
+  const rootPages = root.filter((id) => entities[id]?.type === "page").length;
+  if (rootPages > 0 && rootPages < root.length) {
+    out.push(
+      diag(
+        "partial-wizard",
+        "warning",
+        "Pages become wizard steps only when EVERY top-level item is a Page. Mixed with other fields, a Page renders as a plain container \u2014 move the other fields into Pages (or remove the Page) to get a multi-step wizard.",
+        { rootPages, rootCount: root.length }
+      )
+    );
+  }
   for (const id of duplicateKeyIds(schema)) {
     const e = entities[id];
     out.push(
