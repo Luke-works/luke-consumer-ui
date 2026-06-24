@@ -111,6 +111,7 @@ import { createDefaultFieldTypeRegistry } from "@lukeflow/form-core";
 var REGISTRY = createDefaultFieldTypeRegistry();
 var ATTRIBUTE_TABS = [
   { id: "display", label: "Display" },
+  { id: "settings", label: "Settings" },
   { id: "data", label: "Data" },
   { id: "validation", label: "Validation" },
   { id: "api", label: "API" },
@@ -163,16 +164,40 @@ function createDefaultAttributeEditors() {
     { id: "customClass", tab: "display", attribute: "customClass", label: "Custom CSS class", control: "text", order: 60 },
     { id: "hidden", tab: "display", attribute: "hidden", label: "Hidden", control: "checkbox", order: 70 },
     { id: "disabled", tab: "display", attribute: "disabled", label: "Disabled", control: "checkbox", order: 80, when: data },
+    // ── SETTINGS (structural config for layout containers + static blocks) ──────
+    { id: "numColumns", tab: "settings", attribute: "numColumns", label: "Number of columns", control: "number", order: 10, when: oneOf("table", "columns"), hint: "How many equal columns to lay children out in." },
+    { id: "borders", tab: "settings", attribute: "borders", label: "Show borders", control: "checkbox", order: 11, appliesTo: ["columns", "table"], hint: "Draw a border around each column / cell." },
+    { id: "verticalTabs", tab: "settings", attribute: "verticalTabs", label: "Vertical tabs", control: "checkbox", order: 20, appliesTo: ["tabs"], hint: "Lay the tab strip down the side instead of across the top." },
+    // Content / heading blocks: their primary, type-specific config.
+    { id: "content", tab: "settings", attribute: "content", label: "Content (HTML)", control: "textarea", order: 1, appliesTo: ["content", "html", "htmlElement"], hint: "Trusted HTML shown as-is (author-only, like Form.io's Content)." },
+    {
+      id: "headingSize",
+      tab: "settings",
+      attribute: "headingSize",
+      label: "Size",
+      control: "select",
+      order: 1,
+      appliesTo: ["heading"],
+      hint: "The heading text is the Label.",
+      options: [
+        { label: "H1 \u2014 largest", value: "h1" },
+        { label: "H2", value: "h2" },
+        { label: "H3 (default)", value: "h3" },
+        { label: "H4", value: "h4" },
+        { label: "H5", value: "h5" },
+        { label: "H6 \u2014 smallest", value: "h6" }
+      ]
+    },
     // Panel-like containers: collapse + a color theme for different purposes.
-    { id: "collapsible", tab: "display", attribute: "collapsible", label: "Collapsible", control: "checkbox", order: 90, appliesTo: ["panel", "well", "fieldset"] },
-    { id: "collapsed", tab: "display", attribute: "collapsed", label: "Initially collapsed", control: "checkbox", order: 91, appliesTo: ["panel", "well", "fieldset"], when: (e) => Boolean(e.attributes?.collapsible) },
+    { id: "collapsible", tab: "settings", attribute: "collapsible", label: "Collapsible", control: "checkbox", order: 30, appliesTo: ["panel", "well", "fieldset"] },
+    { id: "collapsed", tab: "settings", attribute: "collapsed", label: "Initially collapsed", control: "checkbox", order: 31, appliesTo: ["panel", "well", "fieldset"], when: (e) => Boolean(e.attributes?.collapsible) },
     {
       id: "panelTheme",
-      tab: "display",
+      tab: "settings",
       attribute: "theme",
       label: "Color theme",
       control: "select",
-      order: 92,
+      order: 32,
       appliesTo: ["panel", "well", "fieldset"],
       hint: "Tint the panel header/border to signal its purpose.",
       options: [
@@ -210,7 +235,6 @@ function createDefaultAttributeEditors() {
     { id: "showCharCount", tab: "data", attribute: "showCharCount", label: "Show character count", control: "checkbox", order: 52, when: textual },
     { id: "showWordCount", tab: "data", attribute: "showWordCount", label: "Show word count", control: "checkbox", order: 53, when: oneOf("textField", "textarea") },
     { id: "autoExpand", tab: "data", attribute: "autoExpand", label: "Auto-expand", control: "checkbox", order: 54, when: oneOf("textarea") },
-    { id: "numColumns", tab: "data", attribute: "numColumns", label: "Number of columns", control: "number", order: 55, when: oneOf("table", "columns"), hint: "How many equal columns to lay children out in." },
     {
       id: "buttonAction",
       tab: "data",
@@ -1395,8 +1419,10 @@ function previewControl(entity) {
       return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, value: dv, placeholder: dv ? void 0 : ph || "Add tags\u2026" });
     case "button":
       return /* @__PURE__ */ jsx6("button", { className: "lf-pv-btn", type: "button", disabled: true, children: str2(a.label) || "Button" });
-    case "heading":
-      return /* @__PURE__ */ jsx6("div", { className: "lf-pv-heading", children: str2(a.label) || str2(a.content) || "Heading" });
+    case "heading": {
+      const size = typeof a.headingSize === "string" && /^h[1-6]$/.test(a.headingSize) ? a.headingSize : "h3";
+      return /* @__PURE__ */ jsx6("div", { className: `lf-pv-heading lf-pv-heading--${size}`, children: str2(a.label) || str2(a.content) || "Heading" });
+    }
     case "content":
     case "html":
     case "htmlElement":
@@ -1761,6 +1787,7 @@ function Node({
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
   const childCols = (entity.type === "columns" || entity.type === "table") && children.length > 1 ? Math.min(6, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
+  const borderedCols = (entity.type === "columns" || entity.type === "table") && Boolean(entity.attributes?.borders);
   return /* @__PURE__ */ jsxs9("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ jsxs9(
@@ -1805,7 +1832,7 @@ function Node({
       }
     ),
     isContainer && /* @__PURE__ */ jsxs9("div", { className: "lf-node-children", children: [
-      children.length > 0 && /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", "data-cols": childCols || void 0, style: childCols ? { display: "grid", gridTemplateColumns: `repeat(${childCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0, children: children.map((cid, i) => /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
+      children.length > 0 && /* @__PURE__ */ jsx9("ol", { className: `lf-node-list${borderedCols ? " lf-node-list--bordered" : ""}`, "data-cols": childCols || void 0, style: childCols ? { display: "grid", gridTemplateColumns: `repeat(${childCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0, children: children.map((cid, i) => /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
       /* @__PURE__ */ jsx9(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
     ] }),
     over === "after" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "after" })

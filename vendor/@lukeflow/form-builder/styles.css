@@ -222,6 +222,12 @@
 .lf-pv-file, .lf-pv-sign { padding: 6px 8px; font-size: 0.8rem; color: var(--lf-muted, #6b7280); border: 1px dashed var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
 .lf-pv-btn { align-self: flex-start; padding: 4px 12px; font: inherit; color: var(--lf-primary, #2563eb); background: none; border: 1px solid var(--lf-primary, #2563eb); border-radius: var(--lf-radius, 6px); }
 .lf-pv-heading { font-weight: 600; font-size: 1rem; color: var(--lf-text, #1a1a1a); }
+.lf-pv-heading--h1 { font-size: 1.6rem; }
+.lf-pv-heading--h2 { font-size: 1.35rem; }
+.lf-pv-heading--h3 { font-size: 1.15rem; }
+.lf-pv-heading--h4 { font-size: 1.05rem; }
+.lf-pv-heading--h5 { font-size: 0.95rem; }
+.lf-pv-heading--h6 { font-size: 0.85rem; }
 .lf-pv-muted { font-size: 0.85rem; color: var(--lf-muted, #6b7280); }
 .lf-pv-hr { width: 100%; border: none; border-top: 1px solid var(--lf-border, #d9d9d9); margin: 4px 0; }
 .lf-node-actions { display: flex; gap: 2px; }
@@ -260,6 +266,8 @@
 /* columns/table container children render in a grid (mirrors the live form). */
 .lf-node-list[data-cols] > .lf-node { min-width: 0; }
 .lf-node-list[data-cols] > .lf-node > .lf-node-row { border: 1px dashed var(--lf-border, #d9d9d9); background: rgba(127, 127, 127, 0.03); }
+/* `borders` on → solid cell borders in the canvas, mirroring the live form. */
+.lf-node-list--bordered[data-cols] > .lf-node > .lf-node-row { border-style: solid; }
 
 /* ── Settings panel + tabs ─────────────────────────────────────────────────── */
 .lf-settings {

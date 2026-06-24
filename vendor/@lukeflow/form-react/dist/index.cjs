@@ -1065,7 +1065,13 @@ function GridCell({
 }
 function Static({ entity }) {
   const a = entity.attributes ?? {};
-  if (entity.type === "heading") return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h3", { className: "lf-heading", children: labelText(a) ?? "" });
+  if (entity.type === "heading") {
+    const text2 = labelText(a) ?? labelText(a, "content");
+    if (!text2) return null;
+    const size = typeof a.headingSize === "string" && /^h[1-6]$/.test(a.headingSize) ? a.headingSize : "h3";
+    const Tag = size;
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Tag, { className: `lf-heading lf-heading--${size}`, children: text2 });
+  }
   if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("hr", { className: "lf-divider" });
   if (entity.type === "button") {
     const action = a.buttonAction === "reset" ? "reset" : a.buttonAction === "button" ? "button" : "submit";
@@ -1088,7 +1094,8 @@ function PanelBox({ entity, schema, ctx, Render }) {
   const theme = PANEL_THEMES.has(raw) ? raw : "default";
   const title = labelText(a);
   const bodyId = `${entity.id}-panel-body`;
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("section", { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
+  const Wrapper = entity.type === "fieldset" ? "fieldset" : "section";
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(Wrapper, { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
     collapsible ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
       /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
       /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
@@ -1100,7 +1107,10 @@ function TabsContainer({ entity, schema, ctx, Render }) {
   const children = entity.children ?? [];
   const [active, setActive] = (0, import_react10.useState)(0);
   const idx = Math.min(active, Math.max(0, children.length - 1));
-  if (children.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-container lf-tabs", "data-type": "tabs" });
+  const vertical = Boolean(entity.attributes?.verticalTabs);
+  const rootClass = `lf-container lf-tabs${vertical ? " lf-tabs--vertical" : ""}`;
+  if (children.length === 0)
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
   const tabId = (i) => `${entity.id}-tab-${i}`;
   const panelId = (i) => `${entity.id}-panel-${i}`;
   const tabLabel = (cid, i) => {
@@ -1108,7 +1118,7 @@ function TabsContainer({ entity, schema, ctx, Render }) {
     const l = c && typeof c.attributes?.label === "string" && c.attributes.label ? c.attributes.label : `Tab ${i + 1}`;
     return ctx.t(l);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-container lf-tabs", "data-type": "tabs", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: rootClass, "data-type": "tabs", children: [
     /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-tabs-nav", role: "tablist", children: children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
       "button",
       {
@@ -1437,7 +1447,8 @@ function RenderEntity({ id, schema, ctx }) {
       cols = childCount <= 1 ? 1 : Math.min(6, Math.max(1, declared));
     }
     const childStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : void 0;
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-container", "data-type": entity.type, children: [
+    const bordered = Boolean(entity.attributes?.borders);
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: `lf-container${bordered ? " lf-container--bordered" : ""}`, "data-type": entity.type, children: [
       labelText(entity.attributes) && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
       /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(RenderEntity, { id: cid, schema, ctx }, cid)) })
     ] });

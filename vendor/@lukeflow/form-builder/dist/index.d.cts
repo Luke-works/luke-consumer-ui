@@ -78,8 +78,10 @@ interface PaletteItem {
  */
 
 /** The fixed set of settings tabs, in display order. */
-type AttributeTab = "display" | "data" | "validation" | "api" | "conditional" | "logic";
-/** Tab ids paired with their human labels, in render order. */
+type AttributeTab = "display" | "settings" | "data" | "validation" | "api" | "conditional" | "logic";
+/** Tab ids paired with their human labels, in render order. `settings` holds a field's
+ *  STRUCTURAL config (layout containers' columns/borders/collapse/theme, a heading's size,
+ *  a content block's HTML) — distinct from `data` (value/options) which layout types lack. */
 declare const ATTRIBUTE_TABS: ReadonlyArray<{
     id: AttributeTab;
     label: string;

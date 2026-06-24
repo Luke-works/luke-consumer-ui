@@ -352,9 +352,40 @@ button.lf-panel-head { cursor: pointer; }
   color: var(--lf-primary);
   border-bottom-color: var(--lf-primary);
 }
+/* Vertical tabs: the strip runs down the side, the active panel fills the rest. */
+.lf-tabs--vertical { display: flex; gap: 12px; }
+.lf-tabs--vertical > .lf-tabs-nav {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  border-bottom: none;
+  border-right: 1px solid var(--lf-border);
+  margin-bottom: 0;
+}
+.lf-tabs--vertical .lf-tab { border-bottom: 2px solid transparent; border-right: 2px solid transparent; }
+.lf-tabs--vertical .lf-tab.is-active { border-bottom-color: transparent; border-right-color: var(--lf-primary); }
+.lf-tabs--vertical > .lf-tabpanel { flex: 1; min-width: 0; }
+/* Empty tabs (no children yet) — a quiet placeholder instead of a blank box. */
+.lf-tabs--empty { border: 1px dashed var(--lf-border); border-radius: var(--lf-radius); }
+.lf-tabs-empty { margin: 0; padding: 12px; color: var(--lf-muted); font-style: italic; }
+
+/* Bordered columns / table — draw a cell border around each child. */
+.lf-container--bordered > .lf-container-children > * {
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  padding: var(--lf-space);
+}
+
+/* A fieldset renders as a real <fieldset> — neutralize UA defaults so .lf-panel styling wins. */
+fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 
 /* Static nodes. */
 .lf-heading { margin: 4px 0; }
+.lf-heading--h1 { font-size: 2rem; }
+.lf-heading--h2 { font-size: 1.5rem; }
+.lf-heading--h3 { font-size: 1.25rem; }
+.lf-heading--h4 { font-size: 1.1rem; }
+.lf-heading--h5 { font-size: 1rem; }
+.lf-heading--h6 { font-size: 0.875rem; }
 .lf-divider { border: none; border-top: 1px solid var(--lf-border); margin: 8px 0; }
 .lf-button {
   align-self: flex-start;
