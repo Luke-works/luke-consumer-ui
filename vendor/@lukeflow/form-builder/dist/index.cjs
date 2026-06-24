@@ -1428,22 +1428,27 @@ var import_form_core8 = require("@lukeflow/form-core");
 
 // src/NodePreview.tsx
 var import_form_core6 = require("@lukeflow/form-core");
+var import_form_react = require("@lukeflow/form-react");
 var import_jsx_runtime6 = require("react/jsx-runtime");
 var REGISTRY3 = (0, import_form_core6.createDefaultFieldTypeRegistry)();
-function NodePreview({ entity }) {
+var NOOP = () => {
+};
+function NodePreview({ entity, field, components }) {
   const a = entity.attributes;
   const ft = REGISTRY3.get(entity.type);
-  if (ft?.isContainer) return null;
-  const control = previewControl(entity);
-  if (ft?.isStatic) return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-pv-static", children: control });
+  const Custom = components?.[entity.type];
+  if (ft?.isContainer && !Custom) return null;
+  const control = Custom ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(CustomPreview, { Custom, entity, field }) : previewControl(entity, field);
+  if (!Custom && ft?.isStatic) return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-pv-static", children: control });
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
   const hideLabel = Boolean(a.hideLabel);
   const label = str2(a.label) || str2(a.key) || entity.type;
   const desc = str2(a.description);
+  const required = field ? field.isRequired : Boolean(a.required);
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lf-pv-field", "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
     /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "lf-pv-fieldlabel", children: [
       label,
-      a.required ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-pv-required", children: " *" }) : null,
+      required ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-pv-required", children: " *" }) : null,
       str2(a.tooltip) ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "lf-tooltip", children: [
         /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
         /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
@@ -1453,11 +1458,32 @@ function NodePreview({ entity }) {
     desc ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-pv-desc", children: desc }) : null
   ] });
 }
-function previewControl(entity) {
+function CustomPreview({ Custom, entity, field }) {
+  const fs = field ?? fallbackFieldState(entity);
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-pv-custom", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_form_react.FormErrorBoundary, { fallback: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-pv-muted", children: entity.type }), children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Custom, { entity, field: fs, value: fs.value, setValue: NOOP, disabled: true, error: null, id: `pv-${entity.id}` }) }) });
+}
+function fallbackFieldState(entity) {
+  const a = entity.attributes;
+  return {
+    entityId: entity.id,
+    key: str2(a.key) || entity.type,
+    value: a.defaultValue ?? "",
+    isVisible: true,
+    isDisabled: true,
+    isRequired: Boolean(a.required),
+    isDirty: false,
+    isTouched: false,
+    error: null,
+    computed: { source: "seed", priority: 0 }
+  };
+}
+function previewControl(entity, field) {
   const a = entity.attributes;
   const ph = str2(a.placeholder);
-  const dv = a.defaultValue != null && a.defaultValue !== "" ? String(a.defaultValue) : "";
+  const ev = field ? field.value : a.defaultValue;
+  const dv = Array.isArray(ev) ? ev.join(", ") : ev != null && ev !== "" ? String(ev) : "";
   const ph2 = dv ? void 0 : ph;
+  const selected = entity.type === "selectBoxes" ? new Set((Array.isArray(ev) ? ev : []).map(String)) : new Set(ev != null && ev !== "" ? [String(ev)] : []);
   switch (entity.type) {
     case "textarea":
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("textarea", { className: "lf-pv-input", disabled: true, rows: typeof a.rows === "number" ? a.rows : 2, value: dv, placeholder: ph2 });
@@ -1466,7 +1492,7 @@ function previewControl(entity) {
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 || (entity.type === "currency" ? "0.00" : "") });
     case "checkbox":
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("label", { className: "lf-pv-check", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { type: "checkbox", disabled: true, defaultChecked: Boolean(a.defaultChecked) }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { type: "checkbox", disabled: true, checked: field ? Boolean(field.value) : Boolean(a.defaultChecked) }),
         " ",
         str2(a.label) || "Checkbox"
       ] });
@@ -1484,16 +1510,16 @@ function previewControl(entity) {
       const type = entity.type === "radio" ? "radio" : "checkbox";
       const shown = opts.length ? opts : [{ label: "Option 1", value: "1" }, { label: "Option 2", value: "2" }];
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-pv-choices", children: shown.slice(0, 4).map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("label", { className: "lf-pv-check", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { type, disabled: true }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { type, disabled: true, checked: selected.has(o.value) }),
         " ",
         o.label
       ] }, i)) });
     }
     case "day":
     case "datetime":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date" });
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date", value: dv });
     case "time":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: "time" });
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: "time", value: dv });
     case "file":
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-pv-file", children: "Choose file\u2026" });
     case "signature":
@@ -1847,14 +1873,24 @@ function Palette({ builder, extra }) {
 // src/Canvas.tsx
 var import_jsx_runtime9 = require("react/jsx-runtime");
 var REGISTRY5 = (0, import_form_core8.createDefaultFieldTypeRegistry)();
+var PreviewContext = (0, import_react7.createContext)({ fields: {}, components: {} });
+var useBuilderPreview = () => (0, import_react7.useContext)(PreviewContext);
 function CanvasDndProvider({ builder, children }) {
   const dnd = useCanvasDnd(builder);
   return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(DndContext.Provider, { value: dnd, children });
 }
-function Canvas({ builder }) {
+function Canvas({ builder, components, registry }) {
   const { schema } = builder;
   const dnd = useDnd();
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+  const fields = (0, import_react7.useMemo)(() => {
+    try {
+      return (0, import_form_core8.createFormEngine)().init(schema, registry ? { registry } : void 0).getState().fields;
+    } catch {
+      return {};
+    }
+  }, [schema, registry]);
+  const preview = (0, import_react7.useMemo)(() => ({ fields, components: components ?? {} }), [fields, components]);
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(PreviewContext.Provider, { value: preview, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
     "div",
     {
       className: `lf-canvas${dnd.dragging ? " is-dragging" : ""}${dnd.overEmpty === ROOT ? " is-drop" : ""}`,
@@ -1864,7 +1900,7 @@ function Canvas({ builder }) {
       onDrop: (e) => dnd.dropIntoEmpty(e, ROOT, schema.root.length),
       children: schema.root.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "lf-canvas-empty", children: "Add a field to begin \u2014 drag one from the palette, or click it." }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
     }
-  );
+  ) });
 }
 function Node({
   id,
@@ -1875,13 +1911,15 @@ function Node({
   depth
 }) {
   const dnd = useDnd();
+  const { fields, components } = useBuilderPreview();
   const entity = builder.schema.entities[id];
   if (!entity) return null;
   const selected = builder.selectedId === id;
   const children = entity.children ?? [];
   const isContainer = Boolean(REGISTRY5.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
-  const hidden = Boolean(entity.attributes?.hidden);
+  const fs = fields[id];
+  const hidden = Boolean(entity.attributes?.hidden) || (fs ? !fs.isVisible : false);
   const colLayout = entity.type === "columns" || entity.type === "table";
   const colCap = entity.type === "table" ? 12 : 6;
   const numCols = colLayout ? Math.min(colCap, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
@@ -1889,7 +1927,7 @@ function Node({
   const borderedCols = entity.type === "table" || entity.type === "columns" && Boolean(entity.attributes?.borders);
   const offGrid = (cid) => {
     const c = builder.schema.entities[cid];
-    return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden));
+    return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden || fields[cid]?.isVisible === false));
   };
   return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(DropIndicator, { pos: "before" }),
@@ -1929,7 +1967,9 @@ function Node({
               /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-node-type", children: entity.type }),
               hidden && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-node-badge", children: "Hidden" })
             ] }),
-            !isContainer && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-node-preview", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(NodePreview, { entity }) })
+            !isContainer && // `inert` (React 19) removes the preview from the a11y/focus/pointer tree entirely
+            // — belt-and-suspenders for custom components that may not honor `disabled`.
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-node-preview", "aria-hidden": "true", inert: true, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(NodePreview, { entity, field: fs, components }) })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: "lf-node-actions", children: [
             /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", "aria-label": `Move ${labelOf(entity)} up`, disabled: index === 0, onClick: () => builder.reorderField(parentId, index, index - 1), children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(IconArrowUp, { size: 15 }) }),
@@ -2130,7 +2170,7 @@ function labelOf(e) {
 var import_react9 = require("react");
 var import_react_dom = require("react-dom");
 var import_client = require("react-dom/client");
-var import_form_react = require("@lukeflow/form-react");
+var import_form_react2 = require("@lukeflow/form-react");
 
 // src/builder/useDialogFocus.ts
 var import_react8 = require("react");
@@ -2235,7 +2275,7 @@ function PreviewModal({
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-modal-body", children: view === "form" ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(import_jsx_runtime10.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-builder-preview", "data-testid": "preview", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
-          import_form_react.FormRenderer,
+          import_form_react2.FormRenderer,
           {
             schema,
             components,
@@ -2289,7 +2329,7 @@ function openPreviewWindow(schema, opts) {
   });
   doc.body.appendChild(mount);
   const root = (0, import_client.createRoot)(mount);
-  root.render(/* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_form_react.FormRenderer, { schema, components: opts?.components, registry: opts?.registry }));
+  root.render(/* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_form_react2.FormRenderer, { schema, components: opts?.components, registry: opts?.registry }));
   const teardown = () => {
     try {
       root.unmount();
@@ -2438,7 +2478,7 @@ var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initial
     /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(CanvasDndProvider, { builder: b, children: [
       /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
         /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Palette, { builder: b, extra: extraFields }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Canvas, { builder: b }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Canvas, { builder: b, components, registry }),
         modal ? aside && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SettingsPanel, { builder: b, editors })
       ] }),
       modal && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SettingsModal, { builder: b, editors, notify: setToast })

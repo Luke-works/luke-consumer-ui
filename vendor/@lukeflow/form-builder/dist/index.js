@@ -121,7 +121,7 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo4, useState as useState10, useEffect as useEffect8, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
+import { useMemo as useMemo5, useState as useState10, useEffect as useEffect8, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
 import { createPortal as createPortal3 } from "react-dom";
 
 // src/SettingsPanel.tsx
@@ -1398,27 +1398,32 @@ function Control({
 }
 
 // src/Canvas.tsx
-import { createContext, useContext, useRef as useRef5, useState as useState7 } from "react";
-import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry5 } from "@lukeflow/form-core";
+import { createContext, useContext, useMemo as useMemo3, useRef as useRef5, useState as useState7 } from "react";
+import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry5, createFormEngine } from "@lukeflow/form-core";
 
 // src/NodePreview.tsx
 import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry3 } from "@lukeflow/form-core";
+import { FormErrorBoundary } from "@lukeflow/form-react";
 import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 var REGISTRY3 = createDefaultFieldTypeRegistry3();
-function NodePreview({ entity }) {
+var NOOP = () => {
+};
+function NodePreview({ entity, field, components }) {
   const a = entity.attributes;
   const ft = REGISTRY3.get(entity.type);
-  if (ft?.isContainer) return null;
-  const control = previewControl(entity);
-  if (ft?.isStatic) return /* @__PURE__ */ jsx6("div", { className: "lf-pv-static", children: control });
+  const Custom = components?.[entity.type];
+  if (ft?.isContainer && !Custom) return null;
+  const control = Custom ? /* @__PURE__ */ jsx6(CustomPreview, { Custom, entity, field }) : previewControl(entity, field);
+  if (!Custom && ft?.isStatic) return /* @__PURE__ */ jsx6("div", { className: "lf-pv-static", children: control });
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
   const hideLabel = Boolean(a.hideLabel);
   const label = str2(a.label) || str2(a.key) || entity.type;
   const desc = str2(a.description);
+  const required = field ? field.isRequired : Boolean(a.required);
   return /* @__PURE__ */ jsxs6("div", { className: "lf-pv-field", "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
     /* @__PURE__ */ jsxs6("span", { className: "lf-pv-fieldlabel", children: [
       label,
-      a.required ? /* @__PURE__ */ jsx6("span", { className: "lf-pv-required", children: " *" }) : null,
+      required ? /* @__PURE__ */ jsx6("span", { className: "lf-pv-required", children: " *" }) : null,
       str2(a.tooltip) ? /* @__PURE__ */ jsxs6("span", { className: "lf-tooltip", children: [
         /* @__PURE__ */ jsx6("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
         /* @__PURE__ */ jsx6("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
@@ -1428,11 +1433,32 @@ function NodePreview({ entity }) {
     desc ? /* @__PURE__ */ jsx6("span", { className: "lf-pv-desc", children: desc }) : null
   ] });
 }
-function previewControl(entity) {
+function CustomPreview({ Custom, entity, field }) {
+  const fs = field ?? fallbackFieldState(entity);
+  return /* @__PURE__ */ jsx6("div", { className: "lf-pv-custom", children: /* @__PURE__ */ jsx6(FormErrorBoundary, { fallback: /* @__PURE__ */ jsx6("span", { className: "lf-pv-muted", children: entity.type }), children: /* @__PURE__ */ jsx6(Custom, { entity, field: fs, value: fs.value, setValue: NOOP, disabled: true, error: null, id: `pv-${entity.id}` }) }) });
+}
+function fallbackFieldState(entity) {
+  const a = entity.attributes;
+  return {
+    entityId: entity.id,
+    key: str2(a.key) || entity.type,
+    value: a.defaultValue ?? "",
+    isVisible: true,
+    isDisabled: true,
+    isRequired: Boolean(a.required),
+    isDirty: false,
+    isTouched: false,
+    error: null,
+    computed: { source: "seed", priority: 0 }
+  };
+}
+function previewControl(entity, field) {
   const a = entity.attributes;
   const ph = str2(a.placeholder);
-  const dv = a.defaultValue != null && a.defaultValue !== "" ? String(a.defaultValue) : "";
+  const ev = field ? field.value : a.defaultValue;
+  const dv = Array.isArray(ev) ? ev.join(", ") : ev != null && ev !== "" ? String(ev) : "";
   const ph2 = dv ? void 0 : ph;
+  const selected = entity.type === "selectBoxes" ? new Set((Array.isArray(ev) ? ev : []).map(String)) : new Set(ev != null && ev !== "" ? [String(ev)] : []);
   switch (entity.type) {
     case "textarea":
       return /* @__PURE__ */ jsx6("textarea", { className: "lf-pv-input", disabled: true, rows: typeof a.rows === "number" ? a.rows : 2, value: dv, placeholder: ph2 });
@@ -1441,7 +1467,7 @@ function previewControl(entity) {
       return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 || (entity.type === "currency" ? "0.00" : "") });
     case "checkbox":
       return /* @__PURE__ */ jsxs6("label", { className: "lf-pv-check", children: [
-        /* @__PURE__ */ jsx6("input", { type: "checkbox", disabled: true, defaultChecked: Boolean(a.defaultChecked) }),
+        /* @__PURE__ */ jsx6("input", { type: "checkbox", disabled: true, checked: field ? Boolean(field.value) : Boolean(a.defaultChecked) }),
         " ",
         str2(a.label) || "Checkbox"
       ] });
@@ -1459,16 +1485,16 @@ function previewControl(entity) {
       const type = entity.type === "radio" ? "radio" : "checkbox";
       const shown = opts.length ? opts : [{ label: "Option 1", value: "1" }, { label: "Option 2", value: "2" }];
       return /* @__PURE__ */ jsx6("div", { className: "lf-pv-choices", children: shown.slice(0, 4).map((o, i) => /* @__PURE__ */ jsxs6("label", { className: "lf-pv-check", children: [
-        /* @__PURE__ */ jsx6("input", { type, disabled: true }),
+        /* @__PURE__ */ jsx6("input", { type, disabled: true, checked: selected.has(o.value) }),
         " ",
         o.label
       ] }, i)) });
     }
     case "day":
     case "datetime":
-      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date" });
+      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date", value: dv });
     case "time":
-      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "time" });
+      return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "time", value: dv });
     case "file":
       return /* @__PURE__ */ jsx6("div", { className: "lf-pv-file", children: "Choose file\u2026" });
     case "signature":
@@ -1822,14 +1848,24 @@ function Palette({ builder, extra }) {
 // src/Canvas.tsx
 import { Fragment as Fragment6, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 var REGISTRY5 = createDefaultFieldTypeRegistry5();
+var PreviewContext = createContext({ fields: {}, components: {} });
+var useBuilderPreview = () => useContext(PreviewContext);
 function CanvasDndProvider({ builder, children }) {
   const dnd = useCanvasDnd(builder);
   return /* @__PURE__ */ jsx9(DndContext.Provider, { value: dnd, children });
 }
-function Canvas({ builder }) {
+function Canvas({ builder, components, registry }) {
   const { schema } = builder;
   const dnd = useDnd();
-  return /* @__PURE__ */ jsx9(
+  const fields = useMemo3(() => {
+    try {
+      return createFormEngine().init(schema, registry ? { registry } : void 0).getState().fields;
+    } catch {
+      return {};
+    }
+  }, [schema, registry]);
+  const preview = useMemo3(() => ({ fields, components: components ?? {} }), [fields, components]);
+  return /* @__PURE__ */ jsx9(PreviewContext.Provider, { value: preview, children: /* @__PURE__ */ jsx9(
     "div",
     {
       className: `lf-canvas${dnd.dragging ? " is-dragging" : ""}${dnd.overEmpty === ROOT ? " is-drop" : ""}`,
@@ -1839,7 +1875,7 @@ function Canvas({ builder }) {
       onDrop: (e) => dnd.dropIntoEmpty(e, ROOT, schema.root.length),
       children: schema.root.length === 0 ? /* @__PURE__ */ jsx9("p", { className: "lf-canvas-empty", children: "Add a field to begin \u2014 drag one from the palette, or click it." }) : /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx9(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
     }
-  );
+  ) });
 }
 function Node({
   id,
@@ -1850,13 +1886,15 @@ function Node({
   depth
 }) {
   const dnd = useDnd();
+  const { fields, components } = useBuilderPreview();
   const entity = builder.schema.entities[id];
   if (!entity) return null;
   const selected = builder.selectedId === id;
   const children = entity.children ?? [];
   const isContainer = Boolean(REGISTRY5.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
-  const hidden = Boolean(entity.attributes?.hidden);
+  const fs = fields[id];
+  const hidden = Boolean(entity.attributes?.hidden) || (fs ? !fs.isVisible : false);
   const colLayout = entity.type === "columns" || entity.type === "table";
   const colCap = entity.type === "table" ? 12 : 6;
   const numCols = colLayout ? Math.min(colCap, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
@@ -1864,7 +1902,7 @@ function Node({
   const borderedCols = entity.type === "table" || entity.type === "columns" && Boolean(entity.attributes?.borders);
   const offGrid = (cid) => {
     const c = builder.schema.entities[cid];
-    return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden));
+    return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden || fields[cid]?.isVisible === false));
   };
   return /* @__PURE__ */ jsxs9("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "before" }),
@@ -1904,7 +1942,9 @@ function Node({
               /* @__PURE__ */ jsx9("span", { className: "lf-node-type", children: entity.type }),
               hidden && /* @__PURE__ */ jsx9("span", { className: "lf-node-badge", children: "Hidden" })
             ] }),
-            !isContainer && /* @__PURE__ */ jsx9("div", { className: "lf-node-preview", "aria-hidden": "true", children: /* @__PURE__ */ jsx9(NodePreview, { entity }) })
+            !isContainer && // `inert` (React 19) removes the preview from the a11y/focus/pointer tree entirely
+            // — belt-and-suspenders for custom components that may not honor `disabled`.
+            /* @__PURE__ */ jsx9("div", { className: "lf-node-preview", "aria-hidden": "true", inert: true, children: /* @__PURE__ */ jsx9(NodePreview, { entity, field: fs, components }) })
           ] }),
           /* @__PURE__ */ jsxs9("span", { className: "lf-node-actions", children: [
             /* @__PURE__ */ jsx9("button", { type: "button", "aria-label": `Move ${labelOf(entity)} up`, disabled: index === 0, onClick: () => builder.reorderField(parentId, index, index - 1), children: /* @__PURE__ */ jsx9(IconArrowUp, { size: 15 }) }),
@@ -2102,7 +2142,7 @@ function labelOf(e) {
 }
 
 // src/builder/PreviewModal.tsx
-import { useMemo as useMemo3, useState as useState8, useEffect as useEffect6, useRef as useRef6 } from "react";
+import { useMemo as useMemo4, useState as useState8, useEffect as useEffect6, useRef as useRef6 } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { FormRenderer } from "@lukeflow/form-react";
@@ -2166,7 +2206,7 @@ function PreviewModal({
   const [submitResult, setSubmitResult] = useState8(null);
   const dialogRef = useRef6(null);
   const copyTimer = useRef6(null);
-  const json = useMemo3(() => JSON.stringify(schema, null, 2), [schema]);
+  const json = useMemo4(() => JSON.stringify(schema, null, 2), [schema]);
   useDialogFocus(true, dialogRef);
   useEffect6(() => {
     const onKey = (e) => {
@@ -2386,7 +2426,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = useState10(false);
   const [toast, setToast] = useState10(null);
-  const editors = useMemo4(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
+  const editors = useMemo5(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
   useEffect8(() => {
     if (!toast) return;
@@ -2413,7 +2453,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
     /* @__PURE__ */ jsxs13(CanvasDndProvider, { builder: b, children: [
       /* @__PURE__ */ jsxs13("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
         /* @__PURE__ */ jsx13(Palette, { builder: b, extra: extraFields }),
-        /* @__PURE__ */ jsx13(Canvas, { builder: b }),
+        /* @__PURE__ */ jsx13(Canvas, { builder: b, components, registry }),
         modal ? aside && /* @__PURE__ */ jsx13("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx13(SettingsPanel, { builder: b, editors })
       ] }),
       modal && /* @__PURE__ */ jsx13(SettingsModal, { builder: b, editors, notify: setToast })

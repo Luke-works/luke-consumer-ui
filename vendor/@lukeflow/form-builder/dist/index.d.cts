@@ -1,4 +1,4 @@
-import { FormSchema, Diagnostic, EntityAttributes, InsertTarget, FormSettings, SchemaEntity, FieldTypeRegistry } from '@lukeflow/form-core';
+import { FormSchema, Diagnostic, EntityAttributes, InsertTarget, FormSettings, SchemaEntity, FieldTypeRegistry, FieldState } from '@lukeflow/form-core';
 export { FieldTypeRegistry } from '@lukeflow/form-core';
 import * as react from 'react';
 import { ReactNode } from 'react';
@@ -193,13 +193,17 @@ interface FormBuilderProps {
     /** Extra palette entries for custom field types (paired with renderer `components`). */
     extraFields?: ReadonlyArray<PaletteItem>;
     /**
-     * Custom field components by `type`, forwarded to the live preview's {@link FormRenderer} —
-     * so a custom field added via {@link FormBuilderProps.extraFields} renders with its real
-     * control in Preview (and the "open in new tab" preview), not a fallback input. Pass the
-     * SAME map your app gives `<FormRenderer>` at runtime so the builder preview matches what ships.
+     * Custom field components by `type`, forwarded to BOTH the engine-backed canvas previews and
+     * the live preview's {@link FormRenderer} — so a custom field added via
+     * {@link FormBuilderProps.extraFields} renders with its real control everywhere in the builder,
+     * not a fallback input. Pass the SAME map your app gives `<FormRenderer>` at runtime so the
+     * builder matches what ships.
+     *
+     * Pass a STABLE reference (module constant or `useMemo`d), not a fresh object literal each
+     * render — an unstable map churns the canvas previews and can remount your custom controls.
      */
     components?: Record<string, FieldComponent>;
-    /** A custom field-type registry, forwarded to the preview's {@link FormRenderer} (defaults to the standard set). */
+    /** A custom field-type registry, forwarded to the canvas previews + live preview (defaults to the standard set). */
     registry?: FieldTypeRegistry;
     /**
      * Extend or override the settings panel's attribute editors. Array form merges by
@@ -242,8 +246,10 @@ interface SettingsPanelProps {
 }
 declare function SettingsPanel({ builder, editors }: SettingsPanelProps): react.JSX.Element;
 
-declare function NodePreview({ entity }: {
+declare function NodePreview({ entity, field, components }: {
     entity: SchemaEntity;
+    field?: FieldState;
+    components?: Record<string, FieldComponent>;
 }): react.JSX.Element | null;
 
 /**
