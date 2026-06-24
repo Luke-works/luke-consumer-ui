@@ -909,9 +909,9 @@ function SignatureField({
     drawTyped(typed);
   };
   return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
-    allowType && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "lf-signature-modes", role: "tablist", "aria-label": "Signature mode", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", role: "tab", "aria-selected": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", role: "tab", "aria-selected": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
+    allowType && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "lf-signature-modes", role: "group", "aria-label": "Signature mode", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", "aria-pressed": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", "aria-pressed": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "lf-signature-padwrap", children: [
       /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
@@ -963,13 +963,15 @@ function Group({
   children
 }) {
   const error = ctx.showErrors ? fs.error : null;
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("fieldset", { className: "lf-field lf-group", "data-type": entity.type, "aria-invalid": error ? true : void 0, children: [
+  const asyncMsg = !error ? ctx.asyncErrors[fs.key] : void 0;
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("fieldset", { className: "lf-field lf-group", "data-type": entity.type, "aria-invalid": error || asyncMsg ? true : void 0, children: [
     /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("legend", { className: "lf-label", children: [
       labelText(entity.attributes) ?? fs.key,
       fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { "aria-hidden": "true", children: " *" })
     ] }),
     children,
-    error && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { role: "alert", className: "lf-error", children: error.message })
+    error && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { role: "alert", className: "lf-error", children: error.message }),
+    !error && asyncMsg && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
   ] });
 }
 function GridField({
@@ -1049,17 +1051,20 @@ function GridCell({
   if (type === "checkbox") {
     return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("input", { type: "checkbox", ...rest, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
   }
-  if (type === "select") {
+  if (type === "select" || type === "radio") {
     return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("select", { ...rest, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
       /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("option", { value: "" }),
       opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("option", { value: o.value, children: o.label }, o.value))
     ] });
   }
+  if (type === "textarea") {
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("textarea", { ...rest, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
+  }
   const numeric = type === "number" || type === "currency";
   return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
     "input",
     {
-      type: "text",
+      type: numeric ? "text" : inputType(type),
       inputMode: numeric ? "decimal" : void 0,
       ...rest,
       value: asText(value),
@@ -1538,15 +1543,16 @@ function Field({ entity, fs, ctx }) {
   const disabled = fs.isDisabled || ctx.readOnly;
   const error = ctx.showErrors ? fs.error : null;
   const errId = error ? `${id}-error` : void 0;
+  const asyncErrId = !error && ctx.asyncErrors[key] ? `${id}-async-error` : void 0;
   const descId = labelText(a, "description") ? `${id}-desc` : void 0;
   const set = (value) => ctx.form.update(key, value);
   const a11y = {
     id,
     name: key,
     disabled,
-    "aria-invalid": error ? true : void 0,
+    "aria-invalid": error || asyncErrId ? true : void 0,
     "aria-required": fs.isRequired ? true : void 0,
-    "aria-describedby": [descId, errId].filter(Boolean).join(" ") || void 0
+    "aria-describedby": [descId, errId, asyncErrId].filter(Boolean).join(" ") || void 0
   };
   const ph = typeof a.placeholder === "string" ? a.placeholder : void 0;
   const inputProps = {};
@@ -1689,7 +1695,7 @@ function Field({ entity, fs, ctx }) {
     ] }),
     descId && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
     error && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
-    !error && ctx.asyncErrors[key] && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
+    !error && ctx.asyncErrors[key] && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { id: asyncErrId, role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
   ] });
 }
 async function runAsyncValidations(schema, form, client) {

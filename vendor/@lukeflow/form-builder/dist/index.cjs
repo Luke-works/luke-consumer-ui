@@ -150,7 +150,7 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-var import_react10 = require("react");
+var import_react11 = require("react");
 var import_react_dom3 = require("react-dom");
 
 // src/SettingsPanel.tsx
@@ -1294,6 +1294,8 @@ function SettingsPanel({ builder, editors }) {
   (0, import_react5.useEffect)(() => {
     setActiveTab("display");
   }, [id, entityType]);
+  const uid = (0, import_react5.useId)();
+  const navRef = (0, import_react5.useRef)(null);
   if (!id || !entity) {
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "lf-settings", "aria-label": "Field settings", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "lf-empty", children: "Select a field to edit its settings." }) });
   }
@@ -1302,24 +1304,42 @@ function SettingsPanel({ builder, editors }) {
   const active = groups.find((g) => g.tab === activeTab) ?? groups[0];
   const fieldKeys = otherFieldKeys(builder.schema, id);
   const patch = (p) => builder.updateAttributes(id, p);
+  const tabId = (t) => `${uid}-tab-${t}`;
+  const panelId = `${uid}-panel`;
+  const onTabKey = (e) => {
+    const i = groups.findIndex((g) => g.tab === active?.tab);
+    let next = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (i + 1) % groups.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (i - 1 + groups.length) % groups.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = groups.length - 1;
+    else return;
+    e.preventDefault();
+    setActiveTab(groups[next].tab);
+    navRef.current?.querySelectorAll('[role="tab"]')[next]?.focus();
+  };
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "lf-settings", "aria-label": "Field settings", children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("h4", { children: [
       "Settings \u2014 ",
       entity.type
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "lf-settings-tabs", role: "tablist", "aria-label": "Field settings tabs", children: groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "lf-settings-tabs", role: "tablist", "aria-label": "Field settings tabs", ref: navRef, children: groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "button",
       {
         type: "button",
         role: "tab",
+        id: tabId(g.tab),
         "aria-selected": active?.tab === g.tab,
+        "aria-controls": panelId,
+        tabIndex: active?.tab === g.tab ? 0 : -1,
         className: `lf-settings-tab${active?.tab === g.tab ? " is-active" : ""}`,
+        onKeyDown: onTabKey,
         onClick: () => setActiveTab(g.tab),
         children: g.label
       },
       g.tab
     )) }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "lf-settings-panel", role: "tabpanel", "aria-label": `${active?.label ?? ""} settings`, children: (() => {
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "lf-settings-panel", role: "tabpanel", id: panelId, "aria-labelledby": active ? tabId(active.tab) : void 0, children: (() => {
       const editorsHere = active?.editors ?? [];
       const isToggle = (ed) => ed.control === "checkbox" || ed.control === "exclude";
       const renderEditor = (ed) => {
@@ -2107,19 +2127,67 @@ function labelOf(e) {
 }
 
 // src/builder/PreviewModal.tsx
-var import_react8 = require("react");
+var import_react9 = require("react");
 var import_react_dom = require("react-dom");
 var import_client = require("react-dom/client");
 var import_form_react = require("@lukeflow/form-react");
+
+// src/builder/useDialogFocus.ts
+var import_react8 = require("react");
+function useDialogFocus(open, dialogRef) {
+  (0, import_react8.useEffect)(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const trigger = document.activeElement;
+    const focusable = () => Array.from(
+      dialog.querySelectorAll(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      )
+    );
+    const onKey = (e) => {
+      if (e.key !== "Tab") return;
+      const f = focusable();
+      if (f.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = f[0];
+      const last = f[f.length - 1];
+      const a = document.activeElement;
+      if (e.shiftKey && (a === first || a === dialog)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && a === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (!dialog.contains(a)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    dialog.addEventListener("keydown", onKey);
+    return () => {
+      dialog.removeEventListener("keydown", onKey);
+      const others = Array.from(document.querySelectorAll('.lf-modal-overlay [role="dialog"]')).filter((d) => d !== dialog && document.contains(d));
+      const restoreTo = others[others.length - 1] ?? trigger;
+      if (restoreTo && document.contains(restoreTo)) restoreTo.focus();
+    };
+  }, [open, dialogRef]);
+}
+
+// src/builder/PreviewModal.tsx
 var import_jsx_runtime10 = require("react/jsx-runtime");
 function PreviewModal({ schema, onClose, notify }) {
-  const [view, setView] = (0, import_react8.useState)("form");
-  const [copied, setCopied] = (0, import_react8.useState)(false);
-  const [submitResult, setSubmitResult] = (0, import_react8.useState)(null);
-  const dialogRef = (0, import_react8.useRef)(null);
-  const copyTimer = (0, import_react8.useRef)(null);
-  const json = (0, import_react8.useMemo)(() => JSON.stringify(schema, null, 2), [schema]);
-  (0, import_react8.useEffect)(() => {
+  const [view, setView] = (0, import_react9.useState)("form");
+  const [copied, setCopied] = (0, import_react9.useState)(false);
+  const [submitResult, setSubmitResult] = (0, import_react9.useState)(null);
+  const dialogRef = (0, import_react9.useRef)(null);
+  const copyTimer = (0, import_react9.useRef)(null);
+  const json = (0, import_react9.useMemo)(() => JSON.stringify(schema, null, 2), [schema]);
+  useDialogFocus(true, dialogRef);
+  (0, import_react9.useEffect)(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -2230,19 +2298,19 @@ function openPreviewWindow(schema) {
 }
 
 // src/builder/SettingsModal.tsx
-var import_react9 = require("react");
+var import_react10 = require("react");
 var import_react_dom2 = require("react-dom");
 var import_jsx_runtime11 = require("react/jsx-runtime");
 function SettingsModal({ builder, editors, notify }) {
   const id = builder.selectedId;
   const entity = id ? builder.schema.entities[id] : void 0;
   const open = Boolean(id && entity);
-  const dialogRef = (0, import_react9.useRef)(null);
+  const dialogRef = (0, import_react10.useRef)(null);
   const select = builder.select;
-  const snapshot = (0, import_react9.useRef)(null);
+  const snapshot = (0, import_react10.useRef)(null);
   const schema = builder.schema;
-  const [confirmDiscard, setConfirmDiscard] = (0, import_react9.useState)(false);
-  const openedKey = (0, import_react9.useRef)(null);
+  const [confirmDiscard, setConfirmDiscard] = (0, import_react10.useState)(false);
+  const openedKey = (0, import_react10.useRef)(null);
   const key = open ? id : null;
   if (key !== openedKey.current) {
     openedKey.current = key;
@@ -2260,9 +2328,9 @@ function SettingsModal({ builder, editors, notify }) {
     setConfirmDiscard(false);
     select(null);
   };
-  const latest = (0, import_react9.useRef)({ saveClose, confirmDiscard });
+  const latest = (0, import_react10.useRef)({ saveClose, confirmDiscard });
   latest.current = { saveClose, confirmDiscard };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     if (!open) return;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
@@ -2272,7 +2340,8 @@ function SettingsModal({ builder, editors, notify }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
-  (0, import_react9.useEffect)(() => {
+  useDialogFocus(open, dialogRef);
+  (0, import_react10.useEffect)(() => {
     if (open) dialogRef.current?.focus();
   }, [open, id]);
   if (!open) return null;
@@ -2316,12 +2385,7 @@ function SettingsModal({ builder, editors, notify }) {
 var import_jsx_runtime12 = require("react/jsx-runtime");
 function ProblemsBadge({ builder }) {
   const n = builder.problems.length;
-  if (n === 0) return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "lf-problems-badge is-ok", children: "No problems" });
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: `lf-problems-badge${builder.hasErrors ? " is-error" : " is-warning"}`, children: [
-    n,
-    " problem",
-    n === 1 ? "" : "s"
-  ] });
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "aria-live": "polite", className: n === 0 ? "lf-problems-badge is-ok" : `lf-problems-badge${builder.hasErrors ? " is-error" : " is-warning"}`, children: n === 0 ? "No problems" : `${n} problem${n === 1 ? "" : "s"}` });
 }
 function Problems({ builder }) {
   if (builder.problems.length === 0) return null;
@@ -2334,22 +2398,22 @@ function Problems({ builder }) {
 
 // src/FormBuilder.tsx
 var import_jsx_runtime13 = require("react/jsx-runtime");
-var FormBuilder = (0, import_react10.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
+var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
   const b = useFormBuilder(initialSchema);
-  (0, import_react10.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
-  const [showPreview, setShowPreview] = (0, import_react10.useState)(false);
-  const [toast, setToast] = (0, import_react10.useState)(null);
-  const editors = (0, import_react10.useMemo)(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
+  (0, import_react11.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
+  const [showPreview, setShowPreview] = (0, import_react11.useState)(false);
+  const [toast, setToast] = (0, import_react11.useState)(null);
+  const editors = (0, import_react11.useMemo)(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
-  (0, import_react10.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
-  const onChangeRef = (0, import_react10.useRef)(onChange);
+  const onChangeRef = (0, import_react11.useRef)(onChange);
   onChangeRef.current = onChange;
-  const mounted = (0, import_react10.useRef)(false);
-  (0, import_react10.useEffect)(() => {
+  const mounted = (0, import_react11.useRef)(false);
+  (0, import_react11.useEffect)(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;

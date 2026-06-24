@@ -121,11 +121,11 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo4, useState as useState10, useEffect as useEffect7, useRef as useRef7, useImperativeHandle, forwardRef } from "react";
+import { useMemo as useMemo4, useState as useState10, useEffect as useEffect8, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
 import { createPortal as createPortal3 } from "react-dom";
 
 // src/SettingsPanel.tsx
-import { useEffect as useEffect4, useState as useState5 } from "react";
+import { useEffect as useEffect4, useId as useId2, useRef as useRef4, useState as useState5 } from "react";
 
 // src/attributeEditors.ts
 import { createDefaultFieldTypeRegistry } from "@lukeflow/form-core";
@@ -1269,6 +1269,8 @@ function SettingsPanel({ builder, editors }) {
   useEffect4(() => {
     setActiveTab("display");
   }, [id, entityType]);
+  const uid = useId2();
+  const navRef = useRef4(null);
   if (!id || !entity) {
     return /* @__PURE__ */ jsx5("div", { className: "lf-settings", "aria-label": "Field settings", children: /* @__PURE__ */ jsx5("p", { className: "lf-empty", children: "Select a field to edit its settings." }) });
   }
@@ -1277,24 +1279,42 @@ function SettingsPanel({ builder, editors }) {
   const active = groups.find((g) => g.tab === activeTab) ?? groups[0];
   const fieldKeys = otherFieldKeys(builder.schema, id);
   const patch = (p) => builder.updateAttributes(id, p);
+  const tabId = (t) => `${uid}-tab-${t}`;
+  const panelId = `${uid}-panel`;
+  const onTabKey = (e) => {
+    const i = groups.findIndex((g) => g.tab === active?.tab);
+    let next = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (i + 1) % groups.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (i - 1 + groups.length) % groups.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = groups.length - 1;
+    else return;
+    e.preventDefault();
+    setActiveTab(groups[next].tab);
+    navRef.current?.querySelectorAll('[role="tab"]')[next]?.focus();
+  };
   return /* @__PURE__ */ jsxs5("div", { className: "lf-settings", "aria-label": "Field settings", children: [
     /* @__PURE__ */ jsxs5("h4", { children: [
       "Settings \u2014 ",
       entity.type
     ] }),
-    /* @__PURE__ */ jsx5("div", { className: "lf-settings-tabs", role: "tablist", "aria-label": "Field settings tabs", children: groups.map((g) => /* @__PURE__ */ jsx5(
+    /* @__PURE__ */ jsx5("div", { className: "lf-settings-tabs", role: "tablist", "aria-label": "Field settings tabs", ref: navRef, children: groups.map((g) => /* @__PURE__ */ jsx5(
       "button",
       {
         type: "button",
         role: "tab",
+        id: tabId(g.tab),
         "aria-selected": active?.tab === g.tab,
+        "aria-controls": panelId,
+        tabIndex: active?.tab === g.tab ? 0 : -1,
         className: `lf-settings-tab${active?.tab === g.tab ? " is-active" : ""}`,
+        onKeyDown: onTabKey,
         onClick: () => setActiveTab(g.tab),
         children: g.label
       },
       g.tab
     )) }),
-    /* @__PURE__ */ jsx5("div", { className: "lf-settings-panel", role: "tabpanel", "aria-label": `${active?.label ?? ""} settings`, children: (() => {
+    /* @__PURE__ */ jsx5("div", { className: "lf-settings-panel", role: "tabpanel", id: panelId, "aria-labelledby": active ? tabId(active.tab) : void 0, children: (() => {
       const editorsHere = active?.editors ?? [];
       const isToggle = (ed) => ed.control === "checkbox" || ed.control === "exclude";
       const renderEditor = (ed) => {
@@ -1378,7 +1398,7 @@ function Control({
 }
 
 // src/Canvas.tsx
-import { createContext, useContext, useRef as useRef4, useState as useState7 } from "react";
+import { createContext, useContext, useRef as useRef5, useState as useState7 } from "react";
 import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry5 } from "@lukeflow/form-core";
 
 // src/NodePreview.tsx
@@ -1975,7 +1995,7 @@ function useDnd() {
   return ctx;
 }
 function useCanvasDnd(builder) {
-  const source = useRef4(null);
+  const source = useRef5(null);
   const [over, setOver] = useState7(null);
   const [overEmpty, setOverEmpty] = useState7(null);
   const [dragging, setDragging] = useState7(false);
@@ -2082,19 +2102,67 @@ function labelOf(e) {
 }
 
 // src/builder/PreviewModal.tsx
-import { useMemo as useMemo3, useState as useState8, useEffect as useEffect5, useRef as useRef5 } from "react";
+import { useMemo as useMemo3, useState as useState8, useEffect as useEffect6, useRef as useRef6 } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { FormRenderer } from "@lukeflow/form-react";
+
+// src/builder/useDialogFocus.ts
+import { useEffect as useEffect5 } from "react";
+function useDialogFocus(open, dialogRef) {
+  useEffect5(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const trigger = document.activeElement;
+    const focusable = () => Array.from(
+      dialog.querySelectorAll(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      )
+    );
+    const onKey = (e) => {
+      if (e.key !== "Tab") return;
+      const f = focusable();
+      if (f.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = f[0];
+      const last = f[f.length - 1];
+      const a = document.activeElement;
+      if (e.shiftKey && (a === first || a === dialog)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && a === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (!dialog.contains(a)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    dialog.addEventListener("keydown", onKey);
+    return () => {
+      dialog.removeEventListener("keydown", onKey);
+      const others = Array.from(document.querySelectorAll('.lf-modal-overlay [role="dialog"]')).filter((d) => d !== dialog && document.contains(d));
+      const restoreTo = others[others.length - 1] ?? trigger;
+      if (restoreTo && document.contains(restoreTo)) restoreTo.focus();
+    };
+  }, [open, dialogRef]);
+}
+
+// src/builder/PreviewModal.tsx
 import { Fragment as Fragment7, jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
 function PreviewModal({ schema, onClose, notify }) {
   const [view, setView] = useState8("form");
   const [copied, setCopied] = useState8(false);
   const [submitResult, setSubmitResult] = useState8(null);
-  const dialogRef = useRef5(null);
-  const copyTimer = useRef5(null);
+  const dialogRef = useRef6(null);
+  const copyTimer = useRef6(null);
   const json = useMemo3(() => JSON.stringify(schema, null, 2), [schema]);
-  useEffect5(() => {
+  useDialogFocus(true, dialogRef);
+  useEffect6(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -2205,19 +2273,19 @@ function openPreviewWindow(schema) {
 }
 
 // src/builder/SettingsModal.tsx
-import { useState as useState9, useEffect as useEffect6, useRef as useRef6 } from "react";
+import { useState as useState9, useEffect as useEffect7, useRef as useRef7 } from "react";
 import { createPortal as createPortal2 } from "react-dom";
 import { Fragment as Fragment8, jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
 function SettingsModal({ builder, editors, notify }) {
   const id = builder.selectedId;
   const entity = id ? builder.schema.entities[id] : void 0;
   const open = Boolean(id && entity);
-  const dialogRef = useRef6(null);
+  const dialogRef = useRef7(null);
   const select = builder.select;
-  const snapshot = useRef6(null);
+  const snapshot = useRef7(null);
   const schema = builder.schema;
   const [confirmDiscard, setConfirmDiscard] = useState9(false);
-  const openedKey = useRef6(null);
+  const openedKey = useRef7(null);
   const key = open ? id : null;
   if (key !== openedKey.current) {
     openedKey.current = key;
@@ -2235,9 +2303,9 @@ function SettingsModal({ builder, editors, notify }) {
     setConfirmDiscard(false);
     select(null);
   };
-  const latest = useRef6({ saveClose, confirmDiscard });
+  const latest = useRef7({ saveClose, confirmDiscard });
   latest.current = { saveClose, confirmDiscard };
-  useEffect6(() => {
+  useEffect7(() => {
     if (!open) return;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
@@ -2247,7 +2315,8 @@ function SettingsModal({ builder, editors, notify }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
-  useEffect6(() => {
+  useDialogFocus(open, dialogRef);
+  useEffect7(() => {
     if (open) dialogRef.current?.focus();
   }, [open, id]);
   if (!open) return null;
@@ -2291,12 +2360,7 @@ function SettingsModal({ builder, editors, notify }) {
 import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
 function ProblemsBadge({ builder }) {
   const n = builder.problems.length;
-  if (n === 0) return /* @__PURE__ */ jsx12("span", { className: "lf-problems-badge is-ok", children: "No problems" });
-  return /* @__PURE__ */ jsxs12("span", { className: `lf-problems-badge${builder.hasErrors ? " is-error" : " is-warning"}`, children: [
-    n,
-    " problem",
-    n === 1 ? "" : "s"
-  ] });
+  return /* @__PURE__ */ jsx12("span", { "aria-live": "polite", className: n === 0 ? "lf-problems-badge is-ok" : `lf-problems-badge${builder.hasErrors ? " is-error" : " is-warning"}`, children: n === 0 ? "No problems" : `${n} problem${n === 1 ? "" : "s"}` });
 }
 function Problems({ builder }) {
   if (builder.problems.length === 0) return null;
@@ -2316,15 +2380,15 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
   const [toast, setToast] = useState10(null);
   const editors = useMemo4(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
-  useEffect7(() => {
+  useEffect8(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
-  const onChangeRef = useRef7(onChange);
+  const onChangeRef = useRef8(onChange);
   onChangeRef.current = onChange;
-  const mounted = useRef7(false);
-  useEffect7(() => {
+  const mounted = useRef8(false);
+  useEffect8(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
