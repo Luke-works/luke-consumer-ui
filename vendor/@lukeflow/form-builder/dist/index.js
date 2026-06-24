@@ -39,6 +39,21 @@ function useFormBuilder(initialSchema = EMPTY) {
     },
     []
   );
+  const addFieldWithChildren = useCallback(
+    (type, attributes, children, target) => {
+      const root = createEntity(type, attributes);
+      const kids = children.map((c) => createEntity(c.type, c.attributes ?? {}));
+      setSchemaState((prev) => {
+        past.current.push(prev);
+        future.current = [];
+        let s = insert(prev, root, target ?? {});
+        for (const kid of kids) s = insert(s, kid, { parentId: root.id });
+        return s;
+      });
+      setSelectedId(root.id);
+    },
+    []
+  );
   const removeField = useCallback(
     (id) => {
       commit(remove(schema, id));
@@ -85,6 +100,7 @@ function useFormBuilder(initialSchema = EMPTY) {
     hasErrors,
     select,
     addField,
+    addFieldWithChildren,
     removeField,
     moveField,
     duplicateField,
@@ -168,6 +184,8 @@ function createDefaultAttributeEditors() {
     { id: "numColumns", tab: "settings", attribute: "numColumns", label: "Number of columns", control: "number", order: 10, when: oneOf("table", "columns"), hint: "How many equal columns to lay children out in." },
     { id: "borders", tab: "settings", attribute: "borders", label: "Show borders", control: "checkbox", order: 11, appliesTo: ["columns", "table"], hint: "Draw a border around each column / cell." },
     { id: "verticalTabs", tab: "settings", attribute: "verticalTabs", label: "Vertical tabs", control: "checkbox", order: 20, appliesTo: ["tabs"], hint: "Lay the tab strip down the side instead of across the top." },
+    { id: "navigation", tab: "settings", attribute: "navigation", label: "Navigation buttons", control: "checkbox", order: 21, appliesTo: ["tabs"], hint: "Add Previous / Next buttons that step through tabs in sequence." },
+    { id: "validateBeforeNext", tab: "settings", attribute: "validateBeforeNext", label: "Validate before advancing", control: "checkbox", order: 22, appliesTo: ["tabs"], when: (e) => Boolean(e.attributes?.navigation), hint: "Block a forward move until the current tab's fields are valid." },
     // Content / heading blocks: their primary, type-specific config.
     { id: "content", tab: "settings", attribute: "content", label: "Content (HTML)", control: "textarea", order: 1, appliesTo: ["content", "html", "htmlElement"], hint: "Trusted HTML shown as-is (author-only, like Form.io's Content)." },
     {
@@ -1732,7 +1750,22 @@ function Palette({ builder, extra }) {
               dnd.begin({ kind: "new", type: p.type, label: p.label, defaults: p.defaults });
             },
             onDragEnd: dnd.end,
-            onClick: () => builder.addField(p.type, { label: p.label, ...p.defaults ?? {} }, intoContainer ? { parentId: intoContainer } : void 0),
+            onClick: () => {
+              const target = intoContainer ? { parentId: intoContainer } : void 0;
+              if (p.type === "tabs") {
+                builder.addFieldWithChildren(
+                  "tabs",
+                  { label: p.label },
+                  [
+                    { type: "panel", attributes: { label: "Tab 1" } },
+                    { type: "panel", attributes: { label: "Tab 2" } }
+                  ],
+                  target
+                );
+              } else {
+                builder.addField(p.type, { label: p.label, ...p.defaults ?? {} }, target);
+              }
+            },
             children: [
               /* @__PURE__ */ jsx8("span", { className: "lf-palette-item-icon", "aria-hidden": "true", children: paletteIcon(p.type) }),
               /* @__PURE__ */ jsx8("span", { className: "lf-palette-item-label", children: p.label })
@@ -1786,8 +1819,13 @@ function Node({
   const isContainer = Boolean(REGISTRY5.get(entity.type)?.isContainer);
   const over = dnd.over?.id === id ? dnd.over.pos : null;
   const hidden = Boolean(entity.attributes?.hidden);
-  const childCols = (entity.type === "columns" || entity.type === "table") && children.length > 1 ? Math.min(6, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
-  const borderedCols = (entity.type === "columns" || entity.type === "table") && Boolean(entity.attributes?.borders);
+  const colLayout = entity.type === "columns" || entity.type === "table";
+  const numCols = colLayout ? Math.min(6, Math.max(1, ((raw) => Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 2)(Number(entity.attributes?.numColumns)))) : 0;
+  const borderedCols = colLayout && Boolean(entity.attributes?.borders);
+  const offGrid = (cid) => {
+    const c = builder.schema.entities[cid];
+    return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden));
+  };
   return /* @__PURE__ */ jsxs9("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ jsxs9(
@@ -1832,7 +1870,25 @@ function Node({
       }
     ),
     isContainer && /* @__PURE__ */ jsxs9("div", { className: "lf-node-children", children: [
-      children.length > 0 && /* @__PURE__ */ jsx9("ol", { className: `lf-node-list${borderedCols ? " lf-node-list--bordered" : ""}`, "data-cols": childCols || void 0, style: childCols ? { display: "grid", gridTemplateColumns: `repeat(${childCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0, children: children.map((cid, i) => /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: i, count: children.length, builder, depth: depth + 1 }, cid)) }),
+      children.length > 0 && (() => {
+        const gridIds = colLayout ? children.filter((cid) => !offGrid(cid)) : children;
+        const belowIds = colLayout ? children.filter(offGrid) : [];
+        const gridCols = colLayout && children.length > 1 ? numCols : 0;
+        const nodeOf = (cid) => /* @__PURE__ */ jsx9(Node, { id: cid, parentId: id, index: children.indexOf(cid), count: children.length, builder, depth: depth + 1 }, cid);
+        return /* @__PURE__ */ jsxs9(Fragment6, { children: [
+          /* @__PURE__ */ jsx9(
+            "ol",
+            {
+              className: `lf-node-list${borderedCols ? " lf-node-list--bordered" : ""}`,
+              "data-cols": gridCols || void 0,
+              style: gridCols ? { display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, alignItems: "start" } : void 0,
+              children: gridIds.map(nodeOf)
+            }
+          ),
+          belowIds.length > 0 && /* @__PURE__ */ jsx9("ol", { className: "lf-node-list lf-node-list--offgrid", children: belowIds.map(nodeOf) })
+        ] });
+      })(),
+      entity.type === "tabs" && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-add-tab", onClick: () => builder.addField("panel", { label: `Tab ${children.length + 1}` }, { parentId: id }), children: "+ Add tab" }),
       /* @__PURE__ */ jsx9(ContainerDropzone, { containerId: id, label: labelOf(entity), compact: children.length > 0, index: children.length })
     ] }),
     over === "after" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "after" })

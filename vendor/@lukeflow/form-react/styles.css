@@ -367,6 +367,21 @@ button.lf-panel-head { cursor: pointer; }
 /* Empty tabs (no children yet) — a quiet placeholder instead of a blank box. */
 .lf-tabs--empty { border: 1px dashed var(--lf-border); border-radius: var(--lf-radius); }
 .lf-tabs-empty { margin: 0; padding: 12px; color: var(--lf-muted); font-style: italic; }
+/* Sequential Prev/Next navigation (opt-in via the `navigation` attribute). */
+.lf-tabs-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.lf-tabs-prev, .lf-tabs-next {
+  padding: 8px 16px;
+  font: inherit;
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg, #fff);
+  color: var(--lf-text);
+  cursor: pointer;
+}
+.lf-tabs-next { border-color: var(--lf-primary); background: var(--lf-primary); color: #fff; }
+.lf-tabs-prev:disabled, .lf-tabs-next:disabled { opacity: 0.5; cursor: not-allowed; }
+.lf-tabs-next { margin-left: auto; }
+.lf-tabs-progress { font-size: 0.85rem; color: var(--lf-muted); }
 
 /* Bordered columns / table — draw a cell border around each child. */
 .lf-container--bordered > .lf-container-children > * {

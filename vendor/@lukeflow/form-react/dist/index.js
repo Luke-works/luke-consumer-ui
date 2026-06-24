@@ -47,7 +47,7 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-import { useState as useState8, useEffect as useEffect5, useRef as useRef5, useCallback as useCallback2 } from "react";
+import { useState as useState8, useEffect as useEffect5, useRef as useRef6, useCallback as useCallback2 } from "react";
 import {
   createDefaultFieldTypeRegistry,
   readAsyncValidation,
@@ -231,6 +231,11 @@ function pageFieldKeys(schema, pageId, form) {
     for (const c of schema.entities[id]?.children ?? []) stack.push(c);
   }
   return out;
+}
+function keysValid(form, keys) {
+  if (keys.length === 0) return true;
+  const set = new Set(keys);
+  return form.validate(keys).errorKeys.every((k) => !set.has(k));
 }
 function tooltipText(a) {
   const v = a?.tooltip;
@@ -928,7 +933,7 @@ function SignatureField({
 }
 
 // src/render/containers.tsx
-import { useState as useState7 } from "react";
+import { useRef as useRef5, useState as useState7 } from "react";
 import {
   evaluateVisibility
 } from "@lukeflow/form-core";
@@ -1086,10 +1091,16 @@ function PanelBox({ entity, schema, ctx, Render }) {
   ] });
 }
 function TabsContainer({ entity, schema, ctx, Render }) {
+  const a = entity.attributes ?? {};
   const children = entity.children ?? [];
   const [active, setActive] = useState7(0);
+  const [focusIdx, setFocusIdx] = useState7(0);
+  const [revealErrors, setRevealErrors] = useState7(false);
+  const navRef = useRef5(null);
   const idx = Math.min(active, Math.max(0, children.length - 1));
-  const vertical = Boolean(entity.attributes?.verticalTabs);
+  const vertical = Boolean(a.verticalTabs);
+  const navigation = Boolean(a.navigation);
+  const validateBeforeNext = Boolean(a.validateBeforeNext);
   const rootClass = `lf-container lf-tabs${vertical ? " lf-tabs--vertical" : ""}`;
   if (children.length === 0)
     return /* @__PURE__ */ jsx9("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ jsx9("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
@@ -1100,8 +1111,43 @@ function TabsContainer({ entity, schema, ctx, Render }) {
     const l = c && typeof c.attributes?.label === "string" && c.attributes.label ? c.attributes.label : `Tab ${i + 1}`;
     return ctx.t(l);
   };
+  const activeTabKeys = () => {
+    const cid = children[idx];
+    const child = schema.entities[cid];
+    const isContainer = child ? Boolean(ctx.reg.get(child.type)?.isContainer) : false;
+    return isContainer ? pageFieldKeys(schema, cid, ctx.form) : [ctx.form.state.fields[cid]?.key].filter(Boolean);
+  };
+  const go = (target) => {
+    const clamped = Math.max(0, Math.min(children.length - 1, target));
+    if (validateBeforeNext && clamped > idx && !keysValid(ctx.form, activeTabKeys())) {
+      setRevealErrors(true);
+      return;
+    }
+    setRevealErrors(false);
+    setActive(clamped);
+    setFocusIdx(clamped);
+  };
+  const moveFocus = (to) => {
+    const i = Math.max(0, Math.min(children.length - 1, to));
+    setFocusIdx(i);
+    navRef.current?.querySelectorAll('[role="tab"]')[i]?.focus();
+  };
+  const onTabKeyDown = (e) => {
+    const fwd = vertical ? "ArrowDown" : "ArrowRight";
+    const back = vertical ? "ArrowUp" : "ArrowLeft";
+    if (e.key === fwd) e.preventDefault(), moveFocus(focusIdx + 1);
+    else if (e.key === back) e.preventDefault(), moveFocus(focusIdx - 1);
+    else if (e.key === "Home") e.preventDefault(), moveFocus(0);
+    else if (e.key === "End") e.preventDefault(), moveFocus(children.length - 1);
+  };
+  const tabCtx = revealErrors ? { ...ctx, showErrors: true } : ctx;
+  const renderTab = (cid) => {
+    const child = schema.entities[cid];
+    const isContainer = child ? Boolean(ctx.reg.get(child.type)?.isContainer) : false;
+    return isContainer ? (child.children ?? []).map((gid) => /* @__PURE__ */ jsx9(Render, { id: gid, schema, ctx: tabCtx }, gid)) : /* @__PURE__ */ jsx9(Render, { id: cid, schema, ctx: tabCtx });
+  };
   return /* @__PURE__ */ jsxs5("div", { className: rootClass, "data-type": "tabs", children: [
-    /* @__PURE__ */ jsx9("div", { className: "lf-tabs-nav", role: "tablist", children: children.map((cid, i) => /* @__PURE__ */ jsx9(
+    /* @__PURE__ */ jsx9("div", { className: "lf-tabs-nav", role: "tablist", "aria-orientation": vertical ? "vertical" : void 0, ref: navRef, children: children.map((cid, i) => /* @__PURE__ */ jsx9(
       "button",
       {
         type: "button",
@@ -1109,13 +1155,24 @@ function TabsContainer({ entity, schema, ctx, Render }) {
         id: tabId(i),
         "aria-selected": i === idx,
         "aria-controls": panelId(i),
+        tabIndex: i === focusIdx ? 0 : -1,
         className: `lf-tab${i === idx ? " is-active" : ""}`,
-        onClick: () => setActive(i),
+        onKeyDown: onTabKeyDown,
+        onClick: () => go(i),
         children: tabLabel(cid, i)
       },
       cid
     )) }),
-    children.map((cid, i) => /* @__PURE__ */ jsx9("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: /* @__PURE__ */ jsx9(Render, { id: cid, schema, ctx }) }, cid))
+    children.map((cid, i) => /* @__PURE__ */ jsx9("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: renderTab(cid) }, cid)),
+    navigation && /* @__PURE__ */ jsxs5("div", { className: "lf-tabs-foot", children: [
+      /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-tabs-prev", disabled: idx === 0, onClick: () => go(idx - 1), children: ctx.t("Previous") }),
+      /* @__PURE__ */ jsxs5("span", { className: "lf-tabs-progress", "aria-live": "polite", children: [
+        idx + 1,
+        " / ",
+        children.length
+      ] }),
+      /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-tabs-next", disabled: idx >= children.length - 1, onClick: () => go(idx + 1), children: ctx.t("Next") })
+    ] })
   ] });
 }
 function EditGridField({
@@ -1205,9 +1262,9 @@ function FormRenderer(props) {
   const [submitted, setSubmitted] = useState8(false);
   const client = useMinionClient();
   const [asyncErrors, setAsyncErrors] = useState8({});
-  const onAutosaveRef = useRef5(onAutosave);
+  const onAutosaveRef = useRef6(onAutosave);
   onAutosaveRef.current = onAutosave;
-  const autosaveTimer = useRef5(null);
+  const autosaveTimer = useRef6(null);
   const flushAutosave = () => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = null;
@@ -1347,8 +1404,8 @@ function FormWizardView({
   const [index, setIndex] = useState8(0);
   const [showErrors, setShowErrors] = useState8(false);
   const t = useTranslate();
-  const pageRef = useRef5(null);
-  const firstRender = useRef5(true);
+  const pageRef = useRef6(null);
+  const firstRender = useRef6(true);
   const visible = pages.filter((id) => form.state.fields[id]?.isVisible !== false);
   const safeIndex = Math.min(index, Math.max(0, visible.length - 1));
   const currentId = visible[safeIndex];
@@ -1363,7 +1420,7 @@ function FormWizardView({
   const ctx = { form, reg, readOnly, showErrors, asyncErrors: {}, components, t, scope: form.getScope() };
   const next = () => {
     if (!currentId) return;
-    if (form.validate(pageFieldKeys(schema, currentId, form)).ok) {
+    if (keysValid(form, pageFieldKeys(schema, currentId, form))) {
       setShowErrors(false);
       setIndex(safeIndex + 1);
     } else {

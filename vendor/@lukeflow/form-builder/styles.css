@@ -268,6 +268,23 @@
 .lf-node-list[data-cols] > .lf-node > .lf-node-row { border: 1px dashed var(--lf-border, #d9d9d9); background: rgba(127, 127, 127, 0.03); }
 /* `borders` on → solid cell borders in the canvas, mirroring the live form. */
 .lf-node-list--bordered[data-cols] > .lf-node > .lf-node-row { border-style: solid; }
+/* Columns/table children the live form omits (carriers / hidden) — shown stacked below the
+   grid so the column split matches the live form, with a hairline to set them apart. */
+.lf-node-list--offgrid { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--lf-border, #d9d9d9); }
+/* Tabs "+ Add tab". */
+.lf-add-tab {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--lf-primary, #2563eb);
+  background: none;
+  border: 1px dashed var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.lf-add-tab:hover { border-color: var(--lf-primary, #2563eb); }
 
 /* ── Settings panel + tabs ─────────────────────────────────────────────────── */
 .lf-settings {

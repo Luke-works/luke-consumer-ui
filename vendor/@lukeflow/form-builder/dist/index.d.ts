@@ -29,6 +29,12 @@ interface UseFormBuilderResult {
     select: (id: string | null) => void;
     /** Create a field of `type` and insert it (selecting the new node). */
     addField: (type: string, attributes?: Partial<EntityAttributes>, target?: InsertTarget) => void;
+    /** Create a container of `type` pre-seeded with `children`, in ONE undo step (e.g. Tabs
+     *  with two starter tab panels). Selects the new container. */
+    addFieldWithChildren: (type: string, attributes: Partial<EntityAttributes>, children: ReadonlyArray<{
+        type: string;
+        attributes?: Partial<EntityAttributes>;
+    }>, target?: InsertTarget) => void;
     /** Remove an entity and its subtree. */
     removeField: (id: string) => void;
     /** Relocate an entity under a new parent/index. */
