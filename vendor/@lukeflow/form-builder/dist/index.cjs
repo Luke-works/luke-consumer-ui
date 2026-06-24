@@ -41,6 +41,11 @@ module.exports = __toCommonJS(index_exports);
 var import_react = require("react");
 var import_form_core = require("@lukeflow/form-core");
 var EMPTY = { root: [], entities: {} };
+var HISTORY_LIMIT = 100;
+function pushBounded(stack, snap) {
+  stack.push(snap);
+  if (stack.length > HISTORY_LIMIT) stack.shift();
+}
 function useFormBuilder(initialSchema = EMPTY) {
   const [schema, setSchemaState] = (0, import_react.useState)(initialSchema);
   const [selectedId, setSelectedId] = (0, import_react.useState)(null);
@@ -50,7 +55,7 @@ function useFormBuilder(initialSchema = EMPTY) {
   const commit = (0, import_react.useCallback)((next) => {
     setSchemaState((prev) => {
       if (next === prev) return prev;
-      past.current.push(prev);
+      pushBounded(past.current, prev);
       future.current = [];
       return next;
     });
@@ -60,7 +65,7 @@ function useFormBuilder(initialSchema = EMPTY) {
     (type, attributes = {}, target) => {
       const entity = (0, import_form_core.createEntity)(type, attributes);
       setSchemaState((prev) => {
-        past.current.push(prev);
+        pushBounded(past.current, prev);
         future.current = [];
         return (0, import_form_core.insert)(prev, entity, target ?? {});
       });
@@ -73,7 +78,7 @@ function useFormBuilder(initialSchema = EMPTY) {
       const root = (0, import_form_core.createEntity)(type, attributes);
       const kids = children.map((c) => (0, import_form_core.createEntity)(c.type, c.attributes ?? {}));
       setSchemaState((prev) => {
-        past.current.push(prev);
+        pushBounded(past.current, prev);
         future.current = [];
         let s = (0, import_form_core.insert)(prev, root, target ?? {});
         for (const kid of kids) s = (0, import_form_core.insert)(s, kid, { parentId: root.id });
@@ -106,7 +111,7 @@ function useFormBuilder(initialSchema = EMPTY) {
     setSchemaState((prev) => {
       const last = past.current.pop();
       if (last === void 0) return prev;
-      future.current.push(prev);
+      pushBounded(future.current, prev);
       forceRender((n) => n + 1);
       return last;
     });
@@ -115,7 +120,7 @@ function useFormBuilder(initialSchema = EMPTY) {
     setSchemaState((prev) => {
       const next = future.current.pop();
       if (next === void 0) return prev;
-      past.current.push(prev);
+      pushBounded(past.current, prev);
       forceRender((n) => n + 1);
       return next;
     });

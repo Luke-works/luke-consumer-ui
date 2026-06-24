@@ -13,21 +13,6 @@
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
     "./styles.css": "./styles.css"
   },
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit"
-  },
   "dependencies": { "@lukeflow/form-core": "0.1.0-alpha.0" },
-  "peerDependencies": { "react": ">=18", "react-dom": ">=18" },
-  "devDependencies": {
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/react": "^16.1.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "jsdom": "^25.0.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  }
+  "peerDependencies": { "react": ">=18", "react-dom": ">=18" }
 }

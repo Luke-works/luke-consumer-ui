@@ -18,16 +18,7 @@
       "require": "./dist/index.cjs"
     }
   },
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
-  },
   "dependencies": {
     "expr-eval": "^2.0.2"
-  },
-  "devDependencies": {
-    "fast-check": "^3.23.1"
   }
 }
