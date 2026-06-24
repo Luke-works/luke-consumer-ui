@@ -1,6 +1,9 @@
-import { FormSchema, Diagnostic, EntityAttributes, InsertTarget, FormSettings, SchemaEntity } from '@lukeflow/form-core';
+import { FormSchema, Diagnostic, EntityAttributes, InsertTarget, FormSettings, SchemaEntity, FieldTypeRegistry } from '@lukeflow/form-core';
+export { FieldTypeRegistry } from '@lukeflow/form-core';
 import * as react from 'react';
 import { ReactNode } from 'react';
+import { FieldComponent } from '@lukeflow/form-react';
+export { FieldComponent, FieldComponentProps } from '@lukeflow/form-react';
 
 /**
  * `useFormBuilder` — the state controller for the form builder. It owns the working
@@ -189,6 +192,15 @@ interface FormBuilderProps {
     onChange?: (schema: FormSchema) => void;
     /** Extra palette entries for custom field types (paired with renderer `components`). */
     extraFields?: ReadonlyArray<PaletteItem>;
+    /**
+     * Custom field components by `type`, forwarded to the live preview's {@link FormRenderer} —
+     * so a custom field added via {@link FormBuilderProps.extraFields} renders with its real
+     * control in Preview (and the "open in new tab" preview), not a fallback input. Pass the
+     * SAME map your app gives `<FormRenderer>` at runtime so the builder preview matches what ships.
+     */
+    components?: Record<string, FieldComponent>;
+    /** A custom field-type registry, forwarded to the preview's {@link FormRenderer} (defaults to the standard set). */
+    registry?: FieldTypeRegistry;
     /**
      * Extend or override the settings panel's attribute editors. Array form merges by
      * `id` over the defaults (replace / append / `remove`); function form receives the

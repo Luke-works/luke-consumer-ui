@@ -2179,7 +2179,13 @@ function useDialogFocus(open, dialogRef) {
 
 // src/builder/PreviewModal.tsx
 var import_jsx_runtime10 = require("react/jsx-runtime");
-function PreviewModal({ schema, onClose, notify }) {
+function PreviewModal({
+  schema,
+  onClose,
+  notify,
+  components,
+  registry
+}) {
   const [view, setView] = (0, import_react9.useState)("form");
   const [copied, setCopied] = (0, import_react9.useState)(false);
   const [submitResult, setSubmitResult] = (0, import_react9.useState)(null);
@@ -2211,7 +2217,7 @@ function PreviewModal({ schema, onClose, notify }) {
     });
   };
   const openInNewTab = () => {
-    if (!openPreviewWindow(schema)) notify("Pop-up blocked \u2014 allow pop-ups to open the preview in a new tab.");
+    if (!openPreviewWindow(schema, { components, registry })) notify("Pop-up blocked \u2014 allow pop-ups to open the preview in a new tab.");
   };
   return (0, import_react_dom.createPortal)(
     /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-modal-overlay lf-builder", onMouseDown: (e) => e.target === e.currentTarget && onClose(), children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { ref: dialogRef, className: "lf-modal lf-preview-modal", role: "dialog", "aria-modal": "true", "aria-label": "Form preview", tabIndex: -1, children: [
@@ -2232,6 +2238,8 @@ function PreviewModal({ schema, onClose, notify }) {
           import_form_react.FormRenderer,
           {
             schema,
+            components,
+            registry,
             onResult: (r) => setSubmitResult({ ok: r.ok, errorKeys: r.errorKeys }),
             onSubmit: (data2) => setSubmitResult({ ok: true, data: data2 })
           }
@@ -2255,7 +2263,7 @@ function PreviewModal({ schema, onClose, notify }) {
     document.body
   );
 }
-function openPreviewWindow(schema) {
+function openPreviewWindow(schema, opts) {
   if (typeof window === "undefined") return false;
   const w = window.open("", "_blank");
   if (!w) return false;
@@ -2281,7 +2289,7 @@ function openPreviewWindow(schema) {
   });
   doc.body.appendChild(mount);
   const root = (0, import_client.createRoot)(mount);
-  root.render(/* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_form_react.FormRenderer, { schema }));
+  root.render(/* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_form_react.FormRenderer, { schema, components: opts?.components, registry: opts?.registry }));
   const teardown = () => {
     try {
       root.unmount();
@@ -2398,7 +2406,7 @@ function Problems({ builder }) {
 
 // src/FormBuilder.tsx
 var import_jsx_runtime13 = require("react/jsx-runtime");
-var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
+var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, className }, ref) {
   const b = useFormBuilder(initialSchema);
   (0, import_react11.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = (0, import_react11.useState)(false);
@@ -2435,7 +2443,7 @@ var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initial
       ] }),
       modal && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SettingsModal, { builder: b, editors, notify: setToast })
     ] }),
-    showPreview && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(PreviewModal, { schema: b.schema, onClose: () => setShowPreview(false), notify: setToast }),
+    showPreview && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(PreviewModal, { schema: b.schema, components, registry, onClose: () => setShowPreview(false), notify: setToast }),
     /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Problems, { builder: b }),
     toast && (0, import_react_dom3.createPortal)(
       /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-toast lf-builder", role: "status", children: [

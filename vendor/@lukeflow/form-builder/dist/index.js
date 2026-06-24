@@ -2154,7 +2154,13 @@ function useDialogFocus(open, dialogRef) {
 
 // src/builder/PreviewModal.tsx
 import { Fragment as Fragment7, jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
-function PreviewModal({ schema, onClose, notify }) {
+function PreviewModal({
+  schema,
+  onClose,
+  notify,
+  components,
+  registry
+}) {
   const [view, setView] = useState8("form");
   const [copied, setCopied] = useState8(false);
   const [submitResult, setSubmitResult] = useState8(null);
@@ -2186,7 +2192,7 @@ function PreviewModal({ schema, onClose, notify }) {
     });
   };
   const openInNewTab = () => {
-    if (!openPreviewWindow(schema)) notify("Pop-up blocked \u2014 allow pop-ups to open the preview in a new tab.");
+    if (!openPreviewWindow(schema, { components, registry })) notify("Pop-up blocked \u2014 allow pop-ups to open the preview in a new tab.");
   };
   return createPortal(
     /* @__PURE__ */ jsx10("div", { className: "lf-modal-overlay lf-builder", onMouseDown: (e) => e.target === e.currentTarget && onClose(), children: /* @__PURE__ */ jsxs10("div", { ref: dialogRef, className: "lf-modal lf-preview-modal", role: "dialog", "aria-modal": "true", "aria-label": "Form preview", tabIndex: -1, children: [
@@ -2207,6 +2213,8 @@ function PreviewModal({ schema, onClose, notify }) {
           FormRenderer,
           {
             schema,
+            components,
+            registry,
             onResult: (r) => setSubmitResult({ ok: r.ok, errorKeys: r.errorKeys }),
             onSubmit: (data2) => setSubmitResult({ ok: true, data: data2 })
           }
@@ -2230,7 +2238,7 @@ function PreviewModal({ schema, onClose, notify }) {
     document.body
   );
 }
-function openPreviewWindow(schema) {
+function openPreviewWindow(schema, opts) {
   if (typeof window === "undefined") return false;
   const w = window.open("", "_blank");
   if (!w) return false;
@@ -2256,7 +2264,7 @@ function openPreviewWindow(schema) {
   });
   doc.body.appendChild(mount);
   const root = createRoot(mount);
-  root.render(/* @__PURE__ */ jsx10(FormRenderer, { schema }));
+  root.render(/* @__PURE__ */ jsx10(FormRenderer, { schema, components: opts?.components, registry: opts?.registry }));
   const teardown = () => {
     try {
       root.unmount();
@@ -2373,7 +2381,7 @@ function Problems({ builder }) {
 
 // src/FormBuilder.tsx
 import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
-var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, attributeEditors, settings = "panel", aside, className }, ref) {
+var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = useState10(false);
@@ -2410,7 +2418,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
       ] }),
       modal && /* @__PURE__ */ jsx13(SettingsModal, { builder: b, editors, notify: setToast })
     ] }),
-    showPreview && /* @__PURE__ */ jsx13(PreviewModal, { schema: b.schema, onClose: () => setShowPreview(false), notify: setToast }),
+    showPreview && /* @__PURE__ */ jsx13(PreviewModal, { schema: b.schema, components, registry, onClose: () => setShowPreview(false), notify: setToast }),
     /* @__PURE__ */ jsx13(Problems, { builder: b }),
     toast && createPortal3(
       /* @__PURE__ */ jsxs13("div", { className: "lf-toast lf-builder", role: "status", children: [
