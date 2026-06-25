@@ -137,9 +137,12 @@
   border-radius: var(--lf-radius, 6px);
 }
 .lf-node-row.is-selected { border-color: var(--lf-primary, #2563eb); background: var(--lf-tint, #eff6ff); }
-.lf-node-grip { cursor: grab; color: var(--lf-muted, #6b7280); user-select: none; line-height: 1; padding: 2px; }
+.lf-node-grip { cursor: grab; color: var(--lf-muted, #6b7280); user-select: none; line-height: 1; padding: 2px; border-radius: 4px; }
 .lf-node-grip:active { cursor: grabbing; }
+.lf-node-grip:focus-visible { outline: 2px solid var(--lf-primary, #2563eb); outline-offset: 1px; }
 .lf-node-row.is-drop-into { background: var(--lf-tint, #eff6ff); border-color: var(--lf-primary, #2563eb); }
+/* Keyboard "grabbed" node: a clear, distinct affordance while it's picked up via the keyboard. */
+.lf-node-row.is-grabbed { border-color: var(--lf-primary, #2563eb); border-style: dashed; box-shadow: 0 0 0 2px var(--lf-tint, #bfdbfe); background: var(--lf-tint, #eff6ff); }
 
 /* A clear insertion separator placed IN THE GAP between rows (not on a field's edge)
    so the drop target is unmistakable: a primary-colored bar with a leading ring. */

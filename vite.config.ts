@@ -23,5 +23,8 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     // e2e/ holds Playwright specs (run via `npm run test:e2e`), not vitest.
     exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+    // 8 GB machine: vitest otherwise spawns one fork per CPU core (~8) and
+    // thrashes swap. Cap the pool so a run can't starve the system.
+    maxWorkers: 2,
   },
 });

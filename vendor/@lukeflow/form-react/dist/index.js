@@ -899,7 +899,7 @@ function SignatureField({
         {
           id: a11y.id,
           ref: canvasRef,
-          "aria-label": "Signature pad",
+          "aria-label": a11y["aria-label"] ?? "Signature pad",
           "aria-invalid": a11y["aria-invalid"],
           "aria-describedby": a11y["aria-describedby"],
           className: "lf-signature-pad",
@@ -993,7 +993,20 @@ function GridField({
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
             const visible = evaluateVisibility(c.attributes, { ...top, ...row });
-            return /* @__PURE__ */ jsx9("td", { children: visible && /* @__PURE__ */ jsx9(GridCell, { type: c.type, value, disabled, options: options(c.attributes), onChange: (v) => ctx.form.update(path, v), "aria-label": `${labelText(c.attributes) ?? ck} row ${i + 1}` }) }, c.id);
+            return /* @__PURE__ */ jsx9("td", { children: visible && /* @__PURE__ */ jsx9(
+              GridCell,
+              {
+                type: c.type,
+                value,
+                disabled,
+                options: options(c.attributes),
+                onChange: (v) => ctx.form.update(path, v),
+                entity: c,
+                scope: { ...top, ...row },
+                id: path,
+                "aria-label": `${labelText(c.attributes) ?? ck} row ${i + 1}`
+              }
+            ) }, c.id);
           }),
           !disabled && /* @__PURE__ */ jsx9("td", { children: /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-row-remove", onClick: () => replace(rows.filter((_, k) => k !== i)), children: "Remove" }) })
         ] }, i);
@@ -1028,10 +1041,29 @@ function GridCell({
   disabled,
   options: opts,
   onChange,
+  entity,
+  scope,
+  id,
   ...rest
 }) {
+  const a = entity?.attributes ?? {};
+  const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"] };
   if (type === "checkbox") {
     return /* @__PURE__ */ jsx9("input", { type: "checkbox", ...rest, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
+  }
+  if (type === "selectBoxes") {
+    const selected = new Set((Array.isArray(value) ? value : []).map(String));
+    const toggle = (v, on) => {
+      const next = new Set(selected);
+      if (on) next.add(v);
+      else next.delete(v);
+      onChange([...next]);
+    };
+    return /* @__PURE__ */ jsx9("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], children: opts.map((o) => /* @__PURE__ */ jsxs5("label", { className: "lf-cell-check", children: [
+      /* @__PURE__ */ jsx9("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
+      " ",
+      o.label
+    ] }, o.value)) });
   }
   if (type === "select" || type === "radio") {
     return /* @__PURE__ */ jsxs5("select", { ...rest, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
@@ -1039,19 +1071,27 @@ function GridCell({
       opts.map((o) => /* @__PURE__ */ jsx9("option", { value: o.value, children: o.label }, o.value))
     ] });
   }
+  if (type === "file") {
+    const fileEntity = entity ?? { id: id ?? "", type: "file", attributes: a };
+    return /* @__PURE__ */ jsx9(FileField, { a11y, multiple: Boolean(a.multiple), value, disabled, onChange, entity: fileEntity, scope: scope ?? {} });
+  }
+  if (type === "signature") {
+    return /* @__PURE__ */ jsx9(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+  }
   if (type === "textarea") {
     return /* @__PURE__ */ jsx9("textarea", { ...rest, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
   }
+  const mask = typeof a.inputMask === "string" ? a.inputMask : "";
   const numeric = type === "number" || type === "currency";
   return /* @__PURE__ */ jsx9(
     "input",
     {
-      type: numeric ? "text" : inputType(type),
+      type: mask || numeric ? "text" : inputType(type),
       inputMode: numeric ? "decimal" : void 0,
       ...rest,
-      value: asText(value),
+      value: mask ? applyMask(asText(value), mask) : asText(value),
       disabled,
-      onChange: (e) => onChange(e.target.value)
+      onChange: (e) => onChange(mask ? applyMask(e.target.value, mask) : e.target.value)
     }
   );
 }
@@ -1257,6 +1297,9 @@ function EditGridField({
               disabled: false,
               options: options(c.attributes),
               onChange: (v) => setEditing((e) => e ? { ...e, draft: { ...e.draft, [ck]: v } } : e),
+              entity: c,
+              scope: { ...top, ...editing.draft },
+              id: `${key}-eg-${ck}`,
               "aria-label": label
             }
           )

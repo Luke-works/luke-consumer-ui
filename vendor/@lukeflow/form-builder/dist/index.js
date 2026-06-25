@@ -121,7 +121,7 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo5, useState as useState10, useEffect as useEffect8, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
+import { useMemo as useMemo5, useState as useState10, useEffect as useEffect9, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
 import { createPortal as createPortal3 } from "react-dom";
 
 // src/SettingsPanel.tsx
@@ -1398,7 +1398,7 @@ function Control({
 }
 
 // src/Canvas.tsx
-import { createContext, useContext, useMemo as useMemo3, useRef as useRef5, useState as useState7 } from "react";
+import { createContext, useContext, useEffect as useEffect5, useId as useId3, useMemo as useMemo3, useRef as useRef5, useState as useState7 } from "react";
 import { createDefaultFieldTypeRegistry as createDefaultFieldTypeRegistry5, createFormEngine } from "@lukeflow/form-core";
 
 // src/NodePreview.tsx
@@ -1848,7 +1848,7 @@ function Palette({ builder, extra }) {
 // src/Canvas.tsx
 import { Fragment as Fragment6, jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 var REGISTRY5 = createDefaultFieldTypeRegistry5();
-var PreviewContext = createContext({ fields: {}, components: {} });
+var PreviewContext = createContext({ fields: {}, components: {}, kbdHelpId: "lf-kbd-dnd-help" });
 var useBuilderPreview = () => useContext(PreviewContext);
 function CanvasDndProvider({ builder, children }) {
   const dnd = useCanvasDnd(builder);
@@ -1864,8 +1864,9 @@ function Canvas({ builder, components, registry }) {
       return {};
     }
   }, [schema, registry]);
-  const preview = useMemo3(() => ({ fields, components: components ?? {} }), [fields, components]);
-  return /* @__PURE__ */ jsx9(PreviewContext.Provider, { value: preview, children: /* @__PURE__ */ jsx9(
+  const kbdHelpId = useId3();
+  const preview = useMemo3(() => ({ fields, components: components ?? {}, kbdHelpId }), [fields, components, kbdHelpId]);
+  return /* @__PURE__ */ jsx9(PreviewContext.Provider, { value: preview, children: /* @__PURE__ */ jsxs9(
     "div",
     {
       className: `lf-canvas${dnd.dragging ? " is-dragging" : ""}${dnd.overEmpty === ROOT ? " is-drop" : ""}`,
@@ -1873,10 +1874,15 @@ function Canvas({ builder, components, registry }) {
       onDragOver: (e) => dnd.overEmptyContainer(e, ROOT),
       onDragLeave: dnd.leave,
       onDrop: (e) => dnd.dropIntoEmpty(e, ROOT, schema.root.length),
-      children: schema.root.length === 0 ? /* @__PURE__ */ jsx9("p", { className: "lf-canvas-empty", children: "Add a field to begin \u2014 drag one from the palette, or click it." }) : /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx9(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
+      children: [
+        schema.root.length === 0 ? /* @__PURE__ */ jsx9("p", { className: "lf-canvas-empty", children: "Add a field to begin \u2014 drag one from the palette, or click it." }) : /* @__PURE__ */ jsx9("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ jsx9(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) }),
+        /* @__PURE__ */ jsx9("span", { id: kbdHelpId, style: SR_ONLY, children: "Press Space or Enter to pick up, then the arrow keys to move (up/down to reorder, right to nest into the item above, left to move out). Press Space or Enter to drop, or Escape to cancel." }),
+        /* @__PURE__ */ jsx9("div", { "aria-live": "assertive", style: SR_ONLY, children: dnd.announcement })
+      ]
     }
   ) });
 }
+var SR_ONLY = { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap", border: 0 };
 function Node({
   id,
   parentId,
@@ -1886,7 +1892,14 @@ function Node({
   depth
 }) {
   const dnd = useDnd();
-  const { fields, components } = useBuilderPreview();
+  const { fields, components, kbdHelpId } = useBuilderPreview();
+  const grabbed = dnd.grabbedId === id;
+  const gripRef = useRef5(null);
+  const grabbedRef = useRef5(grabbed);
+  grabbedRef.current = grabbed;
+  useEffect5(() => {
+    if (grabbed) gripRef.current?.focus();
+  }, [grabbed, parentId, index]);
   const entity = builder.schema.entities[id];
   if (!entity) return null;
   const selected = builder.selectedId === id;
@@ -1904,12 +1917,70 @@ function Node({
     const c = builder.schema.entities[cid];
     return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden || fields[cid]?.isVisible === false));
   };
+  const onGripKeyDown = (e) => {
+    const label = labelOf(entity);
+    if (!grabbed) {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        dnd.beginGrab(id, label);
+      }
+      return;
+    }
+    switch (e.key) {
+      case " ":
+      case "Enter":
+        e.preventDefault();
+        dnd.endGrab(label);
+        break;
+      case "Escape":
+        e.preventDefault();
+        dnd.cancelGrab(label);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (index > 0) {
+          builder.reorderField(parentId, index, index - 1);
+          dnd.announce(`${label} moved to position ${index} of ${count}.`);
+        } else dnd.announce(`${label} is already first.`);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        if (index < count - 1) {
+          builder.reorderField(parentId, index, index + 1);
+          dnd.announce(`${label} moved to position ${index + 2} of ${count}.`);
+        } else dnd.announce(`${label} is already last.`);
+        break;
+      case "ArrowRight": {
+        e.preventDefault();
+        const siblings = parentId == null ? builder.schema.root : builder.schema.entities[parentId]?.children ?? [];
+        const prevId = siblings[index - 1];
+        const prev = prevId ? builder.schema.entities[prevId] : void 0;
+        if (prev && REGISTRY5.get(prev.type)?.isContainer) {
+          builder.moveField(id, { parentId: prevId, index: prev.children?.length ?? 0 });
+          dnd.announce(`${label} moved into ${labelOf(prev)}.`);
+        } else dnd.announce(`No container above ${label} to move into.`);
+        break;
+      }
+      case "ArrowLeft": {
+        e.preventDefault();
+        if (parentId != null) {
+          const parentEntity = builder.schema.entities[parentId];
+          const parentLoc = locate(builder.schema, parentId);
+          builder.moveField(id, { parentId: parentLoc?.parentId ?? null, index: (parentLoc?.index ?? 0) + 1 });
+          dnd.announce(`${label} moved out of ${parentEntity ? labelOf(parentEntity) : "its container"}.`);
+        } else dnd.announce(`${label} is already at the top level.`);
+        break;
+      }
+      default:
+        break;
+    }
+  };
   return /* @__PURE__ */ jsxs9("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ jsx9(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ jsxs9(
       "div",
       {
-        className: `lf-node-row${selected ? " is-selected" : ""}${over === "into" ? " is-drop-into" : ""}${hidden ? " is-hidden" : ""}`,
+        className: `lf-node-row${selected ? " is-selected" : ""}${over === "into" ? " is-drop-into" : ""}${hidden ? " is-hidden" : ""}${grabbed ? " is-grabbed" : ""}`,
         "data-drop": over ?? void 0,
         onDragOver: (e) => {
           e.stopPropagation();
@@ -1924,9 +1995,21 @@ function Node({
           /* @__PURE__ */ jsx9(
             "span",
             {
+              ref: gripRef,
               className: "lf-node-grip",
-              "aria-label": `Drag ${labelOf(entity)}`,
+              role: "button",
+              tabIndex: 0,
+              "aria-pressed": grabbed,
+              "aria-label": grabbed ? `Moving ${labelOf(entity)}` : `Drag ${labelOf(entity)}`,
+              "aria-describedby": kbdHelpId,
+              "aria-keyshortcuts": "Space Enter ArrowUp ArrowDown ArrowLeft ArrowRight Escape",
               draggable: true,
+              onKeyDown: onGripKeyDown,
+              onBlur: () => {
+                window.setTimeout(() => {
+                  if (grabbedRef.current && !document.activeElement?.closest(".lf-node-grip")) dnd.endGrab(labelOf(entity));
+                }, 0);
+              },
               onDragStart: (e) => {
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", id);
@@ -2039,7 +2122,28 @@ function useCanvasDnd(builder) {
   const [over, setOver] = useState7(null);
   const [overEmpty, setOverEmpty] = useState7(null);
   const [dragging, setDragging] = useState7(false);
+  const [grabbedId, setGrabbedId] = useState7(null);
+  const [announcement, setAnnouncement] = useState7("");
+  const grabOrigin = useRef5(null);
+  const announce = (msg) => setAnnouncement(msg);
+  const beginGrab = (id, label) => {
+    grabOrigin.current = builder.schema;
+    setGrabbedId(id);
+    announce(`Grabbed ${label}. Use the arrow keys to move it, Space or Enter to drop, Escape to cancel.`);
+  };
+  const endGrab = (label) => {
+    grabOrigin.current = null;
+    setGrabbedId(null);
+    announce(`Dropped ${label}.`);
+  };
+  const cancelGrab = (label) => {
+    if (grabOrigin.current) builder.setSchema(grabOrigin.current);
+    grabOrigin.current = null;
+    setGrabbedId(null);
+    announce(`Move of ${label} cancelled.`);
+  };
   const begin = (src) => {
+    setGrabbedId(null);
     source.current = src;
     setDragging(true);
   };
@@ -2113,7 +2217,7 @@ function useCanvasDnd(builder) {
     if (s.kind === "new") builder.addField(s.type, { label: s.label, ...s.defaults ?? {} }, { parentId, index });
     else builder.moveField(s.id, { parentId, index });
   };
-  return { over, overEmpty, dragging, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty };
+  return { over, overEmpty, dragging, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty, grabbedId, announcement, beginGrab, endGrab, cancelGrab, announce };
 }
 function isDescendant(schema, ancestorId, maybeId) {
   const stack = [...schema.entities[ancestorId]?.children ?? []];
@@ -2142,15 +2246,15 @@ function labelOf(e) {
 }
 
 // src/builder/PreviewModal.tsx
-import { useMemo as useMemo4, useState as useState8, useEffect as useEffect6, useRef as useRef6 } from "react";
+import { useMemo as useMemo4, useState as useState8, useEffect as useEffect7, useRef as useRef6 } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { FormRenderer } from "@lukeflow/form-react";
 
 // src/builder/useDialogFocus.ts
-import { useEffect as useEffect5 } from "react";
+import { useEffect as useEffect6 } from "react";
 function useDialogFocus(open, dialogRef) {
-  useEffect5(() => {
+  useEffect6(() => {
     if (!open) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -2208,7 +2312,7 @@ function PreviewModal({
   const copyTimer = useRef6(null);
   const json = useMemo4(() => JSON.stringify(schema, null, 2), [schema]);
   useDialogFocus(true, dialogRef);
-  useEffect6(() => {
+  useEffect7(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -2321,7 +2425,7 @@ function openPreviewWindow(schema, opts) {
 }
 
 // src/builder/SettingsModal.tsx
-import { useState as useState9, useEffect as useEffect7, useRef as useRef7 } from "react";
+import { useState as useState9, useEffect as useEffect8, useRef as useRef7 } from "react";
 import { createPortal as createPortal2 } from "react-dom";
 import { Fragment as Fragment8, jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
 function SettingsModal({ builder, editors, notify }) {
@@ -2353,7 +2457,7 @@ function SettingsModal({ builder, editors, notify }) {
   };
   const latest = useRef7({ saveClose, confirmDiscard });
   latest.current = { saveClose, confirmDiscard };
-  useEffect7(() => {
+  useEffect8(() => {
     if (!open) return;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
@@ -2364,7 +2468,7 @@ function SettingsModal({ builder, editors, notify }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
   useDialogFocus(open, dialogRef);
-  useEffect7(() => {
+  useEffect8(() => {
     if (open) dialogRef.current?.focus();
   }, [open, id]);
   if (!open) return null;
@@ -2428,7 +2532,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
   const [toast, setToast] = useState10(null);
   const editors = useMemo5(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
-  useEffect8(() => {
+  useEffect9(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
@@ -2436,7 +2540,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
   const onChangeRef = useRef8(onChange);
   onChangeRef.current = onChange;
   const mounted = useRef8(false);
-  useEffect8(() => {
+  useEffect9(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;

@@ -1873,7 +1873,7 @@ function Palette({ builder, extra }) {
 // src/Canvas.tsx
 var import_jsx_runtime9 = require("react/jsx-runtime");
 var REGISTRY5 = (0, import_form_core8.createDefaultFieldTypeRegistry)();
-var PreviewContext = (0, import_react7.createContext)({ fields: {}, components: {} });
+var PreviewContext = (0, import_react7.createContext)({ fields: {}, components: {}, kbdHelpId: "lf-kbd-dnd-help" });
 var useBuilderPreview = () => (0, import_react7.useContext)(PreviewContext);
 function CanvasDndProvider({ builder, children }) {
   const dnd = useCanvasDnd(builder);
@@ -1889,8 +1889,9 @@ function Canvas({ builder, components, registry }) {
       return {};
     }
   }, [schema, registry]);
-  const preview = (0, import_react7.useMemo)(() => ({ fields, components: components ?? {} }), [fields, components]);
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(PreviewContext.Provider, { value: preview, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+  const kbdHelpId = (0, import_react7.useId)();
+  const preview = (0, import_react7.useMemo)(() => ({ fields, components: components ?? {}, kbdHelpId }), [fields, components, kbdHelpId]);
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(PreviewContext.Provider, { value: preview, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
     "div",
     {
       className: `lf-canvas${dnd.dragging ? " is-dragging" : ""}${dnd.overEmpty === ROOT ? " is-drop" : ""}`,
@@ -1898,10 +1899,15 @@ function Canvas({ builder, components, registry }) {
       onDragOver: (e) => dnd.overEmptyContainer(e, ROOT),
       onDragLeave: dnd.leave,
       onDrop: (e) => dnd.dropIntoEmpty(e, ROOT, schema.root.length),
-      children: schema.root.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "lf-canvas-empty", children: "Add a field to begin \u2014 drag one from the palette, or click it." }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) })
+      children: [
+        schema.root.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "lf-canvas-empty", children: "Add a field to begin \u2014 drag one from the palette, or click it." }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("ol", { className: "lf-node-list", children: schema.root.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Node, { id, parentId: null, index: i, count: schema.root.length, builder, depth: 0 }, id)) }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { id: kbdHelpId, style: SR_ONLY, children: "Press Space or Enter to pick up, then the arrow keys to move (up/down to reorder, right to nest into the item above, left to move out). Press Space or Enter to drop, or Escape to cancel." }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { "aria-live": "assertive", style: SR_ONLY, children: dnd.announcement })
+      ]
     }
   ) });
 }
+var SR_ONLY = { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap", border: 0 };
 function Node({
   id,
   parentId,
@@ -1911,7 +1917,14 @@ function Node({
   depth
 }) {
   const dnd = useDnd();
-  const { fields, components } = useBuilderPreview();
+  const { fields, components, kbdHelpId } = useBuilderPreview();
+  const grabbed = dnd.grabbedId === id;
+  const gripRef = (0, import_react7.useRef)(null);
+  const grabbedRef = (0, import_react7.useRef)(grabbed);
+  grabbedRef.current = grabbed;
+  (0, import_react7.useEffect)(() => {
+    if (grabbed) gripRef.current?.focus();
+  }, [grabbed, parentId, index]);
   const entity = builder.schema.entities[id];
   if (!entity) return null;
   const selected = builder.selectedId === id;
@@ -1929,12 +1942,70 @@ function Node({
     const c = builder.schema.entities[cid];
     return Boolean(c && (c.type === "array" || c.type === "map" || c.attributes?.hidden || fields[cid]?.isVisible === false));
   };
+  const onGripKeyDown = (e) => {
+    const label = labelOf(entity);
+    if (!grabbed) {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        dnd.beginGrab(id, label);
+      }
+      return;
+    }
+    switch (e.key) {
+      case " ":
+      case "Enter":
+        e.preventDefault();
+        dnd.endGrab(label);
+        break;
+      case "Escape":
+        e.preventDefault();
+        dnd.cancelGrab(label);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (index > 0) {
+          builder.reorderField(parentId, index, index - 1);
+          dnd.announce(`${label} moved to position ${index} of ${count}.`);
+        } else dnd.announce(`${label} is already first.`);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        if (index < count - 1) {
+          builder.reorderField(parentId, index, index + 1);
+          dnd.announce(`${label} moved to position ${index + 2} of ${count}.`);
+        } else dnd.announce(`${label} is already last.`);
+        break;
+      case "ArrowRight": {
+        e.preventDefault();
+        const siblings = parentId == null ? builder.schema.root : builder.schema.entities[parentId]?.children ?? [];
+        const prevId = siblings[index - 1];
+        const prev = prevId ? builder.schema.entities[prevId] : void 0;
+        if (prev && REGISTRY5.get(prev.type)?.isContainer) {
+          builder.moveField(id, { parentId: prevId, index: prev.children?.length ?? 0 });
+          dnd.announce(`${label} moved into ${labelOf(prev)}.`);
+        } else dnd.announce(`No container above ${label} to move into.`);
+        break;
+      }
+      case "ArrowLeft": {
+        e.preventDefault();
+        if (parentId != null) {
+          const parentEntity = builder.schema.entities[parentId];
+          const parentLoc = locate(builder.schema, parentId);
+          builder.moveField(id, { parentId: parentLoc?.parentId ?? null, index: (parentLoc?.index ?? 0) + 1 });
+          dnd.announce(`${label} moved out of ${parentEntity ? labelOf(parentEntity) : "its container"}.`);
+        } else dnd.announce(`${label} is already at the top level.`);
+        break;
+      }
+      default:
+        break;
+    }
+  };
   return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("li", { className: `lf-node${isContainer ? " is-container" : ""}`, "data-depth": depth, children: [
     over === "before" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(DropIndicator, { pos: "before" }),
     /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
       "div",
       {
-        className: `lf-node-row${selected ? " is-selected" : ""}${over === "into" ? " is-drop-into" : ""}${hidden ? " is-hidden" : ""}`,
+        className: `lf-node-row${selected ? " is-selected" : ""}${over === "into" ? " is-drop-into" : ""}${hidden ? " is-hidden" : ""}${grabbed ? " is-grabbed" : ""}`,
         "data-drop": over ?? void 0,
         onDragOver: (e) => {
           e.stopPropagation();
@@ -1949,9 +2020,21 @@ function Node({
           /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
             "span",
             {
+              ref: gripRef,
               className: "lf-node-grip",
-              "aria-label": `Drag ${labelOf(entity)}`,
+              role: "button",
+              tabIndex: 0,
+              "aria-pressed": grabbed,
+              "aria-label": grabbed ? `Moving ${labelOf(entity)}` : `Drag ${labelOf(entity)}`,
+              "aria-describedby": kbdHelpId,
+              "aria-keyshortcuts": "Space Enter ArrowUp ArrowDown ArrowLeft ArrowRight Escape",
               draggable: true,
+              onKeyDown: onGripKeyDown,
+              onBlur: () => {
+                window.setTimeout(() => {
+                  if (grabbedRef.current && !document.activeElement?.closest(".lf-node-grip")) dnd.endGrab(labelOf(entity));
+                }, 0);
+              },
               onDragStart: (e) => {
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", id);
@@ -2064,7 +2147,28 @@ function useCanvasDnd(builder) {
   const [over, setOver] = (0, import_react7.useState)(null);
   const [overEmpty, setOverEmpty] = (0, import_react7.useState)(null);
   const [dragging, setDragging] = (0, import_react7.useState)(false);
+  const [grabbedId, setGrabbedId] = (0, import_react7.useState)(null);
+  const [announcement, setAnnouncement] = (0, import_react7.useState)("");
+  const grabOrigin = (0, import_react7.useRef)(null);
+  const announce = (msg) => setAnnouncement(msg);
+  const beginGrab = (id, label) => {
+    grabOrigin.current = builder.schema;
+    setGrabbedId(id);
+    announce(`Grabbed ${label}. Use the arrow keys to move it, Space or Enter to drop, Escape to cancel.`);
+  };
+  const endGrab = (label) => {
+    grabOrigin.current = null;
+    setGrabbedId(null);
+    announce(`Dropped ${label}.`);
+  };
+  const cancelGrab = (label) => {
+    if (grabOrigin.current) builder.setSchema(grabOrigin.current);
+    grabOrigin.current = null;
+    setGrabbedId(null);
+    announce(`Move of ${label} cancelled.`);
+  };
   const begin = (src) => {
+    setGrabbedId(null);
     source.current = src;
     setDragging(true);
   };
@@ -2138,7 +2242,7 @@ function useCanvasDnd(builder) {
     if (s.kind === "new") builder.addField(s.type, { label: s.label, ...s.defaults ?? {} }, { parentId, index });
     else builder.moveField(s.id, { parentId, index });
   };
-  return { over, overEmpty, dragging, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty };
+  return { over, overEmpty, dragging, begin, end, leave, overNode, dropNode, overEmptyContainer, dropIntoEmpty, grabbedId, announcement, beginGrab, endGrab, cancelGrab, announce };
 }
 function isDescendant(schema, ancestorId, maybeId) {
   const stack = [...schema.entities[ancestorId]?.children ?? []];

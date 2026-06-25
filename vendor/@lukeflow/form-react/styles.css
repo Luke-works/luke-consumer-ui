@@ -478,6 +478,18 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   padding: 6px 8px;
   text-align: left;
 }
+/* Multi-choice (selectBoxes) grid cell: stack the inline options compactly within the cell. */
+.lf-cell-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lf-cell-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
 .lf-grid-aggregates td {
   font-weight: 700;
   background: #f9fafb;
