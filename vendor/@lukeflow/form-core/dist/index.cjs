@@ -922,6 +922,75 @@ function extractDataRefs(code) {
   return [...out];
 }
 
+// src/engine/evaluatorTypes.ts
+var SOURCE_PRIORITY = {
+  seed: 0,
+  default: 1,
+  customDefault: 2,
+  calculate: 3,
+  logicSetValue: 4,
+  user: 5,
+  clearOnHide: 0
+};
+function sourcePriority(source) {
+  return SOURCE_PRIORITY[source];
+}
+var DEFAULT_MAX_PASSES = 10;
+
+// src/engine/evaluatorCoercion.ts
+function coerceValue(fieldType, raw) {
+  if (!fieldType) return raw ?? "";
+  try {
+    return fieldType.coerce(raw);
+  } catch {
+    return raw ?? fieldType.empty?.() ?? "";
+  }
+}
+function emptyValue(fieldType) {
+  if (!fieldType) return "";
+  try {
+    return fieldType.empty();
+  } catch {
+    return "";
+  }
+}
+function sameValue(fieldType, a, b) {
+  if (fieldType?.compare) {
+    try {
+      return fieldType.compare(a, b);
+    } catch {
+    }
+  }
+  return defaultSameValue(a, b);
+}
+function defaultSameValue(a, b) {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((x, i) => defaultSameValue(x, b[i]));
+  }
+  if (a == null || b == null || typeof a === "object" || typeof b === "object") return false;
+  const sa = String(a);
+  const sb = String(b);
+  if (sa.trim() !== "" && sb.trim() !== "") {
+    const na = Number(a);
+    const nb = Number(b);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
+  }
+  return sa === sb;
+}
+function asExpr(value) {
+  return typeof value === "string" && value.trim() ? value : void 0;
+}
+function asBool2(value) {
+  return Boolean(value);
+}
+function clampPasses(maxPasses) {
+  if (typeof maxPasses !== "number" || !Number.isFinite(maxPasses) || maxPasses < 1) {
+    return DEFAULT_MAX_PASSES;
+  }
+  return Math.floor(maxPasses);
+}
+
 // src/engine/visibility.ts
 function evaluateVisibility(attributes, scope, opts = {}) {
   const a = attributes ?? {};
@@ -946,37 +1015,46 @@ function evaluateVisibility(attributes, scope, opts = {}) {
   }
   return true;
 }
+function evaluateRequired(attributes, scope) {
+  const a = attributes ?? {};
+  const expr = typeof a.requiredWhen === "string" && a.requiredWhen.trim() ? a.requiredWhen : void 0;
+  if (expr && !hasHostileIdentifier(expr)) {
+    const result = evaluateExpression(expr, { ...scope });
+    if (result !== void 0) return Boolean(result);
+  }
+  return asBool2(a.required);
+}
 
 // src/engine/dependencyExtraction.ts
 var SELF_VALUE_IDENT = "value";
-function asExpr(value) {
+function asExpr2(value) {
   return typeof value === "string" && value.trim() ? value : void 0;
 }
 function* entityExpressions(e) {
   const a = e.attributes ?? {};
-  const calc = asExpr(a.calculateValue);
+  const calc = asExpr2(a.calculateValue);
   if (calc) yield { source: "calculateValue", expr: calc };
-  const cond = asExpr(a.customConditional);
+  const cond = asExpr2(a.customConditional);
   if (cond) yield { source: "customConditional", expr: cond };
-  const valid = asExpr(a.customValidation);
+  const valid = asExpr2(a.customValidation);
   if (valid) yield { source: "customValidation", expr: valid };
-  const dflt = asExpr(a.customDefaultValue);
+  const dflt = asExpr2(a.customDefaultValue);
   if (dflt) yield { source: "customDefaultValue", expr: dflt };
-  const calcJs = asExpr(a.calculateValueJs);
+  const calcJs = asExpr2(a.calculateValueJs);
   if (calcJs) yield { source: "calculateValue", expr: calcJs, jsRefs: true };
-  const condJs = asExpr(a.customConditionalJs);
+  const condJs = asExpr2(a.customConditionalJs);
   if (condJs) yield { source: "customConditional", expr: condJs, jsRefs: true };
-  const validJs = asExpr(a.customValidationJs);
+  const validJs = asExpr2(a.customValidationJs);
   if (validJs) yield { source: "customValidation", expr: validJs, jsRefs: true };
-  const dfltJs = asExpr(a.customDefaultValueJs);
+  const dfltJs = asExpr2(a.customDefaultValueJs);
   if (dfltJs) yield { source: "customDefaultValue", expr: dfltJs, jsRefs: true };
   const logic = a.logic;
   if (Array.isArray(logic)) {
     for (const rule of logic) {
       if (!rule || typeof rule !== "object") continue;
-      const when = asExpr(rule.when);
+      const when = asExpr2(rule.when);
       if (when) yield { source: "logic.when", expr: when };
-      const value = asExpr(rule.value);
+      const value = asExpr2(rule.value);
       if (value) yield { source: "logic.value", expr: value };
     }
   }
@@ -1152,75 +1230,6 @@ function buildDependencyGraph(schema) {
   };
 }
 
-// src/engine/evaluatorTypes.ts
-var SOURCE_PRIORITY = {
-  seed: 0,
-  default: 1,
-  customDefault: 2,
-  calculate: 3,
-  logicSetValue: 4,
-  user: 5,
-  clearOnHide: 0
-};
-function sourcePriority(source) {
-  return SOURCE_PRIORITY[source];
-}
-var DEFAULT_MAX_PASSES = 10;
-
-// src/engine/evaluatorCoercion.ts
-function coerceValue(fieldType, raw) {
-  if (!fieldType) return raw ?? "";
-  try {
-    return fieldType.coerce(raw);
-  } catch {
-    return raw ?? fieldType.empty?.() ?? "";
-  }
-}
-function emptyValue(fieldType) {
-  if (!fieldType) return "";
-  try {
-    return fieldType.empty();
-  } catch {
-    return "";
-  }
-}
-function sameValue(fieldType, a, b) {
-  if (fieldType?.compare) {
-    try {
-      return fieldType.compare(a, b);
-    } catch {
-    }
-  }
-  return defaultSameValue(a, b);
-}
-function defaultSameValue(a, b) {
-  if (a === b) return true;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((x, i) => defaultSameValue(x, b[i]));
-  }
-  if (a == null || b == null || typeof a === "object" || typeof b === "object") return false;
-  const sa = String(a);
-  const sb = String(b);
-  if (sa.trim() !== "" && sb.trim() !== "") {
-    const na = Number(a);
-    const nb = Number(b);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na === nb;
-  }
-  return sa === sb;
-}
-function asExpr2(value) {
-  return typeof value === "string" && value.trim() ? value : void 0;
-}
-function asBool2(value) {
-  return Boolean(value);
-}
-function clampPasses(maxPasses) {
-  if (typeof maxPasses !== "number" || !Number.isFinite(maxPasses) || maxPasses < 1) {
-    return DEFAULT_MAX_PASSES;
-  }
-  return Math.floor(maxPasses);
-}
-
 // src/engine/evaluatorExpression.ts
 function buildScope(fields) {
   const scope = /* @__PURE__ */ Object.create(null);
@@ -1260,7 +1269,7 @@ function evalLogic(logic, scope, entityId, diagnostics) {
   if (!Array.isArray(logic)) return out;
   for (const rule of logic) {
     if (!rule || typeof rule !== "object") continue;
-    const when = asExpr2(rule.when);
+    const when = asExpr(rule.when);
     if (when) {
       const result = evaluateScoped(when, scope, entityId, "logic.when", diagnostics);
       if (!result) continue;
@@ -1285,7 +1294,7 @@ function evalLogic(logic, scope, entityId, diagnostics) {
         out.required = false;
         break;
       case "setValue": {
-        const expr = asExpr2(rule.value);
+        const expr = asExpr(rule.value);
         out.hasSetValue = true;
         out.value = expr ? evaluateScoped(expr, scope, entityId, "logic.value", diagnostics) : void 0;
         break;
@@ -1303,7 +1312,7 @@ function resolveVisibility(a, logic, scope, entityId, diagnostics, allowJs, self
     const shown = cond.show === false ? !match : match;
     if (!shown) return false;
   }
-  const customJs = allowJs ? asExpr2(a.customConditionalJs) : void 0;
+  const customJs = allowJs ? asExpr(a.customConditionalJs) : void 0;
   if (customJs) {
     const r = runJs(customJs, scope, selfValue);
     if (!r.ok) {
@@ -1312,7 +1321,7 @@ function resolveVisibility(a, logic, scope, entityId, diagnostics, allowJs, self
     }
     return Boolean(r.show);
   }
-  const custom = asExpr2(a.customConditional);
+  const custom = asExpr(a.customConditional);
   if (!custom) return true;
   const result = evaluateScoped(custom, scope, entityId, "customConditional", diagnostics);
   return result === void 0 ? true : Boolean(result);
@@ -1526,8 +1535,8 @@ function deriveField(model, fields, field, diagnostics, scope, trace = null, pas
       wroteLogicValue = true;
     }
   }
-  const calcJsExpr = allowJs ? asExpr2(a.calculateValueJs) : void 0;
-  const calcExpr = asExpr2(a.calculateValue);
+  const calcJsExpr = allowJs ? asExpr(a.calculateValueJs) : void 0;
+  const calcExpr = asExpr(a.calculateValue);
   if ((calcJsExpr || calcExpr) && !wroteLogicValue) {
     const pinnedByUser = asBool2(a.allowCalculateOverride) && field.pinned;
     if (!pinnedByUser) {
@@ -2049,13 +2058,14 @@ var createFormEngine = (factoryOptions = {}) => {
     rows.forEach((rowVals, i) => {
       const rowVisScope = { ...top, ...rowVals };
       for (const child of template) {
-        const attributes = { ...child.entity.attributes, type: child.entity.type };
         const cellValue = rowVals?.[child.key];
         const path = `${gridNode.key}[${i}].${child.key}`;
         if (!evaluateVisibility(child.entity.attributes, rowVisScope, { allowJs: allowJsEnabled })) {
           cellErrors.delete(path);
           continue;
         }
+        const required = evaluateRequired(child.entity.attributes, rowVisScope);
+        const attributes = { ...child.entity.attributes, type: child.entity.type, required };
         const rowScope = { ...top, ...rowVals, value: cellValue };
         const r = validateValue(attributes, { field: path, value: cellValue, scope: rowScope }, validatorRegistry);
         if (r.valid) {
@@ -2619,6 +2629,7 @@ exports.evaluateCompiled = evaluateCompiled;
 exports.evaluateExpression = evaluateExpression;
 exports.evaluateIncremental = evaluateIncremental;
 exports.evaluateJs = evaluateJs;
+exports.evaluateRequired = evaluateRequired;
 exports.evaluateVisibility = evaluateVisibility;
 exports.expressionVariables = expressionVariables;
 exports.extractDataRefs = extractDataRefs;

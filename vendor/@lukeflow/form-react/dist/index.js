@@ -1213,7 +1213,8 @@ function DateField({
 // src/render/containers.tsx
 import { useRef as useRef6, useState as useState8 } from "react";
 import {
-  evaluateVisibility
+  evaluateVisibility,
+  evaluateRequired
 } from "@lukeflow/form-core";
 import { jsx as jsx10, jsxs as jsxs7 } from "react/jsx-runtime";
 function Group({
@@ -1271,12 +1272,14 @@ function GridField({
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
             const visible = evaluateVisibility(c.attributes, { ...top, ...row });
+            const required = evaluateRequired(c.attributes, { ...top, ...row });
             return /* @__PURE__ */ jsx10("td", { children: visible && /* @__PURE__ */ jsx10(
               GridCell,
               {
                 type: c.type,
                 value,
                 disabled,
+                required,
                 options: options(c.attributes),
                 onChange: (v) => ctx.form.update(path, v),
                 entity: c,
@@ -1317,6 +1320,7 @@ function GridCell({
   type,
   value,
   disabled,
+  required,
   options: opts,
   onChange,
   entity,
@@ -1325,9 +1329,10 @@ function GridCell({
   ...rest
 }) {
   const a = entity?.attributes ?? {};
-  const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"] };
+  const ariaRequired = required || void 0;
+  const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"], "aria-required": ariaRequired };
   if (type === "checkbox") {
-    return /* @__PURE__ */ jsx10("input", { type: "checkbox", ...rest, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
+    return /* @__PURE__ */ jsx10("input", { type: "checkbox", ...rest, "aria-required": ariaRequired, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
   }
   if (type === "selectBoxes") {
     const selected = new Set((Array.isArray(value) ? value : []).map(String));
@@ -1337,14 +1342,14 @@ function GridCell({
       else next.delete(v);
       onChange([...next]);
     };
-    return /* @__PURE__ */ jsx10("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], children: opts.map((o) => /* @__PURE__ */ jsxs7("label", { className: "lf-cell-check", children: [
+    return /* @__PURE__ */ jsx10("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], "aria-required": ariaRequired, children: opts.map((o) => /* @__PURE__ */ jsxs7("label", { className: "lf-cell-check", children: [
       /* @__PURE__ */ jsx10("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
       " ",
       o.label
     ] }, o.value)) });
   }
   if (type === "select" || type === "radio") {
-    return /* @__PURE__ */ jsxs7("select", { ...rest, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
+    return /* @__PURE__ */ jsxs7("select", { ...rest, "aria-required": ariaRequired, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
       /* @__PURE__ */ jsx10("option", { value: "" }),
       opts.map((o) => /* @__PURE__ */ jsx10("option", { value: o.value, children: o.label }, o.value))
     ] });
@@ -1357,7 +1362,7 @@ function GridCell({
     return /* @__PURE__ */ jsx10(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
   }
   if (type === "textarea") {
-    return /* @__PURE__ */ jsx10("textarea", { ...rest, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
+    return /* @__PURE__ */ jsx10("textarea", { ...rest, "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
   }
   const mask = typeof a.inputMask === "string" ? a.inputMask : "";
   const numeric = type === "number" || type === "currency";
@@ -1367,6 +1372,7 @@ function GridCell({
       type: mask || numeric ? "text" : inputType(type),
       inputMode: numeric ? "decimal" : void 0,
       ...rest,
+      "aria-required": ariaRequired,
       value: mask ? applyMask(asText(value), mask) : asText(value),
       disabled,
       onChange: (e) => onChange(mask ? applyMask(e.target.value, mask) : e.target.value)
@@ -1563,20 +1569,26 @@ function EditGridField({
     editing && /* @__PURE__ */ jsxs7("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
       cells.map((c) => {
         const ck = cellKey(c);
-        if (!evaluateVisibility(c.attributes, { ...top, ...editing.draft })) return null;
+        const rowScope = { ...top, ...editing.draft };
+        if (!evaluateVisibility(c.attributes, rowScope)) return null;
         const label = labelText(c.attributes) ?? ck;
+        const required = evaluateRequired(c.attributes, rowScope);
         return /* @__PURE__ */ jsxs7("label", { className: "lf-eg-cell", children: [
-          /* @__PURE__ */ jsx10("span", { className: "lf-eg-cell-label", children: ctx.t(label) }),
+          /* @__PURE__ */ jsxs7("span", { className: "lf-eg-cell-label", children: [
+            ctx.t(label),
+            required && /* @__PURE__ */ jsx10("span", { "aria-hidden": "true", children: " *" })
+          ] }),
           /* @__PURE__ */ jsx10(
             GridCell,
             {
               type: c.type,
               value: editing.draft[ck],
               disabled: false,
+              required,
               options: options(c.attributes),
               onChange: (v) => setEditing((e) => e ? { ...e, draft: { ...e.draft, [ck]: v } } : e),
               entity: c,
-              scope: { ...top, ...editing.draft },
+              scope: rowScope,
               id: `${key}-eg-${ck}`,
               "aria-label": label
             }

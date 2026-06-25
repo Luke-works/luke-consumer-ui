@@ -1289,12 +1289,14 @@ function GridField({
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
             const visible = (0, import_form_core6.evaluateVisibility)(c.attributes, { ...top, ...row });
+            const required = (0, import_form_core6.evaluateRequired)(c.attributes, { ...top, ...row });
             return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("td", { children: visible && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               GridCell,
               {
                 type: c.type,
                 value,
                 disabled,
+                required,
                 options: options(c.attributes),
                 onChange: (v) => ctx.form.update(path, v),
                 entity: c,
@@ -1335,6 +1337,7 @@ function GridCell({
   type,
   value,
   disabled,
+  required,
   options: opts,
   onChange,
   entity,
@@ -1343,9 +1346,10 @@ function GridCell({
   ...rest
 }) {
   const a = entity?.attributes ?? {};
-  const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"] };
+  const ariaRequired = required || void 0;
+  const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"], "aria-required": ariaRequired };
   if (type === "checkbox") {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "checkbox", ...rest, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "checkbox", ...rest, "aria-required": ariaRequired, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
   }
   if (type === "selectBoxes") {
     const selected = new Set((Array.isArray(value) ? value : []).map(String));
@@ -1355,14 +1359,14 @@ function GridCell({
       else next.delete(v);
       onChange([...next]);
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], children: opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "lf-cell-check", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], "aria-required": ariaRequired, children: opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "lf-cell-check", children: [
       /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
       " ",
       o.label
     ] }, o.value)) });
   }
   if (type === "select" || type === "radio") {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("select", { ...rest, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("select", { ...rest, "aria-required": ariaRequired, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
       /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: "" }),
       opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: o.value, children: o.label }, o.value))
     ] });
@@ -1375,7 +1379,7 @@ function GridCell({
     return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
   }
   if (type === "textarea") {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("textarea", { ...rest, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("textarea", { ...rest, "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
   }
   const mask = typeof a.inputMask === "string" ? a.inputMask : "";
   const numeric = type === "number" || type === "currency";
@@ -1385,6 +1389,7 @@ function GridCell({
       type: mask || numeric ? "text" : inputType(type),
       inputMode: numeric ? "decimal" : void 0,
       ...rest,
+      "aria-required": ariaRequired,
       value: mask ? applyMask(asText(value), mask) : asText(value),
       disabled,
       onChange: (e) => onChange(mask ? applyMask(e.target.value, mask) : e.target.value)
@@ -1581,20 +1586,26 @@ function EditGridField({
     editing && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
       cells.map((c) => {
         const ck = cellKey(c);
-        if (!(0, import_form_core6.evaluateVisibility)(c.attributes, { ...top, ...editing.draft })) return null;
+        const rowScope = { ...top, ...editing.draft };
+        if (!(0, import_form_core6.evaluateVisibility)(c.attributes, rowScope)) return null;
         const label = labelText(c.attributes) ?? ck;
+        const required = (0, import_form_core6.evaluateRequired)(c.attributes, rowScope);
         return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "lf-eg-cell", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "lf-eg-cell-label", children: ctx.t(label) }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "lf-eg-cell-label", children: [
+            ctx.t(label),
+            required && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { "aria-hidden": "true", children: " *" })
+          ] }),
           /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
             GridCell,
             {
               type: c.type,
               value: editing.draft[ck],
               disabled: false,
+              required,
               options: options(c.attributes),
               onChange: (v) => setEditing((e) => e ? { ...e, draft: { ...e.draft, [ck]: v } } : e),
               entity: c,
-              scope: { ...top, ...editing.draft },
+              scope: rowScope,
               id: `${key}-eg-${ck}`,
               "aria-label": label
             }

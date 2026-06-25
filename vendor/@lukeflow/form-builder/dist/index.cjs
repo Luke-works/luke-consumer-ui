@@ -188,6 +188,12 @@ var textual = (e) => TEXTUAL.includes(e.type);
 var numeric = (e) => NUMERIC.includes(e.type);
 var optioned = (e) => OPTIONED.includes(e.type);
 var grid = (e) => GRIDS.includes(e.type);
+var inGrid = (e, schema) => {
+  for (const ent of Object.values(schema.entities ?? {})) {
+    if (ent.children?.includes(e.id)) return GRIDS.includes(ent.type);
+  }
+  return false;
+};
 var CURRENCY_CODES = ["USD", "EUR", "GBP", "INR", "JPY", "CAD", "AUD", "CNY", "BRL", "ZAR"].map((c) => ({ label: c, value: c }));
 function createDefaultAttributeEditors() {
   return [
@@ -316,6 +322,19 @@ function createDefaultAttributeEditors() {
     { id: "clearOnHide", tab: "data", attribute: "clearOnHide", label: "Clear value when hidden", control: "checkbox", order: 81, when: data },
     // ── VALIDATION ─────────────────────────────────────────────────────────────
     { id: "required", tab: "validation", attribute: "required", label: "Required", control: "checkbox", order: 1, when: (e) => data(e) || grid(e) },
+    {
+      id: "requiredWhen",
+      tab: "validation",
+      attribute: "requiredWhen",
+      label: "Required when (grid row)",
+      control: "expression",
+      order: 2,
+      // Grid-cell-only: the engine evaluates `requiredWhen` per row, so only show it for grid cells
+      // (a top-level field uses the Logic tab's require/optional rules instead).
+      when: (e, schema) => data(e) && inGrid(e, schema),
+      placeholder: "amount > 100",
+      hint: "An expression over this row's fields \u2014 when truthy, this cell is required in that row (overrides the static Required)."
+    },
     { id: "minLength", tab: "validation", attribute: "minLength", label: "Min length", control: "number", order: 10, when: textual },
     { id: "maxLength", tab: "validation", attribute: "maxLength", label: "Max length", control: "number", order: 11, when: textual },
     { id: "min", tab: "validation", attribute: "min", label: "Minimum", control: "number", order: 12, when: numeric },

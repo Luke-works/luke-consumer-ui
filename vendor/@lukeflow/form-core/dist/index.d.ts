@@ -1299,12 +1299,12 @@ declare function evaluateJs(code: string, scope: Record<string, unknown>, self?:
 declare function extractDataRefs(code: string): string[];
 
 /**
- * Standalone visibility resolution for a single field's attributes against a scope —
- * the shared primitive used for GRID CELL visibility (per-row), so the engine's grid
- * validation and the renderer agree on which cells are shown. It mirrors the
- * evaluator's `resolveVisibility` for the attribute-driven sources (`hidden`,
- * `conditional`, `customConditional`, `customConditionalJs`) but omits `logic[]`
- * rules, which don't apply to grid cells. Fail-open: a broken expression SHOWS.
+ * Standalone visibility + required resolution for a single field's attributes against a
+ * scope — the shared primitives used for GRID CELL conditional logic (per-row), so the
+ * engine's grid validation and the renderer agree on which cells are shown and which are
+ * required. They mirror the evaluator's attribute-driven sources but omit `logic[]` rules,
+ * which don't apply to grid cells. Fail-open: a broken expression SHOWS / falls back to
+ * the static `required`.
  *
  * @packageDocumentation
  */
@@ -1312,6 +1312,15 @@ declare function extractDataRefs(code: string): string[];
 declare function evaluateVisibility(attributes: Record<string, unknown> | undefined, scope: Readonly<Record<string, unknown>>, opts?: {
     allowJs?: boolean;
 }): boolean;
+/**
+ * Resolve whether a field is REQUIRED for `scope`. A `requiredWhen` expression (evaluated
+ * against the scope) overrides the static `required` — when truthy the field is required,
+ * when falsy it is optional. This is the per-row required channel for grid cells (symmetric
+ * with {@link evaluateVisibility}'s `customConditional`). Fail-safe: a missing/hostile/broken
+ * expression falls back to the static `required` attribute, so a typo can't silently drop a
+ * required check.
+ */
+declare function evaluateRequired(attributes: Record<string, unknown> | undefined, scope: Readonly<Record<string, unknown>>): boolean;
 
 /**
  * The dependency graph's public data model: the {@link DependencySource} tag, a
@@ -2176,4 +2185,4 @@ declare function setSettings(schema: FormSchema, patch: Partial<FormSettings>): 
 /** @lukeflow/form-core — the headless Lukeflow form engine. */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataSource, type DataSourceTrigger, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataSource, type DataSourceTrigger, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
