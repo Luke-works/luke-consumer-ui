@@ -628,17 +628,16 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   cursor: pointer;
 }
 .lf-search-clear:hover { background: var(--lf-border); color: var(--lf-text); }
+/* Portaled to <body> + fixed-positioned in JS (useAnchoredPosition) so an `overflow` ancestor
+   can't clip it. Token fallbacks matter here because the portaled list lives outside `.lf-form`. */
 .lf-search-list {
-  position: absolute;
-  z-index: 10;
-  left: 0;
-  right: 0;
+  z-index: 2147483600; /* above modals/overlays — portaled to <body> */
   margin: 2px 0 0;
   padding: 0;
   list-style: none;
-  background: var(--lf-bg);
-  border: 1px solid var(--lf-border);
-  border-radius: var(--lf-radius);
+  background: var(--lf-bg, #fff);
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
   max-height: 220px;
   overflow: auto;
 }
@@ -695,16 +694,15 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 }
 .lf-datefield-time select { width: auto; }
 
+/* Portaled to <body> + fixed-positioned in JS (useAnchoredPosition), so an `overflow` ancestor
+   can't clip it; this rule is just the visual chrome. */
 .lf-datefield-pop {
-  position: absolute;
-  z-index: 20;
-  top: 100%;
-  left: 0;
+  z-index: 2147483600; /* above modals/overlays — it's portaled to <body>, like the tooltip bubble */
   margin-top: 4px;
   padding: 8px;
   background: var(--lf-bg, #fff);
   border: 1px solid var(--lf-border, #d9d9d9);
-  border-radius: var(--lf-radius);
+  border-radius: var(--lf-radius, 6px);
   box-shadow: 0 10px 30px rgba(16, 24, 40, 0.12);
 }
 .lf-cal-head {
@@ -721,8 +719,8 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   font-size: 18px;
   line-height: 1;
   padding: 2px 8px;
-  border-radius: var(--lf-radius);
-  color: var(--lf-text);
+  border-radius: var(--lf-radius, 6px);
+  color: var(--lf-text, #111827);
 }
 .lf-cal-nav:hover { background: var(--lf-tint, #eff6ff); }
 .lf-cal-row {
@@ -739,9 +737,9 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   border: none;
   background: transparent;
   height: 2rem;
-  border-radius: var(--lf-radius);
+  border-radius: var(--lf-radius, 6px);
   cursor: pointer;
-  color: var(--lf-text);
+  color: var(--lf-text, #111827);
 }
 .lf-cal-day:hover { background: var(--lf-tint, #eff6ff); }
 .lf-cal-day.is-outside { color: var(--lf-muted, #9ca3af); }

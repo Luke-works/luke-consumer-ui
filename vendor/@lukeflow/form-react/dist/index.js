@@ -47,7 +47,7 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-import { useState as useState9, useEffect as useEffect6, useRef as useRef7, useCallback as useCallback2 } from "react";
+import { useState as useState10, useEffect as useEffect6, useRef as useRef7, useCallback as useCallback2 } from "react";
 import {
   createDefaultFieldTypeRegistry,
   readAsyncValidation,
@@ -365,12 +365,59 @@ function TooltipBubble({ text, anchor, doc }) {
 }
 
 // src/render/controls/Select.tsx
-import { useState as useState4, useEffect as useEffect3, useRef as useRef3 } from "react";
+import { useState as useState5, useEffect as useEffect3, useRef as useRef3 } from "react";
+import { createPortal as createPortal2 } from "react-dom";
 import {
   readDataSource as readDataSource2,
   resolveMinionParams as resolveMinionParams2,
   toOptions as toOptions2
 } from "@lukeflow/form-core";
+
+// src/render/usePopover.ts
+import { useLayoutEffect as useLayoutEffect2, useState as useState4 } from "react";
+function useAnchoredPosition(anchorRef, open) {
+  const [style, setStyle] = useState4(null);
+  useLayoutEffect2(() => {
+    if (!open) {
+      setStyle(null);
+      return;
+    }
+    const el = anchorRef.current;
+    const win = el?.ownerDocument?.defaultView;
+    if (!el || !win) return;
+    const M = 8;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      const spaceBelow = win.innerHeight - r.bottom;
+      const spaceAbove = r.top;
+      const below = spaceBelow >= spaceAbove || spaceBelow > 320;
+      const maxHeight = Math.max(120, (below ? spaceBelow : spaceAbove) - M);
+      const left = Math.max(M, Math.min(r.left, win.innerWidth - r.width - M));
+      setStyle({
+        position: "fixed",
+        left,
+        right: "auto",
+        minWidth: r.width,
+        maxHeight,
+        overflowY: "auto",
+        ...below ? { top: r.bottom } : { bottom: win.innerHeight - r.top }
+      });
+    };
+    measure();
+    win.addEventListener("scroll", measure, true);
+    win.addEventListener("resize", measure);
+    return () => {
+      win.removeEventListener("scroll", measure, true);
+      win.removeEventListener("resize", measure);
+    };
+  }, [open, anchorRef]);
+  return style;
+}
+function popoverTarget(anchorRef) {
+  return anchorRef.current?.ownerDocument?.body ?? (typeof document !== "undefined" ? document.body : null);
+}
+
+// src/render/controls/Select.tsx
 import { jsx as jsx6, jsxs as jsxs3 } from "react/jsx-runtime";
 function SearchSelect({
   a11y,
@@ -385,12 +432,12 @@ function SearchSelect({
   const ds = readDataSource2(entity.attributes);
   const dsRaw = entity.attributes?.dataSource;
   const searchParam = typeof dsRaw?.searchParam === "string" ? dsRaw.searchParam : "q";
-  const [query, setQuery] = useState4("");
-  const [open, setOpen] = useState4(false);
-  const [options2, setOptions] = useState4([]);
-  const [loading, setLoading] = useState4(false);
-  const [selectedLabel, setSelectedLabel] = useState4("");
-  const [active, setActive] = useState4(-1);
+  const [query, setQuery] = useState5("");
+  const [open, setOpen] = useState5(false);
+  const [options2, setOptions] = useState5([]);
+  const [loading, setLoading] = useState5(false);
+  const [selectedLabel, setSelectedLabel] = useState5("");
+  const [active, setActive] = useState5(-1);
   const timer = useRef3(null);
   const blurTimer = useRef3(null);
   const clearBlur = () => {
@@ -430,6 +477,8 @@ function SearchSelect({
   }, [query, open, client]);
   const display = open ? query : selectedLabel || asText(value);
   const listId = `${a11y.id}-listbox`;
+  const wrapRef = useRef3(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && (loading || options2.length > 0));
   const onKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -449,7 +498,7 @@ function SearchSelect({
       setActive(-1);
     }
   };
-  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", children: [
+  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", ref: wrapRef, children: [
     /* @__PURE__ */ jsx6(
       "input",
       {
@@ -478,24 +527,27 @@ function SearchSelect({
         }
       }
     ),
-    open && (loading || options2.length > 0) && /* @__PURE__ */ jsxs3("ul", { id: listId, role: "listbox", className: "lf-search-list", children: [
-      loading && /* @__PURE__ */ jsx6("li", { className: "lf-search-loading", children: "Searching\u2026" }),
-      options2.map((o, i) => /* @__PURE__ */ jsx6(
-        "li",
-        {
-          id: optionId(i),
-          role: "option",
-          "aria-selected": i === active,
-          className: i === active ? "is-active" : void 0,
-          onMouseDown: (e) => {
-            e.preventDefault();
-            choose(o);
+    open && (loading || options2.length > 0) && popoverTarget(wrapRef) && createPortal2(
+      /* @__PURE__ */ jsxs3("ul", { id: listId, role: "listbox", className: "lf-search-list", style: popStyle ?? void 0, children: [
+        loading && /* @__PURE__ */ jsx6("li", { className: "lf-search-loading", children: "Searching\u2026" }),
+        options2.map((o, i) => /* @__PURE__ */ jsx6(
+          "li",
+          {
+            id: optionId(i),
+            role: "option",
+            "aria-selected": i === active,
+            className: i === active ? "is-active" : void 0,
+            onMouseDown: (e) => {
+              e.preventDefault();
+              choose(o);
+            },
+            children: o.label
           },
-          children: o.label
-        },
-        o.value
-      ))
-    ] })
+          o.value
+        ))
+      ] }),
+      popoverTarget(wrapRef)
+    )
   ] });
 }
 function SearchableSelect({
@@ -508,9 +560,9 @@ function SearchableSelect({
   disabled,
   t
 }) {
-  const [query, setQuery] = useState4("");
-  const [open, setOpen] = useState4(false);
-  const [active, setActive] = useState4(-1);
+  const [query, setQuery] = useState5("");
+  const [open, setOpen] = useState5(false);
+  const [active, setActive] = useState5(-1);
   const blurTimer = useRef3(null);
   const selected = options2.find((o) => o.value === asText(value));
   const q = query.trim().toLowerCase();
@@ -553,7 +605,9 @@ function SearchableSelect({
   };
   const display = open ? query : selected ? t(selected.label) : asText(value);
   const showClear = !disabled && !required && asText(value) !== "" && !open;
-  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", children: [
+  const wrapRef = useRef3(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && filtered.length > 0);
+  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", ref: wrapRef, children: [
     /* @__PURE__ */ jsx6(
       "input",
       {
@@ -582,26 +636,29 @@ function SearchableSelect({
       }
     ),
     showClear && /* @__PURE__ */ jsx6("button", { type: "button", className: "lf-search-clear", "aria-label": "Clear", onMouseDown: (e) => e.preventDefault(), onClick: () => setValue(""), children: /* @__PURE__ */ jsx6(XGlyph, {}) }),
-    open && filtered.length > 0 && /* @__PURE__ */ jsx6("ul", { id: listId, role: "listbox", className: "lf-search-list", children: filtered.map((o, i) => /* @__PURE__ */ jsx6(
-      "li",
-      {
-        id: optionId(i),
-        role: "option",
-        "aria-selected": o.value === asText(value),
-        className: i === active ? "is-active" : void 0,
-        onMouseDown: (e) => {
-          e.preventDefault();
-          choose(o);
+    open && filtered.length > 0 && popoverTarget(wrapRef) && createPortal2(
+      /* @__PURE__ */ jsx6("ul", { id: listId, role: "listbox", className: "lf-search-list", style: popStyle ?? void 0, children: filtered.map((o, i) => /* @__PURE__ */ jsx6(
+        "li",
+        {
+          id: optionId(i),
+          role: "option",
+          "aria-selected": o.value === asText(value),
+          className: i === active ? "is-active" : void 0,
+          onMouseDown: (e) => {
+            e.preventDefault();
+            choose(o);
+          },
+          children: t(o.label)
         },
-        children: t(o.label)
-      },
-      o.value
-    )) })
+        o.value
+      )) }),
+      popoverTarget(wrapRef)
+    )
   ] });
 }
 
 // src/render/controls/inputs.tsx
-import { useState as useState5 } from "react";
+import { useState as useState6 } from "react";
 import "@lukeflow/form-core";
 import { jsx as jsx7, jsxs as jsxs4 } from "react/jsx-runtime";
 function TextControl({
@@ -630,7 +687,7 @@ function TagsInput({
   onChange,
   placeholder
 }) {
-  const [draft, setDraft] = useState5("");
+  const [draft, setDraft] = useState6("");
   const tags = value.map(String);
   const add = (raw) => {
     const t = raw.trim();
@@ -672,7 +729,7 @@ function NumberInput({
   suffix,
   onChange
 }) {
-  const [focused, setFocused] = useState5(false);
+  const [focused, setFocused] = useState6(false);
   const raw = asText(value);
   let display = raw;
   if (!focused && raw !== "" && currency) {
@@ -715,8 +772,8 @@ function FileField({
   const client = useMinionClient();
   const storage = entity.attributes?.storage;
   const uploadMinion = typeof storage?.minion === "string" ? storage.minion : void 0;
-  const [uploading, setUploading] = useState5(false);
-  const [error, setError] = useState5(null);
+  const [uploading, setUploading] = useState6(false);
+  const [error, setError] = useState6(null);
   const files = Array.isArray(value) ? value : [];
   const handle = async (list) => {
     if (!list || list.length === 0) return;
@@ -752,7 +809,7 @@ function FileField({
 }
 
 // src/render/controls/SignatureField.tsx
-import { useState as useState6, useEffect as useEffect4, useRef as useRef4 } from "react";
+import { useState as useState7, useEffect as useEffect4, useRef as useRef4 } from "react";
 import { jsx as jsx8, jsxs as jsxs5 } from "react/jsx-runtime";
 function SignatureField({
   a11y,
@@ -766,9 +823,9 @@ function SignatureField({
   const drawing = useRef4(false);
   const painted = useRef4("");
   const dataUrl = typeof value === "string" ? value : "";
-  const [hasInk, setHasInk] = useState6(Boolean(dataUrl));
-  const [mode, setMode] = useState6("draw");
-  const [typed, setTyped] = useState6("");
+  const [hasInk, setHasInk] = useState7(Boolean(dataUrl));
+  const [mode, setMode] = useState7("draw");
+  const [typed, setTyped] = useState7("");
   const color = penColor || "#111827";
   const context = () => canvasRef.current?.getContext("2d") ?? null;
   const drawTyped = (name) => {
@@ -939,7 +996,8 @@ function SignatureField({
 }
 
 // src/render/controls/DateField.tsx
-import { useState as useState7, useEffect as useEffect5, useRef as useRef5 } from "react";
+import { useState as useState8, useEffect as useEffect5, useRef as useRef5 } from "react";
+import { createPortal as createPortal3 } from "react-dom";
 import { jsx as jsx9, jsxs as jsxs6 } from "react/jsx-runtime";
 var pad = (n) => String(n).padStart(2, "0");
 var daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
@@ -995,20 +1053,23 @@ function DateField({
   const hasTime = kind === "datetime" || kind === "time";
   const minStep = Math.max(1, Math.floor(minuteStep) || 1);
   const timeDisabled = disabled || kind === "datetime" && !date;
-  const [open, setOpen] = useState7(false);
+  const [open, setOpen] = useState8(false);
   const today = (() => {
     const n = /* @__PURE__ */ new Date();
     return { y: n.getFullYear(), m: n.getMonth(), d: n.getDate() };
   })();
-  const [view, setView] = useState7(date ?? today);
-  const [focused, setFocused] = useState7(date ?? today);
+  const [view, setView] = useState8(date ?? today);
+  const [focused, setFocused] = useState8(date ?? today);
   const wrapRef = useRef5(null);
   const inputRef = useRef5(null);
   const gridRef = useRef5(null);
+  const popRef = useRef5(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && hasCal);
   useEffect5(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      const t = e.target;
+      if (!wrapRef.current?.contains(t) && !popRef.current?.contains(t)) setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -1175,43 +1236,46 @@ function DateField({
         }
       )
     ] }),
-    open && hasCal && /* @__PURE__ */ jsxs6("div", { className: "lf-datefield-pop", role: "dialog", "aria-label": "Choose date", children: [
-      /* @__PURE__ */ jsxs6("div", { className: "lf-cal-head", children: [
-        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
-        /* @__PURE__ */ jsx9("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m) }),
-        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
+    open && hasCal && popoverTarget(wrapRef) && createPortal3(
+      /* @__PURE__ */ jsxs6("div", { ref: popRef, className: "lf-datefield-pop", role: "dialog", "aria-label": "Choose date", style: popStyle ?? void 0, children: [
+        /* @__PURE__ */ jsxs6("div", { className: "lf-cal-head", children: [
+          /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
+          /* @__PURE__ */ jsx9("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m) }),
+          /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
+        ] }),
+        /* @__PURE__ */ jsxs6("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
+          /* @__PURE__ */ jsx9("div", { className: "lf-cal-row", role: "row", children: WEEKDAYS.map((w) => /* @__PURE__ */ jsx9("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w, children: w.slice(0, 2) }, w)) }),
+          Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ jsx9("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
+            const inMonth = c.m === view.m;
+            const isSel = date != null && sameDay(c, date);
+            const isFocused = sameDay(c, focused);
+            const isToday = sameDay(c, today);
+            return /* @__PURE__ */ jsx9(
+              "button",
+              {
+                type: "button",
+                role: "gridcell",
+                "data-focused": isFocused || void 0,
+                "aria-label": dayLabel(c),
+                "aria-selected": isSel,
+                "aria-current": isToday ? "date" : void 0,
+                tabIndex: isFocused ? 0 : -1,
+                className: `lf-cal-day${inMonth ? "" : " is-outside"}${isSel ? " is-selected" : ""}${isToday ? " is-today" : ""}`,
+                onClick: () => pickDay(c),
+                children: c.d
+              },
+              `${c.y}-${c.m}-${c.d}`
+            );
+          }) }, week))
+        ] })
       ] }),
-      /* @__PURE__ */ jsxs6("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
-        /* @__PURE__ */ jsx9("div", { className: "lf-cal-row", role: "row", children: WEEKDAYS.map((w) => /* @__PURE__ */ jsx9("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w, children: w.slice(0, 2) }, w)) }),
-        Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ jsx9("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
-          const inMonth = c.m === view.m;
-          const isSel = date != null && sameDay(c, date);
-          const isFocused = sameDay(c, focused);
-          const isToday = sameDay(c, today);
-          return /* @__PURE__ */ jsx9(
-            "button",
-            {
-              type: "button",
-              role: "gridcell",
-              "data-focused": isFocused || void 0,
-              "aria-label": dayLabel(c),
-              "aria-selected": isSel,
-              "aria-current": isToday ? "date" : void 0,
-              tabIndex: isFocused ? 0 : -1,
-              className: `lf-cal-day${inMonth ? "" : " is-outside"}${isSel ? " is-selected" : ""}${isToday ? " is-today" : ""}`,
-              onClick: () => pickDay(c),
-              children: c.d
-            },
-            `${c.y}-${c.m}-${c.d}`
-          );
-        }) }, week))
-      ] })
-    ] })
+      popoverTarget(wrapRef)
+    )
   ] });
 }
 
 // src/render/containers.tsx
-import { useRef as useRef6, useState as useState8 } from "react";
+import { useRef as useRef6, useState as useState9 } from "react";
 import {
   evaluateVisibility,
   evaluateRequired
@@ -1241,7 +1305,7 @@ function GridField({
   ctx,
   schema
 }) {
-  const [page, setPage] = useState8(0);
+  const [page, setPage] = useState9(0);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -1405,7 +1469,7 @@ var PANEL_THEMES = /* @__PURE__ */ new Set(["default", "primary", "secondary", "
 function PanelBox({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const collapsible = Boolean(a.collapsible);
-  const [open, setOpen] = useState8(!(collapsible && a.collapsed));
+  const [open, setOpen] = useState9(!(collapsible && a.collapsed));
   const raw = typeof a.theme === "string" ? a.theme : "";
   const theme = PANEL_THEMES.has(raw) ? raw : "default";
   const title = labelText(a);
@@ -1422,9 +1486,9 @@ function PanelBox({ entity, schema, ctx, Render }) {
 function TabsContainer({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const children = entity.children ?? [];
-  const [active, setActive] = useState8(0);
-  const [focusIdx, setFocusIdx] = useState8(0);
-  const [revealErrors, setRevealErrors] = useState8(false);
+  const [active, setActive] = useState9(0);
+  const [focusIdx, setFocusIdx] = useState9(0);
+  const [revealErrors, setRevealErrors] = useState9(false);
   const navRef = useRef6(null);
   const idx = Math.min(active, Math.max(0, children.length - 1));
   const vertical = Boolean(a.verticalTabs);
@@ -1525,7 +1589,7 @@ function EditGridField({
   ctx,
   schema
 }) {
-  const [editing, setEditing] = useState8(null);
+  const [editing, setEditing] = useState9(null);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -1612,9 +1676,9 @@ function FormRenderer(props) {
   const formClass = ["lf-form", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore };
   const form = useFormEngine(schema, engineOptions);
-  const [submitted, setSubmitted] = useState9(false);
+  const [submitted, setSubmitted] = useState10(false);
   const client = useMinionClient();
-  const [asyncErrors, setAsyncErrors] = useState9({});
+  const [asyncErrors, setAsyncErrors] = useState10({});
   const onAutosaveRef = useRef7(onAutosave);
   onAutosaveRef.current = onAutosave;
   const autosaveTimer = useRef7(null);
@@ -1754,8 +1818,8 @@ function FormWizardView({
   onResult,
   onEvent
 }) {
-  const [index, setIndex] = useState9(0);
-  const [showErrors, setShowErrors] = useState9(false);
+  const [index, setIndex] = useState10(0);
+  const [showErrors, setShowErrors] = useState10(false);
   const t = useTranslate();
   const pageRef = useRef7(null);
   const firstRender = useRef7(true);

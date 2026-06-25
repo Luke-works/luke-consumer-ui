@@ -80,7 +80,7 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-var import_react12 = require("react");
+var import_react13 = require("react");
 var import_form_core7 = require("@lukeflow/form-core");
 
 // src/minions.tsx
@@ -389,8 +389,55 @@ function TooltipBubble({ text, anchor, doc }) {
 }
 
 // src/render/controls/Select.tsx
-var import_react7 = require("react");
+var import_react8 = require("react");
+var import_react_dom2 = require("react-dom");
 var import_form_core4 = require("@lukeflow/form-core");
+
+// src/render/usePopover.ts
+var import_react7 = require("react");
+function useAnchoredPosition(anchorRef, open) {
+  const [style, setStyle] = (0, import_react7.useState)(null);
+  (0, import_react7.useLayoutEffect)(() => {
+    if (!open) {
+      setStyle(null);
+      return;
+    }
+    const el = anchorRef.current;
+    const win = el?.ownerDocument?.defaultView;
+    if (!el || !win) return;
+    const M = 8;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      const spaceBelow = win.innerHeight - r.bottom;
+      const spaceAbove = r.top;
+      const below = spaceBelow >= spaceAbove || spaceBelow > 320;
+      const maxHeight = Math.max(120, (below ? spaceBelow : spaceAbove) - M);
+      const left = Math.max(M, Math.min(r.left, win.innerWidth - r.width - M));
+      setStyle({
+        position: "fixed",
+        left,
+        right: "auto",
+        minWidth: r.width,
+        maxHeight,
+        overflowY: "auto",
+        ...below ? { top: r.bottom } : { bottom: win.innerHeight - r.top }
+      });
+    };
+    measure();
+    win.addEventListener("scroll", measure, true);
+    win.addEventListener("resize", measure);
+    return () => {
+      win.removeEventListener("scroll", measure, true);
+      win.removeEventListener("resize", measure);
+    };
+  }, [open, anchorRef]);
+  return style;
+}
+function popoverTarget(anchorRef) {
+  return anchorRef.current?.ownerDocument?.body ?? (typeof document !== "undefined" ? document.body : null);
+}
+
+// src/render/controls/Select.tsx
 var import_jsx_runtime6 = require("react/jsx-runtime");
 function SearchSelect({
   a11y,
@@ -405,19 +452,19 @@ function SearchSelect({
   const ds = (0, import_form_core4.readDataSource)(entity.attributes);
   const dsRaw = entity.attributes?.dataSource;
   const searchParam = typeof dsRaw?.searchParam === "string" ? dsRaw.searchParam : "q";
-  const [query, setQuery] = (0, import_react7.useState)("");
-  const [open, setOpen] = (0, import_react7.useState)(false);
-  const [options2, setOptions] = (0, import_react7.useState)([]);
-  const [loading, setLoading] = (0, import_react7.useState)(false);
-  const [selectedLabel, setSelectedLabel] = (0, import_react7.useState)("");
-  const [active, setActive] = (0, import_react7.useState)(-1);
-  const timer = (0, import_react7.useRef)(null);
-  const blurTimer = (0, import_react7.useRef)(null);
+  const [query, setQuery] = (0, import_react8.useState)("");
+  const [open, setOpen] = (0, import_react8.useState)(false);
+  const [options2, setOptions] = (0, import_react8.useState)([]);
+  const [loading, setLoading] = (0, import_react8.useState)(false);
+  const [selectedLabel, setSelectedLabel] = (0, import_react8.useState)("");
+  const [active, setActive] = (0, import_react8.useState)(-1);
+  const timer = (0, import_react8.useRef)(null);
+  const blurTimer = (0, import_react8.useRef)(null);
   const clearBlur = () => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  (0, import_react7.useEffect)(() => () => clearBlur(), []);
+  (0, import_react8.useEffect)(() => () => clearBlur(), []);
   const choose = (o) => {
     clearBlur();
     setValue(o.value);
@@ -427,10 +474,10 @@ function SearchSelect({
     setActive(-1);
   };
   const optionId = (i) => `${a11y.id}-opt-${i}`;
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     if (!client || !ds || !open) return;
     if (timer.current) clearTimeout(timer.current);
     const controller = new AbortController();
@@ -450,6 +497,8 @@ function SearchSelect({
   }, [query, open, client]);
   const display = open ? query : selectedLabel || asText(value);
   const listId = `${a11y.id}-listbox`;
+  const wrapRef = (0, import_react8.useRef)(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && (loading || options2.length > 0));
   const onKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -469,7 +518,7 @@ function SearchSelect({
       setActive(-1);
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lf-search-select", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lf-search-select", ref: wrapRef, children: [
     /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       "input",
       {
@@ -498,24 +547,27 @@ function SearchSelect({
         }
       }
     ),
-    open && (loading || options2.length > 0) && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("ul", { id: listId, role: "listbox", className: "lf-search-list", children: [
-      loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("li", { className: "lf-search-loading", children: "Searching\u2026" }),
-      options2.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-        "li",
-        {
-          id: optionId(i),
-          role: "option",
-          "aria-selected": i === active,
-          className: i === active ? "is-active" : void 0,
-          onMouseDown: (e) => {
-            e.preventDefault();
-            choose(o);
+    open && (loading || options2.length > 0) && popoverTarget(wrapRef) && (0, import_react_dom2.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("ul", { id: listId, role: "listbox", className: "lf-search-list", style: popStyle ?? void 0, children: [
+        loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("li", { className: "lf-search-loading", children: "Searching\u2026" }),
+        options2.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          "li",
+          {
+            id: optionId(i),
+            role: "option",
+            "aria-selected": i === active,
+            className: i === active ? "is-active" : void 0,
+            onMouseDown: (e) => {
+              e.preventDefault();
+              choose(o);
+            },
+            children: o.label
           },
-          children: o.label
-        },
-        o.value
-      ))
-    ] })
+          o.value
+        ))
+      ] }),
+      popoverTarget(wrapRef)
+    )
   ] });
 }
 function SearchableSelect({
@@ -528,10 +580,10 @@ function SearchableSelect({
   disabled,
   t
 }) {
-  const [query, setQuery] = (0, import_react7.useState)("");
-  const [open, setOpen] = (0, import_react7.useState)(false);
-  const [active, setActive] = (0, import_react7.useState)(-1);
-  const blurTimer = (0, import_react7.useRef)(null);
+  const [query, setQuery] = (0, import_react8.useState)("");
+  const [open, setOpen] = (0, import_react8.useState)(false);
+  const [active, setActive] = (0, import_react8.useState)(-1);
+  const blurTimer = (0, import_react8.useRef)(null);
   const selected = options2.find((o) => o.value === asText(value));
   const q = query.trim().toLowerCase();
   const filtered = q ? options2.filter((o) => t(o.label).toLowerCase().includes(q) || o.value.toLowerCase().includes(q)) : options2;
@@ -541,8 +593,8 @@ function SearchableSelect({
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  (0, import_react7.useEffect)(() => () => clearBlur(), []);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => () => clearBlur(), []);
+  (0, import_react8.useEffect)(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
   const choose = (o) => {
@@ -573,7 +625,9 @@ function SearchableSelect({
   };
   const display = open ? query : selected ? t(selected.label) : asText(value);
   const showClear = !disabled && !required && asText(value) !== "" && !open;
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lf-search-select", children: [
+  const wrapRef = (0, import_react8.useRef)(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && filtered.length > 0);
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lf-search-select", ref: wrapRef, children: [
     /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       "input",
       {
@@ -602,26 +656,29 @@ function SearchableSelect({
       }
     ),
     showClear && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", className: "lf-search-clear", "aria-label": "Clear", onMouseDown: (e) => e.preventDefault(), onClick: () => setValue(""), children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(XGlyph, {}) }),
-    open && filtered.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ul", { id: listId, role: "listbox", className: "lf-search-list", children: filtered.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-      "li",
-      {
-        id: optionId(i),
-        role: "option",
-        "aria-selected": o.value === asText(value),
-        className: i === active ? "is-active" : void 0,
-        onMouseDown: (e) => {
-          e.preventDefault();
-          choose(o);
+    open && filtered.length > 0 && popoverTarget(wrapRef) && (0, import_react_dom2.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ul", { id: listId, role: "listbox", className: "lf-search-list", style: popStyle ?? void 0, children: filtered.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        "li",
+        {
+          id: optionId(i),
+          role: "option",
+          "aria-selected": o.value === asText(value),
+          className: i === active ? "is-active" : void 0,
+          onMouseDown: (e) => {
+            e.preventDefault();
+            choose(o);
+          },
+          children: t(o.label)
         },
-        children: t(o.label)
-      },
-      o.value
-    )) })
+        o.value
+      )) }),
+      popoverTarget(wrapRef)
+    )
   ] });
 }
 
 // src/render/controls/inputs.tsx
-var import_react8 = require("react");
+var import_react9 = require("react");
 var import_form_core5 = require("@lukeflow/form-core");
 var import_jsx_runtime7 = require("react/jsx-runtime");
 function TextControl({
@@ -650,7 +707,7 @@ function TagsInput({
   onChange,
   placeholder
 }) {
-  const [draft, setDraft] = (0, import_react8.useState)("");
+  const [draft, setDraft] = (0, import_react9.useState)("");
   const tags = value.map(String);
   const add = (raw) => {
     const t = raw.trim();
@@ -692,7 +749,7 @@ function NumberInput({
   suffix,
   onChange
 }) {
-  const [focused, setFocused] = (0, import_react8.useState)(false);
+  const [focused, setFocused] = (0, import_react9.useState)(false);
   const raw = asText(value);
   let display = raw;
   if (!focused && raw !== "" && currency) {
@@ -735,8 +792,8 @@ function FileField({
   const client = useMinionClient();
   const storage = entity.attributes?.storage;
   const uploadMinion = typeof storage?.minion === "string" ? storage.minion : void 0;
-  const [uploading, setUploading] = (0, import_react8.useState)(false);
-  const [error, setError] = (0, import_react8.useState)(null);
+  const [uploading, setUploading] = (0, import_react9.useState)(false);
+  const [error, setError] = (0, import_react9.useState)(null);
   const files = Array.isArray(value) ? value : [];
   const handle = async (list) => {
     if (!list || list.length === 0) return;
@@ -772,7 +829,7 @@ function FileField({
 }
 
 // src/render/controls/SignatureField.tsx
-var import_react9 = require("react");
+var import_react10 = require("react");
 var import_jsx_runtime8 = require("react/jsx-runtime");
 function SignatureField({
   a11y,
@@ -782,13 +839,13 @@ function SignatureField({
   penColor,
   allowType
 }) {
-  const canvasRef = (0, import_react9.useRef)(null);
-  const drawing = (0, import_react9.useRef)(false);
-  const painted = (0, import_react9.useRef)("");
+  const canvasRef = (0, import_react10.useRef)(null);
+  const drawing = (0, import_react10.useRef)(false);
+  const painted = (0, import_react10.useRef)("");
   const dataUrl = typeof value === "string" ? value : "";
-  const [hasInk, setHasInk] = (0, import_react9.useState)(Boolean(dataUrl));
-  const [mode, setMode] = (0, import_react9.useState)("draw");
-  const [typed, setTyped] = (0, import_react9.useState)("");
+  const [hasInk, setHasInk] = (0, import_react10.useState)(Boolean(dataUrl));
+  const [mode, setMode] = (0, import_react10.useState)("draw");
+  const [typed, setTyped] = (0, import_react10.useState)("");
   const color = penColor || "#111827";
   const context = () => canvasRef.current?.getContext("2d") ?? null;
   const drawTyped = (name) => {
@@ -808,7 +865,7 @@ function SignatureField({
     setHasInk(Boolean(trimmed));
     onChange(trimmed ? canvas.toDataURL("image/png") : "");
   };
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -875,9 +932,9 @@ function SignatureField({
     painted.current = url;
     onChange(url);
   };
-  const onUpRef = (0, import_react9.useRef)(onUp);
+  const onUpRef = (0, import_react10.useRef)(onUp);
   onUpRef.current = onUp;
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     const up = () => {
       if (drawing.current) onUpRef.current();
     };
@@ -898,8 +955,8 @@ function SignatureField({
     if (next === mode) return;
     setMode(next);
   };
-  const typedTimer = (0, import_react9.useRef)(null);
-  (0, import_react9.useEffect)(() => () => {
+  const typedTimer = (0, import_react10.useRef)(null);
+  (0, import_react10.useEffect)(() => () => {
     if (typedTimer.current) clearTimeout(typedTimer.current);
   }, []);
   const onTypedChange = (name) => {
@@ -959,7 +1016,8 @@ function SignatureField({
 }
 
 // src/render/controls/DateField.tsx
-var import_react10 = require("react");
+var import_react11 = require("react");
+var import_react_dom3 = require("react-dom");
 var import_jsx_runtime9 = require("react/jsx-runtime");
 var pad = (n) => String(n).padStart(2, "0");
 var daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
@@ -1015,31 +1073,34 @@ function DateField({
   const hasTime = kind === "datetime" || kind === "time";
   const minStep = Math.max(1, Math.floor(minuteStep) || 1);
   const timeDisabled = disabled || kind === "datetime" && !date;
-  const [open, setOpen] = (0, import_react10.useState)(false);
+  const [open, setOpen] = (0, import_react11.useState)(false);
   const today = (() => {
     const n = /* @__PURE__ */ new Date();
     return { y: n.getFullYear(), m: n.getMonth(), d: n.getDate() };
   })();
-  const [view, setView] = (0, import_react10.useState)(date ?? today);
-  const [focused, setFocused] = (0, import_react10.useState)(date ?? today);
-  const wrapRef = (0, import_react10.useRef)(null);
-  const inputRef = (0, import_react10.useRef)(null);
-  const gridRef = (0, import_react10.useRef)(null);
-  (0, import_react10.useEffect)(() => {
+  const [view, setView] = (0, import_react11.useState)(date ?? today);
+  const [focused, setFocused] = (0, import_react11.useState)(date ?? today);
+  const wrapRef = (0, import_react11.useRef)(null);
+  const inputRef = (0, import_react11.useRef)(null);
+  const gridRef = (0, import_react11.useRef)(null);
+  const popRef = (0, import_react11.useRef)(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && hasCal);
+  (0, import_react11.useEffect)(() => {
     if (!open) return;
     const onDown = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      const t = e.target;
+      if (!wrapRef.current?.contains(t) && !popRef.current?.contains(t)) setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (!open) return;
     const base = parseDate(typeof value === "string" ? value : "") ?? today;
     setView(base);
     setFocused(base);
   }, [open]);
-  (0, import_react10.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (!open || !hasCal) return;
     gridRef.current?.querySelector('[data-focused="true"]')?.focus();
   }, [open, focused, view, hasCal]);
@@ -1195,43 +1256,46 @@ function DateField({
         }
       )
     ] }),
-    open && hasCal && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-datefield-pop", role: "dialog", "aria-label": "Choose date", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-cal-head", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m) }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
+    open && hasCal && popoverTarget(wrapRef) && (0, import_react_dom3.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { ref: popRef, className: "lf-datefield-pop", role: "dialog", "aria-label": "Choose date", style: popStyle ?? void 0, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-cal-head", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m) }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-cal-row", role: "row", children: WEEKDAYS.map((w) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w, children: w.slice(0, 2) }, w)) }),
+          Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
+            const inMonth = c.m === view.m;
+            const isSel = date != null && sameDay(c, date);
+            const isFocused = sameDay(c, focused);
+            const isToday = sameDay(c, today);
+            return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+              "button",
+              {
+                type: "button",
+                role: "gridcell",
+                "data-focused": isFocused || void 0,
+                "aria-label": dayLabel(c),
+                "aria-selected": isSel,
+                "aria-current": isToday ? "date" : void 0,
+                tabIndex: isFocused ? 0 : -1,
+                className: `lf-cal-day${inMonth ? "" : " is-outside"}${isSel ? " is-selected" : ""}${isToday ? " is-today" : ""}`,
+                onClick: () => pickDay(c),
+                children: c.d
+              },
+              `${c.y}-${c.m}-${c.d}`
+            );
+          }) }, week))
+        ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-cal-row", role: "row", children: WEEKDAYS.map((w) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w, children: w.slice(0, 2) }, w)) }),
-        Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
-          const inMonth = c.m === view.m;
-          const isSel = date != null && sameDay(c, date);
-          const isFocused = sameDay(c, focused);
-          const isToday = sameDay(c, today);
-          return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-            "button",
-            {
-              type: "button",
-              role: "gridcell",
-              "data-focused": isFocused || void 0,
-              "aria-label": dayLabel(c),
-              "aria-selected": isSel,
-              "aria-current": isToday ? "date" : void 0,
-              tabIndex: isFocused ? 0 : -1,
-              className: `lf-cal-day${inMonth ? "" : " is-outside"}${isSel ? " is-selected" : ""}${isToday ? " is-today" : ""}`,
-              onClick: () => pickDay(c),
-              children: c.d
-            },
-            `${c.y}-${c.m}-${c.d}`
-          );
-        }) }, week))
-      ] })
-    ] })
+      popoverTarget(wrapRef)
+    )
   ] });
 }
 
 // src/render/containers.tsx
-var import_react11 = require("react");
+var import_react12 = require("react");
 var import_form_core6 = require("@lukeflow/form-core");
 var import_jsx_runtime10 = require("react/jsx-runtime");
 function Group({
@@ -1258,7 +1322,7 @@ function GridField({
   ctx,
   schema
 }) {
-  const [page, setPage] = (0, import_react11.useState)(0);
+  const [page, setPage] = (0, import_react12.useState)(0);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -1422,7 +1486,7 @@ var PANEL_THEMES = /* @__PURE__ */ new Set(["default", "primary", "secondary", "
 function PanelBox({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const collapsible = Boolean(a.collapsible);
-  const [open, setOpen] = (0, import_react11.useState)(!(collapsible && a.collapsed));
+  const [open, setOpen] = (0, import_react12.useState)(!(collapsible && a.collapsed));
   const raw = typeof a.theme === "string" ? a.theme : "";
   const theme = PANEL_THEMES.has(raw) ? raw : "default";
   const title = labelText(a);
@@ -1439,10 +1503,10 @@ function PanelBox({ entity, schema, ctx, Render }) {
 function TabsContainer({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const children = entity.children ?? [];
-  const [active, setActive] = (0, import_react11.useState)(0);
-  const [focusIdx, setFocusIdx] = (0, import_react11.useState)(0);
-  const [revealErrors, setRevealErrors] = (0, import_react11.useState)(false);
-  const navRef = (0, import_react11.useRef)(null);
+  const [active, setActive] = (0, import_react12.useState)(0);
+  const [focusIdx, setFocusIdx] = (0, import_react12.useState)(0);
+  const [revealErrors, setRevealErrors] = (0, import_react12.useState)(false);
+  const navRef = (0, import_react12.useRef)(null);
   const idx = Math.min(active, Math.max(0, children.length - 1));
   const vertical = Boolean(a.verticalTabs);
   const navigation = Boolean(a.navigation);
@@ -1542,7 +1606,7 @@ function EditGridField({
   ctx,
   schema
 }) {
-  const [editing, setEditing] = (0, import_react11.useState)(null);
+  const [editing, setEditing] = (0, import_react12.useState)(null);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -1629,12 +1693,12 @@ function FormRenderer(props) {
   const formClass = ["lf-form", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore };
   const form = useFormEngine(schema, engineOptions);
-  const [submitted, setSubmitted] = (0, import_react12.useState)(false);
+  const [submitted, setSubmitted] = (0, import_react13.useState)(false);
   const client = useMinionClient();
-  const [asyncErrors, setAsyncErrors] = (0, import_react12.useState)({});
-  const onAutosaveRef = (0, import_react12.useRef)(onAutosave);
+  const [asyncErrors, setAsyncErrors] = (0, import_react13.useState)({});
+  const onAutosaveRef = (0, import_react13.useRef)(onAutosave);
   onAutosaveRef.current = onAutosave;
-  const autosaveTimer = (0, import_react12.useRef)(null);
+  const autosaveTimer = (0, import_react13.useRef)(null);
   const flushAutosave = () => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = null;
@@ -1645,13 +1709,13 @@ function FormRenderer(props) {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(flushAutosave, autosaveDelay);
   };
-  (0, import_react12.useEffect)(() => () => {
+  (0, import_react13.useEffect)(() => () => {
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
       onAutosaveRef.current?.(form.engine.serialize());
     }
   }, [form.engine]);
-  const focusFirstError = (0, import_react12.useCallback)(
+  const focusFirstError = (0, import_react13.useCallback)(
     (errorKeys) => {
       if (typeof document === "undefined") return;
       for (const key of errorKeys) {
@@ -1665,7 +1729,7 @@ function FormRenderer(props) {
     },
     [form]
   );
-  const submitProgrammatic = (0, import_react12.useCallback)(() => {
+  const submitProgrammatic = (0, import_react13.useCallback)(() => {
     setSubmitted(true);
     const report = form.validate();
     onResult?.({ ok: report.ok, errorCount: report.errorKeys.length, errorKeys: report.errorKeys });
@@ -1678,11 +1742,11 @@ function FormRenderer(props) {
       focusFirstError(report.errorKeys);
     }
   }, [form, onResult, onEvent, onSubmit, focusFirstError]);
-  (0, import_react12.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     if (autoSubmitSignal) submitProgrammatic();
   }, [autoSubmitSignal]);
   const playbackSignal = playback?.signal;
-  (0, import_react12.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     if (!playback || !playbackSignal) return;
     let cancelled = false;
     const speed = playback.speed ?? 80;
@@ -1771,16 +1835,16 @@ function FormWizardView({
   onResult,
   onEvent
 }) {
-  const [index, setIndex] = (0, import_react12.useState)(0);
-  const [showErrors, setShowErrors] = (0, import_react12.useState)(false);
+  const [index, setIndex] = (0, import_react13.useState)(0);
+  const [showErrors, setShowErrors] = (0, import_react13.useState)(false);
   const t = useTranslate();
-  const pageRef = (0, import_react12.useRef)(null);
-  const firstRender = (0, import_react12.useRef)(true);
+  const pageRef = (0, import_react13.useRef)(null);
+  const firstRender = (0, import_react13.useRef)(true);
   const visible = pages.filter((id) => form.state.fields[id]?.isVisible !== false);
   const safeIndex = Math.min(index, Math.max(0, visible.length - 1));
   const currentId = visible[safeIndex];
   const isLast = safeIndex >= visible.length - 1;
-  (0, import_react12.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
