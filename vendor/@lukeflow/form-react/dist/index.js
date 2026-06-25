@@ -47,7 +47,7 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-import { useState as useState8, useEffect as useEffect5, useRef as useRef6, useCallback as useCallback2 } from "react";
+import { useState as useState9, useEffect as useEffect6, useRef as useRef7, useCallback as useCallback2 } from "react";
 import {
   createDefaultFieldTypeRegistry,
   readAsyncValidation,
@@ -274,15 +274,21 @@ function fileDescriptors(list) {
 
 // src/render/controls/icons.tsx
 import "react";
-import { jsx as jsx4 } from "react/jsx-runtime";
+import { jsx as jsx4, jsxs } from "react/jsx-runtime";
 function XGlyph() {
   return /* @__PURE__ */ jsx4("svg", { className: "lf-x", viewBox: "0 0 24 24", width: "12", height: "12", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ jsx4("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
+}
+function CalendarGlyph() {
+  return /* @__PURE__ */ jsxs("svg", { className: "lf-cal-icon", viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true", focusable: "false", children: [
+    /* @__PURE__ */ jsx4("rect", { x: "3", y: "4.5", width: "18", height: "16", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
+    /* @__PURE__ */ jsx4("path", { d: "M3 9h18M8 2.5v4M16 2.5v4", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
+  ] });
 }
 
 // src/render/controls/Tooltip.tsx
 import { useState as useState3, useEffect as useEffect2, useLayoutEffect, useRef as useRef2 } from "react";
 import { createPortal } from "react-dom";
-import { jsx as jsx5, jsxs } from "react/jsx-runtime";
+import { jsx as jsx5, jsxs as jsxs2 } from "react/jsx-runtime";
 function Tooltip({ text }) {
   const ref = useRef2(null);
   const [anchor, setAnchor] = useState3(null);
@@ -306,7 +312,7 @@ function Tooltip({ text }) {
     setAnchor({ cx: r.left + r.width / 2, top: r.top, bottom: r.bottom });
   };
   const hide = () => setAnchor(null);
-  return /* @__PURE__ */ jsxs("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
+  return /* @__PURE__ */ jsxs2("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
     /* @__PURE__ */ jsx5("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
     anchor && /* @__PURE__ */ jsx5(TooltipBubble, { text, anchor, doc: ref.current?.ownerDocument ?? null })
   ] });
@@ -341,7 +347,7 @@ function TooltipBubble({ text, anchor, doc }) {
   const target = doc?.body ?? (typeof document !== "undefined" ? document.body : null);
   if (!target) return null;
   return createPortal(
-    /* @__PURE__ */ jsxs(
+    /* @__PURE__ */ jsxs2(
       "span",
       {
         ref,
@@ -365,7 +371,7 @@ import {
   resolveMinionParams as resolveMinionParams2,
   toOptions as toOptions2
 } from "@lukeflow/form-core";
-import { jsx as jsx6, jsxs as jsxs2 } from "react/jsx-runtime";
+import { jsx as jsx6, jsxs as jsxs3 } from "react/jsx-runtime";
 function SearchSelect({
   a11y,
   entity,
@@ -443,7 +449,7 @@ function SearchSelect({
       setActive(-1);
     }
   };
-  return /* @__PURE__ */ jsxs2("div", { className: "lf-search-select", children: [
+  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", children: [
     /* @__PURE__ */ jsx6(
       "input",
       {
@@ -472,7 +478,7 @@ function SearchSelect({
         }
       }
     ),
-    open && (loading || options2.length > 0) && /* @__PURE__ */ jsxs2("ul", { id: listId, role: "listbox", className: "lf-search-list", children: [
+    open && (loading || options2.length > 0) && /* @__PURE__ */ jsxs3("ul", { id: listId, role: "listbox", className: "lf-search-list", children: [
       loading && /* @__PURE__ */ jsx6("li", { className: "lf-search-loading", children: "Searching\u2026" }),
       options2.map((o, i) => /* @__PURE__ */ jsx6(
         "li",
@@ -547,7 +553,7 @@ function SearchableSelect({
   };
   const display = open ? query : selected ? t(selected.label) : asText(value);
   const showClear = !disabled && !required && asText(value) !== "" && !open;
-  return /* @__PURE__ */ jsxs2("div", { className: "lf-search-select", children: [
+  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", children: [
     /* @__PURE__ */ jsx6(
       "input",
       {
@@ -597,7 +603,7 @@ function SearchableSelect({
 // src/render/controls/inputs.tsx
 import { useState as useState5 } from "react";
 import "@lukeflow/form-core";
-import { jsx as jsx7, jsxs as jsxs3 } from "react/jsx-runtime";
+import { jsx as jsx7, jsxs as jsxs4 } from "react/jsx-runtime";
 function TextControl({
   type,
   a11y,
@@ -612,7 +618,7 @@ function TextControl({
   const showClear = clearable && v !== "";
   const input = /* @__PURE__ */ jsx7("input", { type, ...a11y, ...extra, value: v, onChange: (e) => handle(e.target.value) });
   if (!clearable) return input;
-  return /* @__PURE__ */ jsxs3("span", { className: "lf-input-wrap", children: [
+  return /* @__PURE__ */ jsxs4("span", { className: "lf-input-wrap", children: [
     input,
     showClear && /* @__PURE__ */ jsx7("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ jsx7(XGlyph, {}) })
   ] });
@@ -631,8 +637,8 @@ function TagsInput({
     if (t && !tags.includes(t)) onChange([...tags, t]);
     setDraft("");
   };
-  return /* @__PURE__ */ jsxs3("div", { className: "lf-tags", children: [
-    tags.map((t) => /* @__PURE__ */ jsxs3("span", { className: "lf-tag", children: [
+  return /* @__PURE__ */ jsxs4("div", { className: "lf-tags", children: [
+    tags.map((t) => /* @__PURE__ */ jsxs4("span", { className: "lf-tag", children: [
       t,
       /* @__PURE__ */ jsx7("button", { type: "button", "aria-label": `Remove ${t}`, disabled, onClick: () => onChange(tags.filter((x) => x !== t)), children: /* @__PURE__ */ jsx7(XGlyph, {}) })
     ] }, t)),
@@ -679,7 +685,7 @@ function NumberInput({
       }
     }
   }
-  return /* @__PURE__ */ jsxs3("span", { className: "lf-number", children: [
+  return /* @__PURE__ */ jsxs4("span", { className: "lf-number", children: [
     prefix && /* @__PURE__ */ jsx7("span", { className: "lf-affix lf-prefix", children: prefix }),
     /* @__PURE__ */ jsx7(
       "input",
@@ -737,7 +743,7 @@ function FileField({
       onChange(fileDescriptors(list));
     }
   };
-  return /* @__PURE__ */ jsxs3("div", { className: "lf-file", children: [
+  return /* @__PURE__ */ jsxs4("div", { className: "lf-file", children: [
     /* @__PURE__ */ jsx7("input", { ...a11y, type: "file", multiple, disabled: disabled || uploading, onChange: (e) => handle(e.target.files) }),
     uploading && /* @__PURE__ */ jsx7("span", { className: "lf-file-uploading", children: "Uploading\u2026" }),
     error && /* @__PURE__ */ jsx7("p", { role: "alert", className: "lf-error", children: error }),
@@ -747,7 +753,7 @@ function FileField({
 
 // src/render/controls/SignatureField.tsx
 import { useState as useState6, useEffect as useEffect4, useRef as useRef4 } from "react";
-import { jsx as jsx8, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx8, jsxs as jsxs5 } from "react/jsx-runtime";
 function SignatureField({
   a11y,
   value,
@@ -888,12 +894,12 @@ function SignatureField({
     }
     drawTyped(typed);
   };
-  return /* @__PURE__ */ jsxs4("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
-    allowType && /* @__PURE__ */ jsxs4("div", { className: "lf-signature-modes", role: "group", "aria-label": "Signature mode", children: [
+  return /* @__PURE__ */ jsxs5("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
+    allowType && /* @__PURE__ */ jsxs5("div", { className: "lf-signature-modes", role: "group", "aria-label": "Signature mode", children: [
       /* @__PURE__ */ jsx8("button", { type: "button", "aria-pressed": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
       /* @__PURE__ */ jsx8("button", { type: "button", "aria-pressed": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
     ] }),
-    /* @__PURE__ */ jsxs4("div", { className: "lf-signature-padwrap", children: [
+    /* @__PURE__ */ jsxs5("div", { className: "lf-signature-padwrap", children: [
       /* @__PURE__ */ jsx8(
         "canvas",
         {
@@ -932,12 +938,284 @@ function SignatureField({
   ] });
 }
 
+// src/render/controls/DateField.tsx
+import { useState as useState7, useEffect as useEffect5, useRef as useRef5 } from "react";
+import { jsx as jsx9, jsxs as jsxs6 } from "react/jsx-runtime";
+var pad = (n) => String(n).padStart(2, "0");
+var daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+function parseDate(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return null;
+  const y = +m[1], mo = +m[2] - 1, d = +m[3];
+  if (mo < 0 || mo > 11 || d < 1 || d > daysInMonth(y, mo)) return null;
+  return { y, m: mo, d };
+}
+function parseTime(value, kind) {
+  const re = kind === "time" ? /^(\d{2}):(\d{2})/ : /T(\d{2}):(\d{2})/;
+  const m = re.exec(value);
+  if (!m) return null;
+  const h = +m[1], min = +m[2];
+  if (h > 23 || min > 59) return null;
+  return { h, min };
+}
+function format(kind, date, time) {
+  const d = date ? `${date.y}-${pad(date.m + 1)}-${pad(date.d)}` : "";
+  const t = time ? `${pad(time.h)}:${pad(time.min)}` : "";
+  if (kind === "time") return t;
+  if (kind === "day") return d;
+  if (!d) return "";
+  return `${d}T${t || "00:00"}`;
+}
+function monthMatrix(y, m) {
+  const firstWeekday = new Date(y, m, 1).getDay();
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const dt = new Date(y, m, 1 - firstWeekday + i);
+    cells.push({ y: dt.getFullYear(), m: dt.getMonth(), d: dt.getDate() });
+  }
+  return cells;
+}
+var sameDay = (a, b) => a.y === b.y && a.m === b.m && a.d === b.d;
+var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+var monthLabel = (y, m) => new Intl.DateTimeFormat(void 0, { month: "long", year: "numeric" }).format(new Date(y, m, 1));
+var dayLabel = (c) => new Intl.DateTimeFormat(void 0, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(c.y, c.m, c.d));
+function DateField({
+  a11y,
+  kind,
+  value,
+  disabled,
+  onChange,
+  clearable,
+  minuteStep = 1
+}) {
+  const raw = typeof value === "string" ? value : "";
+  const date = parseDate(raw);
+  const time = parseTime(raw, kind);
+  const hasCal = kind === "day" || kind === "datetime";
+  const hasTime = kind === "datetime" || kind === "time";
+  const minStep = Math.max(1, Math.floor(minuteStep) || 1);
+  const timeDisabled = disabled || kind === "datetime" && !date;
+  const [open, setOpen] = useState7(false);
+  const today = (() => {
+    const n = /* @__PURE__ */ new Date();
+    return { y: n.getFullYear(), m: n.getMonth(), d: n.getDate() };
+  })();
+  const [view, setView] = useState7(date ?? today);
+  const [focused, setFocused] = useState7(date ?? today);
+  const wrapRef = useRef5(null);
+  const inputRef = useRef5(null);
+  const gridRef = useRef5(null);
+  useEffect5(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  useEffect5(() => {
+    if (!open) return;
+    const base = parseDate(typeof value === "string" ? value : "") ?? today;
+    setView(base);
+    setFocused(base);
+  }, [open]);
+  useEffect5(() => {
+    if (!open || !hasCal) return;
+    gridRef.current?.querySelector('[data-focused="true"]')?.focus();
+  }, [open, focused, view, hasCal]);
+  const openCal = () => {
+    if (!disabled) setOpen(true);
+  };
+  const closeToInput = () => {
+    setOpen(false);
+    inputRef.current?.focus();
+  };
+  const commitDate = (d) => {
+    onChange(format(kind, d, time ?? (kind === "datetime" ? { h: 0, min: 0 } : null)));
+  };
+  const pickDay = (c) => {
+    commitDate(c);
+    closeToInput();
+  };
+  const setTimePart = (h, min) => {
+    onChange(format(kind, kind === "time" ? null : date ?? today, { h, min }));
+  };
+  const shiftFocus = (deltaDays) => {
+    const dt = new Date(focused.y, focused.m, focused.d + deltaDays);
+    const next = { y: dt.getFullYear(), m: dt.getMonth(), d: dt.getDate() };
+    setFocused(next);
+    if (next.m !== view.m || next.y !== view.y) setView(next);
+  };
+  const shiftMonth = (delta) => {
+    const dt = new Date(view.y, view.m + delta, 1);
+    setView({ y: dt.getFullYear(), m: dt.getMonth(), d: 1 });
+    const clampD = Math.min(focused.d, daysInMonth(dt.getFullYear(), dt.getMonth()));
+    setFocused({ y: dt.getFullYear(), m: dt.getMonth(), d: clampD });
+  };
+  const onGridKey = (e) => {
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        shiftFocus(-1);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        shiftFocus(1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        shiftFocus(-7);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        shiftFocus(7);
+        break;
+      case "Home":
+        e.preventDefault();
+        shiftFocus(-new Date(focused.y, focused.m, focused.d).getDay());
+        break;
+      case "End":
+        e.preventDefault();
+        shiftFocus(6 - new Date(focused.y, focused.m, focused.d).getDay());
+        break;
+      case "PageUp":
+        e.preventDefault();
+        shiftMonth(-1);
+        break;
+      case "PageDown":
+        e.preventDefault();
+        shiftMonth(1);
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        pickDay(focused);
+        break;
+      case "Escape":
+        e.preventDefault();
+        closeToInput();
+        break;
+      default:
+        break;
+    }
+  };
+  const cells = hasCal ? monthMatrix(view.y, view.m) : [];
+  const showClear = clearable && !disabled && raw !== "";
+  return /* @__PURE__ */ jsxs6("div", { className: "lf-datefield", ref: wrapRef, children: [
+    /* @__PURE__ */ jsxs6("div", { className: "lf-datefield-input", children: [
+      /* @__PURE__ */ jsx9(
+        "input",
+        {
+          ...a11y,
+          ref: inputRef,
+          type: "text",
+          inputMode: kind === "time" ? "numeric" : void 0,
+          autoComplete: "off",
+          placeholder: kind === "day" ? "YYYY-MM-DD" : kind === "time" ? "HH:MM" : "YYYY-MM-DDTHH:MM",
+          value: raw,
+          disabled,
+          onChange: (e) => onChange(e.target.value),
+          onKeyDown: (e) => {
+            if (e.key === "ArrowDown" && hasCal) {
+              e.preventDefault();
+              openCal();
+            } else if (e.key === "Escape" && open) {
+              setOpen(false);
+            }
+          }
+        }
+      ),
+      showClear && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-datefield-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ jsx9(XGlyph, {}) }),
+      hasCal && /* @__PURE__ */ jsx9(
+        "button",
+        {
+          type: "button",
+          className: "lf-datefield-toggle",
+          "aria-label": open ? "Close calendar" : "Open calendar",
+          "aria-haspopup": "grid",
+          "aria-expanded": open,
+          disabled,
+          onClick: () => open ? closeToInput() : openCal(),
+          children: /* @__PURE__ */ jsx9(CalendarGlyph, {})
+        }
+      )
+    ] }),
+    hasTime && /* @__PURE__ */ jsxs6("span", { className: "lf-datefield-time", title: kind === "datetime" && !date ? "Pick a date first" : void 0, children: [
+      /* @__PURE__ */ jsxs6(
+        "select",
+        {
+          "aria-label": "Hour",
+          disabled: timeDisabled,
+          value: time ? time.h : "",
+          onChange: (e) => {
+            if (e.target.value === "") return;
+            setTimePart(+e.target.value, time?.min ?? 0);
+          },
+          children: [
+            /* @__PURE__ */ jsx9("option", { value: "" }),
+            Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ jsx9("option", { value: h, children: pad(h) }, h))
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsx9("span", { "aria-hidden": "true", children: ":" }),
+      /* @__PURE__ */ jsxs6(
+        "select",
+        {
+          "aria-label": "Minute",
+          disabled: timeDisabled,
+          value: time ? time.min : "",
+          onChange: (e) => {
+            if (e.target.value === "") return;
+            setTimePart(time?.h ?? 0, +e.target.value);
+          },
+          children: [
+            /* @__PURE__ */ jsx9("option", { value: "" }),
+            Array.from({ length: Math.ceil(60 / minStep) }, (_, i) => i * minStep).map((min) => /* @__PURE__ */ jsx9("option", { value: min, children: pad(min) }, min))
+          ]
+        }
+      )
+    ] }),
+    open && hasCal && /* @__PURE__ */ jsxs6("div", { className: "lf-datefield-pop", role: "dialog", "aria-label": "Choose date", children: [
+      /* @__PURE__ */ jsxs6("div", { className: "lf-cal-head", children: [
+        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
+        /* @__PURE__ */ jsx9("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m) }),
+        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
+      ] }),
+      /* @__PURE__ */ jsxs6("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
+        /* @__PURE__ */ jsx9("div", { className: "lf-cal-row", role: "row", children: WEEKDAYS.map((w) => /* @__PURE__ */ jsx9("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w, children: w.slice(0, 2) }, w)) }),
+        Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ jsx9("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
+          const inMonth = c.m === view.m;
+          const isSel = date != null && sameDay(c, date);
+          const isFocused = sameDay(c, focused);
+          const isToday = sameDay(c, today);
+          return /* @__PURE__ */ jsx9(
+            "button",
+            {
+              type: "button",
+              role: "gridcell",
+              "data-focused": isFocused || void 0,
+              "aria-label": dayLabel(c),
+              "aria-selected": isSel,
+              "aria-current": isToday ? "date" : void 0,
+              tabIndex: isFocused ? 0 : -1,
+              className: `lf-cal-day${inMonth ? "" : " is-outside"}${isSel ? " is-selected" : ""}${isToday ? " is-today" : ""}`,
+              onClick: () => pickDay(c),
+              children: c.d
+            },
+            `${c.y}-${c.m}-${c.d}`
+          );
+        }) }, week))
+      ] })
+    ] })
+  ] });
+}
+
 // src/render/containers.tsx
-import { useRef as useRef5, useState as useState7 } from "react";
+import { useRef as useRef6, useState as useState8 } from "react";
 import {
   evaluateVisibility
 } from "@lukeflow/form-core";
-import { jsx as jsx9, jsxs as jsxs5 } from "react/jsx-runtime";
+import { jsx as jsx10, jsxs as jsxs7 } from "react/jsx-runtime";
 function Group({
   entity,
   fs,
@@ -946,14 +1224,14 @@ function Group({
 }) {
   const error = ctx.showErrors ? fs.error : null;
   const asyncMsg = !error ? ctx.asyncErrors[fs.key] : void 0;
-  return /* @__PURE__ */ jsxs5("fieldset", { className: "lf-field lf-group", "data-type": entity.type, "aria-invalid": error || asyncMsg ? true : void 0, children: [
-    /* @__PURE__ */ jsxs5("legend", { className: "lf-label", children: [
+  return /* @__PURE__ */ jsxs7("fieldset", { className: "lf-field lf-group", "data-type": entity.type, "aria-invalid": error || asyncMsg ? true : void 0, children: [
+    /* @__PURE__ */ jsxs7("legend", { className: "lf-label", children: [
       labelText(entity.attributes) ?? fs.key,
-      fs.isRequired && /* @__PURE__ */ jsx9("span", { "aria-hidden": "true", children: " *" })
+      fs.isRequired && /* @__PURE__ */ jsx10("span", { "aria-hidden": "true", children: " *" })
     ] }),
     children,
-    error && /* @__PURE__ */ jsx9("p", { role: "alert", className: "lf-error", children: error.message }),
-    !error && asyncMsg && /* @__PURE__ */ jsx9("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
+    error && /* @__PURE__ */ jsx10("p", { role: "alert", className: "lf-error", children: error.message }),
+    !error && asyncMsg && /* @__PURE__ */ jsx10("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
   ] });
 }
 function GridField({
@@ -962,7 +1240,7 @@ function GridField({
   ctx,
   schema
 }) {
-  const [page, setPage] = useState7(0);
+  const [page, setPage] = useState8(0);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -978,22 +1256,22 @@ function GridField({
   const start = paged ? safePage * pageSize : 0;
   const visibleRows = paged ? rows.slice(start, start + pageSize) : rows;
   const replace = (next) => ctx.form.setValues({ [key]: next }, { markTouched: true });
-  return /* @__PURE__ */ jsxs5("div", { className: "lf-grid", "data-type": entity.type, children: [
-    /* @__PURE__ */ jsx9("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
-    /* @__PURE__ */ jsxs5("table", { children: [
-      /* @__PURE__ */ jsx9("thead", { children: /* @__PURE__ */ jsxs5("tr", { children: [
-        cells.map((c) => /* @__PURE__ */ jsx9("th", { scope: "col", children: labelText(c.attributes) ?? cellKey(c) }, c.id)),
-        !disabled && /* @__PURE__ */ jsx9("th", {})
+  return /* @__PURE__ */ jsxs7("div", { className: "lf-grid", "data-type": entity.type, children: [
+    /* @__PURE__ */ jsx10("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
+    /* @__PURE__ */ jsxs7("table", { children: [
+      /* @__PURE__ */ jsx10("thead", { children: /* @__PURE__ */ jsxs7("tr", { children: [
+        cells.map((c) => /* @__PURE__ */ jsx10("th", { scope: "col", children: labelText(c.attributes) ?? cellKey(c) }, c.id)),
+        !disabled && /* @__PURE__ */ jsx10("th", {})
       ] }) }),
-      /* @__PURE__ */ jsx9("tbody", { children: visibleRows.map((row, j) => {
+      /* @__PURE__ */ jsx10("tbody", { children: visibleRows.map((row, j) => {
         const i = start + j;
-        return /* @__PURE__ */ jsxs5("tr", { children: [
+        return /* @__PURE__ */ jsxs7("tr", { children: [
           cells.map((c) => {
             const ck = cellKey(c);
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
             const visible = evaluateVisibility(c.attributes, { ...top, ...row });
-            return /* @__PURE__ */ jsx9("td", { children: visible && /* @__PURE__ */ jsx9(
+            return /* @__PURE__ */ jsx10("td", { children: visible && /* @__PURE__ */ jsx10(
               GridCell,
               {
                 type: c.type,
@@ -1008,20 +1286,20 @@ function GridField({
               }
             ) }, c.id);
           }),
-          !disabled && /* @__PURE__ */ jsx9("td", { children: /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-row-remove", onClick: () => replace(rows.filter((_, k) => k !== i)), children: "Remove" }) })
+          !disabled && /* @__PURE__ */ jsx10("td", { children: /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-row-remove", onClick: () => replace(rows.filter((_, k) => k !== i)), children: "Remove" }) })
         ] }, i);
       }) }),
-      hasAggregates && /* @__PURE__ */ jsx9("tfoot", { children: /* @__PURE__ */ jsxs5("tr", { className: "lf-grid-aggregates", children: [
+      hasAggregates && /* @__PURE__ */ jsx10("tfoot", { children: /* @__PURE__ */ jsxs7("tr", { className: "lf-grid-aggregates", children: [
         cells.map((c) => {
           const kind = c.attributes?.aggregate;
-          return /* @__PURE__ */ jsx9("td", { children: typeof kind === "string" ? aggregate(rows, cellKey(c), kind) : "" }, c.id);
+          return /* @__PURE__ */ jsx10("td", { children: typeof kind === "string" ? aggregate(rows, cellKey(c), kind) : "" }, c.id);
         }),
-        !disabled && /* @__PURE__ */ jsx9("td", {})
+        !disabled && /* @__PURE__ */ jsx10("td", {})
       ] }) })
     ] }),
-    paged && /* @__PURE__ */ jsxs5("div", { className: "lf-grid-pager", children: [
-      /* @__PURE__ */ jsx9("button", { type: "button", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: "Prev" }),
-      /* @__PURE__ */ jsxs5("span", { className: "lf-grid-page", children: [
+    paged && /* @__PURE__ */ jsxs7("div", { className: "lf-grid-pager", children: [
+      /* @__PURE__ */ jsx10("button", { type: "button", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: "Prev" }),
+      /* @__PURE__ */ jsxs7("span", { className: "lf-grid-page", children: [
         "Rows ",
         start + 1,
         "\u2013",
@@ -1029,10 +1307,10 @@ function GridField({
         " of ",
         rows.length
       ] }),
-      /* @__PURE__ */ jsx9("button", { type: "button", disabled: safePage >= pageCount - 1, onClick: () => setPage(safePage + 1), children: "Next" })
+      /* @__PURE__ */ jsx10("button", { type: "button", disabled: safePage >= pageCount - 1, onClick: () => setPage(safePage + 1), children: "Next" })
     ] }),
-    !disabled && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-row-add", onClick: () => replace([...rows, {}]), children: "Add row" }),
-    error && /* @__PURE__ */ jsx9("p", { role: "alert", className: "lf-error", children: error.message })
+    !disabled && /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-row-add", onClick: () => replace([...rows, {}]), children: "Add row" }),
+    error && /* @__PURE__ */ jsx10("p", { role: "alert", className: "lf-error", children: error.message })
   ] });
 }
 function GridCell({
@@ -1049,7 +1327,7 @@ function GridCell({
   const a = entity?.attributes ?? {};
   const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"] };
   if (type === "checkbox") {
-    return /* @__PURE__ */ jsx9("input", { type: "checkbox", ...rest, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
+    return /* @__PURE__ */ jsx10("input", { type: "checkbox", ...rest, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
   }
   if (type === "selectBoxes") {
     const selected = new Set((Array.isArray(value) ? value : []).map(String));
@@ -1059,31 +1337,31 @@ function GridCell({
       else next.delete(v);
       onChange([...next]);
     };
-    return /* @__PURE__ */ jsx9("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], children: opts.map((o) => /* @__PURE__ */ jsxs5("label", { className: "lf-cell-check", children: [
-      /* @__PURE__ */ jsx9("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
+    return /* @__PURE__ */ jsx10("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], children: opts.map((o) => /* @__PURE__ */ jsxs7("label", { className: "lf-cell-check", children: [
+      /* @__PURE__ */ jsx10("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
       " ",
       o.label
     ] }, o.value)) });
   }
   if (type === "select" || type === "radio") {
-    return /* @__PURE__ */ jsxs5("select", { ...rest, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
-      /* @__PURE__ */ jsx9("option", { value: "" }),
-      opts.map((o) => /* @__PURE__ */ jsx9("option", { value: o.value, children: o.label }, o.value))
+    return /* @__PURE__ */ jsxs7("select", { ...rest, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
+      /* @__PURE__ */ jsx10("option", { value: "" }),
+      opts.map((o) => /* @__PURE__ */ jsx10("option", { value: o.value, children: o.label }, o.value))
     ] });
   }
   if (type === "file") {
     const fileEntity = entity ?? { id: id ?? "", type: "file", attributes: a };
-    return /* @__PURE__ */ jsx9(FileField, { a11y, multiple: Boolean(a.multiple), value, disabled, onChange, entity: fileEntity, scope: scope ?? {} });
+    return /* @__PURE__ */ jsx10(FileField, { a11y, multiple: Boolean(a.multiple), value, disabled, onChange, entity: fileEntity, scope: scope ?? {} });
   }
   if (type === "signature") {
-    return /* @__PURE__ */ jsx9(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+    return /* @__PURE__ */ jsx10(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
   }
   if (type === "textarea") {
-    return /* @__PURE__ */ jsx9("textarea", { ...rest, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
+    return /* @__PURE__ */ jsx10("textarea", { ...rest, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
   }
   const mask = typeof a.inputMask === "string" ? a.inputMask : "";
   const numeric = type === "number" || type === "currency";
-  return /* @__PURE__ */ jsx9(
+  return /* @__PURE__ */ jsx10(
     "input",
     {
       type: mask || numeric ? "text" : inputType(type),
@@ -1102,53 +1380,53 @@ function Static({ entity }) {
     if (!text2) return null;
     const size = typeof a.headingSize === "string" && /^h[1-6]$/.test(a.headingSize) ? a.headingSize : "h3";
     const Tag = size;
-    return /* @__PURE__ */ jsx9(Tag, { className: `lf-heading lf-heading--${size}`, children: text2 });
+    return /* @__PURE__ */ jsx10(Tag, { className: `lf-heading lf-heading--${size}`, children: text2 });
   }
-  if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ jsx9("hr", { className: "lf-divider" });
+  if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ jsx10("hr", { className: "lf-divider" });
   if (entity.type === "button") {
     const action = a.buttonAction === "reset" ? "reset" : a.buttonAction === "button" ? "button" : "submit";
-    return /* @__PURE__ */ jsx9("button", { type: action, className: "lf-button", "data-action": action, children: labelText(a) ?? "Submit" });
+    return /* @__PURE__ */ jsx10("button", { type: action, className: "lf-button", "data-action": action, children: labelText(a) ?? "Submit" });
   }
   if (entity.type === "content" || entity.type === "html" || entity.type === "htmlElement") {
     const html = typeof a.content === "string" ? a.content : "";
-    return /* @__PURE__ */ jsx9("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: html } });
+    return /* @__PURE__ */ jsx10("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: html } });
   }
   const text = labelText(a) ?? labelText(a, "content") ?? "";
   if (!text) return null;
-  return /* @__PURE__ */ jsx9("div", { className: "lf-static", "data-type": entity.type, children: text });
+  return /* @__PURE__ */ jsx10("div", { className: "lf-static", "data-type": entity.type, children: text });
 }
 var PANEL_THEMES = /* @__PURE__ */ new Set(["default", "primary", "secondary", "info", "success", "warning", "danger"]);
 function PanelBox({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const collapsible = Boolean(a.collapsible);
-  const [open, setOpen] = useState7(!(collapsible && a.collapsed));
+  const [open, setOpen] = useState8(!(collapsible && a.collapsed));
   const raw = typeof a.theme === "string" ? a.theme : "";
   const theme = PANEL_THEMES.has(raw) ? raw : "default";
   const title = labelText(a);
   const bodyId = `${entity.id}-panel-body`;
   const Wrapper = entity.type === "fieldset" ? "fieldset" : "section";
-  return /* @__PURE__ */ jsxs5(Wrapper, { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
-    collapsible ? /* @__PURE__ */ jsxs5("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
-      /* @__PURE__ */ jsx9("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
-      /* @__PURE__ */ jsx9("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
-    ] }) : title && /* @__PURE__ */ jsx9("div", { className: "lf-panel-head", children: /* @__PURE__ */ jsx9("span", { className: "lf-panel-title", children: ctx.t(title) }) }),
-    /* @__PURE__ */ jsx9("div", { id: bodyId, className: "lf-container-children lf-panel-body", hidden: !open, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx9(Render, { id: cid, schema, ctx }, cid)) })
+  return /* @__PURE__ */ jsxs7(Wrapper, { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
+    collapsible ? /* @__PURE__ */ jsxs7("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
+      /* @__PURE__ */ jsx10("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
+      /* @__PURE__ */ jsx10("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
+    ] }) : title && /* @__PURE__ */ jsx10("div", { className: "lf-panel-head", children: /* @__PURE__ */ jsx10("span", { className: "lf-panel-title", children: ctx.t(title) }) }),
+    /* @__PURE__ */ jsx10("div", { id: bodyId, className: "lf-container-children lf-panel-body", hidden: !open, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx10(Render, { id: cid, schema, ctx }, cid)) })
   ] });
 }
 function TabsContainer({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const children = entity.children ?? [];
-  const [active, setActive] = useState7(0);
-  const [focusIdx, setFocusIdx] = useState7(0);
-  const [revealErrors, setRevealErrors] = useState7(false);
-  const navRef = useRef5(null);
+  const [active, setActive] = useState8(0);
+  const [focusIdx, setFocusIdx] = useState8(0);
+  const [revealErrors, setRevealErrors] = useState8(false);
+  const navRef = useRef6(null);
   const idx = Math.min(active, Math.max(0, children.length - 1));
   const vertical = Boolean(a.verticalTabs);
   const navigation = Boolean(a.navigation);
   const validateBeforeNext = Boolean(a.validateBeforeNext);
   const rootClass = `lf-container lf-tabs${vertical ? " lf-tabs--vertical" : ""}`;
   if (children.length === 0)
-    return /* @__PURE__ */ jsx9("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ jsx9("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
+    return /* @__PURE__ */ jsx10("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ jsx10("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
   const tabId = (i) => `${entity.id}-tab-${i}`;
   const panelId = (i) => `${entity.id}-panel-${i}`;
   const tabLabel = (cid, i) => {
@@ -1189,10 +1467,10 @@ function TabsContainer({ entity, schema, ctx, Render }) {
   const renderTab = (cid) => {
     const child = schema.entities[cid];
     const isContainer = child ? Boolean(ctx.reg.get(child.type)?.isContainer) : false;
-    return isContainer ? (child.children ?? []).map((gid) => /* @__PURE__ */ jsx9(Render, { id: gid, schema, ctx: tabCtx }, gid)) : /* @__PURE__ */ jsx9(Render, { id: cid, schema, ctx: tabCtx });
+    return isContainer ? (child.children ?? []).map((gid) => /* @__PURE__ */ jsx10(Render, { id: gid, schema, ctx: tabCtx }, gid)) : /* @__PURE__ */ jsx10(Render, { id: cid, schema, ctx: tabCtx });
   };
-  return /* @__PURE__ */ jsxs5("div", { className: rootClass, "data-type": "tabs", children: [
-    /* @__PURE__ */ jsx9("div", { className: "lf-tabs-nav", role: "tablist", "aria-orientation": vertical ? "vertical" : void 0, ref: navRef, children: children.map((cid, i) => /* @__PURE__ */ jsx9(
+  return /* @__PURE__ */ jsxs7("div", { className: rootClass, "data-type": "tabs", children: [
+    /* @__PURE__ */ jsx10("div", { className: "lf-tabs-nav", role: "tablist", "aria-orientation": vertical ? "vertical" : void 0, ref: navRef, children: children.map((cid, i) => /* @__PURE__ */ jsx10(
       "button",
       {
         type: "button",
@@ -1208,15 +1486,15 @@ function TabsContainer({ entity, schema, ctx, Render }) {
       },
       cid
     )) }),
-    children.map((cid, i) => /* @__PURE__ */ jsx9("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: renderTab(cid) }, cid)),
-    navigation && /* @__PURE__ */ jsxs5("div", { className: "lf-tabs-foot", children: [
-      /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-tabs-prev", disabled: idx === 0, onClick: () => go(idx - 1), children: ctx.t("Previous") }),
-      /* @__PURE__ */ jsxs5("span", { className: "lf-tabs-progress", "aria-live": "polite", children: [
+    children.map((cid, i) => /* @__PURE__ */ jsx10("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: renderTab(cid) }, cid)),
+    navigation && /* @__PURE__ */ jsxs7("div", { className: "lf-tabs-foot", children: [
+      /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-tabs-prev", disabled: idx === 0, onClick: () => go(idx - 1), children: ctx.t("Previous") }),
+      /* @__PURE__ */ jsxs7("span", { className: "lf-tabs-progress", "aria-live": "polite", children: [
         idx + 1,
         " / ",
         children.length
       ] }),
-      /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-tabs-next", disabled: idx >= children.length - 1, onClick: () => go(idx + 1), children: ctx.t("Next") })
+      /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-tabs-next", disabled: idx >= children.length - 1, onClick: () => go(idx + 1), children: ctx.t("Next") })
     ] })
   ] });
 }
@@ -1227,11 +1505,11 @@ function TableGrid({ entity, schema, ctx, Render }) {
   const children = entity.children ?? [];
   const rows = Math.max(minRows, Math.ceil(children.length / cols), 1);
   const title = labelText(a);
-  return /* @__PURE__ */ jsxs5("table", { className: "lf-table", "data-type": "table", children: [
-    title && /* @__PURE__ */ jsx9("caption", { className: "lf-container-label", children: ctx.t(title) }),
-    /* @__PURE__ */ jsx9("tbody", { children: Array.from({ length: rows }).map((_, r) => /* @__PURE__ */ jsx9("tr", { children: Array.from({ length: cols }).map((_2, c) => {
+  return /* @__PURE__ */ jsxs7("table", { className: "lf-table", "data-type": "table", children: [
+    title && /* @__PURE__ */ jsx10("caption", { className: "lf-container-label", children: ctx.t(title) }),
+    /* @__PURE__ */ jsx10("tbody", { children: Array.from({ length: rows }).map((_, r) => /* @__PURE__ */ jsx10("tr", { children: Array.from({ length: cols }).map((_2, c) => {
       const cid = children[r * cols + c];
-      return /* @__PURE__ */ jsx9("td", { children: cid ? /* @__PURE__ */ jsx9(Render, { id: cid, schema, ctx }) : null }, c);
+      return /* @__PURE__ */ jsx10("td", { children: cid ? /* @__PURE__ */ jsx10(Render, { id: cid, schema, ctx }) : null }, c);
     }) }, r)) })
   ] });
 }
@@ -1241,7 +1519,7 @@ function EditGridField({
   ctx,
   schema
 }) {
-  const [editing, setEditing] = useState7(null);
+  const [editing, setEditing] = useState8(null);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -1273,23 +1551,23 @@ function EditGridField({
     const v = row?.[cellKey(c)];
     return v == null || v === "" ? null : `${labelText(c.attributes) ?? cellKey(c)}: ${asText(v)}`;
   }).filter(Boolean).join(" \xB7 ");
-  return /* @__PURE__ */ jsxs5("div", { className: "lf-edit-grid", "data-type": "editGrid", children: [
-    /* @__PURE__ */ jsx9("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
-    rows.length > 0 && /* @__PURE__ */ jsx9("ul", { className: "lf-eg-rows", children: rows.map((row, i) => /* @__PURE__ */ jsxs5("li", { className: "lf-eg-row", children: [
-      /* @__PURE__ */ jsx9("span", { className: "lf-eg-summary", children: summary(row) || /* @__PURE__ */ jsx9("em", { className: "lf-eg-empty", children: "Empty row" }) }),
-      !disabled && !editing && /* @__PURE__ */ jsxs5("span", { className: "lf-eg-row-actions", children: [
-        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-eg-edit", onClick: () => startEdit(i), children: ctx.t("Edit") }),
-        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-eg-remove", onClick: () => removeRow(i), children: ctx.t("Remove") })
+  return /* @__PURE__ */ jsxs7("div", { className: "lf-edit-grid", "data-type": "editGrid", children: [
+    /* @__PURE__ */ jsx10("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
+    rows.length > 0 && /* @__PURE__ */ jsx10("ul", { className: "lf-eg-rows", children: rows.map((row, i) => /* @__PURE__ */ jsxs7("li", { className: "lf-eg-row", children: [
+      /* @__PURE__ */ jsx10("span", { className: "lf-eg-summary", children: summary(row) || /* @__PURE__ */ jsx10("em", { className: "lf-eg-empty", children: "Empty row" }) }),
+      !disabled && !editing && /* @__PURE__ */ jsxs7("span", { className: "lf-eg-row-actions", children: [
+        /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-eg-edit", onClick: () => startEdit(i), children: ctx.t("Edit") }),
+        /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-eg-remove", onClick: () => removeRow(i), children: ctx.t("Remove") })
       ] })
     ] }, i)) }),
-    editing && /* @__PURE__ */ jsxs5("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
+    editing && /* @__PURE__ */ jsxs7("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
       cells.map((c) => {
         const ck = cellKey(c);
         if (!evaluateVisibility(c.attributes, { ...top, ...editing.draft })) return null;
         const label = labelText(c.attributes) ?? ck;
-        return /* @__PURE__ */ jsxs5("label", { className: "lf-eg-cell", children: [
-          /* @__PURE__ */ jsx9("span", { className: "lf-eg-cell-label", children: ctx.t(label) }),
-          /* @__PURE__ */ jsx9(
+        return /* @__PURE__ */ jsxs7("label", { className: "lf-eg-cell", children: [
+          /* @__PURE__ */ jsx10("span", { className: "lf-eg-cell-label", children: ctx.t(label) }),
+          /* @__PURE__ */ jsx10(
             GridCell,
             {
               type: c.type,
@@ -1305,29 +1583,29 @@ function EditGridField({
           )
         ] }, c.id);
       }),
-      /* @__PURE__ */ jsxs5("div", { className: "lf-eg-editor-actions", children: [
-        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-eg-cancel", onClick: () => setEditing(null), children: ctx.t("Cancel") }),
-        /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-eg-save", onClick: commitDraft, children: ctx.t("Save") })
+      /* @__PURE__ */ jsxs7("div", { className: "lf-eg-editor-actions", children: [
+        /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-eg-cancel", onClick: () => setEditing(null), children: ctx.t("Cancel") }),
+        /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-eg-save", onClick: commitDraft, children: ctx.t("Save") })
       ] })
     ] }),
-    !disabled && !editing && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-row-add", onClick: startAdd, children: ctx.t("Add another") }),
-    error && /* @__PURE__ */ jsx9("p", { role: "alert", className: "lf-error", children: error.message })
+    !disabled && !editing && /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-row-add", onClick: startAdd, children: ctx.t("Add another") }),
+    error && /* @__PURE__ */ jsx10("p", { role: "alert", className: "lf-error", children: error.message })
   ] });
 }
 
 // src/FormRenderer.tsx
-import { jsx as jsx10, jsxs as jsxs6 } from "react/jsx-runtime";
+import { jsx as jsx11, jsxs as jsxs8 } from "react/jsx-runtime";
 function FormRenderer(props) {
   const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", theme, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
   const formClass = ["lf-form", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore };
   const form = useFormEngine(schema, engineOptions);
-  const [submitted, setSubmitted] = useState8(false);
+  const [submitted, setSubmitted] = useState9(false);
   const client = useMinionClient();
-  const [asyncErrors, setAsyncErrors] = useState8({});
-  const onAutosaveRef = useRef6(onAutosave);
+  const [asyncErrors, setAsyncErrors] = useState9({});
+  const onAutosaveRef = useRef7(onAutosave);
   onAutosaveRef.current = onAutosave;
-  const autosaveTimer = useRef6(null);
+  const autosaveTimer = useRef7(null);
   const flushAutosave = () => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = null;
@@ -1338,7 +1616,7 @@ function FormRenderer(props) {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(flushAutosave, autosaveDelay);
   };
-  useEffect5(() => () => {
+  useEffect6(() => () => {
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
       onAutosaveRef.current?.(form.engine.serialize());
@@ -1371,11 +1649,11 @@ function FormRenderer(props) {
       focusFirstError(report.errorKeys);
     }
   }, [form, onResult, onEvent, onSubmit, focusFirstError]);
-  useEffect5(() => {
+  useEffect6(() => {
     if (autoSubmitSignal) submitProgrammatic();
   }, [autoSubmitSignal]);
   const playbackSignal = playback?.signal;
-  useEffect5(() => {
+  useEffect6(() => {
     if (!playback || !playbackSignal) return;
     let cancelled = false;
     const speed = playback.speed ?? 80;
@@ -1428,7 +1706,7 @@ function FormRenderer(props) {
     }
   };
   const pages = wizardPages(schema);
-  const content = pages ? /* @__PURE__ */ jsx10(
+  const content = pages ? /* @__PURE__ */ jsx11(
     FormWizardView,
     {
       pages,
@@ -1444,11 +1722,11 @@ function FormRenderer(props) {
       onResult,
       onEvent
     }
-  ) : /* @__PURE__ */ jsxs6("form", { noValidate: true, className: formClass, style: theme, onSubmit: handleSubmit, children: [
-    schema.root.map((id) => /* @__PURE__ */ jsx10(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
-    submitLabel !== null && !readOnly && /* @__PURE__ */ jsx10("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
+  ) : /* @__PURE__ */ jsxs8("form", { noValidate: true, className: formClass, style: theme, onSubmit: handleSubmit, children: [
+    schema.root.map((id) => /* @__PURE__ */ jsx11(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
+    submitLabel !== null && !readOnly && /* @__PURE__ */ jsx11("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
   ] });
-  return /* @__PURE__ */ jsx10(FormErrorBoundary, { fallback: errorFallback, onError: (error) => onEvent?.({ type: "error", error }), children: content });
+  return /* @__PURE__ */ jsx11(FormErrorBoundary, { fallback: errorFallback, onError: (error) => onEvent?.({ type: "error", error }), children: content });
 }
 function FormWizardView({
   pages,
@@ -1464,16 +1742,16 @@ function FormWizardView({
   onResult,
   onEvent
 }) {
-  const [index, setIndex] = useState8(0);
-  const [showErrors, setShowErrors] = useState8(false);
+  const [index, setIndex] = useState9(0);
+  const [showErrors, setShowErrors] = useState9(false);
   const t = useTranslate();
-  const pageRef = useRef6(null);
-  const firstRender = useRef6(true);
+  const pageRef = useRef7(null);
+  const firstRender = useRef7(true);
   const visible = pages.filter((id) => form.state.fields[id]?.isVisible !== false);
   const safeIndex = Math.min(index, Math.max(0, visible.length - 1));
   const currentId = visible[safeIndex];
   const isLast = safeIndex >= visible.length - 1;
-  useEffect5(() => {
+  useEffect6(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
@@ -1508,14 +1786,14 @@ function FormWizardView({
       onEvent?.({ type: "invalid", errorKeys: report.errorKeys });
     }
   };
-  return /* @__PURE__ */ jsxs6("form", { noValidate: true, className, style: theme, onSubmit: submit, children: [
-    /* @__PURE__ */ jsx10("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ jsx10("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
-    /* @__PURE__ */ jsx10("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ jsx10(RenderEntity, { id: currentId, schema, ctx }) }),
-    /* @__PURE__ */ jsxs6("div", { className: "lf-wizard-nav", children: [
-      /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
-      !isLast && /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
-      isLast && submitLabel !== null && !readOnly && /* @__PURE__ */ jsx10("button", { type: "submit", className: "lf-submit", children: t(submitLabel) }),
-      /* @__PURE__ */ jsxs6("span", { className: "lf-wizard-progress", children: [
+  return /* @__PURE__ */ jsxs8("form", { noValidate: true, className, style: theme, onSubmit: submit, children: [
+    /* @__PURE__ */ jsx11("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ jsx11("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
+    /* @__PURE__ */ jsx11("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ jsx11(RenderEntity, { id: currentId, schema, ctx }) }),
+    /* @__PURE__ */ jsxs8("div", { className: "lf-wizard-nav", children: [
+      /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
+      !isLast && /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
+      isLast && submitLabel !== null && !readOnly && /* @__PURE__ */ jsx11("button", { type: "submit", className: "lf-submit", children: t(submitLabel) }),
+      /* @__PURE__ */ jsxs8("span", { className: "lf-wizard-progress", children: [
         t("Step"),
         " ",
         safeIndex + 1,
@@ -1535,13 +1813,13 @@ function RenderEntity({ id, schema, ctx }) {
   if (entity.type === "array" || entity.type === "map") return null;
   const ft = ctx.reg.get(entity.type);
   if (ft?.isGrid)
-    return entity.type === "editGrid" ? /* @__PURE__ */ jsx10(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ jsx10(GridField, { entity, fs, ctx, schema });
-  if (ft?.isStatic) return /* @__PURE__ */ jsx10(Static, { entity });
+    return entity.type === "editGrid" ? /* @__PURE__ */ jsx11(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ jsx11(GridField, { entity, fs, ctx, schema });
+  if (ft?.isStatic) return /* @__PURE__ */ jsx11(Static, { entity });
   if (ft?.isContainer) {
-    if (entity.type === "tabs") return /* @__PURE__ */ jsx10(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
+    if (entity.type === "tabs") return /* @__PURE__ */ jsx11(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
     if (entity.type === "panel" || entity.type === "well" || entity.type === "fieldset")
-      return /* @__PURE__ */ jsx10(PanelBox, { entity, schema, ctx, Render: RenderEntity });
-    if (entity.type === "table") return /* @__PURE__ */ jsx10(TableGrid, { entity, schema, ctx, Render: RenderEntity });
+      return /* @__PURE__ */ jsx11(PanelBox, { entity, schema, ctx, Render: RenderEntity });
+    if (entity.type === "table") return /* @__PURE__ */ jsx11(TableGrid, { entity, schema, ctx, Render: RenderEntity });
     let cols;
     if (entity.type === "columns") {
       const raw = Number(entity.attributes?.numColumns);
@@ -1551,13 +1829,13 @@ function RenderEntity({ id, schema, ctx }) {
     }
     const childStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : void 0;
     const bordered = Boolean(entity.attributes?.borders);
-    return /* @__PURE__ */ jsxs6("div", { className: `lf-container${bordered ? " lf-container--bordered" : ""}`, "data-type": entity.type, children: [
-      labelText(entity.attributes) && /* @__PURE__ */ jsx10("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
-      /* @__PURE__ */ jsx10("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx10(RenderEntity, { id: cid, schema, ctx }, cid)) })
+    return /* @__PURE__ */ jsxs8("div", { className: `lf-container${bordered ? " lf-container--bordered" : ""}`, "data-type": entity.type, children: [
+      labelText(entity.attributes) && /* @__PURE__ */ jsx11("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
+      /* @__PURE__ */ jsx11("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx11(RenderEntity, { id: cid, schema, ctx }, cid)) })
     ] });
   }
   if (!fs) return null;
-  return /* @__PURE__ */ jsx10(Field, { entity, fs, ctx });
+  return /* @__PURE__ */ jsx11(Field, { entity, fs, ctx });
 }
 function Field({ entity, fs, ctx }) {
   const a = entity.attributes ?? {};
@@ -1594,8 +1872,8 @@ function Field({ entity, fs, ctx }) {
   if (typeof a.max === "number") numProps.max = a.max;
   const Custom = ctx.components[entity.type];
   if (!Custom && entity.type === "radio") {
-    return /* @__PURE__ */ jsx10(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs6("label", { className: "lf-option", children: [
-      /* @__PURE__ */ jsx10(
+    return /* @__PURE__ */ jsx11(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs8("label", { className: "lf-option", children: [
+      /* @__PURE__ */ jsx11(
         "input",
         {
           type: "radio",
@@ -1611,8 +1889,8 @@ function Field({ entity, fs, ctx }) {
   }
   if (!Custom && entity.type === "selectBoxes") {
     const selected = new Set((Array.isArray(fs.value) ? fs.value : []).map(String));
-    return /* @__PURE__ */ jsx10(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs6("label", { className: "lf-option", children: [
-      /* @__PURE__ */ jsx10(
+    return /* @__PURE__ */ jsx11(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs8("label", { className: "lf-option", children: [
+      /* @__PURE__ */ jsx11(
         "input",
         {
           type: "checkbox",
@@ -1632,14 +1910,14 @@ function Field({ entity, fs, ctx }) {
   }
   let control;
   if (Custom) {
-    control = /* @__PURE__ */ jsx10(Custom, { entity, field: fs, value: fs.value, setValue: set, disabled, error: error?.message ?? null, id });
+    control = /* @__PURE__ */ jsx11(Custom, { entity, field: fs, value: fs.value, setValue: set, disabled, error: error?.message ?? null, id });
   } else
     switch (entity.type) {
       case "checkbox":
-        control = /* @__PURE__ */ jsx10("input", { type: "checkbox", ...a11y, checked: Boolean(fs.value), onChange: (e) => set(e.target.checked) });
+        control = /* @__PURE__ */ jsx11("input", { type: "checkbox", ...a11y, checked: Boolean(fs.value), onChange: (e) => set(e.target.checked) });
         break;
       case "textarea":
-        control = /* @__PURE__ */ jsx10(
+        control = /* @__PURE__ */ jsx11(
           "textarea",
           {
             ...a11y,
@@ -1655,15 +1933,15 @@ function Field({ entity, fs, ctx }) {
         control = a.searchable && readDataSource3(a) ? (
           // Searchable + Minion-backed → server-side type-ahead (re-queries as you type),
           // so a value beyond the first page is still findable (unlike a static filter).
-          /* @__PURE__ */ jsx10(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
-        ) : a.searchable ? /* @__PURE__ */ jsx10(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ jsxs6("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
-          !fs.isRequired && /* @__PURE__ */ jsx10("option", { value: "", children: ph ?? "" }),
-          fieldOptions.map((o) => /* @__PURE__ */ jsx10("option", { value: o.value, children: ctx.t(o.label) }, o.value))
+          /* @__PURE__ */ jsx11(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
+        ) : a.searchable ? /* @__PURE__ */ jsx11(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ jsxs8("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
+          !fs.isRequired && /* @__PURE__ */ jsx11("option", { value: "", children: ph ?? "" }),
+          fieldOptions.map((o) => /* @__PURE__ */ jsx11("option", { value: o.value, children: ctx.t(o.label) }, o.value))
         ] });
         break;
       case "number":
       case "currency":
-        control = /* @__PURE__ */ jsx10(
+        control = /* @__PURE__ */ jsx11(
           NumberInput,
           {
             a11y,
@@ -1677,20 +1955,36 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "searchSelect":
-        control = /* @__PURE__ */ jsx10(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph });
+        control = /* @__PURE__ */ jsx11(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph });
         break;
       case "tags":
       case "tagsField":
-        control = /* @__PURE__ */ jsx10(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set, placeholder: ph });
+        control = /* @__PURE__ */ jsx11(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set, placeholder: ph });
         break;
       case "file":
-        control = /* @__PURE__ */ jsx10(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
+        control = /* @__PURE__ */ jsx11(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
         break;
       case "signature":
-        control = /* @__PURE__ */ jsx10(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+        control = /* @__PURE__ */ jsx11(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+        break;
+      case "day":
+      case "datetime":
+      case "time":
+        control = a.nativeInput ? /* @__PURE__ */ jsx11(TextControl, { type: inputType(entity.type), a11y, extra: inputProps, mask: typeof a.inputMask === "string" ? a.inputMask : "", clearable: Boolean(a.clearable) && !disabled, value: fs.value, onChange: set }) : /* @__PURE__ */ jsx11(
+          DateField,
+          {
+            a11y,
+            kind: entity.type,
+            value: fs.value,
+            disabled,
+            onChange: set,
+            clearable: Boolean(a.clearable) && !disabled,
+            minuteStep: typeof a.minuteStep === "number" ? a.minuteStep : 1
+          }
+        );
         break;
       default:
-        control = /* @__PURE__ */ jsx10(
+        control = /* @__PURE__ */ jsx11(
           TextControl,
           {
             type: inputType(entity.type),
@@ -1706,21 +2000,21 @@ function Field({ entity, fs, ctx }) {
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
   const hideLabel = Boolean(a.hideLabel);
   const fieldClass = ["lf-field", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
-  return /* @__PURE__ */ jsxs6("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
-    /* @__PURE__ */ jsxs6("label", { htmlFor: id, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
+  return /* @__PURE__ */ jsxs8("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
+    /* @__PURE__ */ jsxs8("label", { htmlFor: id, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
       ctx.t(labelText(a) ?? key),
-      fs.isRequired && /* @__PURE__ */ jsx10("span", { "aria-hidden": "true", children: " *" }),
-      /* @__PURE__ */ jsx10(Tooltip, { text: tooltipText(a) })
+      fs.isRequired && /* @__PURE__ */ jsx11("span", { "aria-hidden": "true", children: " *" }),
+      /* @__PURE__ */ jsx11(Tooltip, { text: tooltipText(a) })
     ] }),
     control,
-    (Boolean(a.showCharCount) || Boolean(a.showWordCount)) && /* @__PURE__ */ jsxs6("p", { className: "lf-count", "aria-live": "off", children: [
+    (Boolean(a.showCharCount) || Boolean(a.showWordCount)) && /* @__PURE__ */ jsxs8("p", { className: "lf-count", "aria-live": "off", children: [
       a.showCharCount ? `${asText(fs.value).length} characters` : "",
       a.showCharCount && a.showWordCount ? " \xB7 " : "",
       a.showWordCount ? `${wordCount(asText(fs.value))} words` : ""
     ] }),
-    descId && /* @__PURE__ */ jsx10("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
-    error && /* @__PURE__ */ jsx10("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
-    !error && ctx.asyncErrors[key] && /* @__PURE__ */ jsx10("p", { id: asyncErrId, role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
+    descId && /* @__PURE__ */ jsx11("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
+    error && /* @__PURE__ */ jsx11("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
+    !error && ctx.asyncErrors[key] && /* @__PURE__ */ jsx11("p", { id: asyncErrId, role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
   ] });
 }
 async function runAsyncValidations(schema, form, client) {

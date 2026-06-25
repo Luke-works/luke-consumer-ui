@@ -241,6 +241,10 @@ function createDefaultAttributeEditors() {
         { label: "H6 \u2014 smallest", value: "h6" }
       ]
     },
+    // Date / time fields default to the rich calendar + time picker; expose the per-field
+    // native opt-out and the time-selector minute increment.
+    { id: "nativeInput", tab: "settings", attribute: "nativeInput", label: "Use native input", control: "checkbox", order: 40, appliesTo: ["day", "datetime", "time"], hint: "Use the browser's native date/time input instead of the rich calendar / time picker." },
+    { id: "minuteStep", tab: "settings", attribute: "minuteStep", label: "Minute step", control: "number", order: 41, appliesTo: ["datetime", "time"], when: (e) => !e.attributes?.nativeInput, hint: "Increment (in minutes) between options in the time selector. Default 1." },
     // Panel-like containers: collapse + a color theme for different purposes.
     { id: "collapsible", tab: "settings", attribute: "collapsible", label: "Collapsible", control: "checkbox", order: 30, appliesTo: ["panel", "well", "fieldset"] },
     { id: "collapsed", tab: "settings", attribute: "collapsed", label: "Initially collapsed", control: "checkbox", order: 31, appliesTo: ["panel", "well", "fieldset"], when: (e) => Boolean(e.attributes?.collapsible) },
@@ -1515,11 +1519,19 @@ function previewControl(entity, field) {
         o.label
       ] }, i)) });
     }
+    // Date / time fields render the RICH picker in the live form by default; reflect that on the
+    // canvas (an input + a calendar/clock hint), unless the field opts into the native input.
     case "day":
     case "datetime":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date", value: dv });
+      return a.nativeInput ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date", value: dv }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "lf-pv-datefield", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, value: dv, placeholder: entity.type === "datetime" ? "YYYY-MM-DDTHH:MM" : "YYYY-MM-DD" }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-pv-cal", "aria-hidden": "true", children: "\u{1F4C5}" })
+      ] });
     case "time":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: "time", value: dv });
+      return a.nativeInput ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: "time", value: dv }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "lf-pv-datefield", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, value: dv, placeholder: "HH:MM" }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-pv-cal", "aria-hidden": "true", children: "\u{1F551}" })
+      ] });
     case "file":
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-pv-file", children: "Choose file\u2026" });
     case "signature":
