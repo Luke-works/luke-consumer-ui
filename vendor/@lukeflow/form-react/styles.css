@@ -899,3 +899,12 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 .lf-rt-btn:focus-visible { outline: 2px solid var(--lf-primary); outline-offset: 1px; }
 .lf-rt-editor { min-height: 90px; padding: 8px 10px; background: var(--lf-bg); color: var(--lf-text); }
 .lf-rt-editor:focus { outline: 2px solid var(--lf-primary); outline-offset: -2px; }
+
+/* Large-form rendering virtualization (opt-in via <FormRenderer virtualize />): off-screen field
+   rows skip layout/paint via content-visibility, but stay in the DOM so focus-on-error, Tab order,
+   browser Find, and validation all keep working. contain-intrinsic-size reserves an estimated row
+   height so the scrollbar stays stable. See docs/BENCHMARKS.md. */
+.lf-virtualized .lf-field {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
+}

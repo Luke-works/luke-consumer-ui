@@ -2026,8 +2026,8 @@ function EditGridField({
 // src/FormRenderer.tsx
 import { jsx as jsx13, jsxs as jsxs9 } from "react/jsx-runtime";
 function FormRenderer(props) {
-  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", theme, colorScheme, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
-  const formClass = ["lf-form", className].filter(Boolean).join(" ");
+  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
+  const formClass = ["lf-form", virtualize && "lf-virtualized", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore, allowJs, jsEvaluator };
   const form = useFormEngine(schema, engineOptions);
   const [submitted, setSubmitted] = useState11(false);

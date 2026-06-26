@@ -151,6 +151,12 @@ interface FormRendererProps {
     /** Color scheme: `"light"`/`"dark"` force it; `"auto"` (default) follows the OS preference. */
     colorScheme?: ColorScheme;
     /**
+     * Optimize very large single-page forms (~50+ fields): applies `content-visibility:auto` to field
+     * rows so off-screen fields skip layout/paint while staying in the DOM (focus, tab, find, and
+     * validation all keep working — unlike JS windowing). See docs/BENCHMARKS.md.
+     */
+    virtualize?: boolean;
+    /**
      * Sanitize author-supplied HTML for the `content`/`html` field. Defaults to DOMPurify
      * (browser) / escape (SSR). Override to plug a DOM-backed sanitizer for SSR or a custom
      * allow-list policy. See {@link import("./render/sanitizeHtml").defaultSanitizeHtml}.
