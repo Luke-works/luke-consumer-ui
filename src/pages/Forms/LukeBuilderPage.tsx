@@ -38,6 +38,10 @@ import {
   type StoredForm,
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
+import { Modal } from "../../components/ui/modal";
+import { MonitorPlay, FlaskConical, BadgeCheck } from "lucide-react";
+import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
+import FormTestPanel from "./FormTestPanel";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
 
@@ -75,6 +79,11 @@ export default function LukeBuilderPage() {
   const [submitMessage, setSubmitMessage] = useState("");
   // Live schema mirrored to the AI panel (which reads it to build/modify the form).
   const [liveSchema, setLiveSchema] = useState<BuilderSchemaLike | null>(null);
+  // Preview + "Test the form" (positive/negative validation runs + sign-off).
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSchema, setPreviewSchema] = useState("");
+  const [testOpen, setTestOpen] = useState(false);
+  const [lastTestedAt, setLastTestedAt] = useState<number | null>(null);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
   const latestRef = useRef<FormSchema | null>(null);
@@ -95,6 +104,7 @@ export default function LukeBuilderPage() {
         setForm(f);
         setStatus(f.status);
         setVersion(latestVersion(f));
+        setLastTestedAt(f.lastTestedAt ?? null);
         const sm = readSubmitMessage(f.schema);
         setSubmitMessage(sm);
         submitMsgRef.current = sm;
@@ -264,6 +274,13 @@ export default function LukeBuilderPage() {
     scheduleSave(latestRef.current ?? initialSchema);
   };
 
+  // Preview snapshots the live schema into a read-only renderer; Test opens the
+  // self-contained panel, which snapshots + auto-fills on open.
+  const openPreview = () => {
+    setPreviewSchema(currentJson());
+    setPreviewOpen(true);
+  };
+
   const editors = useMemo(() => lukeAttributeEditors, []);
 
   if (loading) {
@@ -291,36 +308,60 @@ export default function LukeBuilderPage() {
         <h1 className="min-w-0 truncate text-lg font-semibold text-gray-800 dark:text-white/90">{form.name}</h1>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status]}`}>{status}</span>
         <span className="text-xs text-gray-400">v{version}</span>
+        {lastTestedAt && (
+          <span className="inline-flex items-center gap-1 text-xs text-success-600 dark:text-success-400">
+            <BadgeCheck className="size-3.5" />Tested
+          </span>
+        )}
         <span className={`text-xs ${saveError ? "text-error-500" : "text-gray-400"}`}>{canEdit ? saveLabel : "View only"}</span>
 
-        {canEdit && (
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onDiscard}
-              disabled={busy !== null}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-            >
-              Discard draft
-            </button>
-            <button
-              type="button"
-              onClick={onCheckIn}
-              disabled={busy !== null}
-              className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
-            >
-              {busy === "checkin" ? "Checking in…" : "Check in"}
-            </button>
-            <button
-              type="button"
-              onClick={onPublish}
-              disabled={busy !== null}
-              className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
-            >
-              {busy === "publish" ? "Publishing…" : "Publish"}
-            </button>
-          </div>
-        )}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Preview + Test are available to view-only users too (read access can validate). */}
+          <button
+            type="button"
+            onClick={openPreview}
+            title="Preview & test the form — conditions, calculations and validation run live."
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+          >
+            <MonitorPlay className="size-4" />Preview
+          </button>
+          <button
+            type="button"
+            onClick={() => setTestOpen(true)}
+            title="Auto-fill the form with valid sample data, validate it, and sign off."
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+          >
+            <FlaskConical className="size-4" />Test
+          </button>
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                onClick={onDiscard}
+                disabled={busy !== null}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+              >
+                Discard draft
+              </button>
+              <button
+                type="button"
+                onClick={onCheckIn}
+                disabled={busy !== null}
+                className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
+              >
+                {busy === "checkin" ? "Checking in…" : "Check in"}
+              </button>
+              <button
+                type="button"
+                onClick={onPublish}
+                disabled={busy !== null}
+                className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+              >
+                {busy === "publish" ? "Publishing…" : "Publish"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {canEdit && (
@@ -353,6 +394,27 @@ export default function LukeBuilderPage() {
             />
           ) : undefined
         }
+      />
+
+      {/* Read-only live preview of the current draft. */}
+      <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
+        <div className="p-6 sm:p-8">
+          <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Preview — {form.name}</h2>
+          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Fill it out to test conditions, calculated values and validation.</p>
+          <FormRenderer schema={previewSchema} />
+        </div>
+      </Modal>
+
+      <FormTestPanel
+        open={testOpen}
+        onClose={() => setTestOpen(false)}
+        tenant={tenant}
+        formId={id}
+        formName={form.name}
+        canEdit={canEdit}
+        getJson={currentJson}
+        onApplyAiSchema={applyAiSchema}
+        onSignedOff={setLastTestedAt}
       />
     </div>
   );
