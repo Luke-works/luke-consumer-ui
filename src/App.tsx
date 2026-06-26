@@ -19,7 +19,7 @@ import Support from "./pages/Support/Support";
 import AccessManagement from "./pages/Access/AccessManagement";
 
 // Code-split the form designer (@lukeflow/form-builder) to its own route chunk.
-const LukeBuilderPage = lazy(() => import("./pages/Forms/LukeBuilderPage"));
+const FormBuilderPage = lazy(() => import("./pages/Forms/FormBuilderPage"));
 const FormFill = lazy(() => import("./pages/Forms/FormFill"));
 const FormResponses = lazy(() => import("./pages/Forms/FormResponses"));
 const FormEmbed = lazy(() => import("./pages/Forms/FormEmbed"));
@@ -128,7 +128,7 @@ export default function App() {
                         </div>
                       }
                     >
-                      <LukeBuilderPage />
+                      <FormBuilderPage />
                     </Suspense>
                   }
                 />

@@ -10,7 +10,7 @@
  *     inputs. Selectors are scoped under `.lf-builder` so they out-specify the package
  *     defaults regardless of CSS chunk load order.
  *
- * Import AFTER the package stylesheets (see LukeBuilderPage.tsx / LukeFormRenderer.tsx).
+ * Import AFTER the package stylesheets (see FormBuilderPage.tsx / LukeFormRenderer.tsx).
  */
 
 /* ── 1) TOKEN BRIDGE (doubled class wins by specificity) ─────────────────────── */

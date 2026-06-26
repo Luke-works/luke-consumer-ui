@@ -1,5 +1,5 @@
 /**
- * LukeBuilderPage — the form designer, powered by @lukeflow/form-builder (the headless
+ * FormBuilderPage — the form designer, powered by @lukeflow/form-builder (the headless
  * monorepo builder). This is THE builder at `/forms/:id`; it replaced the legacy
  * coltorapps FormBuilderPage (deleted in the cutover).
  *
@@ -39,7 +39,7 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { MonitorPlay, FlaskConical, BadgeCheck, CodeXml } from "lucide-react";
+import { MonitorPlay, FlaskConical, BadgeCheck, CodeXml, ArrowUp } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
@@ -49,6 +49,7 @@ import { PencilIcon } from "../../icons";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
+import PageMeta from "../../components/common/PageMeta";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
 
@@ -68,7 +69,7 @@ const STATUS_BADGE: Record<FormStatus, string> = {
   archived: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
 };
 
-export default function LukeBuilderPage() {
+export default function FormBuilderPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -364,6 +365,15 @@ export default function LukeBuilderPage() {
     setPreviewOpen(true);
   };
 
+  // Floating "scroll to top" for the whole-page-scroll layout — shows past a threshold.
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const editors = useMemo(() => lukeAttributeEditors, []);
 
   if (loading) {
@@ -375,6 +385,7 @@ export default function LukeBuilderPage() {
 
   return (
     <div className="space-y-4">
+      <PageMeta title={`${form.name} | Lukeflow`} description="Design your form in Lukeflow." />
       {canEdit && lockedByOther && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400">
           <span>
@@ -536,6 +547,12 @@ export default function LukeBuilderPage() {
             <span className="text-xs text-gray-400">Form ID</span>
             <p className="font-mono text-sm font-medium text-gray-700 dark:text-gray-200">{form.code}</p>
           </div>
+          {(form.createdByName || form.updatedByName) && (
+            <p className="mb-4 text-xs text-gray-400">
+              {form.createdByName && <>Created by <span className="text-gray-600 dark:text-gray-300">{form.createdByName}</span></>}
+              {form.updatedByName && <>{form.createdByName ? " · " : ""}last edited by <span className="text-gray-600 dark:text-gray-300">{form.updatedByName}</span></>}
+            </p>
+          )}
           <div className="mb-4">
             <Label>Form name</Label>
             <Input value={formName} onChange={(e) => setFormName(e.target.value)} disabled={!canEdit} />
@@ -576,6 +593,17 @@ export default function LukeBuilderPage() {
           )}
         </div>
       </Modal>
+
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="Scroll to top"
+          className="fixed bottom-6 right-6 z-40 flex size-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-theme-lg transition hover:-translate-y-0.5 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        >
+          <ArrowUp className="size-5" />
+        </button>
+      )}
     </div>
   );
 }

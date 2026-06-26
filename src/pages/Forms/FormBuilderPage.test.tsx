@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router";
-import LukeBuilderPage from "./LukeBuilderPage";
+import FormBuilderPage from "./FormBuilderPage";
 import * as formsApi from "../../lib/formsApi";
 
 // Read-write FORMS access so the lifecycle actions render.
@@ -13,6 +13,7 @@ vi.mock("../../context/AuthContext", () => ({
 // Heavy children render nothing — the gate is computed from the loaded schema via the
 // REAL form-core validateSchema (not mocked), the same validator the builder's badge uses.
 vi.mock("@lukeflow/form-builder", () => ({ FormBuilder: React.forwardRef(() => null) }));
+vi.mock("../../components/common/PageMeta", () => ({ default: () => null })); // uses react-helmet-async (needs a provider)
 vi.mock("./AiAssistPanel", () => ({ default: () => null }));
 vi.mock("./FormTestPanel", () => ({ default: () => null }));
 vi.mock("./FormEmbedPanel", () => ({ default: () => null }));
@@ -52,7 +53,7 @@ const CLEAN = { root: ["a", "b"], entities: {
 function renderPage() {
   render(
     <MemoryRouter initialEntries={["/forms/f1"]}>
-      <Routes><Route path="/forms/:id" element={<LukeBuilderPage />} /></Routes>
+      <Routes><Route path="/forms/:id" element={<FormBuilderPage />} /></Routes>
     </MemoryRouter>,
   );
 }
@@ -63,7 +64,7 @@ beforeEach(() => {
   mocked.checkout.mockResolvedValue({} as formsApi.StoredForm);
 });
 
-describe("LukeBuilderPage — problems gating", () => {
+describe("FormBuilderPage — problems gating", () => {
   it("disables Check in / Publish and shows an error chip for a blocking schema", async () => {
     mocked.getForm.mockResolvedValue(form(DUP));
     renderPage();
@@ -82,7 +83,7 @@ describe("LukeBuilderPage — problems gating", () => {
   });
 });
 
-describe("LukeBuilderPage — settings modal", () => {
+describe("FormBuilderPage — settings modal", () => {
   it("opens settings from the name, edits the name, and persists via updateMeta", async () => {
     const user = userEvent.setup();
     mocked.getForm.mockResolvedValue(form(CLEAN)); // name "Contact", no description
@@ -99,7 +100,7 @@ describe("LukeBuilderPage — settings modal", () => {
   });
 });
 
-describe("LukeBuilderPage — edit-lock take-over", () => {
+describe("FormBuilderPage — edit-lock take-over", () => {
   it("shows the 'being edited' banner when another user holds the lock, and takes over on click", async () => {
     const user = userEvent.setup();
     // Initial checkout fails (someone else holds it); a forced take-over succeeds.
