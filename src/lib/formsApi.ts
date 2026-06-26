@@ -142,7 +142,7 @@ export function saveDraft(tenant: string, id: string, schema: string): Promise<u
 export function updateMeta(
   tenant: string,
   id: string,
-  patch: { name?: string; description?: string },
+  patch: { name?: string; description?: string; allowedEmbedOrigins?: string },
 ): Promise<unknown> {
   return req(tenant, `${BASE}/${seg(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
@@ -209,7 +209,10 @@ export async function getAudit(tenant: string, id: string): Promise<AuditEvent[]
 }
 
 /** Mint an opaque, signed embed token for a published form (for the iframe). */
-export async function getEmbedToken(tenant: string, id: string): Promise<{ token: string; code: string }> {
+export async function getEmbedToken(
+  tenant: string,
+  id: string,
+): Promise<{ token: string; code: string; allowedEmbedOrigins?: string | null }> {
   return req(tenant, `${BASE}/${seg(id)}/embed-token`);
 }
 

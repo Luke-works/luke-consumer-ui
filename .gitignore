@@ -32,3 +32,6 @@ dist-ssr
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Route B M2 embed bundle build output (vendored into core-engine static/embed-assets instead)
+dist-embed

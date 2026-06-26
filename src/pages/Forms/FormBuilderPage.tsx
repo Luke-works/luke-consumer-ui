@@ -431,6 +431,9 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [embedToken, setEmbedToken] = useState<string | null>(null);
   const [embedErr, setEmbedErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [embedDomains, setEmbedDomains] = useState(""); // per-form allowed embed origins (Route B M2)
+  const [savingDomains, setSavingDomains] = useState(false);
+  const [domainsSaved, setDomainsSaved] = useState(false);
   const saveTimer = useRef<number | null>(null);
   // Mutual exclusion for lifecycle actions (check-in / publish / discard) so rapid
   // clicks or check-in→publish can't interleave on stale version state (#37).
@@ -685,18 +688,42 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     setCopied(false);
     if (embedToken) return;
     try {
-      const { token } = await getEmbedToken(tenant, formId);
+      const { token, allowedEmbedOrigins } = await getEmbedToken(tenant, formId);
       setEmbedToken(token);
+      setEmbedDomains(allowedEmbedOrigins ?? "");
     } catch (e) {
       setEmbedErr((e as { message?: string })?.message ?? "Couldn’t generate the embed code.");
     }
   };
 
-  const embedUrl = embedToken ? `${window.location.origin}/embed/${embedToken}` : "";
+  // Persist the per-form embed allowlist (Route B M2). The engine sanitizes + stores it and serves
+  // it back as the embed page's frame-ancestors policy.
+  const saveEmbedDomains = async () => {
+    setSavingDomains(true);
+    setDomainsSaved(false);
+    setEmbedErr(null);
+    try {
+      // The engine sanitizes + may reject (400) an all-invalid allowlist; reflect the canonical
+      // stored value back so the tenant sees exactly what's enforced (deduped/lower-cased, junk dropped).
+      const saved = (await updateMeta(tenant, formId, { allowedEmbedOrigins: embedDomains })) as { allowedEmbedOrigins?: string | null };
+      setEmbedDomains(saved?.allowedEmbedOrigins ?? "");
+      setDomainsSaved(true);
+    } catch (e) {
+      setEmbedErr((e as { message?: string })?.message ?? "Couldn’t save the allowed domains.");
+    } finally {
+      setSavingDomains(false);
+    }
+  };
+
+  // The embed PAGE is served by the engine (gateway origin) with a per-tenant frame-ancestors header;
+  // VITE_AUTH_API_URL is that gateway base. The SDK script still loads from this app's origin, but the
+  // iframe it mounts points at the gateway via data-lukeform-host.
+  const gatewayOrigin = (import.meta.env.VITE_AUTH_API_URL as string | undefined) || window.location.origin;
+  const embedUrl = embedToken ? `${gatewayOrigin}/embed/${embedToken}` : "";
   // The script SDK (@lukeflow/form-embed) mounts a cross-origin iframe with a secure postMessage
   // bridge — it auto-sizes to content and reports submit/error to the host page (no fixed height).
   const embedSnippet = embedToken
-    ? `<div data-lukeform-token="${embedToken}"></div>\n<script src="${window.location.origin}/embed.js" data-lukeform-auto></script>`
+    ? `<div data-lukeform-token="${embedToken}" data-lukeform-host="${gatewayOrigin}"></div>\n<script src="${window.location.origin}/embed.js" data-lukeform-auto></script>`
     : "";
   const copyEmbed = async () => {
     try { await navigator.clipboard.writeText(embedSnippet); setCopied(true); } catch { /* ignore */ }
@@ -1174,6 +1201,27 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
                 <Button size="sm" variant="outline" startIcon={<MonitorPlay className="size-4" />} onClick={() => window.open(embedUrl, "_blank", "noopener,noreferrer")}>Open preview</Button>
               </div>
               <p className="mt-3 text-xs text-gray-400">The link is opaque and signed — it carries only this form, scoped to your organization.</p>
+
+              <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <label htmlFor="embed-domains" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Allowed embed domains</label>
+                <p className="mb-2 mt-0.5 text-xs text-gray-400">
+                  One origin per line, e.g. <code>https://acme.com</code> or <code>https://*.acme.com</code>. Only these sites may frame the form. Leave empty to allow any site.
+                </p>
+                <textarea
+                  id="embed-domains"
+                  value={embedDomains}
+                  onChange={(e) => { setEmbedDomains(e.target.value); setDomainsSaved(false); }}
+                  rows={3}
+                  spellCheck={false}
+                  placeholder="https://example.com"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-xs text-gray-700 focus:border-brand-400 focus:outline-none dark:border-gray-700 dark:bg-white/5 dark:text-gray-200"
+                />
+                <div className="mt-2">
+                  <Button size="sm" variant="outline" onClick={saveEmbedDomains} disabled={savingDomains}>
+                    {savingDomains ? "Saving…" : domainsSaved ? "Saved ✓" : "Save domains"}
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </div>
