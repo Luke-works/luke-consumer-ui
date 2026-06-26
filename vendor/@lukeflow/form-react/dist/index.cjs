@@ -1,7 +1,9 @@
 "use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -15,6 +17,14 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
@@ -25,6 +35,7 @@ __export(index_exports, {
   LocaleProvider: () => LocaleProvider,
   MinionProvider: () => MinionProvider,
   VERSION: () => VERSION,
+  defaultSanitizeHtml: () => defaultSanitizeHtml,
   printSubmission: () => printSubmission,
   useFormEngine: () => useFormEngine,
   useMinionClient: () => useMinionClient,
@@ -154,6 +165,36 @@ var FormErrorBoundary = class extends import_react4.Component {
     }
     return this.props.children;
   }
+};
+
+// src/render/sanitizeHtml.ts
+var import_dompurify = __toESM(require("dompurify"), 1);
+var ESCAPE = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+};
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ESCAPE[c] ?? c);
+}
+var defaultSanitizeHtml = (dirty) => {
+  if (typeof dirty !== "string" || dirty === "") return "";
+  if (import_dompurify.default.isSupported) {
+    return import_dompurify.default.sanitize(dirty, {
+      USE_PROFILES: { html: true },
+      // The content field is for RICH TEXT (formatting, links, lists, tables, images) — not
+      // interactive forms or arbitrary layout. Forbidding form-associated tags closes a stored
+      // phishing / off-site-POST vector (a `<form action>` is hoisted into a real form by the
+      // browser), and forbidding inline `style` closes a CSS UI-redress / clickjacking vector
+      // (e.g. a position:fixed full-viewport overlay over the real submit button). Hosts that
+      // need either can loosen the policy via the `sanitizeHtml` prop.
+      FORBID_TAGS: ["form", "input", "button", "textarea", "select", "option", "fieldset", "label"],
+      FORBID_ATTR: ["style"]
+    });
+  }
+  return escapeHtml(dirty);
 };
 
 // src/render/helpers.ts
@@ -1352,7 +1393,7 @@ function GridField({
             const ck = cellKey(c);
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
-            const visible = (0, import_form_core6.evaluateVisibility)(c.attributes, { ...top, ...row });
+            const visible = (0, import_form_core6.evaluateVisibility)(c.attributes, { ...top, ...row }, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator });
             const required = (0, import_form_core6.evaluateRequired)(c.attributes, { ...top, ...row });
             return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("td", { children: visible && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
               GridCell,
@@ -1460,7 +1501,7 @@ function GridCell({
     }
   );
 }
-function Static({ entity }) {
+function Static({ entity, sanitizeHtml = defaultSanitizeHtml }) {
   const a = entity.attributes ?? {};
   if (entity.type === "heading") {
     const text2 = labelText(a) ?? labelText(a, "content");
@@ -1476,7 +1517,7 @@ function Static({ entity }) {
   }
   if (entity.type === "content" || entity.type === "html" || entity.type === "htmlElement") {
     const html = typeof a.content === "string" ? a.content : "";
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: html } });
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: sanitizeHtml(html) } });
   }
   const text = labelText(a) ?? labelText(a, "content") ?? "";
   if (!text) return null;
@@ -1651,7 +1692,7 @@ function EditGridField({
       cells.map((c) => {
         const ck = cellKey(c);
         const rowScope = { ...top, ...editing.draft };
-        if (!(0, import_form_core6.evaluateVisibility)(c.attributes, rowScope)) return null;
+        if (!(0, import_form_core6.evaluateVisibility)(c.attributes, rowScope, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator })) return null;
         const label = labelText(c.attributes) ?? ck;
         const required = (0, import_form_core6.evaluateRequired)(c.attributes, rowScope);
         return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "lf-eg-cell", children: [
@@ -1689,9 +1730,9 @@ function EditGridField({
 // src/FormRenderer.tsx
 var import_jsx_runtime11 = require("react/jsx-runtime");
 function FormRenderer(props) {
-  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", theme, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
+  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", theme, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
   const formClass = ["lf-form", className].filter(Boolean).join(" ");
-  const engineOptions = { initialValues, registry, restore };
+  const engineOptions = { initialValues, registry, restore, allowJs, jsEvaluator };
   const form = useFormEngine(schema, engineOptions);
   const [submitted, setSubmitted] = (0, import_react13.useState)(false);
   const client = useMinionClient();
@@ -1765,7 +1806,8 @@ function FormRenderer(props) {
   const reg = registry ?? (0, import_form_core7.createDefaultFieldTypeRegistry)();
   const comps = components ?? {};
   const t = useTranslate();
-  const ctx = { form, reg, readOnly, showErrors: submitted, asyncErrors, components: comps, t, scope: form.getScope() };
+  const sanitize = sanitizeHtml ?? defaultSanitizeHtml;
+  const ctx = { form, reg, readOnly, showErrors: submitted, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope() };
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
@@ -1811,6 +1853,9 @@ function FormRenderer(props) {
       submitLabel,
       className: formClass,
       theme,
+      sanitizeHtml: sanitize,
+      allowJs,
+      jsEvaluator,
       onSubmit,
       onResult,
       onEvent
@@ -1831,6 +1876,9 @@ function FormWizardView({
   submitLabel,
   className,
   theme,
+  sanitizeHtml,
+  allowJs,
+  jsEvaluator,
   onSubmit,
   onResult,
   onEvent
@@ -1851,7 +1899,7 @@ function FormWizardView({
     }
     pageRef.current?.focus();
   }, [safeIndex]);
-  const ctx = { form, reg, readOnly, showErrors, asyncErrors: {}, components, t, scope: form.getScope() };
+  const ctx = { form, reg, readOnly, showErrors, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope() };
   const next = () => {
     if (!currentId) return;
     if (keysValid(form, pageFieldKeys(schema, currentId, form))) {
@@ -1907,7 +1955,7 @@ function RenderEntity({ id, schema, ctx }) {
   const ft = ctx.reg.get(entity.type);
   if (ft?.isGrid)
     return entity.type === "editGrid" ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(GridField, { entity, fs, ctx, schema });
-  if (ft?.isStatic) return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Static, { entity });
+  if (ft?.isStatic) return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Static, { entity, sanitizeHtml: ctx.sanitizeHtml });
   if (ft?.isContainer) {
     if (entity.type === "tabs") return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
     if (entity.type === "panel" || entity.type === "well" || entity.type === "fieldset")
@@ -2149,6 +2197,7 @@ var VERSION = "0.1.0-alpha.0";
   LocaleProvider,
   MinionProvider,
   VERSION,
+  defaultSanitizeHtml,
   printSubmission,
   useFormEngine,
   useMinionClient,

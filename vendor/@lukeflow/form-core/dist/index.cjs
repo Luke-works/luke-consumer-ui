@@ -1004,7 +1004,8 @@ function evaluateVisibility(attributes, scope, opts = {}) {
   const allowJs = opts.allowJs !== false;
   const customJs = allowJs && typeof a.customConditionalJs === "string" && a.customConditionalJs.trim() ? a.customConditionalJs : void 0;
   if (customJs) {
-    const r = evaluateJs(customJs, { ...scope });
+    const runJs = opts.jsEvaluator ?? evaluateJs;
+    const r = runJs(customJs, { ...scope });
     return r.ok ? Boolean(r.show) : true;
   }
   const custom = typeof a.customConditional === "string" && a.customConditional.trim() ? a.customConditional : void 0;
@@ -1927,7 +1928,7 @@ var createFormEngine = (factoryOptions = {}) => {
             let computed;
             const js = allowJsEnabled && typeof a.calculateValueJs === "string" && a.calculateValueJs.trim() ? a.calculateValueJs : void 0;
             if (js) {
-              const res = evaluateJs(js, rowScope, r[c.key]);
+              const res = runJs(js, rowScope, r[c.key]);
               if (res.ok) computed = res.value;
             } else {
               const expr = a.calculateValue;
@@ -2060,7 +2061,7 @@ var createFormEngine = (factoryOptions = {}) => {
       for (const child of template) {
         const cellValue = rowVals?.[child.key];
         const path = `${gridNode.key}[${i}].${child.key}`;
-        if (!evaluateVisibility(child.entity.attributes, rowVisScope, { allowJs: allowJsEnabled })) {
+        if (!evaluateVisibility(child.entity.attributes, rowVisScope, { allowJs: allowJsEnabled, jsEvaluator })) {
           cellErrors.delete(path);
           continue;
         }

@@ -1,4 +1,4 @@
-import { EngineState, EntityKey, FieldState, FormData, ValidationReport, DiagnosticReport, FormEngine, FormSchema, EngineOptions, SchemaEntity, FieldTypeRegistry, SerializedEngineState, MinionOption, MinionClient, PrintOptions } from '@lukeflow/form-core';
+import { EngineState, EntityKey, FieldState, FormData, ValidationReport, DiagnosticReport, FormEngine, FormSchema, EngineOptions, SchemaEntity, FieldTypeRegistry, SerializedEngineState, JsEvaluator, MinionOption, MinionClient, PrintOptions } from '@lukeflow/form-core';
 import * as react from 'react';
 import { ReactNode, Component, ErrorInfo } from 'react';
 
@@ -46,6 +46,40 @@ interface UseFormEngineResult {
  */
 declare function useFormEngine(schema: FormSchema, options?: EngineOptions): UseFormEngineResult;
 
+/**
+ * HTML sanitization for the static `content` / `html` field. Author-supplied HTML is
+ * run through DOMPurify before it ever reaches `dangerouslySetInnerHTML`, so a form
+ * authored by a LESS-trusted party can't inject `<script>` / `onerror=` / `javascript:`
+ * XSS into every end user who fills the form.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────
+ * TRUST MODEL
+ * ──────────────────────────────────────────────────────────────────────────────
+ * Previously the content field rendered author HTML verbatim ("trusted author", like
+ * Form.io's content component). That is safe only when form AUTHORS are fully trusted.
+ * In a multi-tenant deployment where authors are not fully trusted, raw HTML is a
+ * stored-XSS vector. Sanitizing by default closes it while keeping rich content working
+ * (formatting, links, lists, tables, images — just not script/handlers/dangerous URLs).
+ *
+ * SSR: DOMPurify needs a DOM. In the browser that's the global `window`; under SSR there
+ * is none, so `DOMPurify.isSupported` is `false` and `DOMPurify.sanitize()` would return
+ * its INPUT UNCHANGED — which would emit unsanitized HTML into the server response. We
+ * therefore fall back to escaping the markup to inert text server-side (never unsafe).
+ * Hosts that need real HTML in the SSR pass can inject a DOM-backed sanitizer via
+ * {@link import("../FormRenderer").FormRendererProps.sanitizeHtml}.
+ *
+ * @packageDocumentation
+ */
+/** Sanitize untrusted HTML into a safe HTML string for `dangerouslySetInnerHTML`. */
+type SanitizeHtmlFn = (dirtyHtml: string) => string;
+/**
+ * The default sanitizer: DOMPurify with the standard HTML profile when a DOM is
+ * available, escaping to inert text otherwise. Strips `<script>`, event-handler
+ * attributes, `javascript:`/`data:` script URLs, and other XSS vectors while keeping
+ * ordinary rich content. Pure and side-effect-free.
+ */
+declare const defaultSanitizeHtml: SanitizeHtmlFn;
+
 /** A telemetry/observability event emitted by the renderer (see {@link FormRendererProps.onEvent}). */
 interface FormTelemetryEvent {
     type: "submit" | "invalid" | "async-invalid" | "error";
@@ -78,6 +112,24 @@ interface FormRendererProps {
     submitLabel?: string | null;
     /** Theme tokens applied as CSS custom properties on the form root, e.g. `{ "--lf-primary": "#0a7" }`. */
     theme?: Record<string, string>;
+    /**
+     * Sanitize author-supplied HTML for the `content`/`html` field. Defaults to DOMPurify
+     * (browser) / escape (SSR). Override to plug a DOM-backed sanitizer for SSR or a custom
+     * allow-list policy. See {@link import("./render/sanitizeHtml").defaultSanitizeHtml}.
+     */
+    sanitizeHtml?: SanitizeHtmlFn;
+    /**
+     * Run author JS logic (`calculateValueJs` / `customConditionalJs` / …)? Defaults to `true`.
+     * Set `false` to disable every JS path (only the safe expr-eval sandbox runs) — the valve for
+     * forms authored by untrusted parties when JS isn't needed.
+     */
+    allowJs?: boolean;
+    /**
+     * Isolate author JS through a host-supplied evaluator (e.g. `createQuickJsEvaluator()` from
+     * `@lukeflow/form-core/quickjs`) instead of the built-in `Function` evaluator — for untrusted
+     * authors. Applied to BOTH the engine and the renderer's per-row grid-cell conditional logic.
+     */
+    jsEvaluator?: JsEvaluator;
     /** Observability hook — fires on submit / sync-invalid / async-invalid / render error. */
     onEvent?: (event: FormTelemetryEvent) => void;
     /** Fallback shown if a field/component throws while rendering. */
@@ -211,4 +263,4 @@ declare function printSubmission(schema: FormSchema, data: FormData, options?: P
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, LocaleProvider, type MinionDataState, MinionProvider, type TranslateFn, type UseFormEngineResult, VERSION, printSubmission, useFormEngine, useMinionClient, useMinionData, useTranslate };
+export { type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, defaultSanitizeHtml, printSubmission, useFormEngine, useMinionClient, useMinionData, useTranslate };

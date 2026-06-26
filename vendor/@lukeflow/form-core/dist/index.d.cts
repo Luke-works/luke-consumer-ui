@@ -1256,9 +1256,13 @@ declare function evaluateExpression(expr: unknown, scope: Scope): unknown;
  *
  * This is NOT a security boundary against a MALICIOUS author: raw JS can still reach
  * the realm via member-access tricks (`({}).constructor.constructor`). If your forms
- * can be authored by untrusted parties, disable JS logic entirely via the engine's
- * `allowJs: false` option (then only the safe expr-eval sandbox runs). True isolation
- * (Worker / QuickJS-wasm) is a future hardening, tracked separately.
+ * can be authored by untrusted parties you have two stronger options:
+ *   1. Disable JS logic entirely via the engine's `allowJs: false` option (then only the
+ *      safe expr-eval sandbox runs) — simplest, if you don't need JS at all.
+ *   2. Run author JS in a TRUE isolate by passing `EngineOptions.jsEvaluator` from
+ *      `createQuickJsEvaluator()` (see {@link import("./quickjs").createQuickJsEvaluator},
+ *      the `@lukeflow/form-core/quickjs` subpath) — a WebAssembly QuickJS VM with its own
+ *      realm, memory cap, and execution deadline; member-access escapes can't reach the host.
  *
  * @packageDocumentation
  */
@@ -1308,9 +1312,15 @@ declare function extractDataRefs(code: string): string[];
  *
  * @packageDocumentation
  */
-/** Resolve whether a field is visible for `scope`. `allowJs` gates the JS variant. */
+
+/**
+ * Resolve whether a field is visible for `scope`. `allowJs` gates the JS variant; `jsEvaluator`
+ * routes author `customConditionalJs` through a host-supplied isolate (e.g. `createQuickJsEvaluator()`)
+ * — defaults to the built-in `evaluateJs`, so isolation reaches grid cells too, not just top-level fields.
+ */
 declare function evaluateVisibility(attributes: Record<string, unknown> | undefined, scope: Readonly<Record<string, unknown>>, opts?: {
     allowJs?: boolean;
+    jsEvaluator?: JsEvaluator;
 }): boolean;
 /**
  * Resolve whether a field is REQUIRED for `scope`. A `requiredWhen` expression (evaluated
