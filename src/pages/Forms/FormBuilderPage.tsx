@@ -43,6 +43,7 @@ import {
   latestVersion,
   publishVersion,
   release,
+  rotateEmbedToken,
   saveDraft,
   signOffTest,
   updateMeta,
@@ -434,6 +435,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   const [embedDomains, setEmbedDomains] = useState(""); // per-form allowed embed origins (Route B M2)
   const [savingDomains, setSavingDomains] = useState(false);
   const [domainsSaved, setDomainsSaved] = useState(false);
+  const [rotating, setRotating] = useState(false); // regenerating the embed token (Route B M4)
   const saveTimer = useRef<number | null>(null);
   // Mutual exclusion for lifecycle actions (check-in / publish / discard) so rapid
   // clicks or check-in→publish can't interleave on stale version state (#37).
@@ -727,6 +729,23 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
     : "";
   const copyEmbed = async () => {
     try { await navigator.clipboard.writeText(embedSnippet); setCopied(true); } catch { /* ignore */ }
+  };
+
+  // Revoke the current embed link everywhere it's pasted and mint a fresh one (Route B M4).
+  const regenerateEmbed = async () => {
+    if (!window.confirm("Regenerate this embed link? The snippet you've already pasted on any site will stop working until you replace it.")) return;
+    setRotating(true);
+    setEmbedErr(null);
+    setCopied(false);
+    try {
+      const { token, allowedEmbedOrigins } = await rotateEmbedToken(tenant, formId);
+      setEmbedToken(token);
+      setEmbedDomains(allowedEmbedOrigins ?? "");
+    } catch (e) {
+      setEmbedErr((e as { message?: string })?.message ?? "Couldn’t regenerate the embed link.");
+    } finally {
+      setRotating(false);
+    }
   };
 
   const handleDiscard = () => runExclusive(async () => {
@@ -1199,6 +1218,7 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" onClick={copyEmbed}>{copied ? "Copied ✓" : "Copy snippet"}</Button>
                 <Button size="sm" variant="outline" startIcon={<MonitorPlay className="size-4" />} onClick={() => window.open(embedUrl, "_blank", "noopener,noreferrer")}>Open preview</Button>
+                <Button size="sm" variant="outline" onClick={regenerateEmbed} disabled={rotating}>{rotating ? "Regenerating…" : "Regenerate link"}</Button>
               </div>
               <p className="mt-3 text-xs text-gray-400">The link is opaque and signed — it carries only this form, scoped to your organization.</p>
 

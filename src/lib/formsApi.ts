@@ -216,6 +216,15 @@ export async function getEmbedToken(
   return req(tenant, `${BASE}/${seg(id)}/embed-token`);
 }
 
+/** Revoke all existing embed tokens for this form (bumps the embed-key version) and return a fresh
+ *  one. The previously-pasted snippet stops working everywhere (Route B M4). */
+export async function rotateEmbedToken(
+  tenant: string,
+  id: string,
+): Promise<{ token: string; code: string; allowedEmbedOrigins?: string | null }> {
+  return req(tenant, `${BASE}/${seg(id)}/embed-token/rotate`, { method: "POST" });
+}
+
 /** Record that the form passed its self-test ("Test the form" sign-off). */
 export async function signOffTest(tenant: string, id: string): Promise<StoredForm> {
   const f = await req<ApiForm>(tenant, `${BASE}/${seg(id)}/sign-off`, { method: "POST" });
