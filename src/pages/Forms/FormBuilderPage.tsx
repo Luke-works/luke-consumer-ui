@@ -693,8 +693,10 @@ function Designer({ tenant, formId, form, reload, onSchema, building, suppressFl
   };
 
   const embedUrl = embedToken ? `${window.location.origin}/embed/${embedToken}` : "";
+  // The script SDK (@lukeflow/form-embed) mounts a cross-origin iframe with a secure postMessage
+  // bridge — it auto-sizes to content and reports submit/error to the host page (no fixed height).
   const embedSnippet = embedToken
-    ? `<iframe src="${embedUrl}" width="100%" height="640" style="border:0;max-width:720px" title="${form.name}"></iframe>`
+    ? `<div data-lukeform-token="${embedToken}"></div>\n<script src="${window.location.origin}/embed.js" data-lukeform-auto></script>`
     : "";
   const copyEmbed = async () => {
     try { await navigator.clipboard.writeText(embedSnippet); setCopied(true); } catch { /* ignore */ }

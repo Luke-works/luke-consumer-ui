@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
+import { connectEmbedFrame, type FrameBridge } from "@lukeflow/form-embed";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
@@ -19,6 +20,18 @@ export default function FormEmbed() {
   const [done, setDone] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); // bump to re-attempt a failed load
 
+  // The host-page bridge: auto-reports our height and emits ready/submitted/error to the embedding
+  // site via @lukeflow/form-embed (a no-op when this page is opened standalone, i.e. not framed).
+  const cardRef = useRef<HTMLDivElement>(null);
+  const bridge = useRef<FrameBridge | null>(null);
+  useEffect(() => {
+    // Measure the CARD, not the min-h-screen root (which would pin height to the iframe's own viewport
+    // and never shrink to content).
+    const b = connectEmbedFrame({ element: cardRef.current ?? undefined });
+    bridge.current = b;
+    return () => { b.destroy(); bridge.current = null; };
+  }, []);
+
   useEffect(() => {
     if (!token) return;
     const ctl = new AbortController();
@@ -26,11 +39,12 @@ export default function FormEmbed() {
     setError(null);
     // getEmbedForm retries transient failures with backoff before rejecting (#39).
     getEmbedForm(token, ctl.signal)
-      .then((f) => { setForm(f); setLoading(false); })
+      .then((f) => { setForm(f); setLoading(false); bridge.current?.ready(); })
       .catch((e: unknown) => {
         if (isAbortError(e)) return; // unmounted / re-attempt superseded this one
         setError((e as Error).message);
         setLoading(false);
+        bridge.current?.error((e as Error).message);
       });
     return () => ctl.abort();
   }, [token, reloadKey]);
@@ -40,10 +54,12 @@ export default function FormEmbed() {
     setSubmitting(true);
     setError(null);
     try {
-      await submitEmbed(token, data);
+      const res = await submitEmbed(token, data);
       setDone(true);
+      bridge.current?.submitted(res.instanceId);
     } catch (e) {
       setError((e as Error).message);
+      bridge.current?.error((e as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -51,7 +67,7 @@ export default function FormEmbed() {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-gray-950">
-      <div className="mx-auto max-w-[640px] rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
+      <div ref={cardRef} className="mx-auto max-w-[640px] rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
         {loading ? (
           <p className="py-12 text-center text-sm text-gray-400">Loading…</p>
         ) : done ? (
