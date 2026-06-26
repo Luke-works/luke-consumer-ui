@@ -1,7 +1,5 @@
 'use strict';
 
-var exprEval = require('expr-eval');
-
 // src/schema/types.ts
 var KEY_REGEX_SOURCE = "^[A-Za-z_][A-Za-z0-9_]*$";
 var RESERVED_KEYS = [
@@ -706,7 +704,351 @@ var BUILTIN_RULES = [
   maxFilesRule,
   maxFileSizeRule
 ];
-var parser = new exprEval.Parser({ allowMemberAccess: false });
+
+// src/engine/exprParser.ts
+var CONSTANTS = { PI: Math.PI, E: Math.E };
+var FUNCTIONS = {
+  abs: Math.abs,
+  ceil: Math.ceil,
+  floor: Math.floor,
+  round: Math.round,
+  trunc: Math.trunc,
+  sign: Math.sign,
+  sqrt: Math.sqrt,
+  cbrt: Math.cbrt,
+  exp: Math.exp,
+  log: Math.log,
+  log2: Math.log2,
+  log10: Math.log10,
+  pow: Math.pow,
+  min: Math.min,
+  max: Math.max,
+  hypot: Math.hypot
+};
+var KEYWORDS = /* @__PURE__ */ new Set(["and", "or", "not", "true", "false"]);
+var OPS = ["==", "!=", "<=", ">=", "&&", "||", "+", "-", "*", "/", "%", "^", "<", ">", "!"];
+var PUNC = /* @__PURE__ */ new Set(["(", ")", ",", "?", ":", "[", "]"]);
+function tokenize(src) {
+  const toks = [];
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i];
+    if (c === " " || c === "	" || c === "\n" || c === "\r") {
+      i++;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      const quote = c;
+      let j = i + 1;
+      let s = "";
+      while (j < n && src[j] !== quote) {
+        if (src[j] === "\\" && j + 1 < n) {
+          s += src[j + 1];
+          j += 2;
+          continue;
+        }
+        s += src[j];
+        j++;
+      }
+      if (j >= n) throw new SyntaxError("unterminated string");
+      toks.push({ t: "str", v: s });
+      i = j + 1;
+      continue;
+    }
+    if (c >= "0" && c <= "9" || c === "." && i + 1 < n && src[i + 1] >= "0" && src[i + 1] <= "9") {
+      let j = i;
+      while (j < n && (src[j] >= "0" && src[j] <= "9" || src[j] === ".")) j++;
+      if (j < n && (src[j] === "e" || src[j] === "E")) {
+        j++;
+        if (j < n && (src[j] === "+" || src[j] === "-")) j++;
+        while (j < n && src[j] >= "0" && src[j] <= "9") j++;
+      }
+      toks.push({ t: "num", v: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (/[A-Za-z_$]/.test(c)) {
+      let j = i + 1;
+      while (j < n && /[\w$]/.test(src[j])) j++;
+      toks.push({ t: "ident", v: src.slice(i, j) });
+      i = j;
+      continue;
+    }
+    const op = OPS.find((o) => src.startsWith(o, i));
+    if (op) {
+      toks.push({ t: "op", v: op });
+      i += op.length;
+      continue;
+    }
+    if (PUNC.has(c)) {
+      toks.push({ t: "punc", v: c });
+      i++;
+      continue;
+    }
+    throw new SyntaxError(`unexpected character '${c}'`);
+  }
+  return toks;
+}
+var Parser = class {
+  constructor(toks) {
+    this.toks = toks;
+    this.p = 0;
+  }
+  peek() {
+    return this.toks[this.p];
+  }
+  next() {
+    return this.toks[this.p++];
+  }
+  isOp(v) {
+    const t = this.peek();
+    return !!t && (t.t === "op" || t.t === "ident") && t.v === v;
+  }
+  isPunc(v) {
+    const t = this.peek();
+    return !!t && t.t === "punc" && t.v === v;
+  }
+  eat(v) {
+    const t = this.next();
+    if (!t || t.v !== v) throw new SyntaxError(`expected '${v}'`);
+  }
+  parse() {
+    const node = this.ternary();
+    if (this.peek()) throw new SyntaxError(`unexpected token '${this.peek().v}'`);
+    return node;
+  }
+  ternary() {
+    const cond = this.or();
+    if (this.isPunc("?")) {
+      this.next();
+      const then = this.ternary();
+      this.eat(":");
+      const els = this.ternary();
+      return { k: "ternary", cond, then, else: els };
+    }
+    return cond;
+  }
+  or() {
+    let l = this.and();
+    while (this.isOp("or") || this.isOp("||")) {
+      this.next();
+      l = { k: "logical", op: "or", l, r: this.and() };
+    }
+    return l;
+  }
+  and() {
+    let l = this.equality();
+    while (this.isOp("and") || this.isOp("&&")) {
+      this.next();
+      l = { k: "logical", op: "and", l, r: this.equality() };
+    }
+    return l;
+  }
+  equality() {
+    let l = this.comparison();
+    while (this.isOp("==") || this.isOp("!=")) {
+      const op = this.next().v;
+      l = { k: "bin", op, l, r: this.comparison() };
+    }
+    return l;
+  }
+  comparison() {
+    let l = this.additive();
+    while (this.isOp("<") || this.isOp("<=") || this.isOp(">") || this.isOp(">=")) {
+      const op = this.next().v;
+      l = { k: "bin", op, l, r: this.additive() };
+    }
+    return l;
+  }
+  additive() {
+    let l = this.multiplicative();
+    while (this.isOp("+") || this.isOp("-")) {
+      const op = this.next().v;
+      l = { k: "bin", op, l, r: this.multiplicative() };
+    }
+    return l;
+  }
+  multiplicative() {
+    let l = this.unary();
+    while (this.isOp("*") || this.isOp("/") || this.isOp("%")) {
+      const op = this.next().v;
+      l = { k: "bin", op, l, r: this.unary() };
+    }
+    return l;
+  }
+  // Unary binds LOOSER than `^` (so `-2^2` === -(2^2) === -4, matching standard math + expr-eval),
+  // but the EXPONENT may be unary (`2^-1`). unary → power → primary; the exponent recurses via unary.
+  unary() {
+    if (this.isOp("-") || this.isOp("+") || this.isOp("!") || this.isOp("not")) {
+      const op = this.next().v;
+      return { k: "unary", op: op === "not" ? "!" : op, arg: this.unary() };
+    }
+    return this.power();
+  }
+  power() {
+    const l = this.primary();
+    if (this.isOp("^")) {
+      this.next();
+      return { k: "bin", op: "^", l, r: this.unary() };
+    }
+    return l;
+  }
+  primary() {
+    const t = this.next();
+    if (!t) throw new SyntaxError("unexpected end of expression");
+    if (t.t === "num") {
+      const v = Number(t.v);
+      if (Number.isNaN(v)) throw new SyntaxError(`invalid number '${t.v}'`);
+      return { k: "lit", v };
+    }
+    if (t.t === "str") return { k: "lit", v: t.v };
+    if (t.t === "punc" && t.v === "(") {
+      const e = this.ternary();
+      this.eat(")");
+      return e;
+    }
+    if (t.t === "punc" && t.v === "[") {
+      const items = [];
+      if (!this.isPunc("]")) {
+        items.push(this.ternary());
+        while (this.isPunc(",")) {
+          this.next();
+          items.push(this.ternary());
+        }
+      }
+      this.eat("]");
+      return { k: "array", items };
+    }
+    if (t.t === "ident") {
+      if (t.v === "true") return { k: "lit", v: true };
+      if (t.v === "false") return { k: "lit", v: false };
+      if (KEYWORDS.has(t.v)) throw new SyntaxError(`unexpected keyword '${t.v}'`);
+      if (this.isPunc("(")) {
+        this.next();
+        const args = [];
+        if (!this.isPunc(")")) {
+          args.push(this.ternary());
+          while (this.isPunc(",")) {
+            this.next();
+            args.push(this.ternary());
+          }
+        }
+        this.eat(")");
+        return { k: "call", name: t.v, args };
+      }
+      return { k: "var", name: t.v };
+    }
+    throw new SyntaxError(`unexpected token '${t.v}'`);
+  }
+};
+function parse(source) {
+  return new Parser(tokenize(source)).parse();
+}
+var truthy = (v) => Boolean(v);
+var isNumericLike = (v) => typeof v === "number" || typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v));
+function looseEq(a, b) {
+  if (a === b) return true;
+  if (isNumericLike(a) && isNumericLike(b)) return Number(a) === Number(b);
+  return false;
+}
+function evaluate(node, scope) {
+  switch (node.k) {
+    case "lit":
+      return node.v;
+    case "var":
+      if (Object.prototype.hasOwnProperty.call(scope, node.name)) return scope[node.name];
+      if (Object.prototype.hasOwnProperty.call(CONSTANTS, node.name)) return CONSTANTS[node.name];
+      throw new Error(`undefined variable: ${node.name}`);
+    case "unary": {
+      const v = evaluate(node.arg, scope);
+      if (node.op === "!") return !truthy(v);
+      if (node.op === "-") return -Number(v);
+      return +Number(v);
+    }
+    case "logical": {
+      const l = evaluate(node.l, scope);
+      if (node.op === "and") return truthy(l) ? truthy(evaluate(node.r, scope)) : false;
+      return truthy(l) ? true : truthy(evaluate(node.r, scope));
+    }
+    case "ternary":
+      return truthy(evaluate(node.cond, scope)) ? evaluate(node.then, scope) : evaluate(node.else, scope);
+    case "bin": {
+      const l = evaluate(node.l, scope);
+      const r = evaluate(node.r, scope);
+      switch (node.op) {
+        case "+":
+          return typeof l === "string" || typeof r === "string" ? `${l}${r}` : Number(l) + Number(r);
+        case "-":
+          return Number(l) - Number(r);
+        case "*":
+          return Number(l) * Number(r);
+        case "/":
+          return Number(l) / Number(r);
+        case "%":
+          return Number(l) % Number(r);
+        case "^":
+          return Number(l) ** Number(r);
+        case "==":
+          return looseEq(l, r);
+        case "!=":
+          return !looseEq(l, r);
+        case "<":
+          return Number(l) < Number(r);
+        case "<=":
+          return Number(l) <= Number(r);
+        case ">":
+          return Number(l) > Number(r);
+        case ">=":
+          return Number(l) >= Number(r);
+        default:
+          throw new Error(`unknown operator: ${node.op}`);
+      }
+    }
+    case "call": {
+      const fn = Object.prototype.hasOwnProperty.call(FUNCTIONS, node.name) ? FUNCTIONS[node.name] : void 0;
+      if (!fn) throw new Error(`undefined function: ${node.name}`);
+      return fn(...node.args.map((a) => Number(evaluate(a, scope))));
+    }
+    case "array":
+      return node.items.map((i) => evaluate(i, scope));
+  }
+}
+function variablesOf(node, out = [], seen = /* @__PURE__ */ new Set()) {
+  switch (node.k) {
+    // Built-in constants (PI/E) are not field dependencies (a same-named field still settles on a
+    // full pass; it just doesn't get an incremental edge — an acceptable edge for such a key).
+    case "var":
+      if (!seen.has(node.name) && !Object.prototype.hasOwnProperty.call(CONSTANTS, node.name)) {
+        seen.add(node.name);
+        out.push(node.name);
+      }
+      break;
+    case "unary":
+      variablesOf(node.arg, out, seen);
+      break;
+    case "bin":
+    case "logical":
+      variablesOf(node.l, out, seen);
+      variablesOf(node.r, out, seen);
+      break;
+    case "ternary":
+      variablesOf(node.cond, out, seen);
+      variablesOf(node.then, out, seen);
+      variablesOf(node.else, out, seen);
+      break;
+    case "call":
+      for (const a of node.args) variablesOf(a, out, seen);
+      break;
+    case "array":
+      for (const i of node.items) variablesOf(i, out, seen);
+      break;
+  }
+  return out;
+}
+
+// src/engine/expression.ts
+var MAX_EXPRESSION_LENGTH = 4096;
 var HOSTILE_IDENTIFIERS = /* @__PURE__ */ new Set([
   ...Object.getOwnPropertyNames(Object.prototype),
   "prototype",
@@ -722,29 +1064,19 @@ function hasHostileIdentifier(expr) {
   }
   return false;
 }
-function dedupe(values) {
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const v of values) {
-    if (!seen.has(v)) {
-      seen.add(v);
-      out.push(v);
-    }
-  }
-  return out;
-}
 function parseExpression(expr) {
   const source = typeof expr === "string" ? expr.trim() : "";
   if (!source) return { ok: true, expression: null };
+  if (source.length > MAX_EXPRESSION_LENGTH) return { ok: false, error: "expression too long" };
   let ast;
   try {
-    ast = parser.parse(source);
+    ast = parse(source);
   } catch (e) {
     return { ok: false, error: errorMessage(e) };
   }
-  let variables = [];
+  let variables;
   try {
-    variables = dedupe(ast.variables({ withMembers: false }));
+    variables = variablesOf(ast);
   } catch {
     variables = [];
   }
@@ -757,8 +1089,7 @@ function expressionVariables(expr) {
 }
 function evaluateCompiled(expr, scope) {
   try {
-    const value = expr.ast.evaluate(scope);
-    return { ok: true, value };
+    return { ok: true, value: evaluate(expr.ast, scope) };
   } catch (e) {
     return { ok: false, error: errorMessage(e) };
   }
@@ -1419,7 +1750,7 @@ function seedFields(model, values, source = "seed") {
 }
 
 // src/engine/evaluator.ts
-function evaluate(model, fields, options = {}) {
+function evaluate2(model, fields, options = {}) {
   return settle(model, fields, model.order, options);
 }
 function evaluateIncremental(model, fields, changedKeys, options = {}) {
@@ -1809,9 +2140,9 @@ var createFormEngine = (factoryOptions = {}) => {
     const seenUnknownIdent = /* @__PURE__ */ new Set();
     for (const edge of graph.edges) {
       if (model.byKey.has(edge.from)) continue;
-      const dedupe2 = `${edge.to}|${edge.from}|${edge.via}`;
-      if (seenUnknownIdent.has(dedupe2)) continue;
-      seenUnknownIdent.add(dedupe2);
+      const dedupe = `${edge.to}|${edge.from}|${edge.via}`;
+      if (seenUnknownIdent.has(dedupe)) continue;
+      seenUnknownIdent.add(dedupe);
       diags.push({
         code: "expr-unknown-ident",
         severity: "warning",
@@ -1862,7 +2193,7 @@ var createFormEngine = (factoryOptions = {}) => {
     cellErrors.clear();
     validatedOnce = false;
     isValidFlag = null;
-    const res = evaluate(model, fields, passOpts());
+    const res = evaluate2(model, fields, passOpts());
     runtimeDiagnostics = res.diagnostics;
     lastPassCount = res.passCount;
     recordTrace(res);
@@ -1880,7 +2211,7 @@ var createFormEngine = (factoryOptions = {}) => {
         f.pinned = Boolean(node.entity.attributes?.allowCalculateOverride);
         touched.add(node.key);
       }
-      const replay = evaluate(model, fields, passOpts());
+      const replay = evaluate2(model, fields, passOpts());
       runtimeDiagnostics = replay.diagnostics;
       lastPassCount = replay.passCount;
       recordTrace(replay);
@@ -2018,7 +2349,7 @@ var createFormEngine = (factoryOptions = {}) => {
         f.pinned = Boolean(node.entity.attributes?.allowCalculateOverride);
       }
     }
-    const res = evaluate(model, fields, passOpts());
+    const res = evaluate2(model, fields, passOpts());
     runtimeDiagnostics = res.diagnostics;
     lastPassCount = res.passCount;
     recordTrace(res);
@@ -2028,7 +2359,7 @@ var createFormEngine = (factoryOptions = {}) => {
   }
   function evaluateFull() {
     if (!model) return getState();
-    const res = evaluate(model, fields, passOpts());
+    const res = evaluate2(model, fields, passOpts());
     runtimeDiagnostics = res.diagnostics;
     lastPassCount = res.passCount;
     recordTrace(res);
@@ -2259,7 +2590,7 @@ var createFormEngine = (factoryOptions = {}) => {
     cellErrors.clear();
     validatedOnce = false;
     isValidFlag = null;
-    const res = evaluate(model, fields, passOpts());
+    const res = evaluate2(model, fields, passOpts());
     runtimeDiagnostics = res.diagnostics;
     lastPassCount = res.passCount;
     recordTrace(res);
@@ -2634,7 +2965,7 @@ exports.downstreamClosure = downstreamClosure;
 exports.duplicate = duplicate;
 exports.duplicateKeyIds = duplicateKeyIds;
 exports.emailRule = emailRule;
-exports.evaluate = evaluate;
+exports.evaluate = evaluate2;
 exports.evaluateCompiled = evaluateCompiled;
 exports.evaluateExpression = evaluateExpression;
 exports.evaluateIncremental = evaluateIncremental;

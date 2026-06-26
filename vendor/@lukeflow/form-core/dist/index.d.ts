@@ -1,5 +1,3 @@
-import { Expression } from 'expr-eval';
-
 /**
  * The Lukeflow form schema — the portable JSON contract that every renderer and the
  * backend target.
@@ -1105,35 +1103,90 @@ interface EvalTrace {
 }
 
 /**
- * The safe expression sandbox — the Coltor-free, React-free, DOM-free
- * re-implementation of `luke-consumer-ui/src/lib/expression.ts`.
+ * A tiny, dependency-free expression parser + evaluator — the engine's safe expression
+ * language (arithmetic / comparison / boolean / ternary over field values by key). It replaces
+ * the `expr-eval` dependency (which carried an unfixed high-severity prototype-pollution /
+ * unrestricted-function advisory) with a purpose-built evaluator that is safe BY CONSTRUCTION:
+ *
+ *   - identifiers resolve ONLY to OWN-enumerable properties of the supplied scope — never via the
+ *     prototype chain — so `constructor` / `__proto__` / `valueOf` / `toString` etc. are simply
+ *     "undefined variable" (they throw, the wrapper fails open). No host value can ever leak.
+ *   - there is NO member access (`a.b` / `a["b"]`), NO assignment, NO `this`, NO globals.
+ *   - the only callable names are a fixed allow-list of PURE functions (below); any other call
+ *     throws "undefined function".
+ *
+ * Grammar (precedence low→high): ternary `?:` · `or`/`||` · `and`/`&&` · `==`/`!=` ·
+ * `<` `<=` `>` `>=` · `+` `-` · `*` `/` `%` · `^` (right-assoc) · unary `-` `+` `!`/`not` ·
+ * call / literal / `( )`. Literals: number, string (`'…'`/`"…"`), `true`/`false`.
+ *
+ * The parser THROWS on a syntax error and the evaluator THROWS on an undefined variable/function
+ * (matching the prior expr-eval contract); the security wrapper in `expression.ts` catches both
+ * and fails open. This module never reads anything but its arguments.
+ *
+ * @packageDocumentation
+ */
+type ExprNode = {
+    k: "lit";
+    v: number | string | boolean;
+} | {
+    k: "var";
+    name: string;
+} | {
+    k: "unary";
+    op: string;
+    arg: ExprNode;
+} | {
+    k: "bin";
+    op: string;
+    l: ExprNode;
+    r: ExprNode;
+} | {
+    k: "logical";
+    op: "and" | "or";
+    l: ExprNode;
+    r: ExprNode;
+} | {
+    k: "ternary";
+    cond: ExprNode;
+    then: ExprNode;
+    else: ExprNode;
+} | {
+    k: "call";
+    name: string;
+    args: ExprNode[];
+} | {
+    k: "array";
+    items: ExprNode[];
+};
+
+/**
+ * The safe expression sandbox.
  *
  * Lukeflow form rules (`calculateValue`, `customConditional`, `customValidation`,
  * `customDefaultValue`, `logic[].when` / `.value`) are authored as small
  * arithmetic/boolean expressions that reference field values BY KEY, e.g.
- * `price * quantity` or `age >= 18 and country == "US"`. They are evaluated by
- * the {@link https://github.com/silentmatt/expr-eval | expr-eval} grammar — a
- * sandboxed expression language, NOT JavaScript `eval`: there is no property
- * write, no function call out to host code, no prototype access. The single
- * shared {@link Parser} below is configured with member access DISABLED so an
- * expression can never reach into `constructor`/`__proto__` on a scope value.
+ * `price * quantity` or `age >= 18 and country == "US"`. They are evaluated by the
+ * engine's OWN {@link import("./exprParser") parser/evaluator} (`exprParser.ts`) — a
+ * sandboxed expression language, NOT JavaScript `eval`, and NOT a third-party dependency:
+ * no property write, no member access, no prototype access, no host call-out. Identifiers
+ * resolve only to OWN scope properties, so an expression can never reach `constructor` /
+ * `__proto__` on a scope value. (This replaced the `expr-eval` dependency, which carried an
+ * unfixed prototype-pollution / unrestricted-function advisory — see docs/SECURITY.md.)
  *
- * Two concerns live here, and only here, so the rest of the engine never touches
- * the parser directly:
+ * Two concerns live here, and only here, so the rest of the engine never touches the
+ * parser directly:
  *
- *   1. STATIC ANALYSIS — {@link parseExpression} compiles an expression once and,
- *      on success, exposes the field KEYS it references via
- *      {@link CompiledExpression.variables} (expr-eval's `variables()`, which
- *      already excludes built-in functions/constants like `floor`, `min`, `PI`).
- *      The dependency graph is built from these, NOT from a regex.
+ *   1. STATIC ANALYSIS — {@link parseExpression} compiles an expression once and, on
+ *      success, exposes the field KEYS it references via {@link CompiledExpression.variables}
+ *      (an AST walk that excludes literals and built-in function names). The dependency
+ *      graph is built from these, NOT from a regex.
  *
- *   2. RUNTIME EVALUATION — {@link evaluateExpression} runs a compiled (or raw)
- *      expression against a value-by-key scope. Evaluation is deliberately
- *      FAIL-OPEN: a parse or runtime error returns `undefined` (the caller then
- *      shows the field / treats validation as passing / no-ops a calculate) so a
- *      typo can never blank a field or wedge a submit. The failure is surfaced to
- *      the caller as a structured outcome (never thrown, never logged here) so the
- *      engine can record it as an `expr-runtime-error` diagnostic.
+ *   2. RUNTIME EVALUATION — {@link evaluateExpression} runs a compiled (or raw) expression
+ *      against a value-by-key scope. Evaluation is deliberately FAIL-OPEN: a parse or runtime
+ *      error returns `undefined` (the caller then shows the field / treats validation as
+ *      passing / no-ops a calculate) so a typo can never blank a field or wedge a submit. The
+ *      failure is surfaced to the caller as a structured outcome (never thrown, never logged
+ *      here) so the engine can record it as an `expr-runtime-error` diagnostic.
  *
  * @packageDocumentation
  */
@@ -1144,16 +1197,15 @@ interface EvalTrace {
  */
 type Scope = Record<string, unknown>;
 /**
- * A successfully-parsed expression plus the field KEYS it references. The keys
- * come from expr-eval's own AST walk (`variables()`), which already drops
- * built-in function names and constants — so `floor(price) * qty` yields exactly
- * `["price", "qty"]`.
+ * A successfully-parsed expression plus the field KEYS it references. The keys come from a real
+ * AST walk ({@link import("./exprParser").variablesOf}) which excludes literals and built-in
+ * function names — so `floor(price) * qty` yields exactly `["price", "qty"]`.
  */
 interface CompiledExpression {
     /** The original (trimmed) source. */
     readonly source: string;
-    /** The compiled expr-eval AST, ready to {@link evaluateCompiled}. */
-    readonly ast: Expression;
+    /** The compiled AST, ready to {@link evaluateCompiled}. */
+    readonly ast: ExprNode;
     /** The referenced field keys, de-duplicated, in first-seen order. */
     readonly variables: readonly string[];
 }
@@ -1201,9 +1253,13 @@ declare function hasHostileIdentifier(expr: string): boolean;
  * - A syntax error → `{ ok: false, error }` (the caller emits `expr-parse-error`).
  * - Otherwise → `{ ok: true, expression }` with `expression.variables` populated.
  *
- * Variable extraction is done via expr-eval's `variables()` (a real AST walk),
- * NOT a regex, so it correctly ignores string literals, keywords, member names,
- * and built-in functions/constants.
+ * Variable extraction is a real AST walk (NOT a regex), so it correctly ignores string
+ * literals, keywords, and built-in functions/constants.
+ *
+ * TOTALITY: this never throws. A pathologically large/deep expression (e.g. thousands of
+ * nested terms) is rejected up front by {@link MAX_EXPRESSION_LENGTH}, and the AST walk is
+ * defensively guarded — so a deep AST can never leak a `RangeError` (stack overflow) past
+ * the fail-open boundary into a render/validate.
  */
 declare function parseExpression(expr: unknown): ParseResult;
 /**

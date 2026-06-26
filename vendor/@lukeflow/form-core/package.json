@@ -17,8 +17,5 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
-  },
-  "dependencies": {
-    "expr-eval": "^2.0.2"
   }
 }
