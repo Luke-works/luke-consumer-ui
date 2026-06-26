@@ -490,7 +490,12 @@ function fail(field, code, params, customMessage) {
   };
 }
 function isEmptyValue(v) {
-  return v === void 0 || v === null || v === "" || Array.isArray(v) && v.length === 0;
+  if (v === void 0 || v === null || v === "" || Array.isArray(v) && v.length === 0) return true;
+  if (typeof v === "object" && !Array.isArray(v)) {
+    const vals = Object.values(v);
+    return vals.length === 0 || vals.every((x) => x === void 0 || x === null || x === "" || Array.isArray(x) && x.length === 0);
+  }
+  return false;
 }
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var URL_RE = /^https?:\/\/\S+$/;
@@ -1667,11 +1672,13 @@ var STRING_TYPES = [
   "radio",
   "signature",
   "address",
-  "time"
+  "time",
+  "richText"
+  // WYSIWYG → sanitized HTML string
 ];
 var DATE_TYPES = ["day", "datetime"];
-var NUMBER_TYPES = ["number", "currency"];
-var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField", "array"];
+var NUMBER_TYPES = ["number", "currency", "rating"];
+var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField", "array", "ranking"];
 var GRID_TYPES = ["dataGrid", "editGrid"];
 var CONTAINER_TYPES = ["panel", "columns", "fieldset", "well", "table", "tabs", "container", "wizard", "page"];
 var STATIC_TYPES = ["button", "heading", "content", "htmlElement", "html", "divider", "hr"];
@@ -1685,6 +1692,8 @@ function createDefaultFieldTypeRegistry() {
   for (const name of ARRAY_TYPES) add(arrayType(name));
   add(arrayType("file", "file"));
   add(objectType("map"));
+  add(objectType("matrix"));
+  add(objectType("addressBlock"));
   for (const name of GRID_TYPES) add(gridType(name));
   for (const name of CONTAINER_TYPES) add(noneType(name, "container"));
   for (const name of STATIC_TYPES) add(noneType(name, "static"));

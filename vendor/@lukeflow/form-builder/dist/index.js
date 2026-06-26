@@ -140,7 +140,7 @@ var ATTRIBUTE_TABS = [
   { id: "logic", label: "Logic" }
 ];
 var TEXTUAL = ["textField", "textarea", "email", "url", "phoneNumber", "password"];
-var OPTIONED = ["select", "searchSelect", "radio", "selectBoxes"];
+var OPTIONED = ["select", "searchSelect", "radio", "selectBoxes", "ranking"];
 var NUMERIC = ["number", "currency"];
 var GRIDS = ["dataGrid", "editGrid"];
 function isDataField(type) {
@@ -222,6 +222,8 @@ function createDefaultAttributeEditors() {
     // native opt-out and the time-selector minute increment.
     { id: "nativeInput", tab: "settings", attribute: "nativeInput", label: "Use native input", control: "checkbox", order: 40, appliesTo: ["day", "datetime", "time"], hint: "Use the browser's native date/time input instead of the rich calendar / time picker." },
     { id: "minuteStep", tab: "settings", attribute: "minuteStep", label: "Minute step", control: "number", order: 41, appliesTo: ["datetime", "time"], when: (e) => !e.attributes?.nativeInput, hint: "Increment (in minutes) between options in the time selector. Default 1." },
+    { id: "ratingMax", tab: "settings", attribute: "max", label: "Max stars", control: "number", order: 42, appliesTo: ["rating"], hint: "Number of stars to show (default 5)." },
+    { id: "matrixMultiple", tab: "settings", attribute: "multiple", label: "Allow multiple per row", control: "checkbox", order: 43, appliesTo: ["matrix"], hint: "Use checkboxes instead of radios so each row can have several answers." },
     // Panel-like containers: collapse + a color theme for different purposes.
     { id: "collapsible", tab: "settings", attribute: "collapsible", label: "Collapsible", control: "checkbox", order: 30, appliesTo: ["panel", "well", "fieldset"] },
     { id: "collapsed", tab: "settings", attribute: "collapsed", label: "Initially collapsed", control: "checkbox", order: 31, appliesTo: ["panel", "well", "fieldset"], when: (e) => Boolean(e.attributes?.collapsible) },
@@ -245,6 +247,8 @@ function createDefaultAttributeEditors() {
     },
     // ── DATA ─────────────────────────────────────────────────────────────────
     { id: "options", tab: "data", attribute: "options", label: "Options", control: "options", order: 1, when: optioned, hint: "List = one value per option; Label + Value = a distinct stored value per option." },
+    { id: "matrixRows", tab: "data", attribute: "rows", label: "Rows", control: "options", order: 3, appliesTo: ["matrix"], hint: "Each row (question) of the survey grid." },
+    { id: "matrixColumns", tab: "data", attribute: "columns", label: "Columns", control: "options", order: 4, appliesTo: ["matrix"], hint: "The answer choices (columns) shared by every row." },
     {
       id: "dataSource",
       tab: "data",
@@ -1767,6 +1771,11 @@ var PALETTE_GROUPS = [
       { type: "tags", label: "Tags" },
       { type: "file", label: "File Upload" },
       { type: "signature", label: "Signature" },
+      { type: "rating", label: "Rating", defaults: { max: 5 } },
+      { type: "ranking", label: "Ranking", defaults: OPTS },
+      { type: "matrix", label: "Matrix", defaults: { rows: [{ label: "Row 1", value: "row1" }, { label: "Row 2", value: "row2" }], columns: [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }] } },
+      { type: "addressBlock", label: "Address" },
+      { type: "richText", label: "Rich Text" },
       { type: "dataGrid", label: "Data Grid" },
       { type: "editGrid", label: "Edit Grid" }
     ]
