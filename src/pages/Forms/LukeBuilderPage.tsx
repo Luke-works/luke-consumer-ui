@@ -1,18 +1,15 @@
 /**
- * LukeBuilderPage — the STAGED form designer powered by @lukeflow/form-builder
- * (the headless monorepo builder), as the next step of the consumer-ui cutover.
+ * LukeBuilderPage — the form designer, powered by @lukeflow/form-builder (the headless
+ * monorepo builder). This is THE builder at `/forms/:id`; it replaced the legacy
+ * coltorapps FormBuilderPage (deleted in the cutover).
  *
  * It is a thin shell: the package's <FormBuilder> provides the full editing surface
- * (searchable palette, drag-and-drop canvas, tabbed attribute settings incl. Minion
- * data sources + JS logic), and this page owns the app lifecycle — load, debounced
- * autosave, check-in, publish, discard — plus consumer-ui's domain-specific attribute
- * editors injected via the `attributeEditors` plugin (see {@link lukeAttributeEditors}).
- *
- * Scope (v1): a runnable, verifiable cutover that leaves the existing coltorapps
- * FormBuilderPage untouched. The AI panel (LukeBuilds), "Test the form" (LukeTests) +
- * sign-off, edit-lock and embed are NOT yet ported here — they remain on the legacy
- * page until this is QA'd, then they get layered on and the legacy page + coltorapps
- * are removed. Reachable at `/forms/:id/build-v2`.
+ * (searchable palette, drag-and-drop canvas, tabbed attribute settings incl. Minion data
+ * sources + JS logic, Problems panel, live preview), and this page owns the app lifecycle —
+ * load, debounced autosave, edit-lock + take-over, leave-guard, check-in/publish/discard
+ * (gated on blocking problems) — plus the AI panel (LukeBuilds), "Test the form" + sign-off
+ * (LukeTests), Preview, Embed, and the settings modal. Domain-specific attribute editors
+ * inject via the `attributeEditors` plugin (see {@link lukeAttributeEditors}).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -378,11 +375,6 @@ export default function LukeBuilderPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-        New builder (preview) — powered by <code>@lukeflow/form-builder</code>. Being finalized for cutover; the
-        classic designer remains available if you hit anything missing.
-      </div>
-
       {canEdit && lockedByOther && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400">
           <span>

@@ -18,9 +18,7 @@ import Settings from "./pages/Account/Settings";
 import Support from "./pages/Support/Support";
 import AccessManagement from "./pages/Access/AccessManagement";
 
-// Code-split the form designer (builder + zod) to its own route chunk.
-const FormBuilderPage = lazy(() => import("./pages/Forms/FormBuilderPage"));
-// Staged next-gen designer powered by @lukeflow/form-builder (cutover preview).
+// Code-split the form designer (@lukeflow/form-builder) to its own route chunk.
 const LukeBuilderPage = lazy(() => import("./pages/Forms/LukeBuilderPage"));
 const FormFill = lazy(() => import("./pages/Forms/FormFill"));
 const FormResponses = lazy(() => import("./pages/Forms/FormResponses"));
@@ -122,21 +120,6 @@ export default function App() {
                 {/* Form designer — lives in the normal dashboard shell. */}
                 <Route
                   path="/forms/:id"
-                  element={
-                    <Suspense
-                      fallback={
-                        <div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">
-                          Loading designer…
-                        </div>
-                      }
-                    >
-                      <FormBuilderPage />
-                    </Suspense>
-                  }
-                />
-                {/* Staged next-gen designer (cutover preview) — @lukeflow/form-builder. */}
-                <Route
-                  path="/forms/:id/build-v2"
                   element={
                     <Suspense
                       fallback={

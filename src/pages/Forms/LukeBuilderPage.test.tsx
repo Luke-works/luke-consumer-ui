@@ -51,8 +51,8 @@ const CLEAN = { root: ["a", "b"], entities: {
 
 function renderPage() {
   render(
-    <MemoryRouter initialEntries={["/forms/f1/build-v2"]}>
-      <Routes><Route path="/forms/:id/build-v2" element={<LukeBuilderPage />} /></Routes>
+    <MemoryRouter initialEntries={["/forms/f1"]}>
+      <Routes><Route path="/forms/:id" element={<LukeBuilderPage />} /></Routes>
     </MemoryRouter>,
   );
 }

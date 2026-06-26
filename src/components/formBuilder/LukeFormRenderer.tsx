@@ -1,13 +1,11 @@
 /**
- * Adapter: renders a stored form via the published @lukeflow/form-react engine while
- * preserving the in-tree FormRenderer's prop shape, so call sites swap with a one-line
- * import change. Used first for the read-only viewing surfaces (FormResponses,
- * InstanceDetail, FormInbox) as the renderer-cutover beachhead.
- *
- * NOTE: the in-tree FormRenderer additionally supports `playback` / `onResult` /
- * `autoSubmitSignal` (the "Test the form" flow) which the package does not yet
- * replicate — those surfaces (FormFill test, FormBuilderPage) stay on the in-tree
- * renderer until that parity lands.
+ * Adapter: renders a stored form via the published @lukeflow/form-react engine, exposing a
+ * small stable prop shape (schema/initialValues/onSubmit/onChange/onResult/playback/
+ * autoSubmitSignal/readOnly). This is the ONLY form renderer in the app — every surface goes
+ * through it: the builder's Preview + "Test the form", FormFill, FormResponses, InstanceDetail,
+ * FormInbox, and the public embed. The package fully supports `playback`/`onResult`/
+ * `autoSubmitSignal` (the Test flow). The in-tree coltorapps renderer was removed in the
+ * builder cutover.
  */
 import { FormRenderer as LukeRenderer } from "@lukeflow/form-react";
 import type { FormData, FormSchema } from "@lukeflow/form-core";
