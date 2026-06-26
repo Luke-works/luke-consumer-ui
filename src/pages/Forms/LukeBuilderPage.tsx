@@ -39,9 +39,10 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { MonitorPlay, FlaskConical, BadgeCheck } from "lucide-react";
+import { MonitorPlay, FlaskConical, BadgeCheck, CodeXml } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import FormTestPanel from "./FormTestPanel";
+import FormEmbedPanel from "./FormEmbedPanel";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
 
@@ -84,6 +85,7 @@ export default function LukeBuilderPage() {
   const [previewSchema, setPreviewSchema] = useState("");
   const [testOpen, setTestOpen] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(null);
+  const [embedOpen, setEmbedOpen] = useState(false);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
   const latestRef = useRef<FormSchema | null>(null);
@@ -359,6 +361,16 @@ export default function LukeBuilderPage() {
               >
                 {busy === "publish" ? "Publishing…" : "Publish"}
               </button>
+              {status === "published" && (
+                <button
+                  type="button"
+                  onClick={() => setEmbedOpen(true)}
+                  title="Get an iframe snippet to embed this form on any website."
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+                >
+                  <CodeXml className="size-4" />Embed
+                </button>
+              )}
             </>
           )}
         </div>
@@ -416,6 +428,9 @@ export default function LukeBuilderPage() {
         onApplyAiSchema={applyAiSchema}
         onSignedOff={setLastTestedAt}
       />
+
+      {/* Keyed by formId so navigating to another form's builder mints a fresh token. */}
+      <FormEmbedPanel key={id} open={embedOpen} onClose={() => setEmbedOpen(false)} tenant={tenant} formId={id} />
     </div>
   );
 }
