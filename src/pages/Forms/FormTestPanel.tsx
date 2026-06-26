@@ -2,10 +2,14 @@
  * FormTestPanel — "Test the form" + sign-off, ported from the legacy FormBuilderPage
  * into the @lukeflow/form-builder (Builder-v2) shell.
  *
- * Positive run: auto-fill VALID sample data → it must pass. Negative run: auto-fill
- * deliberately INVALID data → validation must reject it. LukeTests can generate richer
- * valid datasets and repair validation gaps. Sign-off records that the form passed its
- * self-test (a clean positive run + every negative rule rejected).
+ * Positive run: fill VALID data → it must pass. Negative run: fill deliberately INVALID
+ * data → validation must reject it. Both runs offer a deterministic "Local" heuristic fill
+ * AND LukeTests-generated datasets (valid for positive, invalid for negative). Sign-off
+ * records that the form passed its self-test (a clean positive run + the negative rejected).
+ *
+ * Local vs AI verdicts differ on the negative side: the Local heuristic knows WHICH field it
+ * broke and why, so it checks each expected violation per-field; an AI invalid dataset has no
+ * per-field expectation, so its pass test is simply "the form reported at least one error".
  *
  * Self-contained: it owns all test state and reads the live schema on open via `getJson`
  * (the builder is uncontrolled in v2, so the page mirrors its schema). Unlike the legacy
@@ -88,9 +92,11 @@ export default function FormTestPanel({
   const [aiFilling, setAiFilling] = useState(false);
   const [aiFixing, setAiFixing] = useState(false);
   const [aiTestError, setAiTestError] = useState<string | null>(null);
-  // Many positive datasets from LukeTests; posSel = which one is active ("local" = heuristic auto-fill).
+  // LukeTests datasets per run; sel = which one is active ("local" = the deterministic heuristic).
   const [posAiSets, setPosAiSets] = useState<TestDataset[]>([]);
   const [posSel, setPosSel] = useState<"local" | number>("local");
+  const [negAiSets, setNegAiSets] = useState<TestDataset[]>([]);
+  const [negSel, setNegSel] = useState<"local" | number>("local");
   const [genCount, setGenCount] = useState(5);
 
   // Read the live schema lazily on open without re-snapshotting every time the
@@ -98,8 +104,9 @@ export default function FormTestPanel({
   const getJsonRef = useRef(getJson);
   useEffect(() => { getJsonRef.current = getJson; });
 
-  // On open: snapshot the schema, auto-fill valid + invalid sample data, reset
-  // verdicts, and trigger the positive run (the renderer validates after playback).
+  // On open: snapshot the schema, auto-fill valid + invalid sample data, reset verdicts, and
+  // run BOTH the positive AND negative renderers (so the summary shows real verdicts right away
+  // — the negative isn't left saying "running…" while you're still on the positive tab).
   useEffect(() => {
     if (!open) return;
     const json = getJsonRef.current();
@@ -112,10 +119,12 @@ export default function FormTestPanel({
     setNegResult(null);
     setPosAiSets([]);
     setPosSel("local");
+    setNegAiSets([]);
+    setNegSel("local");
     setTestTab("positive");
-    setNegPlay(0);
     setAiTestError(null);
     setPosPlay((p) => p + 1);
+    setNegPlay((p) => p + 1);
     setTestNonce((n) => n + 1);
   }, [open]);
 
@@ -130,11 +139,16 @@ export default function FormTestPanel({
     }
   };
 
-  // Verdicts. Negative passes when every intentionally-invalid field was rejected
-  // (or there were no rules to test). Sign-off needs a clean positive AND negative.
+  // Verdicts. An AI invalid dataset has no per-field expectation, so it passes when the form
+  // reports ANY error (it must reject deliberately-broken data). The Local heuristic checks each
+  // expected violation per-field. Sign-off needs a clean positive AND a rejected negative
+  // (negNA = the local heuristic found nothing breakable → negative is n/a).
+  const negAi = negSel !== "local";
   const negCaught = negResult ? negExpected.filter((e) => negResult.errorKeys.includes(e.key)) : [];
-  const negNA = negExpected.length === 0;
-  const negOk = !!negResult && negExpected.every((e) => negResult.errorKeys.includes(e.key));
+  const negNA = !negAi && negExpected.length === 0;
+  const negOk =
+    !!negResult &&
+    (negAi ? negResult.errorCount > 0 : negExpected.every((e) => negResult.errorKeys.includes(e.key)));
   const posOk = !!posResult?.ok;
   const canSignOff = posOk && (negNA || negOk);
   // Playback steps (form order) for the typing animation.
@@ -161,15 +175,19 @@ export default function FormTestPanel({
     }
   };
 
-  // Generate a batch of realistic VALID datasets for the positive run with LukeTests
-  // (richer + more varied than the heuristic auto-fill). Negative stays rule-aware.
-  const fillPositiveWithAi = async () => {
+  // Generate a batch of LukeTests datasets for the active tab: realistic VALID data for the
+  // positive run, or varied INVALID data for the negative run.
+  const fillWithAi = async (mode: "valid" | "invalid") => {
     setAiFilling(true);
     setAiTestError(null);
     try {
       const schema = JSON.parse(getJsonRef.current()) as BuilderSchemaLike;
-      const { datasets } = await generateTestData(schema, "valid", genCount, formName, tenant ?? undefined);
-      if (datasets.length) {
+      const { datasets } = await generateTestData(schema, mode, genCount, formName, tenant ?? undefined);
+      if (!datasets.length) {
+        setAiTestError("LukeTests returned no datasets — try again.");
+        return;
+      }
+      if (mode === "valid") {
         setPosAiSets(datasets);
         setPosSel(0);
         setPosInitial(datasets[0].values);
@@ -177,7 +195,13 @@ export default function FormTestPanel({
         setPosResult(null);
         setPosPlay((p) => p + 1); // replay with the first dataset, then re-validate
       } else {
-        setAiTestError("LukeTests returned no datasets — try again.");
+        setNegAiSets(datasets);
+        setNegSel(0);
+        setNegInitial(datasets[0].values);
+        setNegExpected([]); // AI invalid data has no per-field expectation
+        setTestTab("negative");
+        setNegResult(null);
+        setNegPlay((p) => p + 1);
       }
     } catch (e) {
       setAiTestError((e as Error).message);
@@ -186,13 +210,28 @@ export default function FormTestPanel({
     }
   };
 
-  // Switch the active positive dataset (Local heuristic, or one of the AI batch)
-  // and replay the animation against it.
+  // Switch the active positive dataset (Local heuristic, or one of the AI batch) and replay.
   const selectPositive = (sel: "local" | number) => {
     setPosSel(sel);
     setPosInitial(sel === "local" ? autofillSchema(testSchema) : posAiSets[sel]?.values ?? {});
     setPosResult(null);
     setPosPlay((p) => p + 1);
+  };
+
+  // Switch the active negative dataset. Local restores the heuristic's per-field expectations;
+  // an AI dataset has none (judged purely by "did the form reject it?").
+  const selectNegative = (sel: "local" | number) => {
+    setNegSel(sel);
+    if (sel === "local") {
+      const neg = negativeFillSchema(testSchema);
+      setNegInitial(neg.values);
+      setNegExpected(neg.expected);
+    } else {
+      setNegInitial(negAiSets[sel]?.values ?? {});
+      setNegExpected([]);
+    }
+    setNegResult(null);
+    setNegPlay((p) => p + 1);
   };
 
   // Hand the active-tab failures to LukeTests and apply its fix through the builder's
@@ -206,6 +245,8 @@ export default function FormTestPanel({
       if (testTab === "positive" && posResult) {
         const fields = posResult.errorKeys.map((k) => labels[k] ?? k).join(", ") || "some fields";
         message = `In a Test run I filled this form with VALID data, but these fields still fail validation: ${fields}. The validation is too strict or misconfigured — adjust the form so correct input passes.`;
+      } else if (negAi) {
+        message = `In a Test run, LukeTests filled this form with deliberately INVALID data and the form ACCEPTED it (no validation errors). Tighten the field validation so invalid input is rejected.`;
       } else {
         const missed = negExpected.filter((e) => !negResult?.errorKeys.includes(e.key));
         const fields = missed.map((e) => `${e.label} (${e.reason})`).join(", ") || "some fields";
@@ -238,7 +279,7 @@ export default function FormTestPanel({
         )}
         <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Test — {formName}</h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          <strong>Positive</strong> fills valid data (must pass). <strong>Negative</strong> fills invalid data (validation must reject it). Regex / custom-rule fields may need a manual value.
+          <strong>Positive</strong> fills valid data (must pass). <strong>Negative</strong> fills invalid data (validation must reject it). LukeTests can generate richer datasets for either. Regex / custom-rule fields may need a manual value.
         </p>
 
         {/* Overall summary */}
@@ -247,7 +288,13 @@ export default function FormTestPanel({
             Positive: {posResult ? (posOk ? "✓ valid" : `✗ ${posResult.errorCount} error${posResult.errorCount === 1 ? "" : "s"}`) : "running…"}
           </span>
           <span className={`rounded-full px-2.5 py-1 font-medium ${negResult ? (negNA || negOk ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400") : "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400"}`}>
-            Negative: {negResult ? (negNA ? "n/a (no rules)" : `${negOk ? "✓" : "✗"} ${negCaught.length}/${negExpected.length} rejected`) : "running…"}
+            Negative: {negResult
+              ? negNA
+                ? "n/a (no rules)"
+                : negAi
+                  ? (negOk ? `✓ rejected (${negResult.errorCount} error${negResult.errorCount === 1 ? "" : "s"})` : "✗ accepted invalid data")
+                  : `${negOk ? "✓" : "✗"} ${negCaught.length}/${negExpected.length} rejected`
+              : "running…"}
           </span>
         </div>
 
@@ -257,7 +304,7 @@ export default function FormTestPanel({
             <button
               key={t}
               type="button"
-              onClick={() => { setTestTab(t); if (t === "negative" && negPlay === 0) setNegPlay((s) => s + 1); }}
+              onClick={() => setTestTab(t)}
               className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition ${testTab === t ? "border-brand-500 text-brand-600" : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"}`}
             >
               {t}
@@ -265,8 +312,8 @@ export default function FormTestPanel({
           ))}
         </div>
 
-        {/* Negative per-field breakdown */}
-        {testTab === "negative" && negResult && !negNA && (
+        {/* Negative — Local heuristic: per-field breakdown of which broken rules were caught. */}
+        {testTab === "negative" && !negAi && negResult && !negNA && (
           <ul className="mb-4 space-y-1 rounded-lg bg-gray-50 p-3 text-xs dark:bg-white/5">
             {negExpected.map((e) => {
               const caught = negResult.errorKeys.includes(e.key);
@@ -281,7 +328,16 @@ export default function FormTestPanel({
           </ul>
         )}
 
-        {/* Positive dataset selector (Local heuristic + LukeTests batch). */}
+        {/* Negative — AI invalid dataset: no per-field expectation, so just whether it was rejected. */}
+        {testTab === "negative" && negAi && negResult && (
+          <p className={`mb-4 rounded-lg p-3 text-xs ${negOk ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"}`}>
+            {negOk
+              ? `✓ The form rejected this invalid data (${negResult.errorCount} validation error${negResult.errorCount === 1 ? "" : "s"}).`
+              : "✗ The form ACCEPTED this invalid data — no validation errors. Tighten the rules so bad input is rejected."}
+          </p>
+        )}
+
+        {/* Positive dataset selector (Local heuristic + LukeTests valid batch). */}
         {testTab === "positive" && posAiSets.length > 0 && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-gray-400">Dataset:</span>
@@ -292,6 +348,24 @@ export default function FormTestPanel({
                 onClick={() => selectPositive(sel)}
                 title={typeof sel === "number" ? posAiSets[sel].notes : "Heuristic auto-fill"}
                 className={`rounded-full border px-2.5 py-0.5 transition ${posSel === sel ? "border-brand-400 bg-brand-50 text-brand-600 dark:bg-brand-500/10" : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5"}`}
+              >
+                {sel === "local" ? "Local" : `AI ${sel + 1}`}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Negative dataset selector (Local heuristic + LukeTests invalid batch). */}
+        {testTab === "negative" && negAiSets.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-gray-400">Dataset:</span>
+            {(["local", ...negAiSets.map((_, i) => i)] as ("local" | number)[]).map((sel) => (
+              <button
+                key={String(sel)}
+                type="button"
+                onClick={() => selectNegative(sel)}
+                title={typeof sel === "number" ? negAiSets[sel].notes : "Heuristic invalid-data fill (rule-aware)"}
+                className={`rounded-full border px-2.5 py-0.5 transition ${negSel === sel ? "border-brand-400 bg-brand-50 text-brand-600 dark:bg-brand-500/10" : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5"}`}
               >
                 {sel === "local" ? "Local" : `AI ${sel + 1}`}
               </button>
@@ -314,10 +388,10 @@ export default function FormTestPanel({
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => (testTab === "positive" ? setPosPlay((s) => s + 1) : setNegPlay((s) => s + 1))}>Re-run</Button>
-            {canEdit && testTab === "positive" && (
+            {canEdit && (
               <div className="flex items-center gap-1.5">
-                <Tooltip content="Let LukeTests generate realistic valid datasets for the positive run.">
-                  <Button size="sm" variant="outline" onClick={fillPositiveWithAi} disabled={aiFilling} startIcon={<LukeTestsMark className="size-4" />}>
+                <Tooltip content={testTab === "positive" ? "Let LukeTests generate realistic valid datasets (they should pass)." : "Let LukeTests generate varied invalid datasets (they should be rejected)."}>
+                  <Button size="sm" variant="outline" onClick={() => fillWithAi(testTab === "positive" ? "valid" : "invalid")} disabled={aiFilling} startIcon={<LukeTestsMark className="size-4" />}>
                     {aiFilling ? "Generating…" : "Generate data"}
                   </Button>
                 </Tooltip>
@@ -340,7 +414,7 @@ export default function FormTestPanel({
             )}
           </div>
           {canEdit ? (
-            <Tooltip content={canSignOff ? "Record that this form passed its self-test." : "Sign-off needs a clean positive run and all negative rules rejected."}>
+            <Tooltip content={canSignOff ? "Record that this form passed its self-test." : "Sign-off needs a clean positive run and the negative run rejected."}>
               <span>
                 <Button size="sm" onClick={signOff} disabled={!canSignOff || signing} startIcon={<BadgeCheck className="size-4" />}>
                   {signing ? "Signing off…" : "Sign off"}

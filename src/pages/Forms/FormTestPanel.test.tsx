@@ -98,4 +98,43 @@ describe("FormTestPanel", () => {
     expect(screen.queryByRole("button", { name: /generate data/i })).not.toBeInTheDocument();
     expect(screen.getByText(/sign-off needs edit access/i)).toBeInTheDocument();
   });
+
+  it("Generate data requests VALID datasets on the positive tab and INVALID on the negative tab", async () => {
+    const user = userEvent.setup();
+    mockedAgent.generateTestData.mockResolvedValue({
+      datasets: [{ values: {}, notes: "set" }],
+      brain: "groq",
+    } as agentApi.TestDataResult);
+    renderPanel();
+
+    // Positive is the default tab → "valid".
+    await user.click(screen.getByRole("button", { name: /generate data/i }));
+    await waitFor(() =>
+      expect(mockedAgent.generateTestData).toHaveBeenCalledWith(expect.anything(), "valid", expect.any(Number), "Contact", "t1"),
+    );
+
+    // Switch to Negative → "invalid".
+    await user.click(screen.getByRole("button", { name: /^negative$/i }));
+    await user.click(screen.getByRole("button", { name: /generate data/i }));
+    await waitFor(() =>
+      expect(mockedAgent.generateTestData).toHaveBeenCalledWith(expect.anything(), "invalid", expect.any(Number), "Contact", "t1"),
+    );
+  });
+
+  it("an AI invalid dataset passes the negative run when the form reports any error", async () => {
+    const user = userEvent.setup();
+    mockedAgent.generateTestData.mockResolvedValue({
+      datasets: [{ values: { email: "x" }, notes: "broken email" }],
+      brain: "groq",
+    } as agentApi.TestDataResult);
+    renderPanel();
+
+    await user.click(screen.getByRole("button", { name: /^negative$/i }));
+    await user.click(screen.getByRole("button", { name: /generate data/i }));
+    // Fire the NEGATIVE renderer's FAIL result ([1] — the form rejected the invalid data).
+    await waitFor(() => expect(screen.getAllByText("res-fail").length).toBeGreaterThan(1));
+    await user.click(screen.getAllByText("res-fail")[1]);
+
+    expect(await screen.findByText(/rejected this invalid data/i)).toBeInTheDocument();
+  });
 });
