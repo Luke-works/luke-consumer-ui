@@ -20,7 +20,7 @@ import { FormBuilder, type FormBuilderHandle } from "@lukeflow/form-builder";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
-import { camelCaseKeys, readSubmitMessage, type FormSchema } from "@lukeflow/form-core";
+import { camelCaseKeys, readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import AiAssistPanel from "./AiAssistPanel";
@@ -139,6 +139,14 @@ export default function LukeBuilderPage() {
 
   const initialSchema = useMemo(() => (form ? parseSchema(form.schema) : EMPTY), [form]);
 
+  // Blocking (error-severity) schema problems, from the SAME form-core validator the
+  // builder's Problems badge/panel use — so a red "N problems" badge ⟺ Check-in/Publish
+  // disabled here. liveSchema mirrors the builder's working schema (set on load + onChange).
+  const blocking = useMemo(
+    () => validateSchema((liveSchema as unknown as FormSchema | null) ?? initialSchema).filter((d) => d.severity === "error"),
+    [liveSchema, initialSchema],
+  );
+
   // Merge the form-level submit message into a schema before persisting (preserving
   // any other settings), matching the legacy page's `withSettings`.
   const toJson = useCallback(
@@ -220,7 +228,7 @@ export default function LukeBuilderPage() {
   const currentJson = () => toJson(latestRef.current ?? initialSchema);
 
   const onCheckIn = async () => {
-    if (!tenant || !id) return;
+    if (!tenant || !id || blocking.length) return; // never check in a schema with blocking problems
     setBusy("checkin");
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     try {
@@ -238,7 +246,7 @@ export default function LukeBuilderPage() {
   };
 
   const onPublish = async () => {
-    if (!tenant || !id) return;
+    if (!tenant || !id || blocking.length) return; // never publish a schema with blocking problems
     setBusy("publish");
     try {
       await publishVersion(tenant, id, version);
@@ -337,6 +345,14 @@ export default function LukeBuilderPage() {
           </button>
           {canEdit && (
             <>
+              {blocking.length > 0 && (
+                <span
+                  title="Fix these before checking in or publishing — see the Problems list in the builder below."
+                  className="inline-flex items-center gap-1 rounded-lg bg-error-50 px-2.5 py-1.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400"
+                >
+                  <span aria-hidden>⊘</span>{blocking.length} error{blocking.length > 1 ? "s" : ""}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={onDiscard}
@@ -348,7 +364,8 @@ export default function LukeBuilderPage() {
               <button
                 type="button"
                 onClick={onCheckIn}
-                disabled={busy !== null}
+                disabled={busy !== null || blocking.length > 0}
+                title={blocking.length ? "Fix the blocking problems before checking in." : undefined}
                 className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
               >
                 {busy === "checkin" ? "Checking in…" : "Check in"}
@@ -356,7 +373,8 @@ export default function LukeBuilderPage() {
               <button
                 type="button"
                 onClick={onPublish}
-                disabled={busy !== null}
+                disabled={busy !== null || blocking.length > 0}
+                title={blocking.length ? "Fix the blocking problems before publishing." : undefined}
                 className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
               >
                 {busy === "publish" ? "Publishing…" : "Publish"}
