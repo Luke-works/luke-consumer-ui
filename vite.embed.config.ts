@@ -12,6 +12,13 @@ export default defineConfig({
     react(),
     svgr({ svgrOptions: { icon: true, exportType: "named", namedExport: "ReactComponent" } }),
   ],
+  // The embed renderer is ALWAYS served by core-engine at the gateway origin (same origin as the
+  // public /api/public/embed API), so it must call the API SAME-ORIGIN/relative. Force the public
+  // API base to "" here — otherwise publicEmbedApi bakes in the build host's VITE_AUTH_API_URL
+  // (e.g. http://localhost:8083 from a local build), which the iframe then can't reach.
+  define: {
+    "import.meta.env.VITE_AUTH_API_URL": JSON.stringify(""),
+  },
   // Don't copy public/ (favicons, images, and the form-embed SDK's own embed.js) into this output —
   // we only want embed.js + embed.css here, and public/embed.js would otherwise collide with the bundle.
   publicDir: false,
