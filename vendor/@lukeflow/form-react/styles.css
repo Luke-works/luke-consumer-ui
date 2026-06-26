@@ -3,23 +3,63 @@
  * Theme by overriding the --lf-* design tokens (globally in your CSS, or per-form via
  * the <FormRenderer theme={{ "--lf-primary": "#0a7" }} /> prop).
  */
-.lf-form {
+/* ── Design tokens (light defaults). Override globally, per-form via the `theme` prop,
+   or app-wide via <FormThemeProvider>. Shared by the form root AND `.lf-pop` (the portaled
+   popovers — calendar / select dropdown / tooltip — which render outside .lf-form and so
+   carry the tokens + data-theme themselves). Dark values live in the blocks below. ── */
+.lf-form,
+.lf-pop {
   --lf-primary: #2563eb;
   --lf-text: #111827;
   --lf-muted: #6b7280;
   --lf-border: #d1d5db;
   --lf-error: #dc2626;
   --lf-bg: #ffffff;
+  --lf-tint: #eff6ff; /* subtle primary-tinted surface (selected/hover) */
+  --lf-on-primary: #ffffff; /* foreground on a --lf-primary fill (must meet 4.5:1 against it) */
   --lf-radius: 6px;
   --lf-space: 12px;
   --lf-font: inherit; /* inherit the host app's font by default; override to force one */
+}
 
+.lf-form {
   color: var(--lf-text);
+  background: var(--lf-bg);
   font-family: var(--lf-font);
   font-size: 14px;
   display: flex;
   flex-direction: column;
   gap: var(--lf-space);
+}
+
+/* ── Dark theme ──────────────────────────────────────────────────────────────────
+   Activated explicitly by `colorScheme="dark"` (sets data-theme="dark" on the root + each
+   portaled popover), or automatically under OS dark mode UNLESS the form forces light.
+   Only the color tokens flip — radius/space/font are scheme-agnostic. A host `theme` prop
+   still overrides these (set inline on the same elements). */
+.lf-form[data-theme="dark"],
+.lf-pop[data-theme="dark"] {
+  --lf-primary: #60a5fa;
+  --lf-text: #f3f4f6;
+  --lf-muted: #9ca3af;
+  --lf-border: #374151;
+  --lf-error: #f87171;
+  --lf-bg: #1f2937;
+  --lf-tint: #1e3a5f;
+  --lf-on-primary: #0b1220; /* dark ink on the lighter dark-mode primary — ~10:1 (WCAG AA) */
+}
+@media (prefers-color-scheme: dark) {
+  .lf-form:not([data-theme="light"]):not([data-theme="dark"]),
+  .lf-pop:not([data-theme="light"]):not([data-theme="dark"]) {
+    --lf-primary: #60a5fa;
+    --lf-text: #f3f4f6;
+    --lf-muted: #9ca3af;
+    --lf-border: #374151;
+    --lf-error: #f87171;
+    --lf-bg: #1f2937;
+    --lf-tint: #1e3a5f;
+    --lf-on-primary: #0b1220;
+  }
 }
 
 .lf-field {
@@ -151,7 +191,7 @@
   height: 15px;
   border-radius: 50%;
   background: var(--lf-primary);
-  color: #fff;
+  color: var(--lf-on-primary, #fff);
   font-family: Georgia, "Times New Roman", serif;
   font-style: italic;
   font-weight: 700;
@@ -169,9 +209,9 @@
   max-width: 260px;
   padding: 9px 13px;
   border-radius: 12px;
-  background: #ffffff;
-  color: #1d2939;
-  border: 1px solid #d0d5dd;
+  background: var(--lf-bg);
+  color: var(--lf-text);
+  border: 1px solid var(--lf-border);
   box-shadow: 0 10px 26px rgba(16, 24, 40, 0.16);
   font-size: 12px;
   font-weight: 400;
@@ -191,7 +231,7 @@
   left: 50%;
   transform: translateX(-50%);
   border: 8px solid transparent;
-  border-top-color: #d0d5dd;
+  border-top-color: var(--lf-border);
 }
 .lf-tooltip-bubble::after {
   content: "";
@@ -201,7 +241,7 @@
   transform: translateX(-50%);
   margin-top: -1.5px;
   border: 7px solid transparent;
-  border-top-color: #ffffff;
+  border-top-color: var(--lf-bg);
 }
 .lf-tooltip:hover > .lf-tooltip-bubble,
 .lf-tooltip:focus > .lf-tooltip-bubble,
@@ -217,9 +257,9 @@
   max-width: 260px;
   padding: 9px 13px;
   border-radius: 12px;
-  background: #ffffff;
-  color: #1d2939;
-  border: 1px solid #d0d5dd;
+  background: var(--lf-bg);
+  color: var(--lf-text);
+  border: 1px solid var(--lf-border);
   box-shadow: 0 10px 26px rgba(16, 24, 40, 0.18);
   font-size: 12px;
   font-weight: 400;
@@ -233,8 +273,8 @@
   width: 11px;
   height: 11px;
   transform: translateX(-50%) rotate(45deg);
-  background: #ffffff;
-  border: 1px solid #d0d5dd;
+  background: var(--lf-bg);
+  border: 1px solid var(--lf-border);
 }
 .lf-tooltip-bubble--portal.is-top .lf-tooltip-arrow {
   bottom: -6px;
@@ -297,8 +337,8 @@ button.lf-panel-head { cursor: pointer; }
 .lf-panel-body[hidden] { display: none; }
 /* Theme tints — colored header + matching border, for signalling purpose. */
 .lf-panel--primary { border-color: var(--lf-primary); }
-.lf-panel--primary > .lf-panel-head { background: var(--lf-primary); color: #fff; border-bottom-color: var(--lf-primary); }
-.lf-panel--primary .lf-panel-caret { color: #fff; }
+.lf-panel--primary > .lf-panel-head { background: var(--lf-primary); color: var(--lf-on-primary, #fff); border-bottom-color: var(--lf-primary); }
+.lf-panel--primary .lf-panel-caret { color: var(--lf-on-primary, #fff); }
 .lf-panel--info { border-color: #3b82f6; }
 .lf-panel--info > .lf-panel-head { background: #eff6ff; color: #1e40af; border-bottom-color: #bfdbfe; }
 .lf-panel--success { border-color: #16a34a; }
@@ -309,6 +349,20 @@ button.lf-panel-head { cursor: pointer; }
 .lf-panel--danger > .lf-panel-head { background: #fef2f2; color: #991b1b; border-bottom-color: #fecaca; }
 .lf-panel--secondary { border-color: #6b7280; }
 .lf-panel--secondary > .lf-panel-head { background: #f3f4f6; color: #374151; border-bottom-color: #e5e7eb; }
+/* Dark-mode status tints: translucent hue over the dark surface + light ink (the light pastels
+   above would otherwise stay bright bars inside a dark form). Forced dark + OS dark. */
+.lf-form[data-theme="dark"] .lf-panel--info > .lf-panel-head { background: rgba(59,130,246,0.16); color: #93c5fd; border-bottom-color: #3b82f6; }
+.lf-form[data-theme="dark"] .lf-panel--success > .lf-panel-head { background: rgba(22,163,74,0.16); color: #86efac; border-bottom-color: #16a34a; }
+.lf-form[data-theme="dark"] .lf-panel--warning > .lf-panel-head { background: rgba(217,119,6,0.18); color: #fcd34d; border-bottom-color: #d97706; }
+.lf-form[data-theme="dark"] .lf-panel--danger > .lf-panel-head { background: rgba(220,38,38,0.18); color: #fca5a5; border-bottom-color: #dc2626; }
+.lf-form[data-theme="dark"] .lf-panel--secondary > .lf-panel-head { background: rgba(148,163,184,0.16); color: #cbd5e1; border-bottom-color: #64748b; }
+@media (prefers-color-scheme: dark) {
+  .lf-form:not([data-theme="light"]):not([data-theme="dark"]) .lf-panel--info > .lf-panel-head { background: rgba(59,130,246,0.16); color: #93c5fd; border-bottom-color: #3b82f6; }
+  .lf-form:not([data-theme="light"]):not([data-theme="dark"]) .lf-panel--success > .lf-panel-head { background: rgba(22,163,74,0.16); color: #86efac; border-bottom-color: #16a34a; }
+  .lf-form:not([data-theme="light"]):not([data-theme="dark"]) .lf-panel--warning > .lf-panel-head { background: rgba(217,119,6,0.18); color: #fcd34d; border-bottom-color: #d97706; }
+  .lf-form:not([data-theme="light"]):not([data-theme="dark"]) .lf-panel--danger > .lf-panel-head { background: rgba(220,38,38,0.18); color: #fca5a5; border-bottom-color: #dc2626; }
+  .lf-form:not([data-theme="light"]):not([data-theme="dark"]) .lf-panel--secondary > .lf-panel-head { background: rgba(148,163,184,0.16); color: #cbd5e1; border-bottom-color: #64748b; }
+}
 .lf-container-label {
   font-weight: 700;
   margin-bottom: 6px;
@@ -378,7 +432,7 @@ button.lf-panel-head { cursor: pointer; }
   color: var(--lf-text);
   cursor: pointer;
 }
-.lf-tabs-next { border-color: var(--lf-primary); background: var(--lf-primary); color: #fff; }
+.lf-tabs-next { border-color: var(--lf-primary); background: var(--lf-primary); color: var(--lf-on-primary, #fff); }
 .lf-tabs-prev:disabled, .lf-tabs-next:disabled { opacity: 0.5; cursor: not-allowed; }
 .lf-tabs-next { margin-inline-start: auto; }
 .lf-tabs-progress { font-size: 0.85rem; color: var(--lf-muted); }
@@ -417,7 +471,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   border: 1px solid var(--lf-primary);
   border-radius: var(--lf-radius);
   background: var(--lf-primary);
-  color: #fff;
+  color: var(--lf-on-primary, #fff);
   font: inherit;
   cursor: pointer;
 }
@@ -440,7 +494,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 }
 .lf-tag {
   background: var(--lf-primary);
-  color: #fff;
+  color: var(--lf-on-primary, #fff);
   border-radius: 999px;
   padding: 2px 8px;
   display: inline-flex;
@@ -453,7 +507,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   justify-content: center;
   background: none;
   border: 0;
-  color: #fff;
+  color: var(--lf-on-primary, #fff);
   cursor: pointer;
   padding: 0;
 }
@@ -544,7 +598,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 .lf-eg-save {
   border: 1px solid var(--lf-primary);
   background: var(--lf-primary);
-  color: #fff;
+  color: var(--lf-on-primary, #fff);
   border-radius: var(--lf-radius);
   padding: 6px 14px;
   font: inherit;
@@ -556,7 +610,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 /* Draw / Type mode toggle (shown when allowType). */
 .lf-signature-modes { display: inline-flex; border: 1px solid var(--lf-border); border-radius: 999px; overflow: hidden; }
 .lf-signature-mode { padding: 4px 14px; border: none; background: var(--lf-bg); color: var(--lf-muted); font: inherit; font-size: 13px; cursor: pointer; }
-.lf-signature-mode.is-active { background: var(--lf-primary); color: #fff; }
+.lf-signature-mode.is-active { background: var(--lf-primary); color: var(--lf-on-primary, #fff); }
 .lf-signature-mode:disabled { opacity: 0.6; cursor: default; }
 .lf-signature-typed {
   width: 100%;
@@ -744,7 +798,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 .lf-cal-day:hover { background: var(--lf-tint, #eff6ff); }
 .lf-cal-day.is-outside { color: var(--lf-muted, #9ca3af); }
 .lf-cal-day.is-today { font-weight: 700; box-shadow: inset 0 0 0 1px var(--lf-border, #d9d9d9); }
-.lf-cal-day.is-selected { background: var(--lf-primary, #2563eb); color: #fff; }
+.lf-cal-day.is-selected { background: var(--lf-primary, #2563eb); color: var(--lf-on-primary, #fff); }
 .lf-cal-day:focus-visible { outline: 2px solid var(--lf-primary, #2563eb); outline-offset: -2px; }
 
 .lf-wizard-steps {
@@ -775,7 +829,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 .lf-submit,
 .lf-wizard-next {
   background: var(--lf-primary);
-  color: #fff;
+  color: var(--lf-on-primary, #fff);
   border: 0;
   border-radius: var(--lf-radius);
   padding: 8px 16px;

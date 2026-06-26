@@ -1,6 +1,6 @@
 import { EngineState, EntityKey, FieldState, FormData, ValidationReport, DiagnosticReport, FormEngine, FormSchema, EngineOptions, SchemaEntity, FieldTypeRegistry, SerializedEngineState, JsEvaluator, MinionOption, MinionClient, PrintOptions } from '@lukeflow/form-core';
 import * as react from 'react';
-import { ReactNode, Component, ErrorInfo } from 'react';
+import { ReactNode, CSSProperties, Component, ErrorInfo } from 'react';
 
 /**
  * `useFormEngine` — the React adapter over the headless {@link FormEngine}.
@@ -45,6 +45,42 @@ interface UseFormEngineResult {
  * (initialValues / registry / maxPasses / trace / restore) are read at build time.
  */
 declare function useFormEngine(schema: FormSchema, options?: EngineOptions): UseFormEngineResult;
+
+/** The renderer's design tokens (CSS custom properties you can override). */
+type FormTokenName = "--lf-primary" | "--lf-text" | "--lf-muted" | "--lf-border" | "--lf-error" | "--lf-bg" | "--lf-tint" | "--lf-radius" | "--lf-space" | "--lf-font";
+/** A design-token override map — set any subset of the renderer's `--lf-*` tokens. */
+type FormTheme = Partial<Record<FormTokenName, string>>;
+/** Force a color scheme, or follow the OS preference (`"auto"`, the default). */
+type ColorScheme = "light" | "dark" | "auto";
+interface FormThemeContextValue {
+    theme?: FormTheme;
+    colorScheme?: ColorScheme;
+}
+/**
+ * Provide app-wide brand tokens + color scheme so every nested {@link import("./FormRenderer").FormRenderer}
+ * inherits them (white-label). A per-form `theme` / `colorScheme` prop overrides what's set here.
+ */
+declare function FormThemeProvider({ theme, colorScheme, children, }: FormThemeContextValue & {
+    children: ReactNode;
+}): react.JSX.Element;
+/** The nearest {@link FormThemeProvider}'s tokens + color scheme (empty if none). */
+declare function useFormTheme(): FormThemeContextValue;
+/**
+ * The `data-theme` attribute value for a color scheme: `"light"`/`"dark"` force it; `"auto"`
+ * (or undefined) returns `undefined` so the `prefers-color-scheme` media query decides.
+ */
+declare function dataThemeAttr(scheme: ColorScheme | undefined): "light" | "dark" | undefined;
+/**
+ * Theme props for a PORTALED popover wrapper (calendar / select dropdown / tooltip). Such popovers
+ * render to `document.body` — OUTSIDE `.lf-form` — so they must carry the design tokens + scheme
+ * themselves. Add the `.lf-pop` class, spread these, and merge `themeStyle` with the popover's own
+ * positioning style. `FormRenderer` re-publishes the resolved theme/scheme to its subtree so this
+ * reads the effective values (host provider + per-form prop).
+ */
+declare function usePopoverTheme(): {
+    dataTheme: "light" | "dark" | undefined;
+    themeStyle: CSSProperties;
+};
 
 /**
  * HTML sanitization for the static `content` / `html` field. Author-supplied HTML is
@@ -110,8 +146,10 @@ interface FormRendererProps {
     autosaveDelay?: number;
     /** Submit button label (omit the button entirely with `null`). */
     submitLabel?: string | null;
-    /** Theme tokens applied as CSS custom properties on the form root, e.g. `{ "--lf-primary": "#0a7" }`. */
-    theme?: Record<string, string>;
+    /** Design-token overrides applied as CSS custom properties on the form root, e.g. `{ "--lf-primary": "#0a7" }`. */
+    theme?: FormTheme;
+    /** Color scheme: `"light"`/`"dark"` force it; `"auto"` (default) follows the OS preference. */
+    colorScheme?: ColorScheme;
     /**
      * Sanitize author-supplied HTML for the `content`/`html` field. Defaults to DOMPurify
      * (browser) / escape (SSR). Override to plug a DOM-backed sanitizer for SSR or a custom
@@ -298,4 +336,4 @@ declare function printSubmission(schema: FormSchema, data: FormData, options?: P
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type Direction, type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, type LocaleInfo, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, defaultSanitizeHtml, getLocaleDirection, printSubmission, useFormEngine, useLocale, useMinionClient, useMinionData, useTranslate };
+export { type ColorScheme, type Direction, type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, type FormTheme, FormThemeProvider, type FormTokenName, type LocaleInfo, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, dataThemeAttr, defaultSanitizeHtml, getLocaleDirection, printSubmission, useFormEngine, useFormTheme, useLocale, useMinionClient, useMinionData, usePopoverTheme, useTranslate };
