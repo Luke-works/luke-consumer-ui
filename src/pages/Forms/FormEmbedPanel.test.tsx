@@ -61,16 +61,32 @@ describe("FormEmbedPanel", () => {
     await waitFor(() => expect(ta).toHaveValue("https://acme.com"));
   });
 
-  it("rotates the token only after the user confirms", async () => {
+  it("rotates the token only after confirming in the modal (no window.confirm)", async () => {
     mocked.getEmbedToken.mockResolvedValue({ token: "tok_old", code: "C1" });
     mocked.rotateEmbedToken.mockResolvedValue({ token: "tok_new", code: "C1" });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
     renderOpen();
     await screen.findByText(/data-lukeform-token="tok_old"/);
-    await user.click(screen.getByRole("button", { name: /regenerate link/i }));
+
+    // The toolbar button opens a confirmation modal — it does NOT rotate yet.
+    await user.click(screen.getByRole("button", { name: /^regenerate link$/i }));
+    expect(await screen.findByText(/regenerate embed link\?/i)).toBeInTheDocument();
+    expect(mocked.rotateEmbedToken).not.toHaveBeenCalled();
+
+    // Two "Regenerate link" buttons now exist; the confirm modal's is the last one.
+    const buttons = screen.getAllByRole("button", { name: /^regenerate link$/i });
+    await user.click(buttons[buttons.length - 1]);
     await waitFor(() => expect(mocked.rotateEmbedToken).toHaveBeenCalledWith("t1", "f1"));
     expect(await screen.findByText(/data-lukeform-token="tok_new"/)).toBeInTheDocument();
-    confirmSpy.mockRestore();
+  });
+
+  it("Cancel in the regenerate modal does not rotate the token", async () => {
+    mocked.getEmbedToken.mockResolvedValue({ token: "tok_old", code: "C1" });
+    const user = userEvent.setup();
+    renderOpen();
+    await screen.findByText(/data-lukeform-token="tok_old"/);
+    await user.click(screen.getByRole("button", { name: /^regenerate link$/i }));
+    await user.click(await screen.findByRole("button", { name: /cancel/i }));
+    expect(mocked.rotateEmbedToken).not.toHaveBeenCalled();
   });
 });

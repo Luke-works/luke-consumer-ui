@@ -34,6 +34,7 @@ export default function FormEmbedPanel({
   const [savingDomains, setSavingDomains] = useState(false);
   const [domainsSaved, setDomainsSaved] = useState(false);
   const [rotating, setRotating] = useState(false); // regenerating the embed token (M4)
+  const [confirmRegen, setConfirmRegen] = useState(false); // "regenerate link" confirmation
 
   // Mint the token lazily on first open (cached after). A published version is required —
   // the engine 404s an unpublished form; that surfaces here as an error.
@@ -84,9 +85,9 @@ export default function FormEmbedPanel({
     }
   };
 
-  // Revoke the current link everywhere it's pasted and mint a fresh one (M4).
+  // Revoke the current link everywhere it's pasted and mint a fresh one (M4). Confirmed via the
+  // confirmRegen modal (not a window.confirm), so this runs only after the user accepts.
   const regenerateEmbed = async () => {
-    if (!window.confirm("Regenerate this embed link? The snippet you’ve already pasted on any site will stop working until you replace it.")) return;
     setRotating(true);
     setEmbedErr(null);
     setCopied(false);
@@ -102,6 +103,7 @@ export default function FormEmbedPanel({
   };
 
   return (
+    <>
     <Modal isOpen={open} onClose={onClose} className="mx-4 w-full max-w-[560px]">
       <div className="p-6">
         <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Embed this form</h2>
@@ -118,7 +120,7 @@ export default function FormEmbedPanel({
             <div className="mt-3 flex items-center gap-2">
               <Button size="sm" onClick={copyEmbed}>{copied ? "Copied ✓" : "Copy snippet"}</Button>
               <Button size="sm" variant="outline" startIcon={<MonitorPlay className="size-4" />} onClick={() => window.open(embedUrl, "_blank", "noopener,noreferrer")}>Open preview</Button>
-              <Button size="sm" variant="outline" onClick={regenerateEmbed} disabled={rotating}>{rotating ? "Regenerating…" : "Regenerate link"}</Button>
+              <Button size="sm" variant="outline" onClick={() => setConfirmRegen(true)} disabled={rotating}>{rotating ? "Regenerating…" : "Regenerate link"}</Button>
             </div>
             <p className="mt-3 text-xs text-gray-400">The link is opaque and signed — it carries only this form, scoped to your organization.</p>
 
@@ -146,5 +148,20 @@ export default function FormEmbedPanel({
         )}
       </div>
     </Modal>
+
+    {/* Regenerate (revoke) confirmation — replaces the old window.confirm. */}
+    <Modal isOpen={confirmRegen} onClose={() => setConfirmRegen(false)} className="mx-4 w-full max-w-[440px]">
+      <div className="p-6">
+        <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Regenerate embed link?</h2>
+        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+          The snippet you’ve already pasted on any site will stop working until you replace it with the new one.
+        </p>
+        <div className="flex justify-end gap-3">
+          <Button size="sm" variant="outline" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+          <Button size="sm" variant="danger" onClick={() => { setConfirmRegen(false); void regenerateEmbed(); }}>Regenerate link</Button>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }
