@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router";
 import LukeBuilderPage from "./LukeBuilderPage";
 import * as formsApi from "../../lib/formsApi";
@@ -54,7 +55,11 @@ function renderPage() {
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Re-establish a clean default each test (clearAllMocks keeps implementations).
+  mocked.checkout.mockResolvedValue({} as formsApi.StoredForm);
+});
 
 describe("LukeBuilderPage — problems gating", () => {
   it("disables Check in / Publish and shows an error chip for a blocking schema", async () => {
@@ -72,5 +77,23 @@ describe("LukeBuilderPage — problems gating", () => {
     const checkIn = await screen.findByRole("button", { name: /check in/i });
     expect(checkIn).toBeEnabled();
     expect(screen.queryByText(/\d+ error/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("LukeBuilderPage — edit-lock take-over", () => {
+  it("shows the 'being edited' banner when another user holds the lock, and takes over on click", async () => {
+    const user = userEvent.setup();
+    // Initial checkout fails (someone else holds it); a forced take-over succeeds.
+    mocked.checkout.mockImplementation((_t: string, _i: string, force?: boolean) =>
+      force ? Promise.resolve({} as formsApi.StoredForm) : Promise.reject(new Error("409")));
+    mocked.getForm.mockResolvedValue({ ...form(CLEAN), lockedBy: "workos:alice" } as formsApi.StoredForm);
+    renderPage();
+
+    expect(await screen.findByText(/being edited by/i)).toBeInTheDocument();
+    expect(screen.getByText("alice")).toBeInTheDocument(); // workos: prefix stripped
+    await user.click(screen.getByRole("button", { name: /take over/i }));
+
+    await waitFor(() => expect(mocked.checkout).toHaveBeenCalledWith("t1", "f1", true));
+    await waitFor(() => expect(screen.queryByText(/being edited by/i)).not.toBeInTheDocument());
   });
 });

@@ -43,6 +43,8 @@ import { MonitorPlay, FlaskConical, BadgeCheck, CodeXml } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
+import { guardedLeave } from "../../lib/leaveGuard";
+import { useMutationLock } from "../../hooks/useMutationLock";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
 
@@ -68,6 +70,7 @@ export default function LukeBuilderPage() {
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
   const canEdit = canWrite(session, FORMS);
+  const me = session?.userId ?? null;
 
   const [form, setForm] = useState<StoredForm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,6 +89,8 @@ export default function LukeBuilderPage() {
   const [testOpen, setTestOpen] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(null);
   const [embedOpen, setEmbedOpen] = useState(false);
+  // Advisory edit-lock: who (other than me) currently holds it, for the "being edited" banner.
+  const [lockedByOther, setLockedByOther] = useState<string | null>(null);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
   const latestRef = useRef<FormSchema | null>(null);
@@ -95,6 +100,11 @@ export default function LukeBuilderPage() {
   // Imperative handle: lets the AI apply a new schema WITHOUT remounting the builder,
   // so the AI panel + its chat history (the `aside`) stay mounted across applies.
   const builderRef = useRef<FormBuilderHandle>(null);
+  const heldLock = useRef(false); // true once our checkout succeeds — guards a late load from re-showing the banner
+
+  // Mutual exclusion for lifecycle actions (check-in / publish / discard) so rapid clicks
+  // or check-in→publish can't interleave on stale version state.
+  const { locked: mutating, runExclusive } = useMutationLock();
 
   useEffect(() => {
     if (!tenant || !id) return;
@@ -112,6 +122,8 @@ export default function LukeBuilderPage() {
         submitMsgRef.current = sm;
         latestRef.current = null;
         setLiveSchema(parseSchema(f.schema) as unknown as BuilderSchemaLike);
+        // Show the "being edited" banner only if someone else holds the lock AND we haven't taken it.
+        if (!heldLock.current) setLockedByOther(f.lockedBy && f.lockedBy !== me ? f.lockedBy : null);
         setLoading(false);
       })
       .catch(() => {
@@ -123,7 +135,7 @@ export default function LukeBuilderPage() {
     return () => {
       active = false;
     };
-  }, [tenant, id, reloadKey, navigate]);
+  }, [tenant, id, reloadKey, navigate, me]);
 
   // Acquire the advisory edit lock on open and release it on leave — the backend
   // gates draft saves on the lock, so without this every autosave returns "Save failed".
@@ -131,11 +143,24 @@ export default function LukeBuilderPage() {
   // until taken over, matching the classic designer's behavior.
   useEffect(() => {
     if (!tenant || !id || !canEdit) return;
-    checkout(tenant, id).catch(() => {}); // 409 → another holder; non-fatal
+    let active = true;
+    checkout(tenant, id)
+      .then(() => { if (active) { heldLock.current = true; setLockedByOther(null); } }) // we hold it now
+      .catch(() => {}); // 409 → another holder; the banner (set from the loaded form) stays
     return () => {
+      active = false;
+      heldLock.current = false;
       void release(tenant, id);
     };
   }, [tenant, id, canEdit]);
+
+  // Force-acquire the lock from the current holder, clearing the banner.
+  const takeOver = async () => {
+    if (!tenant || !id) return;
+    await checkout(tenant, id, true);
+    heldLock.current = true;
+    setLockedByOther(null);
+  };
 
   const initialSchema = useMemo(() => (form ? parseSchema(form.schema) : EMPTY), [form]);
 
@@ -156,16 +181,18 @@ export default function LukeBuilderPage() {
   );
 
   const persist = useCallback(
-    async (schema: FormSchema) => {
-      if (!tenant || !id) return;
+    async (schema: FormSchema): Promise<boolean> => {
+      if (!tenant || !id) return false;
       try {
         await saveDraft(tenant, id, toJson(schema));
         unsaved.current = false;
         setSaved(true);
         setSaveError(false);
+        return true;
       } catch {
         setSaved(false);
         setSaveError(true);
+        return false;
       }
     },
     [tenant, id, toJson],
@@ -227,7 +254,20 @@ export default function LukeBuilderPage() {
 
   const currentJson = () => toJson(latestRef.current ?? initialSchema);
 
-  const onCheckIn = async () => {
+  // Flush a pending autosave on demand, surfacing failures (returns success).
+  const flushSave = (): Promise<boolean> => {
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    return persist(latestRef.current ?? initialSchema);
+  };
+
+  // Leaving in-app during the autosave debounce must not drop edits: flush first and
+  // only navigate if the save succeeds; on failure stay put (the indicator shows the error).
+  const leaveDesigner = async (to: string) => {
+    const safe = await guardedLeave(canEdit && unsaved.current, flushSave);
+    if (safe) navigate(to);
+  };
+
+  const onCheckIn = () => runExclusive(async () => {
     if (!tenant || !id || blocking.length) return; // never check in a schema with blocking problems
     setBusy("checkin");
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -243,9 +283,11 @@ export default function LukeBuilderPage() {
     } finally {
       setBusy(null);
     }
-  };
+  });
 
-  const onPublish = async () => {
+  // The mutex guarantees a check-in (which sets `version`) has fully resolved before
+  // publish can start, so the version published here is never stale.
+  const onPublish = () => runExclusive(async () => {
     if (!tenant || !id || blocking.length) return; // never publish a schema with blocking problems
     setBusy("publish");
     try {
@@ -258,9 +300,9 @@ export default function LukeBuilderPage() {
     } finally {
       setBusy(null);
     }
-  };
+  });
 
-  const onDiscard = async () => {
+  const onDiscard = () => runExclusive(async () => {
     if (!tenant || !id) return;
     if (!window.confirm("Discard draft changes and revert to the published version?")) return;
     setBusy("discard");
@@ -275,7 +317,7 @@ export default function LukeBuilderPage() {
     } finally {
       setBusy(null);
     }
-  };
+  });
 
   const onSubmitMessage = (v: string) => {
     setSubmitMessage(v);
@@ -303,14 +345,29 @@ export default function LukeBuilderPage() {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-        New builder (preview) — powered by <code>@lukeflow/form-builder</code>. “Test the form” and sign-off are
-        not wired here yet; use the classic designer for those.
+        New builder (preview) — powered by <code>@lukeflow/form-builder</code>. Being finalized for cutover; the
+        classic designer remains available if you hit anything missing.
       </div>
+
+      {canEdit && lockedByOther && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400">
+          <span>
+            This form is being edited by <span className="font-medium">{lockedByOther.replace(/^workos:/, "")}</span>. Your changes may overwrite theirs.
+          </span>
+          <button
+            type="button"
+            onClick={() => void takeOver()}
+            className="shrink-0 rounded-lg border border-amber-400 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+          >
+            Take over
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() => navigate("/forms")}
+          onClick={() => void leaveDesigner("/forms")}
           className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
         >
           ← Forms
@@ -356,7 +413,7 @@ export default function LukeBuilderPage() {
               <button
                 type="button"
                 onClick={onDiscard}
-                disabled={busy !== null}
+                disabled={busy !== null || mutating}
                 className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
               >
                 Discard draft
@@ -364,7 +421,7 @@ export default function LukeBuilderPage() {
               <button
                 type="button"
                 onClick={onCheckIn}
-                disabled={busy !== null || blocking.length > 0}
+                disabled={busy !== null || mutating || blocking.length > 0}
                 title={blocking.length ? "Fix the blocking problems before checking in." : undefined}
                 className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
               >
@@ -373,7 +430,7 @@ export default function LukeBuilderPage() {
               <button
                 type="button"
                 onClick={onPublish}
-                disabled={busy !== null || blocking.length > 0}
+                disabled={busy !== null || mutating || blocking.length > 0}
                 title={blocking.length ? "Fix the blocking problems before publishing." : undefined}
                 className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
               >
