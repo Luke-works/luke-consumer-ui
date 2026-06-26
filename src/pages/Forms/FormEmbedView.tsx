@@ -21,6 +21,7 @@ export default function FormEmbedView({ token }: { token?: string }) {
   // The host-page bridge: auto-reports our height and emits ready/submitted/error to the embedding
   // site via @lukeflow/form-embed (a no-op when this page is opened standalone, i.e. not framed).
   const cardRef = useRef<HTMLDivElement>(null);
+  const honeypot = useRef<HTMLInputElement>(null); // bot trap — humans never fill it (Route B M5)
   const bridge = useRef<FrameBridge | null>(null);
   useEffect(() => {
     // Measure the CARD, not the min-h-screen root (which would pin height to the iframe's own viewport
@@ -52,7 +53,8 @@ export default function FormEmbedView({ token }: { token?: string }) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await submitEmbed(token, data);
+      // Carry the honeypot value under the agreed key; the engine drops the submission if it's filled.
+      const res = await submitEmbed(token, { ...data, _lukehp: honeypot.current?.value ?? "" });
       setDone(true);
       bridge.current?.submitted(res.instanceId);
     } catch (e) {
@@ -84,6 +86,17 @@ export default function FormEmbedView({ token }: { token?: string }) {
         ) : form ? (
           <>
             <h1 className="mb-5 text-xl font-semibold text-gray-800 dark:text-white/90">{form.title}</h1>
+            {/* Honeypot bot-trap (M5): hidden from humans (off-screen, not tabbable, aria-hidden),
+                tempting to bots. A filled value makes the engine silently drop the submission. */}
+            <input
+              ref={honeypot}
+              type="text"
+              name="company_website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, opacity: 0 }}
+            />
             {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
             {/* A bad schema must not blank the host's iframe — degrade to a message. */}
             <ErrorBoundary
