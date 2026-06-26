@@ -29,11 +29,14 @@ import {
   checkIn,
   checkout,
   discardDraft,
+  getAudit,
   getForm,
   latestVersion,
   publishVersion,
   release,
   saveDraft,
+  updateMeta,
+  type AuditEvent,
   type FormStatus,
   type StoredForm,
 } from "../../lib/formsApi";
@@ -45,6 +48,10 @@ import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
 import { guardedLeave } from "../../lib/leaveGuard";
 import { useMutationLock } from "../../hooks/useMutationLock";
+import { PencilIcon } from "../../icons";
+import Label from "../../components/form/Label";
+import Input from "../../components/form/input/InputField";
+import Button from "../../components/ui/button/Button";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
 
@@ -91,6 +98,11 @@ export default function LukeBuilderPage() {
   const [embedOpen, setEmbedOpen] = useState(false);
   // Advisory edit-lock: who (other than me) currently holds it, for the "being edited" banner.
   const [lockedByOther, setLockedByOther] = useState<string | null>(null);
+  // Form settings modal (name / description / submission message + activity feed).
+  const [formSettingsOpen, setFormSettingsOpen] = useState(false);
+  const [formName, setFormName] = useState("");
+  const [formDesc, setFormDesc] = useState("");
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
   const latestRef = useRef<FormSchema | null>(null);
@@ -326,6 +338,28 @@ export default function LukeBuilderPage() {
     scheduleSave(latestRef.current ?? initialSchema);
   };
 
+  // Load the activity feed when the settings modal opens. The inputs are seeded by the
+  // name button's onClick (NOT here) so a re-render mid-edit can't clobber what's typed.
+  useEffect(() => {
+    if (!formSettingsOpen || !tenant || !id) return;
+    let active = true;
+    getAudit(tenant, id)
+      .then((a) => active && setAuditEvents(a))
+      .catch(() => active && setAuditEvents([]));
+    return () => { active = false; };
+  }, [formSettingsOpen, tenant, id]);
+
+  // Persist name + description (form metadata, not schema). The submission message lives in the
+  // schema and autosaves separately via onSubmitMessage; updateMeta only touches name/description.
+  const saveFormSettings = async () => {
+    if (!tenant || !id) return;
+    const name = formName.trim() || form?.name || "";
+    setFormName(name);
+    await updateMeta(tenant, id, { name, description: formDesc });
+    setForm((f) => (f ? { ...f, name, description: formDesc } : f));
+    setFormSettingsOpen(false);
+  };
+
   // Preview snapshots the live schema into a read-only renderer; Test opens the
   // self-contained panel, which snapshots + auto-fills on open.
   const openPreview = () => {
@@ -372,7 +406,15 @@ export default function LukeBuilderPage() {
         >
           ← Forms
         </button>
-        <h1 className="min-w-0 truncate text-lg font-semibold text-gray-800 dark:text-white/90">{form.name}</h1>
+        <button
+          type="button"
+          onClick={() => { setFormName(form.name); setFormDesc(form.description ?? ""); setFormSettingsOpen(true); }}
+          title="Form settings"
+          className="group flex min-w-0 items-center gap-1.5 text-lg font-semibold text-gray-800 dark:text-white/90"
+        >
+          <span className="truncate">{form.name}</span>
+          <PencilIcon className="size-3.5 shrink-0 text-gray-300 transition group-hover:text-gray-500" />
+        </button>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status]}`}>{status}</span>
         <span className="text-xs text-gray-400">v{version}</span>
         {lastTestedAt && (
@@ -451,18 +493,6 @@ export default function LukeBuilderPage() {
         </div>
       </div>
 
-      {canEdit && (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-gray-700 dark:text-gray-300">Submission “thank you” message</span>
-          <input
-            value={submitMessage}
-            onChange={(e) => onSubmitMessage(e.target.value)}
-            placeholder="Thanks — we’ve received your submission."
-            className="h-9 w-full max-w-xl rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90"
-          />
-        </label>
-      )}
-
       <FormBuilder
         key={`${form.id}-${reloadKey}`}
         ref={builderRef}
@@ -506,6 +536,54 @@ export default function LukeBuilderPage() {
 
       {/* Keyed by formId so navigating to another form's builder mints a fresh token. */}
       <FormEmbedPanel key={id} open={embedOpen} onClose={() => setEmbedOpen(false)} tenant={tenant} formId={id} />
+
+      <Modal isOpen={formSettingsOpen} onClose={() => setFormSettingsOpen(false)} className="mx-4 w-full max-w-[480px]">
+        <div className="p-6">
+          <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Form settings</h2>
+          <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">
+            <span className="text-xs text-gray-400">Form ID</span>
+            <p className="font-mono text-sm font-medium text-gray-700 dark:text-gray-200">{form.code}</p>
+          </div>
+          <div className="mb-4">
+            <Label>Form name</Label>
+            <Input value={formName} onChange={(e) => setFormName(e.target.value)} disabled={!canEdit} />
+          </div>
+          <div className="mb-4">
+            <Label>Description</Label>
+            <Input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Optional" disabled={!canEdit} />
+          </div>
+          <div className="mb-6">
+            <Label>Submission message</Label>
+            <textarea
+              value={submitMessage}
+              onChange={(e) => onSubmitMessage(e.target.value)}
+              disabled={!canEdit}
+              rows={3}
+              placeholder="Thank you! Your response has been recorded."
+              className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
+            />
+            <p className="mt-1 text-xs text-gray-400">Shown with a success animation after the form is submitted. Leave blank for the default.</p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setFormSettingsOpen(false)}>{canEdit ? "Cancel" : "Close"}</Button>
+            {canEdit && <Button onClick={saveFormSettings} disabled={!formName.trim()}>Save</Button>}
+          </div>
+
+          {auditEvents.length > 0 && (
+            <div className="mt-6 border-t border-gray-100 pt-4 dark:border-gray-800">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Activity</p>
+              <ul className="max-h-40 space-y-1 overflow-y-auto">
+                {auditEvents.map((ev, i) => (
+                  <li key={i} className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <span><span className="font-medium text-gray-700 dark:text-gray-300">{ev.action.replace(/_/g, " ")}</span>{ev.detail ? ` ${ev.detail}` : ""}{ev.actorName ? ` · ${ev.actorName}` : ""}</span>
+                    <span className="text-gray-400">{new Date(ev.at).toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

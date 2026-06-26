@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router";
 import LukeBuilderPage from "./LukeBuilderPage";
@@ -25,6 +25,8 @@ vi.mock("../../lib/formsApi", () => ({
   publishVersion: vi.fn(),
   discardDraft: vi.fn(),
   saveDraft: vi.fn(),
+  updateMeta: vi.fn().mockResolvedValue({}),
+  getAudit: vi.fn().mockResolvedValue([]),
   latestVersion: () => 1,
 }));
 
@@ -77,6 +79,23 @@ describe("LukeBuilderPage — problems gating", () => {
     const checkIn = await screen.findByRole("button", { name: /check in/i });
     expect(checkIn).toBeEnabled();
     expect(screen.queryByText(/\d+ error/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("LukeBuilderPage — settings modal", () => {
+  it("opens settings from the name, edits the name, and persists via updateMeta", async () => {
+    const user = userEvent.setup();
+    mocked.getForm.mockResolvedValue(form(CLEAN)); // name "Contact", no description
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /contact/i })); // form-name button
+    const nameInput = await screen.findByDisplayValue("Contact"); // seeded from the saved form
+    fireEvent.change(nameInput, { target: { value: "Contact Form" } });
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(mocked.updateMeta).toHaveBeenCalledWith("t1", "f1", { name: "Contact Form", description: "" }),
+    );
   });
 });
 
