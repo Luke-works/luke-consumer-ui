@@ -232,13 +232,48 @@ interface MinionDataState {
  */
 declare function useMinionData(entity: SchemaEntity, scope: Readonly<Record<string, unknown>>): MinionDataState;
 
-/** Translate a source string to the active locale (returns it unchanged by default). */
-type TranslateFn = (text: string) => string;
-declare function LocaleProvider({ messages, t, children, }: {
+/** Translate a source string to the active locale (optionally interpolating ICU-style params). */
+type TranslateFn = (text: string, params?: Record<string, unknown>) => string;
+/** Resolved writing direction. */
+type Direction = "ltr" | "rtl";
+/** Resolve the writing direction for a BCP-47 locale (RTL for Arabic/Hebrew/Persian/Urdu/…). */
+declare function getLocaleDirection(locale: string): Direction;
+/** The active locale and its derived capabilities, from the nearest {@link LocaleProvider}. */
+interface LocaleInfo {
+    /** The active BCP-47 locale tag (e.g. `"en-US"`, `"ar-EG"`). */
+    locale: string;
+    /** The resolved writing direction (`"rtl"` for Arabic/Hebrew/…). */
+    dir: Direction;
+    /** Translate a user-facing string (identity by default). */
+    t: TranslateFn;
+    /** Locale-aware number / currency / percent formatting (`Intl.NumberFormat`). */
+    formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+    /** Locale-aware date / time formatting (`Intl.DateTimeFormat`). */
+    formatDate: (value: Date | number, options?: Intl.DateTimeFormatOptions) => string;
+    /**
+     * Locale-aware pluralization via `Intl.PluralRules` — pass the cardinal forms you support
+     * (`{ one, other }` for English; CLDR adds `zero`/`two`/`few`/`many` for other locales) and
+     * the count selects the right one.
+     */
+    plural: (count: number, forms: Partial<Record<Intl.LDMLPluralRule, string>>) => string;
+}
+declare function LocaleProvider({ locale, dir, messages, t, children, }: {
+    /** The active BCP-47 locale (default `"en"`). */
+    locale?: string;
+    /** Force a writing direction; omit to derive it from `locale`. */
+    dir?: Direction;
+    /**
+     * Source-string → localized-string map (Form.io-style "translate by label"). Pass a STABLE
+     * reference (module constant or `useMemo`) — an inline object literal changes identity every
+     * render and re-publishes the context to all consumers.
+     */
     messages?: Record<string, string>;
+    /** Custom (params-aware) translate function — takes precedence over `messages`. Memoize it too. */
     t?: TranslateFn;
     children: ReactNode;
 }): react.JSX.Element;
+/** The active locale, direction, translate fn, and locale-aware formatters. */
+declare function useLocale(): LocaleInfo;
 /** The active translate function from the nearest {@link LocaleProvider}. */
 declare function useTranslate(): TranslateFn;
 
@@ -263,4 +298,4 @@ declare function printSubmission(schema: FormSchema, data: FormData, options?: P
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, defaultSanitizeHtml, printSubmission, useFormEngine, useMinionClient, useMinionData, useTranslate };
+export { type Direction, type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, type LocaleInfo, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, defaultSanitizeHtml, getLocaleDirection, printSubmission, useFormEngine, useLocale, useMinionClient, useMinionData, useTranslate };

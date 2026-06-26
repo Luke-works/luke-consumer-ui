@@ -92,7 +92,7 @@
   color: var(--lf-muted);
   font-size: 11px;
   margin: 0;
-  text-align: right;
+  text-align: end;
 }
 /* autoExpand textarea grows with content where supported (progressive enhancement). */
 .lf-autoexpand {
@@ -107,11 +107,11 @@
 }
 .lf-input-wrap > input {
   flex: 1;
-  padding-right: 28px;
+  padding-inline-end: 28px;
 }
 .lf-clear {
   position: absolute;
-  right: 6px;
+  inset-inline-end: 6px;
   width: 20px;
   height: 20px;
   display: inline-flex;
@@ -138,7 +138,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  margin-left: 5px;
+  margin-inline-start: 5px;
   cursor: help;
   outline: none;
 }
@@ -239,12 +239,12 @@
 .lf-tooltip-bubble--portal.is-top .lf-tooltip-arrow {
   bottom: -6px;
   border-top: none;
-  border-left: none;
+  border-inline-start: none;
 }
 .lf-tooltip-bubble--portal.is-bottom .lf-tooltip-arrow {
   top: -6px;
   border-bottom: none;
-  border-right: none;
+  border-inline-end: none;
 }
 
 .lf-group {
@@ -260,14 +260,14 @@
 }
 
 .lf-container {
-  border-left: 3px solid var(--lf-border);
-  padding-left: var(--lf-space);
+  border-inline-start: 3px solid var(--lf-border);
+  padding-inline-start: var(--lf-space);
 }
 
 /* ── Panel / well / fieldset: color themes + collapse ──────────────────────── */
 .lf-panel {
-  border-left: none;
-  padding-left: 0;
+  border-inline-start: none;
+  padding-inline-start: 0;
   border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius);
   overflow: hidden;
@@ -281,7 +281,7 @@
   padding: 10px 14px;
   font: inherit;
   font-weight: 700;
-  text-align: left;
+  text-align: start;
   color: var(--lf-text);
   background: rgba(127, 127, 127, 0.06);
   border: none;
@@ -322,8 +322,8 @@ button.lf-panel-head { cursor: pointer; }
    generic left accent bar/indent (like panel/tabs) so the grid reads cleanly. */
 .lf-container[data-type="columns"],
 .lf-container[data-type="table"] {
-  border-left: none;
-  padding-left: 0;
+  border-inline-start: none;
+  padding-inline-start: 0;
 }
 .lf-container[data-type="columns"] > .lf-container-children,
 .lf-container[data-type="table"] > .lf-container-children {
@@ -331,7 +331,7 @@ button.lf-panel-head { cursor: pointer; }
   gap: var(--lf-space);
 }
 /* Tabs. */
-.lf-tabs { border-left: none; padding-left: 0; }
+.lf-tabs { border-inline-start: none; padding-inline-start: 0; }
 .lf-tabs-nav {
   display: flex;
   flex-wrap: wrap;
@@ -358,11 +358,11 @@ button.lf-panel-head { cursor: pointer; }
   flex-direction: column;
   flex-wrap: nowrap;
   border-bottom: none;
-  border-right: 1px solid var(--lf-border);
+  border-inline-end: 1px solid var(--lf-border);
   margin-bottom: 0;
 }
-.lf-tabs--vertical .lf-tab { border-bottom: 2px solid transparent; border-right: 2px solid transparent; }
-.lf-tabs--vertical .lf-tab.is-active { border-bottom-color: transparent; border-right-color: var(--lf-primary); }
+.lf-tabs--vertical .lf-tab { border-bottom: 2px solid transparent; border-inline-end: 2px solid transparent; }
+.lf-tabs--vertical .lf-tab.is-active { border-bottom-color: transparent; border-inline-end-color: var(--lf-primary); }
 .lf-tabs--vertical > .lf-tabpanel { flex: 1; min-width: 0; }
 /* Empty tabs (no children yet) — a quiet placeholder instead of a blank box. */
 .lf-tabs--empty { border: 1px dashed var(--lf-border); border-radius: var(--lf-radius); }
@@ -380,7 +380,7 @@ button.lf-panel-head { cursor: pointer; }
 }
 .lf-tabs-next { border-color: var(--lf-primary); background: var(--lf-primary); color: #fff; }
 .lf-tabs-prev:disabled, .lf-tabs-next:disabled { opacity: 0.5; cursor: not-allowed; }
-.lf-tabs-next { margin-left: auto; }
+.lf-tabs-next { margin-inline-start: auto; }
 .lf-tabs-progress { font-size: 0.85rem; color: var(--lf-muted); }
 
 /* Bordered columns — draw a cell border around each child. */
@@ -392,7 +392,7 @@ button.lf-panel-head { cursor: pointer; }
 
 /* Table — a true rows × columns grid rendered as a real <table>. */
 .lf-table { border-collapse: collapse; width: 100%; }
-.lf-table > caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
+.lf-table > caption { text-align: start; font-weight: 700; margin-bottom: 6px; }
 .lf-table td {
   border: 1px solid var(--lf-border);
   padding: var(--lf-space);
@@ -476,7 +476,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 .lf-grid td {
   border: 1px solid var(--lf-border);
   padding: 6px 8px;
-  text-align: left;
+  text-align: start;
 }
 /* Multi-choice (selectBoxes) grid cell: stack the inline options compactly within the cell. */
 .lf-cell-choices {
@@ -610,10 +610,10 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 .lf-search-select {
   position: relative;
 }
-.lf-search-select > input { padding-right: 30px; }
+.lf-search-select > input { padding-inline-end: 30px; }
 .lf-search-clear {
   position: absolute;
-  right: 8px;
+  inset-inline-end: 8px;
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex;
@@ -665,7 +665,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 }
 .lf-datefield-input > input {
   width: 100%;
-  padding-right: 58px; /* room for clear + calendar toggle */
+  padding-inline-end: 58px; /* room for clear + calendar toggle */
 }
 .lf-datefield-toggle,
 .lf-datefield-clear {
@@ -682,8 +682,8 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   padding: 4px;
   border-radius: var(--lf-radius);
 }
-.lf-datefield-toggle { right: 6px; }
-.lf-datefield-clear { right: 30px; }
+.lf-datefield-toggle { inset-inline-end: 6px; }
+.lf-datefield-clear { inset-inline-end: 30px; }
 .lf-datefield-toggle:hover,
 .lf-datefield-clear:hover { color: var(--lf-text); }
 .lf-datefield-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -769,7 +769,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 }
 .lf-wizard-progress {
   color: var(--lf-muted);
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .lf-submit,

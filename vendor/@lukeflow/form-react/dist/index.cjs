@@ -36,8 +36,10 @@ __export(index_exports, {
   MinionProvider: () => MinionProvider,
   VERSION: () => VERSION,
   defaultSanitizeHtml: () => defaultSanitizeHtml,
+  getLocaleDirection: () => getLocaleDirection,
   printSubmission: () => printSubmission,
   useFormEngine: () => useFormEngine,
+  useLocale: () => useLocale,
   useMinionClient: () => useMinionClient,
   useMinionData: () => useMinionData,
   useTranslate: () => useTranslate
@@ -131,18 +133,91 @@ function useMinionData(entity, scope) {
 // src/i18n.tsx
 var import_react3 = require("react");
 var import_jsx_runtime2 = require("react/jsx-runtime");
+var DEFAULT_LOCALE = "en";
 var identity = (s) => s;
-var LocaleContext = (0, import_react3.createContext)(identity);
+var RTL_LANGUAGES = /* @__PURE__ */ new Set([
+  "ar",
+  "arc",
+  "ckb",
+  "dv",
+  "fa",
+  "he",
+  "khw",
+  "ks",
+  "ps",
+  "sd",
+  "syr",
+  "ug",
+  "ur",
+  "yi"
+]);
+function getLocaleDirection(locale) {
+  try {
+    const loc = new Intl.Locale(locale);
+    const info = loc.textInfo;
+    if (info?.direction === "rtl" || info?.direction === "ltr") return info.direction;
+    return RTL_LANGUAGES.has(loc.language ?? "") ? "rtl" : "ltr";
+  } catch {
+    const lang = locale.toLowerCase().split(/[-_]/)[0] ?? "";
+    return RTL_LANGUAGES.has(lang) ? "rtl" : "ltr";
+  }
+}
+function makeFormatters(locale) {
+  return {
+    formatNumber: (value, options2) => {
+      try {
+        return new Intl.NumberFormat(locale, options2).format(value);
+      } catch {
+        return String(value);
+      }
+    },
+    formatDate: (value, options2) => {
+      try {
+        return new Intl.DateTimeFormat(locale, options2).format(value);
+      } catch {
+        return String(value);
+      }
+    },
+    plural: (count, forms) => {
+      try {
+        const rule = new Intl.PluralRules(locale).select(count);
+        return forms[rule] ?? forms.other ?? "";
+      } catch {
+        return forms.other ?? "";
+      }
+    }
+  };
+}
+var LocaleContext = (0, import_react3.createContext)({
+  locale: DEFAULT_LOCALE,
+  dir: "ltr",
+  t: identity,
+  ...makeFormatters(DEFAULT_LOCALE)
+});
 function LocaleProvider({
+  locale = DEFAULT_LOCALE,
+  dir,
   messages,
   t,
   children
 }) {
-  const fn = t ?? (messages ? (s) => messages[s] ?? s : identity);
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(LocaleContext.Provider, { value: fn, children });
+  const formatters = (0, import_react3.useMemo)(() => makeFormatters(locale), [locale]);
+  const resolvedDir = (0, import_react3.useMemo)(() => dir ?? getLocaleDirection(locale), [dir, locale]);
+  const translate = (0, import_react3.useMemo)(
+    () => t ?? (messages ? (s) => messages[s] ?? s : identity),
+    [t, messages]
+  );
+  const info = (0, import_react3.useMemo)(
+    () => ({ locale, dir: resolvedDir, t: translate, ...formatters }),
+    [locale, resolvedDir, translate, formatters]
+  );
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(LocaleContext.Provider, { value: info, children });
+}
+function useLocale() {
+  return (0, import_react3.useContext)(LocaleContext);
 }
 function useTranslate() {
-  return (0, import_react3.useContext)(LocaleContext);
+  return (0, import_react3.useContext)(LocaleContext).t;
 }
 
 // src/errorBoundary.tsx
@@ -790,18 +865,13 @@ function NumberInput({
   suffix,
   onChange
 }) {
+  const { formatNumber } = useLocale();
   const [focused, setFocused] = (0, import_react9.useState)(false);
   const raw = asText(value);
   let display = raw;
   if (!focused && raw !== "" && currency) {
     const n = Number(raw);
-    if (!Number.isNaN(n)) {
-      try {
-        display = new Intl.NumberFormat(void 0, { style: "currency", currency }).format(n);
-      } catch {
-        display = raw;
-      }
-    }
+    if (!Number.isNaN(n)) display = formatNumber(n, { style: "currency", currency });
   }
   return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "lf-number", children: [
     prefix && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "lf-affix lf-prefix", children: prefix }),
@@ -1096,8 +1166,20 @@ function monthMatrix(y, m) {
 }
 var sameDay = (a, b) => a.y === b.y && a.m === b.m && a.d === b.d;
 var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-var monthLabel = (y, m) => new Intl.DateTimeFormat(void 0, { month: "long", year: "numeric" }).format(new Date(y, m, 1));
-var dayLabel = (c) => new Intl.DateTimeFormat(void 0, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(c.y, c.m, c.d));
+var monthLabel = (y, m, locale) => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(new Date(y, m, 1));
+var dayLabel = (c, locale) => new Intl.DateTimeFormat(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(new Date(c.y, c.m, c.d));
+function weekdayLabels(locale) {
+  try {
+    const narrow = new Intl.DateTimeFormat(locale, { weekday: "narrow" });
+    const long = new Intl.DateTimeFormat(locale, { weekday: "long" });
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(2024, 0, 7 + i);
+      return { narrow: narrow.format(d), long: long.format(d) };
+    });
+  } catch {
+    return WEEKDAYS.map((w) => ({ narrow: w[0] ?? "", long: w }));
+  }
+}
 function DateField({
   a11y,
   kind,
@@ -1107,6 +1189,8 @@ function DateField({
   clearable,
   minuteStep = 1
 }) {
+  const { locale } = useLocale();
+  const weekdays = weekdayLabels(locale);
   const raw = typeof value === "string" ? value : "";
   const date = parseDate(raw);
   const time = parseTime(raw, kind);
@@ -1301,11 +1385,11 @@ function DateField({
       /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { ref: popRef, className: "lf-datefield-pop", role: "dialog", "aria-label": "Choose date", style: popStyle ?? void 0, children: [
         /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-cal-head", children: [
           /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m) }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m, locale) }),
           /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-cal-row", role: "row", children: WEEKDAYS.map((w) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w, children: w.slice(0, 2) }, w)) }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-cal-row", role: "row", children: weekdays.map((w, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w.long, children: w.narrow }, i)) }),
           Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
             const inMonth = c.m === view.m;
             const isSel = date != null && sameDay(c, date);
@@ -1317,7 +1401,7 @@ function DateField({
                 type: "button",
                 role: "gridcell",
                 "data-focused": isFocused || void 0,
-                "aria-label": dayLabel(c),
+                "aria-label": dayLabel(c, locale),
                 "aria-selected": isSel,
                 "aria-current": isToday ? "date" : void 0,
                 tabIndex: isFocused ? 0 : -1,
@@ -1805,7 +1889,7 @@ function FormRenderer(props) {
   }, [playbackSignal]);
   const reg = registry ?? (0, import_form_core7.createDefaultFieldTypeRegistry)();
   const comps = components ?? {};
-  const t = useTranslate();
+  const { t, dir } = useLocale();
   const sanitize = sanitizeHtml ?? defaultSanitizeHtml;
   const ctx = { form, reg, readOnly, showErrors: submitted, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope() };
   const handleSubmit = async (e) => {
@@ -1860,7 +1944,7 @@ function FormRenderer(props) {
       onResult,
       onEvent
     }
-  ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { noValidate: true, className: formClass, style: theme, onSubmit: handleSubmit, children: [
+  ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { noValidate: true, dir, className: formClass, style: theme, onSubmit: handleSubmit, children: [
     schema.root.map((id) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
     submitLabel !== null && !readOnly && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
   ] });
@@ -1885,7 +1969,7 @@ function FormWizardView({
 }) {
   const [index, setIndex] = (0, import_react13.useState)(0);
   const [showErrors, setShowErrors] = (0, import_react13.useState)(false);
-  const t = useTranslate();
+  const { t, dir } = useLocale();
   const pageRef = (0, import_react13.useRef)(null);
   const firstRender = (0, import_react13.useRef)(true);
   const visible = pages.filter((id) => form.state.fields[id]?.isVisible !== false);
@@ -1927,7 +2011,7 @@ function FormWizardView({
       onEvent?.({ type: "invalid", errorKeys: report.errorKeys });
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { noValidate: true, className, style: theme, onSubmit: submit, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { noValidate: true, dir, className, style: theme, onSubmit: submit, children: [
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(RenderEntity, { id: currentId, schema, ctx }) }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-wizard-nav", children: [
@@ -2198,8 +2282,10 @@ var VERSION = "0.1.0-alpha.0";
   MinionProvider,
   VERSION,
   defaultSanitizeHtml,
+  getLocaleDirection,
   printSubmission,
   useFormEngine,
+  useLocale,
   useMinionClient,
   useMinionData,
   useTranslate
