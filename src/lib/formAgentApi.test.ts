@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { generateSchema, AgentCancelledError, type BuilderSchemaLike } from "./formAgentApi";
+import { generateSchema, normalizeAgentSchema, AgentCancelledError, type BuilderSchemaLike } from "./formAgentApi";
 
 const EMPTY: BuilderSchemaLike = { entities: {}, root: [] };
 
@@ -91,5 +91,41 @@ describe("formAgentApi (#40)", () => {
 
     await expect(generateSchema("hi", EMPTY)).rejects.toThrow(/isn.?t configured|VITE_FORM_AGENT_URL/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// The agent emits coltorapps schemas (entity id only as map key, snake_case keys); the form-core
+// builder/renderer read entity.id + expect camelCase. normalizeAgentSchema bridges the gap — this
+// is what was missing when LukeBuilds "broke" after the builder cutover.
+describe("normalizeAgentSchema", () => {
+  it("stamps each entity's inner id from its map key (form-core reads entity.id)", () => {
+    const agent: BuilderSchemaLike = {
+      entities: {
+        "ent-1": { type: "textField", attributes: { key: "first_name", label: "First Name", required: true } },
+        "ent-2": { type: "textField", attributes: { key: "last_name", label: "Last Name" } },
+      },
+      root: ["ent-1", "ent-2"],
+    };
+    const out = normalizeAgentSchema(agent) as { entities: Record<string, { id?: string }>; root: string[] };
+    expect(out.entities["ent-1"].id).toBe("ent-1");
+    expect(out.entities["ent-2"].id).toBe("ent-2");
+    expect(out.root).toEqual(["ent-1", "ent-2"]);
+  });
+
+  it("camelCases snake_case field keys", () => {
+    const out = normalizeAgentSchema({
+      entities: { a: { type: "textField", attributes: { key: "first_name" } } },
+      root: ["a"],
+    }) as { entities: Record<string, { attributes: { key: string } }> };
+    expect(out.entities["a"].attributes.key).not.toContain("_");
+  });
+
+  it("is idempotent (safe to run at both the persist and apply boundaries)", () => {
+    const input: BuilderSchemaLike = {
+      entities: { a: { type: "textField", attributes: { key: "full_name" } } },
+      root: ["a"],
+    };
+    const once = normalizeAgentSchema(input);
+    expect(normalizeAgentSchema(once)).toEqual(once);
   });
 });

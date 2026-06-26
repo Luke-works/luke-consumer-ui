@@ -3,7 +3,7 @@ import LukeBuildsMark from "../../components/branding/LukeBuildsMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { saveDraft } from "../../lib/formsApi";
-import { generateSchema, AgentCancelledError, type BuilderSchemaLike } from "../../lib/formAgentApi";
+import { generateSchema, normalizeAgentSchema, AgentCancelledError, type BuilderSchemaLike } from "../../lib/formAgentApi";
 
 type Msg = { role: "you" | "ai"; text: string; error?: boolean; suggestions?: string[] };
 
@@ -71,8 +71,11 @@ export default function AiAssistPanel({
       // Only persist + remount the builder when the form actually changed; a
       // question / chit-chat leaves it untouched, so skip the canvas flash.
       if (result.changed !== false) {
-        await saveDraft(tenant, formId, JSON.stringify(result.schema));
-        onApplied(result.schema, result.title);
+        // The agent emits coltorapps schemas (id-only-as-map-key); normalize to the form-core
+        // shape the builder needs BEFORE persisting + applying, else fields render broken.
+        const applied = normalizeAgentSchema(result.schema);
+        await saveDraft(tenant, formId, JSON.stringify(applied));
+        onApplied(applied, result.title);
       }
     } catch (e) {
       // A user cancel isn't an error — note it quietly instead of a red banner.

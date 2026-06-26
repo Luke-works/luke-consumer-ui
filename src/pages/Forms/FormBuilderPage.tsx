@@ -17,11 +17,11 @@ import { FormBuilder, type FormBuilderHandle } from "@lukeflow/form-builder";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
-import { camelCaseKeys, readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
+import { readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import AiAssistPanel from "./AiAssistPanel";
-import type { BuilderSchemaLike } from "../../lib/formAgentApi";
+import { normalizeAgentSchema, type BuilderSchemaLike } from "../../lib/formAgentApi";
 import {
   checkIn,
   checkout,
@@ -233,8 +233,9 @@ export default function FormBuilderPage() {
   // without our uniqueness guards), push it into the builder via the imperative handle
   // (no remount → the AI chat survives), and let onChange persist it.
   const applyAiSchema = useCallback((schema: BuilderSchemaLike) => {
-    const normalized = camelCaseKeys(schema as unknown as FormSchema);
-    builderRef.current?.setSchema(normalized); // fires onChange → mirrors liveSchema + autosaves
+    // Bridge the agent's coltorapps schema → form-core (stamp entity ids, camelCase keys) so the
+    // builder actually renders it. setSchema fires onChange → mirrors liveSchema + autosaves.
+    builderRef.current?.setSchema(normalizeAgentSchema(schema) as unknown as FormSchema);
   }, []);
 
   // Flush a pending edit on unmount (best-effort — can't surface UI once gone).

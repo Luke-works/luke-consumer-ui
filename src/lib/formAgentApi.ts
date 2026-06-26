@@ -11,6 +11,8 @@
 // shipping authored content to a public host. Calls are tenant-scoped (X-Tenant-Id)
 // and carry no client user id.
 
+import { camelCaseKeys, repairSchema, type FormSchema } from "@lukeflow/form-core";
+
 /** Resolve the agents base URL, or throw if it isn't configured (no public fallback). */
 function agentBase(): string {
   const raw = import.meta.env.VITE_FORM_AGENT_URL as string | undefined;
@@ -198,4 +200,24 @@ export function generateTestData(
     tenant,
     signal,
   );
+}
+
+/**
+ * Bridge an agent-produced schema into the form-core shape the builder/renderer consume.
+ *
+ * The agent emits coltorapps-format schemas: each entity's id lives ONLY as its map key
+ * (there's no inner `id` field) and field keys are snake_case. The @lukeflow/form-builder
+ * canvas and @lukeflow/form-react renderer read `entity.id` (for the control id, error id,
+ * aria wiring, React keys…) and expect camelCase keys — so an un-normalized agent schema
+ * renders every field with `id === undefined` and breaks. Stamp each entity's id from its
+ * map key, camelCase the keys, then repair tree integrity. Idempotent, so it's safe to run
+ * at every boundary the agent's output enters (persist + apply).
+ */
+export function normalizeAgentSchema(schema: BuilderSchemaLike): BuilderSchemaLike {
+  const entities = (schema?.entities ?? {}) as Record<string, Record<string, unknown>>;
+  const withIds = {
+    ...schema,
+    entities: Object.fromEntries(Object.entries(entities).map(([id, e]) => [id, { ...e, id }])),
+  } as unknown as FormSchema;
+  return repairSchema(camelCaseKeys(withIds)).schema as unknown as BuilderSchemaLike;
 }
