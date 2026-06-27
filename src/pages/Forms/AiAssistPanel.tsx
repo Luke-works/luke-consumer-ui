@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import LukeBuildsMark from "../../components/branding/LukeBuildsMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
@@ -31,12 +31,16 @@ export default function AiAssistPanel({
   formName,
   schema,
   onApplied,
+  lifecycleActions,
 }: {
   tenant: string;
   formId: string;
   formName: string;
   schema: BuilderSchemaLike | null;
   onApplied: (schema: BuilderSchemaLike, title: string) => void;
+  /** The Undo-checkout / Check-in / Publish trio, surfaced here too so the lifecycle is reachable
+   *  without scrolling back to the top bar while working in the assistant. */
+  lifecycleActions?: ReactNode;
 }) {
   const { session } = useAuth();
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -110,6 +114,11 @@ export default function AiAssistPanel({
           </p>
         </div>
       </div>
+
+      {/* Lifecycle actions (Undo checkout · Check in · Publish) — same gated trio as the top bar. */}
+      {lifecycleActions && (
+        <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">{lifecycleActions}</div>
+      )}
 
       {/* Log */}
       <div ref={logRef} className="flex-1 space-y-2 overflow-y-auto p-3">

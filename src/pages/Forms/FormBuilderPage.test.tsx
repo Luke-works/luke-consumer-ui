@@ -36,8 +36,7 @@ const mocked = vi.mocked(formsApi);
 function form(schema: object, over: Partial<formsApi.StoredForm> = {}): formsApi.StoredForm {
   return {
     id: "f1", code: "C1", name: "Contact", schema: JSON.stringify(schema),
-    status: "published", publishedVersion: 1, latestVersion: 1,
-    latestVersionSignedOff: false, draftMatchesLatestVersion: false,
+    status: "published", publishedVersion: 1, latestVersion: 1, latestVersionSignedOff: false,
     ...over,
   } as formsApi.StoredForm;
 }
@@ -67,20 +66,20 @@ beforeEach(() => {
 });
 
 describe("FormBuilderPage — lifecycle gating", () => {
-  it("allows Check in even with a blocking schema (snapshot), but gates Publish and shows an error chip", async () => {
-    mocked.getForm.mockResolvedValue(form(DUP)); // not signed off (default)
+  it("disables Check in / Undo checkout on open (no changes yet) and shows an error chip for a blocking schema", async () => {
+    mocked.getForm.mockResolvedValue(form(DUP));
     renderPage();
-    const checkIn = await screen.findByRole("button", { name: /check in/i });
-    expect(checkIn).toBeEnabled(); // check-in is a snapshot — errors / WIP are allowed
-    expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled(); // unsigned → no publish
+    // Opening the form isn't a change: nothing to check in or undo until the user edits.
+    expect(await screen.findByRole("button", { name: /check in/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /undo checkout/i })).toBeDisabled();
     expect(screen.getByText(/\d+ error/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
   });
 
-  it("shows no error chip for a clean schema and enables Check in", async () => {
+  it("shows no error chip for a clean schema", async () => {
     mocked.getForm.mockResolvedValue(form(CLEAN));
     renderPage();
-    const checkIn = await screen.findByRole("button", { name: /check in/i });
-    expect(checkIn).toBeEnabled();
+    await screen.findByRole("button", { name: /check in/i });
     expect(screen.queryByText(/\d+ error/i)).not.toBeInTheDocument();
   });
 
@@ -88,20 +87,14 @@ describe("FormBuilderPage — lifecycle gating", () => {
     // Signed off + not yet published → Publish is actionable.
     mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true, publishedVersion: undefined }));
     renderPage();
-    await waitFor(() => expect(screen.getByRole("button", { name: /publish/i })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: /^publish$/i })).toBeEnabled());
     expect(screen.getByText(/signed off/i)).toBeInTheDocument(); // the badge
   });
 
   it("disables Publish (shows 'Published') when the latest version is already the live one", async () => {
     mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true, publishedVersion: 1 }));
     renderPage();
-    await waitFor(() => expect(screen.getByRole("button", { name: /published/i })).toBeDisabled());
-  });
-
-  it("disables Check in when the draft already matches the latest version", async () => {
-    mocked.getForm.mockResolvedValue(form(CLEAN, { draftMatchesLatestVersion: true }));
-    renderPage();
-    expect(await screen.findByRole("button", { name: /check in/i })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: /^published$/i })).toBeDisabled());
   });
 });
 

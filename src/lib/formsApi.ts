@@ -23,9 +23,6 @@ export type StoredForm = {
   latestVersion: number;
   /** Whether that latest version is signed off (⟺ publishable). Single-form loads. */
   latestVersionSignedOff: boolean;
-  /** Whether the draft already equals the latest checked-in version ⟺ nothing to check in.
-   *  Compared server-side-stored string to string (byte-exact). Single-form loads. */
-  draftMatchesLatestVersion: boolean;
   lockedBy?: string | null;
   deletedAt?: number | null;
   createdBy?: string;
@@ -73,7 +70,7 @@ type ApiAudit = { action: string; detail?: string | null; actor?: string | null;
 const STATUS_IN: Record<string, FormStatus> = { DRAFT: "draft", PUBLISHED: "published", RETIRED: "archived" };
 const ms = (iso?: string | null): number => (iso ? Date.parse(iso) : 0);
 
-function toForm(f: ApiForm, latestVersion = 0, latestVersionSignedOff = false, draftMatchesLatestVersion = false): StoredForm {
+function toForm(f: ApiForm, latestVersion = 0, latestVersionSignedOff = false): StoredForm {
   return {
     id: f.id,
     code: f.code,
@@ -84,7 +81,6 @@ function toForm(f: ApiForm, latestVersion = 0, latestVersionSignedOff = false, d
     publishedVersion: f.publishedVersion ?? undefined,
     latestVersion,
     latestVersionSignedOff,
-    draftMatchesLatestVersion,
     lockedBy: f.lockedBy ?? null,
     deletedAt: f.deletedAt ? ms(f.deletedAt) : null,
     createdBy: f.createdBy ?? undefined,
@@ -136,10 +132,8 @@ export async function getForm(tenant: string, id: string): Promise<StoredForm> {
     req<ApiVersion[]>(tenant, `${BASE}/${seg(id)}/versions`),
   ]);
   const max = maxVersion(versions);
-  const latest = versions.find((v) => v.version === max);
-  const latestSignedOff = !!latest?.signedOffAt;
-  const draftMatches = !!latest && (form.draftSchema ?? "") === latest.schema;
-  return toForm(form, max, latestSignedOff, draftMatches);
+  const latestSignedOff = !!versions.find((v) => v.version === max)?.signedOffAt;
+  return toForm(form, max, latestSignedOff);
 }
 
 export async function createForm(tenant: string, name: string, description?: string): Promise<StoredForm> {

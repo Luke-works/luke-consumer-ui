@@ -26,12 +26,12 @@ import { normalizeAgentSchema, type BuilderSchemaLike } from "../../lib/formAgen
 import {
   checkIn,
   checkout,
-  discardDraft,
   getAudit,
   getForm,
   latestVersion,
   publishVersion,
   release,
+  restoreVersion,
   saveDraft,
   signOffTest,
   updateMeta,
@@ -51,6 +51,7 @@ import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
+import LifecycleActions, { type LifecycleState } from "./LifecycleActions";
 import PageMeta from "../../components/common/PageMeta";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
@@ -84,7 +85,7 @@ export default function FormBuilderPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [saved, setSaved] = useState(true);
   const [saveError, setSaveError] = useState(false);
-  const [busy, setBusy] = useState<null | "checkin" | "publish" | "discard">(null);
+  const [busy, setBusy] = useState<null | "checkin" | "publish" | "undo">(null);
   const [status, setStatus] = useState<FormStatus>("draft");
   const [version, setVersion] = useState(0);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
@@ -136,7 +137,9 @@ export default function FormBuilderPage() {
         setPublishedVersion(f.publishedVersion ?? null);
         setLastTestedAt(f.lastTestedAt ?? null);
         setLatestSignedOff(f.latestVersionSignedOff);
-        setDirtySinceCheckIn(!f.draftMatchesLatestVersion);
+        // Checkout baseline: opening the form is not itself a change. Check-in / Undo-checkout
+        // light up only once the user actually edits (onChange), and reset on check-in / reload.
+        setDirtySinceCheckIn(false);
         const sm = readSubmitMessage(f.schema);
         setSubmitMessage(sm);
         submitMsgRef.current = sm;
@@ -347,17 +350,20 @@ export default function FormBuilderPage() {
     setSaved(true);
   };
 
-  const onDiscard = () => runExclusive(async () => {
-    if (!tenant || !id) return;
-    if (!window.confirm("Discard draft changes and revert to the published version?")) return;
-    setBusy("discard");
+  // Undo checkout: revert the draft to the last checked-in version (discard the edits made
+  // since opening), keeping the form checked out so editing continues. The reload re-syncs
+  // version/sign-off state and resets the dirty baseline.
+  const onUndoCheckout = () => runExclusive(async () => {
+    if (!tenant || !id || version < 1) return; // nothing checked in to revert to
+    if (!window.confirm(`Undo your changes and revert to the last checked-in version (v${version})?`)) return;
+    setBusy("undo");
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     try {
-      await discardDraft(tenant, id);
+      await restoreVersion(tenant, id, version);
       unsaved.current = false;
       setReloadKey((k) => k + 1);
     } catch (e) {
-      console.error("Discard failed", e);
+      console.error("Undo checkout failed", e);
       setSaveError(true);
     } finally {
       setBusy(null);
@@ -414,6 +420,11 @@ export default function FormBuilderPage() {
   if (!tenant || !id || !form) return null;
 
   const saveLabel = saveError ? "Save failed" : saved ? "Saved" : "Saving…";
+
+  // Shared by the top bar and the LukeBuilds panel so both render the same gated trio.
+  const lifecycleState: LifecycleState = {
+    busy, mutating, dirty: dirtySinceCheckIn, version, signedOff: latestSignedOff, publishedVersion,
+  };
 
   return (
     <div className="space-y-4">
@@ -482,42 +493,12 @@ export default function FormBuilderPage() {
                   </span>
                 </Tooltip>
               )}
-              <Tooltip content="Discard draft changes and revert to the published version.">
-                <button
-                  type="button"
-                  onClick={onDiscard}
-                  disabled={busy !== null || mutating}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-                >
-                  Discard draft
-                </button>
-              </Tooltip>
-              <Tooltip content={dirtySinceCheckIn
-                ? "Snapshot the current form as a new version. Errors / work-in-progress are fine — it won't go live until you sign off and publish."
-                : `No changes to check in — the draft already matches v${version}.`}>
-                <button
-                  type="button"
-                  onClick={onCheckIn}
-                  disabled={busy !== null || mutating || !dirtySinceCheckIn}
-                  className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
-                >
-                  {busy === "checkin" ? "Checking in…" : "Check in"}
-                </button>
-              </Tooltip>
-              <Tooltip content={
-                version < 1 ? "Check in a version first."
-                : publishedVersion === version ? `v${version} is already published — it's the live version.`
-                : !latestSignedOff ? "Form can't be published — this version isn't signed off yet. Open Test, get a clean run, then Sign off."
-                : `Publish v${version} — make it the live version.`}>
-                <button
-                  type="button"
-                  onClick={onPublish}
-                  disabled={busy !== null || mutating || version < 1 || !latestSignedOff || publishedVersion === version}
-                  className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
-                >
-                  {busy === "publish" ? "Publishing…" : publishedVersion === version ? "Published" : "Publish"}
-                </button>
-              </Tooltip>
+              <LifecycleActions
+                state={lifecycleState}
+                onUndoCheckout={onUndoCheckout}
+                onCheckIn={onCheckIn}
+                onPublish={onPublish}
+              />
               <Tooltip content={publishedVersion != null
                 ? `Embed the published version (v${publishedVersion}) — get an iframe snippet for any website.`
                 : "Publish a version first — the embed always serves the published version."}>
@@ -550,6 +531,14 @@ export default function FormBuilderPage() {
               formName={form.name}
               schema={liveSchema}
               onApplied={applyAiSchema}
+              lifecycleActions={
+                <LifecycleActions
+                  state={lifecycleState}
+                  onUndoCheckout={onUndoCheckout}
+                  onCheckIn={onCheckIn}
+                  onPublish={onPublish}
+                />
+              }
             />
           ) : undefined
         }
