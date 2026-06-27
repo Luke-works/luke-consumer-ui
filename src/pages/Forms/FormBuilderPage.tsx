@@ -51,7 +51,8 @@ import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
-import LifecycleActions, { type LifecycleState } from "./LifecycleActions";
+import LifecycleActions from "./LifecycleActions";
+import { lifecycleGate, type LifecycleState } from "./lifecycle";
 import PageMeta from "../../components/common/PageMeta";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
@@ -440,10 +441,22 @@ export default function FormBuilderPage() {
 
   const saveLabel = saveError ? "Save failed" : saved ? "Saved" : "Saving…";
 
-  // Shared by the top bar and the LukeBuilds panel so both render the same gated trio.
+  // Shared by the top-bar buttons and the LukeBuilds chat so both gate identically.
   const editable = canEdit && checkedOut;
   const lifecycleState: LifecycleState = {
     busy, mutating, checkedOut, dirty: dirtySinceCheckIn, version, signedOff: latestSignedOff, publishedVersion,
+  };
+
+  // Run a lifecycle action the user asked for conversationally in LukeBuilds. Gated by the SAME
+  // rules as the buttons; returns a message to show in chat when it isn't currently allowed.
+  const runLifecycle = (action: "checkin" | "publish" | "undo_checkout"): { ok: boolean; message: string } => {
+    const gate = lifecycleGate(lifecycleState);
+    const g = action === "checkin" ? gate.checkin : action === "publish" ? gate.publish : gate.undo;
+    if (!g.ok) return { ok: false, message: g.reason };
+    if (action === "checkin") onCheckIn();
+    else if (action === "publish") onPublish();
+    else onUndoCheckout();
+    return { ok: true, message: "" };
   };
 
   return (
@@ -561,15 +574,7 @@ export default function FormBuilderPage() {
                 formName={form.name}
                 schema={liveSchema}
                 onApplied={applyAiSchema}
-                lifecycleActions={
-                  <LifecycleActions
-                    state={lifecycleState}
-                    onCheckout={onCheckout}
-                    onUndoCheckout={onUndoCheckout}
-                    onCheckIn={onCheckIn}
-                    onPublish={onPublish}
-                  />
-                }
+                onRunLifecycle={runLifecycle}
               />
             ) : undefined
           }

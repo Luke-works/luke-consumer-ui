@@ -36,6 +36,8 @@ export type AgentResult = {
   suggestions?: string[];
   /** False when the form was left untouched (e.g. the user asked a question). */
   changed?: boolean;
+  /** A lifecycle action the user asked for conversationally, for the app to run (gated). */
+  action?: "checkin" | "publish" | "undo_checkout" | null;
   brain: string;
 };
 

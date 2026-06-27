@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import LukeBuildsMark from "../../components/branding/LukeBuildsMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
@@ -31,16 +31,16 @@ export default function AiAssistPanel({
   formName,
   schema,
   onApplied,
-  lifecycleActions,
+  onRunLifecycle,
 }: {
   tenant: string;
   formId: string;
   formName: string;
   schema: BuilderSchemaLike | null;
   onApplied: (schema: BuilderSchemaLike, title: string) => void;
-  /** The Undo-checkout / Check-in / Publish trio, surfaced here too so the lifecycle is reachable
-   *  without scrolling back to the top bar while working in the assistant. */
-  lifecycleActions?: ReactNode;
+  /** Run a lifecycle action the user asked for conversationally (check in / publish / undo).
+   *  The app decides if it's allowed and returns a message to show when it isn't. */
+  onRunLifecycle?: (action: "checkin" | "publish" | "undo_checkout") => { ok: boolean; message: string };
 }) {
   const { session } = useAuth();
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -52,7 +52,7 @@ export default function AiAssistPanel({
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+    logRef.current?.scrollTo?.({ top: logRef.current.scrollHeight });
   }, [messages, busy]);
 
   const send = async (text: string) => {
@@ -69,17 +69,25 @@ export default function AiAssistPanel({
     try {
       const result = await generateSchema(msg, schema ?? EMPTY, formName, session?.tenant ?? undefined, controller.signal);
       setBrain(result.brain);
-      const n = result.schema.root?.length ?? 0;
-      const text = result.reply?.trim() || `Done — the form now has ${n} field${n === 1 ? "" : "s"}.`;
-      setMessages((m) => [...m, { role: "ai", text, suggestions: result.suggestions }]);
-      // Only persist + remount the builder when the form actually changed; a
-      // question / chit-chat leaves it untouched, so skip the canvas flash.
-      if (result.changed !== false) {
-        // The agent emits coltorapps schemas (id-only-as-map-key); normalize to the form-core
-        // shape the builder needs BEFORE persisting + applying, else fields render broken.
-        const applied = normalizeAgentSchema(result.schema);
-        await saveDraft(tenant, formId, JSON.stringify(applied));
-        onApplied(applied, result.title);
+      if (result.action && onRunLifecycle) {
+        // A conversational lifecycle command (check in / publish / undo) — run it instead of
+        // editing the form. The app gates it and returns a message to show if it's not allowed.
+        const r = onRunLifecycle(result.action);
+        const text = r.ok ? result.reply?.trim() || "Done." : r.message;
+        setMessages((m) => [...m, { role: "ai", text }]);
+      } else {
+        const n = result.schema.root?.length ?? 0;
+        const text = result.reply?.trim() || `Done — the form now has ${n} field${n === 1 ? "" : "s"}.`;
+        setMessages((m) => [...m, { role: "ai", text, suggestions: result.suggestions }]);
+        // Only persist + remount the builder when the form actually changed; a
+        // question / chit-chat leaves it untouched, so skip the canvas flash.
+        if (result.changed !== false) {
+          // The agent emits coltorapps schemas (id-only-as-map-key); normalize to the form-core
+          // shape the builder needs BEFORE persisting + applying, else fields render broken.
+          const applied = normalizeAgentSchema(result.schema);
+          await saveDraft(tenant, formId, JSON.stringify(applied));
+          onApplied(applied, result.title);
+        }
       }
     } catch (e) {
       // A user cancel isn't an error — note it quietly instead of a red banner.
@@ -114,11 +122,6 @@ export default function AiAssistPanel({
           </p>
         </div>
       </div>
-
-      {/* Lifecycle actions (Undo checkout · Check in · Publish) — same gated trio as the top bar. */}
-      {lifecycleActions && (
-        <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">{lifecycleActions}</div>
-      )}
 
       {/* Log */}
       <div ref={logRef} className="flex-1 space-y-2 overflow-y-auto p-3">
