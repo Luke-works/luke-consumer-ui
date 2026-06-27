@@ -456,6 +456,33 @@ function IconReset(props = {}) {
     props
   );
 }
+function IconUndo(props = {}) {
+  return svg(
+    /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("path", { d: "M9 14L4 9l5-5", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ jsx("path", { d: "M4 9h10.5a5.5 5.5 0 0 1 0 11H9", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" })
+    ] }),
+    props
+  );
+}
+function IconRedo(props = {}) {
+  return svg(
+    /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("path", { d: "M15 14l5-5-5-5", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ jsx("path", { d: "M20 9H9.5a5.5 5.5 0 0 0 0 11H15", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" })
+    ] }),
+    props
+  );
+}
+function IconEye(props = {}) {
+  return svg(
+    /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx("path", { d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "3", fill: "none", stroke: "currentColor", strokeWidth: "2" })
+    ] }),
+    props
+  );
+}
 
 // src/settings/util.ts
 import {
@@ -2577,6 +2604,26 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+  useEffect9(() => {
+    const onKey = (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && e.shiftKey) {
+        e.preventDefault();
+        b.redo();
+      } else if (key === "z") {
+        e.preventDefault();
+        b.undo();
+      } else if (key === "y") {
+        e.preventDefault();
+        b.redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [b.undo, b.redo]);
   const onChangeRef = useRef8(onChange);
   onChangeRef.current = onChange;
   const mounted = useRef8(false);
@@ -2589,9 +2636,18 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
   }, [b.schema]);
   return /* @__PURE__ */ jsxs13("div", { className: `lf-builder ${className ?? ""}`, children: [
     /* @__PURE__ */ jsxs13("div", { className: "lf-builder-toolbar", children: [
-      /* @__PURE__ */ jsx13("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", children: "Undo" }),
-      /* @__PURE__ */ jsx13("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", children: "Redo" }),
-      /* @__PURE__ */ jsx13("button", { type: "button", onClick: () => setShowPreview(true), children: "Preview" }),
+      /* @__PURE__ */ jsxs13("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", title: "Undo (\u2318/Ctrl+Z)", children: [
+        /* @__PURE__ */ jsx13(IconUndo, {}),
+        "Undo"
+      ] }),
+      /* @__PURE__ */ jsxs13("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", title: "Redo (\u2318/Ctrl+Shift+Z)", children: [
+        /* @__PURE__ */ jsx13(IconRedo, {}),
+        "Redo"
+      ] }),
+      /* @__PURE__ */ jsxs13("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
+        /* @__PURE__ */ jsx13(IconEye, {}),
+        "Preview"
+      ] }),
       /* @__PURE__ */ jsx13(ProblemsBadge, { builder: b })
     ] }),
     /* @__PURE__ */ jsxs13(CanvasDndProvider, { builder: b, children: [

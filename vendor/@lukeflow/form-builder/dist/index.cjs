@@ -483,6 +483,33 @@ function IconReset(props = {}) {
     props
   );
 }
+function IconUndo(props = {}) {
+  return svg(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M9 14L4 9l5-5", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M4 9h10.5a5.5 5.5 0 0 1 0 11H9", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" })
+    ] }),
+    props
+  );
+}
+function IconRedo(props = {}) {
+  return svg(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M15 14l5-5-5-5", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M20 9H9.5a5.5 5.5 0 0 0 0 11H15", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" })
+    ] }),
+    props
+  );
+}
+function IconEye(props = {}) {
+  return svg(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", { cx: "12", cy: "12", r: "3", fill: "none", stroke: "currentColor", strokeWidth: "2" })
+    ] }),
+    props
+  );
+}
 
 // src/settings/util.ts
 var import_form_core3 = require("@lukeflow/form-core");
@@ -2602,6 +2629,26 @@ var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initial
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+  (0, import_react11.useEffect)(() => {
+    const onKey = (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && e.shiftKey) {
+        e.preventDefault();
+        b.redo();
+      } else if (key === "z") {
+        e.preventDefault();
+        b.undo();
+      } else if (key === "y") {
+        e.preventDefault();
+        b.redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [b.undo, b.redo]);
   const onChangeRef = (0, import_react11.useRef)(onChange);
   onChangeRef.current = onChange;
   const mounted = (0, import_react11.useRef)(false);
@@ -2614,9 +2661,18 @@ var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initial
   }, [b.schema]);
   return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-builder ${className ?? ""}`, children: [
     /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-builder-toolbar", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", children: "Undo" }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", children: "Redo" }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", onClick: () => setShowPreview(true), children: "Preview" }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", title: "Undo (\u2318/Ctrl+Z)", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconUndo, {}),
+        "Undo"
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", title: "Redo (\u2318/Ctrl+Shift+Z)", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconRedo, {}),
+        "Redo"
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconEye, {}),
+        "Preview"
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ProblemsBadge, { builder: b })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(CanvasDndProvider, { builder: b, children: [
