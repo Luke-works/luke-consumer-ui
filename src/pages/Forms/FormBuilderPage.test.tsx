@@ -66,25 +66,35 @@ beforeEach(() => {
 });
 
 describe("FormBuilderPage — lifecycle gating", () => {
-  it("disables Check in / Undo checkout on open (no changes yet) and shows an error chip for a blocking schema", async () => {
+  it("opens an existing form view-only: Checkout shown, Check in disabled, error chip for a blocking schema", async () => {
     mocked.getForm.mockResolvedValue(form(DUP));
     renderPage();
-    // Opening the form isn't a change: nothing to check in or undo until the user edits.
-    expect(await screen.findByRole("button", { name: /check in/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /undo checkout/i })).toBeDisabled();
+    // Existing form (has a version) opens view-only — you check out to edit.
+    expect(await screen.findByRole("button", { name: /^checkout$/i })).toBeEnabled();
+    expect(screen.getByText(/you're looking at v/i)).toBeInTheDocument(); // the view-only banner
+    expect(screen.getByRole("button", { name: /check in/i })).toBeDisabled(); // not checked out
     expect(screen.getByText(/\d+ error/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
+  });
+
+  it("Checkout enters edit mode — the button flips to Undo checkout and the banner clears", async () => {
+    const user = userEvent.setup();
+    mocked.getForm.mockResolvedValue(form(CLEAN));
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /^checkout$/i }));
+    expect(await screen.findByRole("button", { name: /undo checkout/i })).toBeInTheDocument();
+    expect(screen.queryByText(/you're looking at v/i)).not.toBeInTheDocument(); // banner gone
   });
 
   it("shows no error chip for a clean schema", async () => {
     mocked.getForm.mockResolvedValue(form(CLEAN));
     renderPage();
-    await screen.findByRole("button", { name: /check in/i });
+    await screen.findByRole("button", { name: /^checkout$/i });
     expect(screen.queryByText(/\d+ error/i)).not.toBeInTheDocument();
   });
 
   it("enables Publish only when the latest version is signed off and not already live", async () => {
-    // Signed off + not yet published → Publish is actionable.
+    // Signed off + not yet published → Publish is actionable (independent of checkout).
     mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true, publishedVersion: undefined }));
     renderPage();
     await waitFor(() => expect(screen.getByRole("button", { name: /^publish$/i })).toBeEnabled());

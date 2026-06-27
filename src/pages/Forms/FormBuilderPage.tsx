@@ -89,9 +89,11 @@ export default function FormBuilderPage() {
   const [status, setStatus] = useState<FormStatus>("draft");
   const [version, setVersion] = useState(0);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
-  // Has the draft changed since the last check-in? Drives the Check-in button (nothing to
-  // check in when the draft already equals the latest version).
+  // Has the draft changed since checkout / the last check-in? Drives Check-in + Undo-checkout.
   const [dirtySinceCheckIn, setDirtySinceCheckIn] = useState(false);
+  // Editing session: the builder is VIEW-ONLY until you check out. New forms (no version yet)
+  // open straight into edit mode (there's nothing to view); existing ones open view-only.
+  const [checkedOut, setCheckedOut] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
   // Live schema mirrored to the AI panel (which reads it to build/modify the form).
   const [liveSchema, setLiveSchema] = useState<BuilderSchemaLike | null>(null);
@@ -140,6 +142,8 @@ export default function FormBuilderPage() {
         // Checkout baseline: opening the form is not itself a change. Check-in / Undo-checkout
         // light up only once the user actually edits (onChange), and reset on check-in / reload.
         setDirtySinceCheckIn(false);
+        // A brand-new form (no versions) has nothing to view → open editable; otherwise view-only.
+        setCheckedOut(canEdit && latestVersion(f) < 1);
         const sm = readSubmitMessage(f.schema);
         setSubmitMessage(sm);
         submitMsgRef.current = sm;
@@ -158,7 +162,7 @@ export default function FormBuilderPage() {
     return () => {
       active = false;
     };
-  }, [tenant, id, reloadKey, navigate, me]);
+  }, [tenant, id, reloadKey, navigate, me, canEdit]);
 
   // Acquire the advisory edit lock on open and release it on leave — the backend
   // gates draft saves on the lock, so without this every autosave returns "Save failed".
@@ -350,25 +354,40 @@ export default function FormBuilderPage() {
     setSaved(true);
   };
 
-  // Undo checkout: revert the draft to the last checked-in version (discard the edits made
-  // since opening), keeping the form checked out so editing continues. The reload re-syncs
-  // version/sign-off state and resets the dirty baseline.
-  const onUndoCheckout = () => runExclusive(async () => {
-    if (!tenant || !id || version < 1) return; // nothing checked in to revert to
-    if (!window.confirm(`Undo your changes and revert to the last checked-in version (v${version})?`)) return;
-    setBusy("undo");
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    try {
-      await restoreVersion(tenant, id, version);
-      unsaved.current = false;
+  // Checkout: enter an editing session. The builder becomes editable and the current latest
+  // version is the point Undo-checkout rolls back to.
+  const onCheckout = () => setCheckedOut(true);
+
+  // Undo checkout: leave the editing session. With unsaved edits, revert the draft to the last
+  // checked-in version (the reload re-syncs version/sign-off + drops back to view-only); with no
+  // edits, just exit to view-only.
+  const onUndoCheckout = () => {
+    if (!checkedOut) return;
+    if (!dirtySinceCheckIn || version < 1) {
+      // No changes to revert — just leave edit mode. Reload to remount the builder (clearing its
+      // undo history so a stray ⌘Z can't mutate a view-only form) and drop back to view-only.
+      setCheckedOut(false);
       setReloadKey((k) => k + 1);
-    } catch (e) {
-      console.error("Undo checkout failed", e);
-      setSaveError(true);
-    } finally {
-      setBusy(null);
+      return;
     }
-  });
+    void runExclusive(async () => {
+      if (!tenant || !id) return;
+      if (!window.confirm(`Undo your changes and revert to the last checked-in version (v${version})?`)) return;
+      setBusy("undo");
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      try {
+        await restoreVersion(tenant, id, version);
+        unsaved.current = false;
+        setCheckedOut(false);
+        setReloadKey((k) => k + 1);
+      } catch (e) {
+        console.error("Undo checkout failed", e);
+        setSaveError(true);
+      } finally {
+        setBusy(null);
+      }
+    });
+  };
 
   const onSubmitMessage = (v: string) => {
     setSubmitMessage(v);
@@ -422,8 +441,9 @@ export default function FormBuilderPage() {
   const saveLabel = saveError ? "Save failed" : saved ? "Saved" : "Saving…";
 
   // Shared by the top bar and the LukeBuilds panel so both render the same gated trio.
+  const editable = canEdit && checkedOut;
   const lifecycleState: LifecycleState = {
-    busy, mutating, dirty: dirtySinceCheckIn, version, signedOff: latestSignedOff, publishedVersion,
+    busy, mutating, checkedOut, dirty: dirtySinceCheckIn, version, signedOff: latestSignedOff, publishedVersion,
   };
 
   return (
@@ -495,6 +515,7 @@ export default function FormBuilderPage() {
               )}
               <LifecycleActions
                 state={lifecycleState}
+                onCheckout={onCheckout}
                 onUndoCheckout={onUndoCheckout}
                 onCheckIn={onCheckIn}
                 onPublish={onPublish}
@@ -516,33 +537,44 @@ export default function FormBuilderPage() {
         </div>
       </div>
 
-      <FormBuilder
-        key={`${form.id}-${reloadKey}`}
-        ref={builderRef}
-        initialSchema={initialSchema}
-        onChange={handleChange}
-        attributeEditors={editors}
-        settings="modal"
-        aside={
-          canEdit ? (
-            <AiAssistPanel
-              tenant={tenant}
-              formId={id}
-              formName={form.name}
-              schema={liveSchema}
-              onApplied={applyAiSchema}
-              lifecycleActions={
-                <LifecycleActions
-                  state={lifecycleState}
-                  onUndoCheckout={onUndoCheckout}
-                  onCheckIn={onCheckIn}
-                  onPublish={onPublish}
-                />
-              }
-            />
-          ) : undefined
-        }
-      />
+      {/* View-only notice: an editor hasn't checked the form out yet (the Checkout button is above). */}
+      {canEdit && !checkedOut && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300">
+          🔒 View-only — you're looking at v{version}. Use <span className="font-medium">Checkout</span> above to edit it.
+        </div>
+      )}
+
+      {/* The builder is non-interactive (inert) until checked out — true view-only, not just visual. */}
+      <div inert={!editable || undefined} className={editable ? "" : "opacity-75 transition-opacity"}>
+        <FormBuilder
+          key={`${form.id}-${reloadKey}`}
+          ref={builderRef}
+          initialSchema={initialSchema}
+          onChange={handleChange}
+          attributeEditors={editors}
+          settings="modal"
+          aside={
+            canEdit ? (
+              <AiAssistPanel
+                tenant={tenant}
+                formId={id}
+                formName={form.name}
+                schema={liveSchema}
+                onApplied={applyAiSchema}
+                lifecycleActions={
+                  <LifecycleActions
+                    state={lifecycleState}
+                    onCheckout={onCheckout}
+                    onUndoCheckout={onUndoCheckout}
+                    onCheckIn={onCheckIn}
+                    onPublish={onPublish}
+                  />
+                }
+              />
+            ) : undefined
+          }
+        />
+      </div>
 
       <FormTestPanel
         open={testOpen}
