@@ -118,6 +118,10 @@
 /* ── Canvas tree ───────────────────────────────────────────────────────────── */
 .lf-canvas {
   min-height: 160px;
+  /* min-width:0 lets this grid column shrink below its content's min-content (grid/flex items
+     default to min-width:auto) — without it the canvas spills past the right edge, making the
+     page horizontally scrollable (and drag-auto-scroll slides it). */
+  min-width: 0;
   padding: 8px;
   border: 1px solid var(--lf-border, #d9d9d9);
   border-radius: var(--lf-radius, 6px);
