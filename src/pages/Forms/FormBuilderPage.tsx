@@ -470,7 +470,14 @@ export default function FormBuilderPage() {
   };
 
   return (
-    <div className="space-y-4">
+    // overflow-x-clip: the top-bar button tooltips (TailAdmin: position:absolute, left-1/2,
+    // always in the DOM) stick ~50px past the viewport on the right-edge buttons, which made the
+    // whole PAGE horizontally scrollable. On macOS that overflow is invisible at rest (overlay
+    // scrollbars) but native drag-and-drop edge auto-scroll latched onto it and slid the page
+    // sideways mid-drag, clipping the palette. `clip` (not `hidden`) contains that overflow
+    // without becoming a scroll container, so the page can't scroll/auto-scroll — and the sticky
+    // palette/AI-panel still pin to the viewport (verified). Vertical flow is unaffected.
+    <div className="space-y-4 overflow-x-clip">
       <PageMeta title={`${form.name} | Lukeflow`} description="Design your form in Lukeflow." />
       {canEdit && lockedByOther && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400">
