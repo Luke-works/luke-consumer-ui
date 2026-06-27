@@ -21,6 +21,21 @@ export type LifecycleState = {
 export type LifecycleAction = "checkin" | "publish" | "undo";
 export type Gate = { ok: boolean; reason: string };
 
+/**
+ * Shared toolbar button styling — the single source of truth so every button in the builder's
+ * top bar is pixel-consistent (same height, padding, radius, font weight, icon gap, focus ring,
+ * disabled treatment), whether it's rendered here-adjacent in {@link LifecycleActions} or over in
+ * FormBuilderPage (Preview / Test / Embed / back). The row uses exactly ONE solid "primary"
+ * button — the next logical step in the workflow — and a uniform neutral style for everything
+ * else, instead of three competing treatments.
+ */
+export const TOOLBAR_BTN_BASE =
+  "inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition focus:outline-hidden focus-visible:ring-3 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+export const TOOLBAR_BTN_NEUTRAL =
+  `${TOOLBAR_BTN_BASE} border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5`;
+export const TOOLBAR_BTN_PRIMARY =
+  `${TOOLBAR_BTN_BASE} border border-transparent bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:hover:bg-brand-500`;
+
 /** Whether each lifecycle action is currently allowed + a human reason (tooltip / chat reply). */
 export function lifecycleGate(state: LifecycleState): Record<LifecycleAction, Gate> {
   const { checkedOut, dirty, version, signedOff, publishedVersion } = state;

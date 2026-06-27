@@ -53,7 +53,7 @@ import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import LifecycleActions from "./LifecycleActions";
-import { lifecycleGate, type LifecycleState } from "./lifecycle";
+import { lifecycleGate, TOOLBAR_BTN_NEUTRAL, type LifecycleState } from "./lifecycle";
 import PageMeta from "../../components/common/PageMeta";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
@@ -491,7 +491,7 @@ export default function FormBuilderPage() {
         <button
           type="button"
           onClick={() => void leaveDesigner("/forms")}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+          className={TOOLBAR_BTN_NEUTRAL}
         >
           <ArrowLeft className="size-4" />Forms
         </button>
@@ -519,20 +519,12 @@ export default function FormBuilderPage() {
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {/* Preview + Test are available to view-only users too (read access can validate). */}
           <Tooltip content="Preview the form — fill it to test conditions, calculations and validation.">
-            <button
-              type="button"
-              onClick={openPreview}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-            >
+            <button type="button" onClick={openPreview} className={TOOLBAR_BTN_NEUTRAL}>
               <Eye className="size-4" />Preview
             </button>
           </Tooltip>
           <Tooltip content="Auto-fill the form with sample data, validate it, and sign off.">
-            <button
-              type="button"
-              onClick={() => setTestOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-            >
+            <button type="button" onClick={() => setTestOpen(true)} className={TOOLBAR_BTN_NEUTRAL}>
               <FlaskConical className="size-4" />Test
             </button>
           </Tooltip>
@@ -540,7 +532,7 @@ export default function FormBuilderPage() {
             <>
               {blocking.length > 0 && (
                 <Tooltip content="A form with errors can't be signed off or published. Fix these — see the Problems list in the builder below. (You can still check it in as a work-in-progress snapshot.)">
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-error-50 px-2.5 py-1.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">
+                  <span className="inline-flex h-9 items-center gap-1 rounded-lg bg-error-50 px-2.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">
                     <span aria-hidden>⊘</span>{blocking.length} error{blocking.length > 1 ? "s" : ""}
                   </span>
                 </Tooltip>
@@ -555,12 +547,7 @@ export default function FormBuilderPage() {
               <Tooltip content={publishedVersion != null
                 ? `Embed the published version (v${publishedVersion}) — get an iframe snippet for any website.`
                 : "Publish a version first — the embed always serves the published version."}>
-                <button
-                  type="button"
-                  onClick={() => setEmbedOpen(true)}
-                  disabled={publishedVersion == null}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-                >
+                <button type="button" onClick={() => setEmbedOpen(true)} disabled={publishedVersion == null} className={TOOLBAR_BTN_NEUTRAL}>
                   <CodeXml className="size-4" />Embed
                 </button>
               </Tooltip>
