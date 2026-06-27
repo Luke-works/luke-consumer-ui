@@ -40,9 +40,12 @@
   gap: 1rem;
 }
 
-/* Body: three cards (palette · canvas · settings). */
+/* Body: three cards (palette · canvas · settings). minmax(0, Npx) — NOT bare Npx — on the
+   side panes so a narrow viewport (small window / sidebar expanded) shrinks them rather than
+   pushing the 340px AI rail past the page edge, which made the page scroll sideways and let
+   native drag-and-drop auto-scroll slide it mid-drag. */
 .lf-builder .lf-builder-body {
-  grid-template-columns: 230px minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 230px) minmax(0, 1fr) minmax(0, 340px);
   gap: 1.25rem;
   align-items: start;
 }

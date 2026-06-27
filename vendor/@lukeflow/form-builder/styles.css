@@ -54,7 +54,12 @@
 /* ── Three-pane body ───────────────────────────────────────────────────────── */
 .lf-builder-body {
   display: grid;
-  grid-template-columns: 200px 1fr 320px;
+  /* minmax(0, Npx) NOT a bare Npx for the side panes: a bare fixed track is RIGID and won't
+     shrink when the container is narrower than palette + canvas + settings, so the right pane
+     spills past the page edge → the whole page scrolls horizontally (and native-DnD edge
+     auto-scroll then slides it sideways mid-drag). minmax(0, Npx) keeps the N-px width when
+     there's room but lets the pane shrink instead of overflowing when there isn't. */
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) minmax(0, 320px);
   gap: var(--lf-space, 12px);
   align-items: start;
 }
@@ -553,8 +558,10 @@
 .lf-builder-preview { padding: 12px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); }
 
 /* ── settings="modal": layout modes + the third-column aside ─────────────────── */
-.lf-builder-body--modal { grid-template-columns: 200px minmax(0, 1fr); }
-.lf-builder-body--modal.lf-builder-body--aside { grid-template-columns: 200px minmax(0, 1fr) 340px; }
+/* minmax(0, Npx) on the fixed panes (not a bare Npx) so a narrow viewport shrinks them
+   instead of overflowing the page — see the note on .lf-builder-body above. */
+.lf-builder-body--modal { grid-template-columns: minmax(0, 200px) minmax(0, 1fr); }
+.lf-builder-body--modal.lf-builder-body--aside { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) minmax(0, 340px); }
 .lf-builder-aside { min-width: 0; }
 
 /* ── Settings modal ──────────────────────────────────────────────────────────── */
