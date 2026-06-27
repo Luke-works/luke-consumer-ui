@@ -9,6 +9,7 @@
  * {@link lifecycleGate} is the single source of truth for whether each action is allowed (and
  * why) — shared with the conversational path (LukeBuilds chat) so buttons + chat never disagree.
  */
+import { Pencil, RotateCcw, Save, Rocket } from "lucide-react";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import { lifecycleGate, type LifecycleState } from "./lifecycle";
 
@@ -30,7 +31,7 @@ export default function LifecycleActions({
   const busyOrMut = busy !== null || mutating;
   const alreadyLive = version >= 1 && publishedVersion === version;
   const brandGhost =
-    "inline-flex items-center rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10";
+    "inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -38,7 +39,7 @@ export default function LifecycleActions({
       {!checkedOut ? (
         <Tooltip content="Check out the form to start editing — it's view-only until you do. Sets the point you can roll back to.">
           <button type="button" onClick={onCheckout} disabled={busyOrMut} className={brandGhost}>
-            Checkout
+            <Pencil className="size-4" />Checkout
           </button>
         </Tooltip>
       ) : (
@@ -47,15 +48,15 @@ export default function LifecycleActions({
             type="button"
             onClick={onUndoCheckout}
             disabled={busyOrMut || !gate.undo.ok}
-            className="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
           >
-            {busy === "undo" ? "Reverting…" : "Undo checkout"}
+            <RotateCcw className="size-4" />{busy === "undo" ? "Reverting…" : "Undo checkout"}
           </button>
         </Tooltip>
       )}
       <Tooltip content={gate.checkin.reason}>
         <button type="button" onClick={onCheckIn} disabled={busyOrMut || !gate.checkin.ok} className={brandGhost}>
-          {busy === "checkin" ? "Checking in…" : "Check in"}
+          <Save className="size-4" />{busy === "checkin" ? "Checking in…" : "Check in"}
         </button>
       </Tooltip>
       <Tooltip content={gate.publish.reason}>
@@ -63,9 +64,9 @@ export default function LifecycleActions({
           type="button"
           onClick={onPublish}
           disabled={busyOrMut || !gate.publish.ok}
-          className="inline-flex items-center rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
-          {busy === "publish" ? "Publishing…" : alreadyLive ? "Published" : "Publish"}
+          <Rocket className="size-4" />{busy === "publish" ? "Publishing…" : alreadyLive ? "Published" : "Publish"}
         </button>
       </Tooltip>
     </div>

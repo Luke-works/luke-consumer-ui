@@ -41,7 +41,8 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { FlaskConical, BadgeCheck, CodeXml, ArrowUp } from "lucide-react";
+import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft } from "lucide-react";
+import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
 import { guardedLeave } from "../../lib/leaveGuard";
@@ -98,6 +99,9 @@ export default function FormBuilderPage() {
   const [submitMessage, setSubmitMessage] = useState("");
   // Live schema mirrored to the AI panel (which reads it to build/modify the form).
   const [liveSchema, setLiveSchema] = useState<BuilderSchemaLike | null>(null);
+  // Preview (read-only fill) — available even in view-only; opens from the top bar.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewSchema, setPreviewSchema] = useState("");
   // "Test the form" (positive/negative validation runs + sign-off).
   const [testOpen, setTestOpen] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(null);
@@ -287,6 +291,12 @@ export default function FormBuilderPage() {
   }, []);
 
   const currentJson = () => toJson(latestRef.current ?? initialSchema);
+
+  // Preview snapshots the current schema into a read-only renderer (works in view-only too).
+  const openPreview = () => {
+    setPreviewSchema(currentJson());
+    setPreviewOpen(true);
+  };
 
   // Flush a pending autosave on demand, surfacing failures (returns success).
   const flushSave = (): Promise<boolean> => {
@@ -481,9 +491,9 @@ export default function FormBuilderPage() {
         <button
           type="button"
           onClick={() => void leaveDesigner("/forms")}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
         >
-          ← Forms
+          <ArrowLeft className="size-4" />Forms
         </button>
         <button
           type="button"
@@ -507,7 +517,16 @@ export default function FormBuilderPage() {
         <span className={`text-xs ${saveError ? "text-error-500" : "text-gray-400"}`}>{canEdit ? saveLabel : "View only"}</span>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {/* Test is available to view-only users too (read access can validate). */}
+          {/* Preview + Test are available to view-only users too (read access can validate). */}
+          <Tooltip content="Preview the form — fill it to test conditions, calculations and validation.">
+            <button
+              type="button"
+              onClick={openPreview}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+            >
+              <Eye className="size-4" />Preview
+            </button>
+          </Tooltip>
           <Tooltip content="Auto-fill the form with sample data, validate it, and sign off.">
             <button
               type="button"
@@ -566,6 +585,7 @@ export default function FormBuilderPage() {
           onChange={handleChange}
           attributeEditors={editors}
           settings="modal"
+          hidePreview /* Preview lives in the top bar (works in view-only too) */
           aside={
             canEdit ? (
               <AiAssistPanel
@@ -580,6 +600,15 @@ export default function FormBuilderPage() {
           }
         />
       </div>
+
+      {/* Read-only live preview of the current form (top-bar Preview). */}
+      <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
+        <div className="p-6 sm:p-8">
+          <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Preview — {form.name}</h2>
+          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Fill it out to test conditions, calculated values and validation.</p>
+          <FormRenderer schema={previewSchema} />
+        </div>
+      </Modal>
 
       <FormTestPanel
         open={testOpen}

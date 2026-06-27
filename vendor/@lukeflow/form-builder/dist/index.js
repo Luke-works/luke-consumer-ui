@@ -2605,7 +2605,7 @@ function Problems({ builder }) {
 
 // src/FormBuilder.tsx
 import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
-var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, className }, ref) {
+var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = useState10(false);
@@ -2657,7 +2657,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
         /* @__PURE__ */ jsx13(IconRedo, {}),
         "Redo"
       ] }),
-      /* @__PURE__ */ jsxs13("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
+      !hidePreview && /* @__PURE__ */ jsxs13("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
         /* @__PURE__ */ jsx13(IconEye, {}),
         "Preview"
       ] }),

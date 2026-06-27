@@ -2630,7 +2630,7 @@ function Problems({ builder }) {
 
 // src/FormBuilder.tsx
 var import_jsx_runtime13 = require("react/jsx-runtime");
-var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, className }, ref) {
+var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, className }, ref) {
   const b = useFormBuilder(initialSchema);
   (0, import_react11.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = (0, import_react11.useState)(false);
@@ -2682,7 +2682,7 @@ var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initial
         /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconRedo, {}),
         "Redo"
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
+      !hidePreview && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
         /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconEye, {}),
         "Preview"
       ] }),

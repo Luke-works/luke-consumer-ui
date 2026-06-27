@@ -224,6 +224,11 @@ interface FormBuilderProps {
      * own backend. The host reads the live schema via {@link FormBuilderProps.onChange}.
      */
     aside?: ReactNode;
+    /**
+     * Hide the toolbar's built-in "Preview" button. Use when the host provides its own preview
+     * affordance (e.g. in its own top bar) so the form isn't previewable from two places.
+     */
+    hidePreview?: boolean;
     className?: string;
 }
 /** Imperative handle (via `ref`) for replacing the schema without a remount. */
