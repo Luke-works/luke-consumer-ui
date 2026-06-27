@@ -21,11 +21,14 @@ export default function FormEmbedPanel({
   onClose,
   tenant,
   formId,
+  publishedVersion,
 }: {
   open: boolean;
   onClose: () => void;
   tenant: string;
   formId: string;
+  /** The live version the embed serves (the engine resolves @published). Null = not published. */
+  publishedVersion?: number | null;
 }) {
   const [embedToken, setEmbedToken] = useState<string | null>(null);
   const [embedErr, setEmbedErr] = useState<string | null>(null);
@@ -109,6 +112,9 @@ export default function FormEmbedPanel({
         <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Embed this form</h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           Paste this snippet into any web page. Submissions create a response and start a process.
+          {publishedVersion != null && (
+            <> It always serves the <span className="font-medium text-gray-700 dark:text-gray-200">published version (v{publishedVersion})</span> — re-publish to update what visitors see.</>
+          )}
         </p>
         {embedErr ? (
           <p className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-500 dark:bg-error-500/10">{embedErr}</p>

@@ -50,6 +50,7 @@ import { PencilIcon } from "../../icons";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
+import Tooltip from "../../components/ui/tooltip/Tooltip";
 import PageMeta from "../../components/common/PageMeta";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
@@ -86,6 +87,10 @@ export default function FormBuilderPage() {
   const [busy, setBusy] = useState<null | "checkin" | "publish" | "discard">(null);
   const [status, setStatus] = useState<FormStatus>("draft");
   const [version, setVersion] = useState(0);
+  const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
+  // Has the draft changed since the last check-in? Drives the Check-in button (nothing to
+  // check in when the draft already equals the latest version).
+  const [dirtySinceCheckIn, setDirtySinceCheckIn] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
   // Live schema mirrored to the AI panel (which reads it to build/modify the form).
   const [liveSchema, setLiveSchema] = useState<BuilderSchemaLike | null>(null);
@@ -128,8 +133,10 @@ export default function FormBuilderPage() {
         setForm(f);
         setStatus(f.status);
         setVersion(latestVersion(f));
+        setPublishedVersion(f.publishedVersion ?? null);
         setLastTestedAt(f.lastTestedAt ?? null);
         setLatestSignedOff(f.latestVersionSignedOff);
+        setDirtySinceCheckIn(!f.draftMatchesLatestVersion);
         const sm = readSubmitMessage(f.schema);
         setSubmitMessage(sm);
         submitMsgRef.current = sm;
@@ -226,8 +233,10 @@ export default function FormBuilderPage() {
     (schema: FormSchema) => {
       latestRef.current = schema;
       setLiveSchema(schema as unknown as BuilderSchemaLike); // keep the AI panel's view current
-      // The working draft now differs from the signed-off version, so Publish must re-gate:
-      // you sign off (check in + test) the CURRENT work before it can go live.
+      // The working draft now differs from the latest checked-in version, so Check-in has
+      // something to do again, and the signed-off version no longer matches the draft — Publish
+      // must re-gate (sign off the CURRENT work before it can go live).
+      setDirtySinceCheckIn(true);
       setLatestSignedOff(false);
       if (!canEdit) return; // view-only: never persist edits.
       scheduleSave(schema);
@@ -287,12 +296,13 @@ export default function FormBuilderPage() {
   // Check-in is a SNAPSHOT — allowed even with validation errors / work-in-progress. It never
   // publishes (publish is a separate, sign-off-gated step) and the new version starts unsigned.
   const onCheckIn = () => runExclusive(async () => {
-    if (!tenant || !id) return;
+    if (!tenant || !id || !dirtySinceCheckIn) return; // nothing to check in if the draft is unchanged
     setBusy("checkin");
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     try {
       const art = await checkIn(tenant, id, currentJson());
       setVersion(art.version);
+      setDirtySinceCheckIn(false); // draft now equals the new version
       setLatestSignedOff(false); // a plain check-in is unsigned until it's tested + signed off
       setSaved(true);
       setSaveError(false);
@@ -307,11 +317,12 @@ export default function FormBuilderPage() {
   // Publish promotes the latest version live — gated on it being signed off (the server enforces
   // this too). The mutex guarantees a check-in (which sets `version`) resolves first.
   const onPublish = () => runExclusive(async () => {
-    if (!tenant || !id || version < 1 || !latestSignedOff) return; // only a signed-off version can go live
+    if (!tenant || !id || version < 1 || !latestSignedOff || publishedVersion === version) return; // signed-off + not already live
     setBusy("publish");
     try {
       await publishVersion(tenant, id, version);
       setStatus("published");
+      setPublishedVersion(version);
       setSaveError(false);
     } catch (e) {
       console.error("Publish failed", e);
@@ -329,6 +340,7 @@ export default function FormBuilderPage() {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     const art = await checkIn(tenant, id, currentJson());
     setVersion(art.version);
+    setDirtySinceCheckIn(false); // draft now equals the just-signed-off version
     const updated = await signOffTest(tenant, id);
     setLatestSignedOff(true);
     setLastTestedAt(updated.lastTestedAt ?? Date.now());
@@ -356,6 +368,10 @@ export default function FormBuilderPage() {
     setSubmitMessage(v);
     submitMsgRef.current = v;
     if (!canEdit) return;
+    // The submit message is part of the persisted schema, so changing it dirties the draft
+    // (re-enables Check-in) and re-gates sign-off, same as any field edit.
+    setDirtySinceCheckIn(true);
+    setLatestSignedOff(false);
     scheduleSave(latestRef.current ?? initialSchema);
   };
 
@@ -448,60 +464,72 @@ export default function FormBuilderPage() {
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {/* Test is available to view-only users too (read access can validate). */}
-          <button
-            type="button"
-            onClick={() => setTestOpen(true)}
-            title="Auto-fill the form with valid sample data, validate it, and sign off."
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-          >
-            <FlaskConical className="size-4" />Test
-          </button>
+          <Tooltip content="Auto-fill the form with sample data, validate it, and sign off.">
+            <button
+              type="button"
+              onClick={() => setTestOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+            >
+              <FlaskConical className="size-4" />Test
+            </button>
+          </Tooltip>
           {canEdit && (
             <>
               {blocking.length > 0 && (
-                <span
-                  title="A form with errors can't be signed off or published. Fix these — see the Problems list in the builder below. (You can still check it in as a work-in-progress snapshot.)"
-                  className="inline-flex items-center gap-1 rounded-lg bg-error-50 px-2.5 py-1.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400"
-                >
-                  <span aria-hidden>⊘</span>{blocking.length} error{blocking.length > 1 ? "s" : ""}
-                </span>
+                <Tooltip content="A form with errors can't be signed off or published. Fix these — see the Problems list in the builder below. (You can still check it in as a work-in-progress snapshot.)">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-error-50 px-2.5 py-1.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">
+                    <span aria-hidden>⊘</span>{blocking.length} error{blocking.length > 1 ? "s" : ""}
+                  </span>
+                </Tooltip>
               )}
-              <button
-                type="button"
-                onClick={onDiscard}
-                disabled={busy !== null || mutating}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
-              >
-                Discard draft
-              </button>
-              <button
-                type="button"
-                onClick={onCheckIn}
-                disabled={busy !== null || mutating}
-                title="Snapshot the current form as a new version. Errors / work-in-progress are fine — it won't go live until you sign off and publish."
-                className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
-              >
-                {busy === "checkin" ? "Checking in…" : "Check in"}
-              </button>
-              <button
-                type="button"
-                onClick={onPublish}
-                disabled={busy !== null || mutating || version < 1 || !latestSignedOff}
-                title={version < 1 ? "Check in a version first." : !latestSignedOff ? "Sign off the latest version first — open Test, get a clean run, then Sign off." : "Publish the latest version live."}
-                className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
-              >
-                {busy === "publish" ? "Publishing…" : "Publish"}
-              </button>
-              {status === "published" && (
+              <Tooltip content="Discard draft changes and revert to the published version.">
+                <button
+                  type="button"
+                  onClick={onDiscard}
+                  disabled={busy !== null || mutating}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+                >
+                  Discard draft
+                </button>
+              </Tooltip>
+              <Tooltip content={dirtySinceCheckIn
+                ? "Snapshot the current form as a new version. Errors / work-in-progress are fine — it won't go live until you sign off and publish."
+                : `No changes to check in — the draft already matches v${version}.`}>
+                <button
+                  type="button"
+                  onClick={onCheckIn}
+                  disabled={busy !== null || mutating || !dirtySinceCheckIn}
+                  className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
+                >
+                  {busy === "checkin" ? "Checking in…" : "Check in"}
+                </button>
+              </Tooltip>
+              <Tooltip content={
+                version < 1 ? "Check in a version first."
+                : publishedVersion === version ? `v${version} is already published — it's the live version.`
+                : !latestSignedOff ? "Form can't be published — this version isn't signed off yet. Open Test, get a clean run, then Sign off."
+                : `Publish v${version} — make it the live version.`}>
+                <button
+                  type="button"
+                  onClick={onPublish}
+                  disabled={busy !== null || mutating || version < 1 || !latestSignedOff || publishedVersion === version}
+                  className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                >
+                  {busy === "publish" ? "Publishing…" : publishedVersion === version ? "Published" : "Publish"}
+                </button>
+              </Tooltip>
+              <Tooltip content={publishedVersion != null
+                ? `Embed the published version (v${publishedVersion}) — get an iframe snippet for any website.`
+                : "Publish a version first — the embed always serves the published version."}>
                 <button
                   type="button"
                   onClick={() => setEmbedOpen(true)}
-                  title="Get an iframe snippet to embed this form on any website."
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+                  disabled={publishedVersion == null}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
                 >
                   <CodeXml className="size-4" />Embed
                 </button>
-              )}
+              </Tooltip>
             </>
           )}
         </div>
@@ -539,7 +567,7 @@ export default function FormBuilderPage() {
       />
 
       {/* Keyed by formId so navigating to another form's builder mints a fresh token. */}
-      <FormEmbedPanel key={id} open={embedOpen} onClose={() => setEmbedOpen(false)} tenant={tenant} formId={id} />
+      <FormEmbedPanel key={id} open={embedOpen} onClose={() => setEmbedOpen(false)} tenant={tenant} formId={id} publishedVersion={publishedVersion} />
 
       <Modal isOpen={formSettingsOpen} onClose={() => setFormSettingsOpen(false)} className="mx-4 w-full max-w-[480px]">
         <div className="p-6">

@@ -36,7 +36,8 @@ const mocked = vi.mocked(formsApi);
 function form(schema: object, over: Partial<formsApi.StoredForm> = {}): formsApi.StoredForm {
   return {
     id: "f1", code: "C1", name: "Contact", schema: JSON.stringify(schema),
-    status: "published", publishedVersion: 1, latestVersion: 1, latestVersionSignedOff: false,
+    status: "published", publishedVersion: 1, latestVersion: 1,
+    latestVersionSignedOff: false, draftMatchesLatestVersion: false,
     ...over,
   } as formsApi.StoredForm;
 }
@@ -83,11 +84,24 @@ describe("FormBuilderPage — lifecycle gating", () => {
     expect(screen.queryByText(/\d+ error/i)).not.toBeInTheDocument();
   });
 
-  it("enables Publish only when the latest version is signed off", async () => {
-    mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true }));
+  it("enables Publish only when the latest version is signed off and not already live", async () => {
+    // Signed off + not yet published → Publish is actionable.
+    mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true, publishedVersion: undefined }));
     renderPage();
     await waitFor(() => expect(screen.getByRole("button", { name: /publish/i })).toBeEnabled());
     expect(screen.getByText(/signed off/i)).toBeInTheDocument(); // the badge
+  });
+
+  it("disables Publish (shows 'Published') when the latest version is already the live one", async () => {
+    mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true, publishedVersion: 1 }));
+    renderPage();
+    await waitFor(() => expect(screen.getByRole("button", { name: /published/i })).toBeDisabled());
+  });
+
+  it("disables Check in when the draft already matches the latest version", async () => {
+    mocked.getForm.mockResolvedValue(form(CLEAN, { draftMatchesLatestVersion: true }));
+    renderPage();
+    expect(await screen.findByRole("button", { name: /check in/i })).toBeDisabled();
   });
 });
 

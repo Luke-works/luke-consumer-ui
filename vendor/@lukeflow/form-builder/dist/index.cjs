@@ -510,6 +510,16 @@ function IconEye(props = {}) {
     props
   );
 }
+function IconExternal(props = {}) {
+  return svg(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M15 3h6v6", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M10 14L21 3", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" })
+    ] }),
+    props
+  );
+}
 
 // src/settings/util.ts
 var import_form_core3 = require("@lukeflow/form-core");
@@ -2440,7 +2450,10 @@ function PreviewModal({
             /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", role: "tab", "aria-selected": view === "json", className: `lf-seg-btn${view === "json" ? " is-active" : ""}`, onClick: () => setView("json"), children: "JSON" })
           ] }),
           view === "json" && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "lf-modal-ghost", onClick: copyJson, children: copied ? "Copied \u2713" : "Copy" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "lf-modal-ghost", onClick: openInNewTab, children: "Open in new tab \u2197" }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("button", { type: "button", className: "lf-modal-ghost", onClick: openInNewTab, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(IconExternal, {}),
+            "Open in new tab"
+          ] }),
           /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "lf-iconbtn lf-iconbtn--close", "aria-label": "Close preview", title: "Close", onClick: onClose, children: "\u2715" })
         ] })
       ] }),

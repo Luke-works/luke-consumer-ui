@@ -614,6 +614,9 @@
 
 /* Ghost text actions used in the preview modal header. */
 .lf-modal-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
   font: inherit;
   font-size: 0.82rem;
