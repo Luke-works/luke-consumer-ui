@@ -1,12 +1,14 @@
-// App glue for the e-signature API. The transport-agnostic client lives in the headless
-// @lukeflow/sign-core package (vendored); here we just inject this app's auth (token getter +
-// refresh-on-401) and base URL, then re-export the contract types + a ready-to-use client.
+// App glue for the e-signature capability. The headless contract + transport live in the
+// vendored @lukeflow/sign-core; here we inject this app's auth (token getter + refresh-on-401)
+// and base URL, then expose ready-to-use clients + re-export the schema/lifecycle helpers.
 //
-// Base URL: VITE_SIGNATURES_API_URL points at the standalone engine (e.g. http://localhost:8090);
-// unset → falls back to VITE_AUTH_API_URL so it rides the gateway after the capability folds
-// into core. Authed calls send Authorization: Bearer + X-Tenant-Id (NEVER X-User-Id — the
-// gateway forbids it). The public /api/public/sign/** calls send NO auth/tenant headers.
-import { createSignaturesClient } from "@lukeflow/sign-core";
+// Base URL: VITE_SIGNATURES_API_URL → the standalone engine (http://localhost:8090); unset →
+// VITE_AUTH_API_URL so it rides the gateway post-merge. Authed calls send Authorization +
+// X-Tenant-Id (never X-User-Id). Public per-recipient signing uses the token alone.
+import {
+  createSignatureDefinitionsClient,
+  createSignatureInstancesClient,
+} from "@lukeflow/sign-core";
 import { getAccessToken, refresh } from "./authApi";
 
 const BASE = (
@@ -15,31 +17,43 @@ const BASE = (
   ""
 ).replace(/\/$/, "");
 
-/** The app's e-signature client — auth injected from authApi. */
-export const signaturesClient = createSignaturesClient({
-  baseUrl: BASE,
-  getToken: getAccessToken,
-  refresh,
-});
+const auth = { baseUrl: BASE, getToken: getAccessToken, refresh };
 
-// Re-export the contract (types, geometry helpers, ApiError) so app code imports from one place.
+/** Phase 1 — design-time signature definitions (CRUD + checkout/check-in/sign-off/publish + docs). */
+export const signatureDefinitions = createSignatureDefinitionsClient(auth);
+
+/** Phase 2 — runtime campaigns/instances (start, track, cancel, download sealed) + public signing. */
+export const signatureInstances = createSignatureInstancesClient(auth);
+
+/** Build the public signing link for a recipient token (recipients deliver this). */
+export const recipientSignUrl = (token: string): string =>
+  `${window.location.origin}/sign/${encodeURIComponent(token)}`;
+
+// Re-export contract + helpers so app code imports from one place.
 export {
   ApiError,
-  isRotated,
-  cssToPdf,
-  fieldToCssRect,
-  placeField,
-  DEFAULT_FIELD_SIZE,
+  parseSignatureSchema,
+  repairSignatureSchema,
+  defaultSignatureSchema,
+  validateSignatureSchema,
+  isSchemaSignable,
+  lifecycleGate,
+  FIELD_TYPE_LABEL,
+  isTerminalInstanceState,
 } from "@lukeflow/sign-core";
 export type {
-  SignatureStatus,
-  VerificationMethod,
-  SignatureField,
-  SignatureRequest,
-  SignatureAuditEvent,
-  SignatureDetail,
-  SigningSession,
-  PdfGeometry,
-  CreateSignatureInput,
-  SubmitSignatureInput,
+  StoredSignatureDefinition,
+  SignatureArtifact,
+  SignatureDefinitionAudit,
+  SignatureSchema,
+  SchemaVariable,
+  SignerRole,
+  SignatureDefinitionStatus,
+  LifecycleState,
+  SignatureInstance,
+  SignatureInstanceDetail,
+  InstanceRecipient,
+  SignatureInstanceState,
+  RecipientSession,
+  CampaignInput,
 } from "@lukeflow/sign-core";

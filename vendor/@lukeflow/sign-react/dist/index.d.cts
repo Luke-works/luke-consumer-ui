@@ -1,6 +1,6 @@
 import * as react from 'react';
 import { ReactNode } from 'react';
-import { PdfGeometry, SigningSession, SubmitSignatureInput } from '@lukeflow/sign-core';
+import { PdfGeometry, SigningSession, SubmitSignatureInput, SignatureSchema } from '@lukeflow/sign-core';
 export * from '@lukeflow/sign-core';
 
 /**
@@ -94,6 +94,8 @@ type DocumentViewerProps = {
     }) => ReactNode;
     /** Called once per page render with that page's geometry (current page). */
     onGeometry?: (g: PdfGeometry, page: number) => void;
+    /** Called when the document loads, with its total page count. */
+    onNumPages?: (n: number) => void;
     onError?: (e: unknown) => void;
     theme?: CeremonyTheme;
     accent?: string;
@@ -105,7 +107,7 @@ type DocumentViewerProps = {
  * layer for field placement, and a per-page overlay slot. Built directly on react-pdf so it
  * knows the page count; pairs with @lukeflow/sign-core geometry helpers. Inline-styled.
  */
-declare function DocumentViewer({ source, baseWidth, fieldPage, initialPage, minZoom, maxZoom, toolbar, onClick, renderOverlay, onGeometry, onError, theme, accent, jumpLabel, }: DocumentViewerProps): react.JSX.Element;
+declare function DocumentViewer({ source, baseWidth, fieldPage, initialPage, minZoom, maxZoom, toolbar, onClick, renderOverlay, onGeometry, onNumPages, onError, theme, accent, jumpLabel, }: DocumentViewerProps): react.JSX.Element;
 
 type AdoptMethod = "draw" | "type" | "upload";
 type AdoptSignatureProps = {
@@ -146,4 +148,36 @@ type SigningCeremonyProps = {
  */
 declare function SigningCeremony({ session, onSubmit, onError, brandName, logoUrl, accent, theme, adoptMethods, errorMessage, }: SigningCeremonyProps): react.JSX.Element;
 
-export { type AdoptMethod, AdoptSignature, type AdoptSignatureProps, type CeremonyTheme, DEFAULT_ACCENT, DocumentViewer, type DocumentViewerProps, type Palette, PdfView, SignaturePad, SigningCeremony, type SigningCeremonyProps, hexA, palette, useCeremonyTheme };
+interface SignatureBuilderProps {
+    /** The schema to edit (the builder is uncontrolled after mount; drive resets via the ref). */
+    initialSchema: SignatureSchema;
+    /** PDF to render: a just-picked File or a URL/data string for an already-stored document. */
+    documentSource?: File | string | null;
+    /** Fires on every edit with the new schema (debounce + saveDraft in the host). */
+    onChange?: (schema: SignatureSchema) => void;
+    /** Upload a picked document; return the DocumentStore key + meta to record on the schema. */
+    onUploadDocument?: (file: File) => Promise<{
+        key: string;
+        name: string;
+        pageCount?: number;
+    }>;
+    /** View-only (e.g. not checked out). Disables all editing. */
+    readOnly?: boolean;
+    /** Right-hand column (AI assist panel, etc.). */
+    aside?: ReactNode;
+    theme?: CeremonyTheme;
+    accent?: string;
+}
+interface SignatureBuilderHandle {
+    getSchema: () => SignatureSchema;
+    setSchema: (s: SignatureSchema) => void;
+}
+/**
+ * Design-time signature designer: manage signer roles, drop a palette of fields (signature,
+ * initials, date, name, text) bound to a signer onto a multi-page PDF, drag to reposition, set
+ * routing, and see validation. Produces a SignatureSchema. Inline-styled (no CSS framework).
+ * Uncontrolled like the forms FormBuilder — the host owns load/save/lifecycle; reset via the ref.
+ */
+declare const SignatureBuilder: react.ForwardRefExoticComponent<SignatureBuilderProps & react.RefAttributes<SignatureBuilderHandle>>;
+
+export { type AdoptMethod, AdoptSignature, type AdoptSignatureProps, type CeremonyTheme, DEFAULT_ACCENT, DocumentViewer, type DocumentViewerProps, type Palette, PdfView, SignatureBuilder, type SignatureBuilderHandle, type SignatureBuilderProps, SignaturePad, SigningCeremony, type SigningCeremonyProps, hexA, palette, useCeremonyTheme };

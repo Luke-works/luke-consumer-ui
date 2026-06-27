@@ -272,6 +272,7 @@ function DocumentViewer({
   onClick,
   renderOverlay,
   onGeometry,
+  onNumPages,
   onError,
   theme,
   accent,
@@ -403,7 +404,10 @@ function DocumentViewer({
             Document2,
             {
               file,
-              onLoadSuccess: (d) => setNumPages(d.numPages),
+              onLoadSuccess: (d) => {
+                setNumPages(d.numPages);
+                onNumPages?.(d.numPages);
+              },
               loading: /* @__PURE__ */ jsx3("div", { style: { padding: 28, fontSize: 14, color: c.textFaint }, children: "Loading document\u2026" }),
               error: /* @__PURE__ */ jsx3("div", { style: { padding: 28, fontSize: 14, color: c.danger }, children: "Could not load the document." }),
               onLoadError: onError,
@@ -1081,6 +1085,569 @@ function vLabel(m) {
   return m === "EMAIL_OTP" ? "Email code" : m === "SMS_OTP" ? "SMS code" : m === "IDV" ? "ID verification" : m;
 }
 
+// src/SignatureBuilder.tsx
+import { forwardRef, useCallback as useCallback3, useImperativeHandle, useMemo as useMemo4, useRef as useRef2, useState as useState5 } from "react";
+import {
+  FIELD_TYPE_LABEL,
+  FIELD_TYPES,
+  SIGNER_COLORS,
+  fieldToCssRect as fieldToCssRect2,
+  isRotated as isRotated2,
+  nextId,
+  placeField,
+  validateSignatureSchema
+} from "@lukeflow/sign-core";
+import { Fragment, jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+var FIELD_SIZE = {
+  SIGNATURE: { w: 160, h: 50 },
+  INITIALS: { w: 72, h: 44 },
+  DATE: { w: 120, h: 28 },
+  NAME: { w: 160, h: 28 },
+  TEXT: { w: 160, h: 32 }
+};
+var VERIFY_OPTIONS = [
+  { value: "NONE", label: "No verification" },
+  { value: "EMAIL_OTP", label: "Email code" },
+  { value: "SMS_OTP", label: "SMS code" },
+  { value: "IDV", label: "ID verification" }
+];
+var SignatureBuilder = forwardRef(function SignatureBuilder2({ initialSchema, documentSource, onChange, onUploadDocument, readOnly = false, aside, theme, accent }, ref) {
+  const t = useCeremonyTheme(theme);
+  const c = palette(t, accent);
+  const [schema, setSchemaState] = useState5(initialSchema);
+  const [localFile, setLocalFile] = useState5(null);
+  const [activeSignerId, setActiveSignerId] = useState5(initialSchema.signers[0]?.id ?? "signer-1");
+  const [tool, setTool] = useState5(null);
+  const [selectedFieldId, setSelectedFieldId] = useState5(null);
+  const [rotatedWarn, setRotatedWarn] = useState5(false);
+  const [uploadErr, setUploadErr] = useState5(null);
+  const schemaRef = useRef2(schema);
+  schemaRef.current = schema;
+  const commit = useCallback3(
+    (next) => {
+      setSchemaState(next);
+      schemaRef.current = next;
+      onChange?.(next);
+    },
+    [onChange]
+  );
+  useImperativeHandle(
+    ref,
+    () => ({
+      getSchema: () => schemaRef.current,
+      setSchema: (s) => {
+        setSchemaState(s);
+        schemaRef.current = s;
+        if (!s.signers.some((sr) => sr.id === activeSignerId)) setActiveSignerId(s.signers[0]?.id ?? "");
+      }
+    }),
+    [activeSignerId]
+  );
+  const docSource = localFile ?? documentSource ?? null;
+  const problems = useMemo4(() => validateSignatureSchema(schema), [schema]);
+  const errorCount = problems.filter((p) => p.level === "error").length;
+  const signerColor = (id) => schema.signers.find((s) => s.id === id)?.color ?? c.accent;
+  const addSigner = () => {
+    const id = nextId("signer", schema.signers);
+    const order = schema.signers.length + 1;
+    const color = SIGNER_COLORS[schema.signers.length % SIGNER_COLORS.length];
+    const signer = { id, label: `Signer ${order}`, order, verify: "NONE", color };
+    commit({ ...schema, signers: [...schema.signers, signer] });
+    setActiveSignerId(id);
+  };
+  const updateSigner = (id, patch) => commit({ ...schema, signers: schema.signers.map((s) => s.id === id ? { ...s, ...patch } : s) });
+  const removeSigner = (id) => {
+    if (schema.signers.length <= 1) return;
+    const signers = schema.signers.filter((s) => s.id !== id);
+    const fields = schema.fields.filter((f) => f.signerId !== id);
+    commit({ ...schema, signers, fields });
+    if (activeSignerId === id) setActiveSignerId(signers[0]?.id ?? "");
+  };
+  const placeNewField = (p) => {
+    if (!tool || readOnly) return;
+    if (isRotated2(p.geometry)) {
+      setRotatedWarn(true);
+      return;
+    }
+    setRotatedWarn(false);
+    const rect = placeField(p.geometry, p.cssX, p.cssY, FIELD_SIZE[tool], p.page);
+    const field = {
+      id: nextId("field", schema.fields),
+      signerId: activeSignerId,
+      type: tool,
+      page: rect.page,
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: rect.h,
+      required: true
+    };
+    commit({ ...schema, fields: [...schema.fields, field] });
+    setSelectedFieldId(field.id);
+    setTool(null);
+  };
+  const moveField = (id, x, y) => commit({ ...schema, fields: schema.fields.map((f) => f.id === id ? { ...f, x, y } : f) });
+  const addVariable = () => commit({ ...schema, variables: [...schema.variables, { key: "", label: "", required: false }] });
+  const updateVariable = (i, patch) => commit({ ...schema, variables: schema.variables.map((v, idx) => idx === i ? { ...v, ...patch } : v) });
+  const removeVariable = (i) => commit({ ...schema, variables: schema.variables.filter((_, idx) => idx !== i) });
+  const removeField = (id) => {
+    commit({ ...schema, fields: schema.fields.filter((f) => f.id !== id) });
+    if (selectedFieldId === id) setSelectedFieldId(null);
+  };
+  const onPickFile = async (file) => {
+    setUploadErr(null);
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setUploadErr("Please choose a PDF.");
+      return;
+    }
+    setLocalFile(file);
+    commit({ ...schema, document: { ...schema.document, name: file.name, key: void 0 } });
+    if (onUploadDocument) {
+      try {
+        const up = await onUploadDocument(file);
+        commit({
+          ...schemaRef.current,
+          document: { key: up.key, name: up.name || file.name, pageCount: up.pageCount }
+        });
+      } catch {
+        setUploadErr("Upload failed. Try again.");
+      }
+    }
+  };
+  const renderOverlay = ({ page, geometry }) => /* @__PURE__ */ jsx6(Fragment, { children: schema.fields.filter((f) => f.page === page).map((f) => /* @__PURE__ */ jsx6(
+    FieldBox,
+    {
+      c,
+      field: f,
+      geometry,
+      color: signerColor(f.signerId),
+      signerLabel: schema.signers.find((s) => s.id === f.signerId)?.label ?? "?",
+      selected: selectedFieldId === f.id,
+      interactive: !tool && !readOnly,
+      onSelect: () => setSelectedFieldId(f.id),
+      onMove: (x, y) => moveField(f.id, x, y),
+      onDelete: () => removeField(f.id)
+    },
+    f.id
+  )) });
+  return /* @__PURE__ */ jsxs6(
+    "div",
+    {
+      style: {
+        display: "grid",
+        gridTemplateColumns: aside ? "248px minmax(0,1fr) 300px" : "248px minmax(0,1fr)",
+        gap: 12,
+        alignItems: "start",
+        color: c.text,
+        background: c.bg
+      },
+      children: [
+        /* @__PURE__ */ jsxs6("aside", { style: { display: "flex", flexDirection: "column", gap: 16, padding: 12, border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface }, children: [
+          /* @__PURE__ */ jsxs6(Section, { c, title: "Signers", children: [
+            /* @__PURE__ */ jsx6("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: schema.signers.map((s) => /* @__PURE__ */ jsx6(
+              SignerRow,
+              {
+                c,
+                signer: s,
+                active: s.id === activeSignerId,
+                canRemove: schema.signers.length > 1 && !readOnly,
+                readOnly,
+                onActivate: () => setActiveSignerId(s.id),
+                onChange: (patch) => updateSigner(s.id, patch),
+                onRemove: () => removeSigner(s.id)
+              },
+              s.id
+            )) }),
+            !readOnly && /* @__PURE__ */ jsx6("button", { type: "button", onClick: addSigner, style: ghost(c), children: "+ Add signer" })
+          ] }),
+          /* @__PURE__ */ jsxs6(Section, { c, title: "Fields", children: [
+            /* @__PURE__ */ jsxs6("p", { style: { margin: "0 0 8px", fontSize: 11, color: c.textFaint }, children: [
+              "Pick a field, then click the document to place it for",
+              " ",
+              /* @__PURE__ */ jsx6("strong", { style: { color: signerColor(activeSignerId) }, children: schema.signers.find((s) => s.id === activeSignerId)?.label ?? "the signer" }),
+              "."
+            ] }),
+            /* @__PURE__ */ jsx6("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }, children: FIELD_TYPES.map((ft) => /* @__PURE__ */ jsx6(
+              "button",
+              {
+                type: "button",
+                disabled: readOnly,
+                onClick: () => setTool((cur) => cur === ft ? null : ft),
+                style: {
+                  padding: "8px 6px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  cursor: readOnly ? "not-allowed" : "pointer",
+                  color: tool === ft ? c.accentText : c.text,
+                  background: tool === ft ? c.accent : c.surfaceMuted,
+                  border: `1px solid ${tool === ft ? c.accent : c.border}`,
+                  opacity: readOnly ? 0.5 : 1
+                },
+                children: FIELD_TYPE_LABEL[ft]
+              },
+              ft
+            )) }),
+            tool && /* @__PURE__ */ jsxs6("p", { style: { margin: "8px 0 0", fontSize: 11, color: c.accent }, children: [
+              "Click the document to drop a ",
+              FIELD_TYPE_LABEL[tool],
+              " field. Esc/click again to cancel."
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs6(Section, { c, title: "Routing", children: [
+            /* @__PURE__ */ jsx6("div", { style: { display: "flex", gap: 6 }, children: ["sequential", "parallel"].map((r) => /* @__PURE__ */ jsx6(
+              "button",
+              {
+                type: "button",
+                disabled: readOnly,
+                onClick: () => commit({ ...schema, routing: r }),
+                style: {
+                  flex: 1,
+                  padding: "8px 6px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textTransform: "capitalize",
+                  borderRadius: 8,
+                  cursor: readOnly ? "not-allowed" : "pointer",
+                  color: schema.routing === r ? c.accent : c.textMuted,
+                  background: schema.routing === r ? c.accentSoft : "transparent",
+                  border: `1px solid ${schema.routing === r ? c.accent : c.border}`
+                },
+                children: r
+              },
+              r
+            )) }),
+            /* @__PURE__ */ jsx6("p", { style: { margin: "8px 0 0", fontSize: 11, color: c.textFaint }, children: schema.routing === "sequential" ? "Signers sign one after another, in order." : "All signers sign in any order." })
+          ] }),
+          /* @__PURE__ */ jsxs6(Section, { c, title: "Data attributes", children: [
+            /* @__PURE__ */ jsxs6("p", { style: { margin: "0 0 8px", fontSize: 11, color: c.textFaint }, children: [
+              "Values a campaign supplies at send time, usable as ",
+              /* @__PURE__ */ jsx6("code", { children: "{{key}}" }),
+              "."
+            ] }),
+            /* @__PURE__ */ jsx6("div", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: schema.variables.map((v, i) => /* @__PURE__ */ jsxs6("div", { style: { border: `1px solid ${c.border}`, borderRadius: 8, padding: 8, background: c.surfaceMuted }, children: [
+              /* @__PURE__ */ jsxs6("div", { style: { display: "flex", alignItems: "center", gap: 6 }, children: [
+                /* @__PURE__ */ jsx6(
+                  "input",
+                  {
+                    value: v.key,
+                    disabled: readOnly,
+                    placeholder: "key (e.g. fullName)",
+                    onChange: (e) => updateVariable(i, { key: e.target.value.replace(/\s+/g, "") }),
+                    style: { flex: 1, minWidth: 0, fontSize: 12, fontFamily: "monospace", color: c.text, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 6, padding: "4px 6px" }
+                  }
+                ),
+                !readOnly && /* @__PURE__ */ jsx6(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => removeVariable(i),
+                    "aria-label": "Remove attribute",
+                    style: { border: "none", background: "transparent", color: c.textFaint, cursor: "pointer", fontSize: 14 },
+                    children: "\xD7"
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsx6(
+                "input",
+                {
+                  value: v.label,
+                  disabled: readOnly,
+                  placeholder: "Label",
+                  onChange: (e) => updateVariable(i, { label: e.target.value }),
+                  style: { marginTop: 6, width: "100%", boxSizing: "border-box", fontSize: 12, color: c.text, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 6, padding: "4px 6px" }
+                }
+              ),
+              /* @__PURE__ */ jsxs6("label", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 11, color: c.textMuted }, children: [
+                /* @__PURE__ */ jsx6("input", { type: "checkbox", checked: !!v.required, disabled: readOnly, onChange: (e) => updateVariable(i, { required: e.target.checked }) }),
+                "Required"
+              ] })
+            ] }, i)) }),
+            !readOnly && /* @__PURE__ */ jsx6("button", { type: "button", onClick: addVariable, style: ghost(c), children: "+ Add attribute" })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs6("main", { style: { minWidth: 0 }, children: [
+          docSource ? /* @__PURE__ */ jsxs6("div", { onKeyDown: (e) => e.key === "Escape" && setTool(null), tabIndex: -1, children: [
+            /* @__PURE__ */ jsx6(
+              DocumentViewer,
+              {
+                source: docSource,
+                theme: t,
+                accent,
+                onError: () => setUploadErr("This document couldn\u2019t be displayed."),
+                onNumPages: (n) => {
+                  if (schema.document.pageCount !== n) {
+                    commit({ ...schemaRef.current, document: { ...schemaRef.current.document, pageCount: n } });
+                  }
+                },
+                onClick: tool && !readOnly ? placeNewField : void 0,
+                renderOverlay
+              }
+            ),
+            rotatedWarn && /* @__PURE__ */ jsx6("p", { style: { marginTop: 8, fontSize: 13, color: c.danger }, children: "That page is rotated \u2014 fields can\u2019t be placed on it accurately. Use an un-rotated page." })
+          ] }) : /* @__PURE__ */ jsx6(Dropzone, { c, readOnly, onPick: onPickFile, error: uploadErr }),
+          docSource && uploadErr && /* @__PURE__ */ jsx6("p", { style: { marginTop: 8, fontSize: 13, color: c.danger }, children: uploadErr }),
+          docSource && !readOnly && /* @__PURE__ */ jsxs6("label", { style: { display: "inline-block", marginTop: 10, fontSize: 12, color: c.accent, cursor: "pointer" }, children: [
+            "Replace document",
+            /* @__PURE__ */ jsx6("input", { type: "file", accept: "application/pdf,.pdf", style: { display: "none" }, onChange: (e) => void onPickFile(e.target.files?.[0] ?? null) })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs6("aside", { style: { display: aside ? "flex" : "none", flexDirection: "column", gap: 12 }, children: [
+          aside,
+          /* @__PURE__ */ jsx6(ProblemsPanel, { c, problems, errorCount })
+        ] }),
+        !aside && /* @__PURE__ */ jsx6("div", { style: { gridColumn: "1 / -1" }, children: /* @__PURE__ */ jsx6(ProblemsPanel, { c, problems, errorCount }) })
+      ]
+    }
+  );
+});
+var SignatureBuilder_default = SignatureBuilder;
+function FieldBox({
+  c,
+  field,
+  geometry,
+  color,
+  signerLabel,
+  selected,
+  interactive,
+  onSelect,
+  onMove,
+  onDelete
+}) {
+  const r = fieldToCssRect2(geometry, field);
+  const drag = useRef2(null);
+  const onPointerDown = (e) => {
+    if (!interactive) return;
+    e.stopPropagation();
+    onSelect();
+    drag.current = { startX: e.clientX, startY: e.clientY, fx: field.x, fy: field.y };
+    e.target.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e) => {
+    if (!drag.current) return;
+    const dxCss = e.clientX - drag.current.startX;
+    const dyCss = e.clientY - drag.current.startY;
+    const dxPdf = dxCss * geometry.pdfW / geometry.cssW;
+    const dyPdf = dyCss * geometry.pdfH / geometry.cssH;
+    const nx = Math.max(0, Math.min(geometry.pdfW - field.w, drag.current.fx + dxPdf));
+    const ny = Math.max(0, Math.min(geometry.pdfH - field.h, drag.current.fy + dyPdf));
+    onMove(nx, ny);
+  };
+  const endDrag = (e) => {
+    if (drag.current) {
+      drag.current = null;
+      try {
+        e.target.releasePointerCapture(e.pointerId);
+      } catch {
+      }
+    }
+  };
+  return /* @__PURE__ */ jsxs6(
+    "div",
+    {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: endDrag,
+      onPointerCancel: endDrag,
+      style: {
+        position: "absolute",
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+        borderRadius: 4,
+        border: `2px solid ${color}`,
+        background: hexWithAlpha(color, selected ? 0.28 : 0.16),
+        boxShadow: selected ? `0 0 0 2px ${c.surface}, 0 0 0 4px ${color}` : "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "visible",
+        cursor: interactive ? "move" : "default",
+        pointerEvents: interactive ? "auto" : "none",
+        touchAction: "none"
+      },
+      children: [
+        /* @__PURE__ */ jsxs6("span", { style: { fontSize: 9, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 0.3, padding: "0 2px", textAlign: "center", lineHeight: 1.1 }, children: [
+          FIELD_TYPE_LABEL[field.type],
+          /* @__PURE__ */ jsx6("br", {}),
+          /* @__PURE__ */ jsx6("span", { style: { fontWeight: 500, opacity: 0.85 }, children: signerLabel })
+        ] }),
+        selected && interactive && /* @__PURE__ */ jsx6(
+          "button",
+          {
+            type: "button",
+            onPointerDown: (e) => e.stopPropagation(),
+            onClick: (e) => {
+              e.stopPropagation();
+              onDelete();
+            },
+            "aria-label": "Remove field",
+            style: {
+              position: "absolute",
+              top: -10,
+              right: -10,
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              border: "none",
+              background: c.danger,
+              color: "#fff",
+              fontSize: 12,
+              lineHeight: "20px",
+              cursor: "pointer",
+              padding: 0
+            },
+            children: "\xD7"
+          }
+        )
+      ]
+    }
+  );
+}
+function SignerRow({
+  c,
+  signer,
+  active,
+  canRemove,
+  readOnly,
+  onActivate,
+  onChange,
+  onRemove
+}) {
+  return /* @__PURE__ */ jsxs6(
+    "div",
+    {
+      onClick: onActivate,
+      style: {
+        border: `1px solid ${active ? signer.color ?? c.accent : c.border}`,
+        borderRadius: 8,
+        padding: 8,
+        background: active ? hexWithAlpha(signer.color ?? c.accent, 0.1) : c.surfaceMuted,
+        cursor: "pointer"
+      },
+      children: [
+        /* @__PURE__ */ jsxs6("div", { style: { display: "flex", alignItems: "center", gap: 6 }, children: [
+          /* @__PURE__ */ jsx6("span", { style: { width: 10, height: 10, borderRadius: "50%", background: signer.color ?? c.accent, flexShrink: 0 } }),
+          /* @__PURE__ */ jsx6(
+            "input",
+            {
+              value: signer.label,
+              disabled: readOnly,
+              onChange: (e) => onChange({ label: e.target.value }),
+              onClick: (e) => e.stopPropagation(),
+              style: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: c.text, background: "transparent", border: "none", outline: "none" }
+            }
+          ),
+          canRemove && /* @__PURE__ */ jsx6(
+            "button",
+            {
+              type: "button",
+              onClick: (e) => {
+                e.stopPropagation();
+                onRemove();
+              },
+              "aria-label": "Remove signer",
+              style: { border: "none", background: "transparent", color: c.textFaint, cursor: "pointer", fontSize: 14 },
+              children: "\xD7"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsx6(
+          "select",
+          {
+            value: signer.verify ?? "NONE",
+            disabled: readOnly,
+            onClick: (e) => e.stopPropagation(),
+            onChange: (e) => onChange({ verify: e.target.value }),
+            style: { marginTop: 6, width: "100%", fontSize: 11, color: c.textMuted, background: c.surface, border: `1px solid ${c.border}`, borderRadius: 6, padding: "4px 6px" },
+            children: VERIFY_OPTIONS.map((o) => /* @__PURE__ */ jsx6("option", { value: o.value, children: o.label }, o.value))
+          }
+        )
+      ]
+    }
+  );
+}
+function Dropzone({ c, readOnly, onPick, error }) {
+  return /* @__PURE__ */ jsxs6(
+    "label",
+    {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        minHeight: "50vh",
+        textAlign: "center",
+        border: `2px dashed ${c.borderStrong}`,
+        borderRadius: 12,
+        background: c.surfaceMuted,
+        cursor: readOnly ? "not-allowed" : "pointer",
+        color: c.textMuted
+      },
+      children: [
+        /* @__PURE__ */ jsx6("span", { style: { fontSize: 15, fontWeight: 700, color: c.text }, children: "Upload the document to sign" }),
+        /* @__PURE__ */ jsx6("span", { style: { fontSize: 13 }, children: "Drop a PDF here or click to choose" }),
+        error && /* @__PURE__ */ jsx6("span", { style: { fontSize: 13, color: c.danger }, children: error }),
+        /* @__PURE__ */ jsx6("input", { type: "file", accept: "application/pdf,.pdf", disabled: readOnly, style: { display: "none" }, onChange: (e) => onPick(e.target.files?.[0] ?? null) })
+      ]
+    }
+  );
+}
+function ProblemsPanel({ c, problems, errorCount }) {
+  return /* @__PURE__ */ jsxs6("div", { style: { border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 12 }, children: [
+    /* @__PURE__ */ jsxs6("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: problems.length ? 8 : 0 }, children: [
+      /* @__PURE__ */ jsx6("span", { style: { fontSize: 13, fontWeight: 700, color: c.text }, children: "Problems" }),
+      /* @__PURE__ */ jsx6(
+        "span",
+        {
+          style: {
+            fontSize: 11,
+            fontWeight: 700,
+            padding: "1px 8px",
+            borderRadius: 999,
+            color: errorCount ? c.danger : c.success,
+            background: errorCount ? c.dangerSoft : c.successSoft
+          },
+          children: errorCount ? `${errorCount} error${errorCount > 1 ? "s" : ""}` : "Ready"
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsx6("ul", { style: { listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }, children: problems.map((p, i) => /* @__PURE__ */ jsxs6("li", { style: { fontSize: 12, color: p.level === "error" ? c.danger : c.warning, display: "flex", gap: 6 }, children: [
+      /* @__PURE__ */ jsx6("span", { "aria-hidden": true, children: p.level === "error" ? "\u26D4" : "\u26A0\uFE0F" }),
+      /* @__PURE__ */ jsx6("span", { children: p.message })
+    ] }, i)) })
+  ] });
+}
+function Section({ c, title, children }) {
+  return /* @__PURE__ */ jsxs6("section", { children: [
+    /* @__PURE__ */ jsx6("h3", { style: { margin: "0 0 8px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: c.textFaint }, children: title }),
+    children
+  ] });
+}
+function ghost(c) {
+  return {
+    marginTop: 8,
+    width: "100%",
+    padding: "8px 10px",
+    fontSize: 12,
+    fontWeight: 600,
+    color: c.accent,
+    background: c.accentSoft,
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer"
+  };
+}
+function hexWithAlpha(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const h = m[1];
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${alpha})`;
+}
+
 // src/index.ts
 export * from "@lukeflow/sign-core";
 export {
@@ -1088,6 +1655,7 @@ export {
   DEFAULT_ACCENT,
   DocumentViewer,
   PdfView,
+  SignatureBuilder_default as SignatureBuilder,
   SignaturePad,
   SigningCeremony,
   hexA,

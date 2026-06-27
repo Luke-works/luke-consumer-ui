@@ -1,7 +1,7 @@
 {
   "name": "@lukeflow/sign-core",
   "version": "0.1.0-alpha.0",
-  "description": "Headless e-signature contract: types, timestamp adapters, field/coordinate geometry, and a transport-agnostic API client (auth injected).",
+  "description": "Headless e-signature contract: schema, lifecycle, definitions + instances clients, geometry.",
   "license": "UNLICENSED",
   "type": "module",
   "sideEffects": false,

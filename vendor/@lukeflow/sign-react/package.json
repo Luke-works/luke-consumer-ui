@@ -1,7 +1,7 @@
 {
   "name": "@lukeflow/sign-react",
   "version": "0.1.0-alpha.0",
-  "description": "React components for @lukeflow/sign-core — PDF viewer, signature pad, adopt-signature, and the guided signing ceremony.",
+  "description": "React components for @lukeflow/sign-core — SignatureBuilder, SigningCeremony, DocumentViewer, SignaturePad.",
   "license": "UNLICENSED",
   "type": "module",
   "sideEffects": false,
