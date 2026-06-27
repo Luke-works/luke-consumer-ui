@@ -449,16 +449,20 @@ export default function FormsList() {
             )}
             {historyVersions.slice().reverse().map((art) => {
               const isLive = historyForm?.publishedVersion === art.version;
+              const signedOff = !!art.signedOffAt;
               return (
                 <li key={art.version} className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-4 py-2.5 dark:border-gray-800">
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-gray-800 dark:text-white/90">v{art.version}</span>
                     {isLive && <span className="ml-2 rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-medium uppercase text-success-600 dark:bg-success-500/15">Live</span>}
+                    {!isLive && signedOff && <span className="ml-2 rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-medium uppercase text-success-600 dark:bg-success-500/15">Signed off</span>}
+                    {!signedOff && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase text-gray-500 dark:bg-white/10 dark:text-gray-400">Not signed off</span>}
                     <span className="ml-2 text-xs text-gray-400">{new Date(art.checkedInAt).toLocaleString()}</span>
                   </div>
                   <div className="flex shrink-0 gap-1.5">
                     <Button size="sm" variant="outline" onClick={() => setPreviewSchema(art.schema)}>Preview</Button>
-                    {canEdit && !isLive && (
+                    {/* Publish only a signed-off version — the server enforces this too. */}
+                    {canEdit && !isLive && signedOff && (
                       <Button size="sm" variant="outline" onClick={async () => {
                         if (!tenant || !historyForm) return;
                         await publishVersion(tenant, historyForm.id, art.version);
@@ -466,14 +470,16 @@ export default function FormsList() {
                         setHistoryForm({ ...historyForm, publishedVersion: art.version, status: "published" });
                       }}>Publish</Button>
                     )}
+                    {/* Check out: load this version into the editable draft and open the builder. */}
                     {canEdit && (
                       <Button size="sm" variant="outline" onClick={async () => {
                         if (!tenant || !historyForm) return;
-                        if (!window.confirm(`Restore v${art.version} into the editable draft? Current draft edits will be replaced.`)) return;
-                        await restoreVersion(tenant, historyForm.id, art.version);
-                        await refresh();
+                        if (!window.confirm(`Check out v${art.version} for editing? It's loaded into the editable draft (replacing any current draft changes) and opens in the builder.`)) return;
+                        const formId = historyForm.id;
+                        await restoreVersion(tenant, formId, art.version);
                         setHistoryForm(null);
-                      }}>Restore</Button>
+                        navigate(`/forms/${formId}`);
+                      }}>Check out</Button>
                     )}
                   </div>
                 </li>

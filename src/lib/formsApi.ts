@@ -21,6 +21,8 @@ export type StoredForm = {
   publishedVersion?: number;
   /** Highest checked-in version (0 when none). Populated on single-form loads. */
   latestVersion: number;
+  /** Whether that latest version is signed off (⟺ publishable). Single-form loads. */
+  latestVersionSignedOff: boolean;
   lockedBy?: string | null;
   deletedAt?: number | null;
   createdBy?: string;
@@ -36,7 +38,7 @@ export type StoredForm = {
 };
 
 /** A checked-in, immutable version (the artifact workflows resolve). */
-export type FormArtifact = { version: number; schema: string; checkedInAt: number; by?: string };
+export type FormArtifact = { version: number; schema: string; checkedInAt: number; by?: string; signedOffAt?: number | null };
 
 /** One entry in a form's activity feed. */
 export type AuditEvent = { action: string; detail?: string; actor?: string; actorName?: string; at: number };
@@ -61,14 +63,14 @@ type ApiForm = {
   lastTestedAt?: string | null;
   lastTestedBy?: string | null;
 };
-type ApiVersion = { version: number; schema: string; checkedInBy?: string | null; checkedInAt: string };
+type ApiVersion = { version: number; schema: string; checkedInBy?: string | null; checkedInAt: string; signedOffAt?: string | null; signedOffBy?: string | null };
 type ApiAudit = { action: string; detail?: string | null; actor?: string | null; actorName?: string | null; at: string };
 
 // ── Adapters (backend ⇄ view model) ─────────────────────────────────────────
 const STATUS_IN: Record<string, FormStatus> = { DRAFT: "draft", PUBLISHED: "published", RETIRED: "archived" };
 const ms = (iso?: string | null): number => (iso ? Date.parse(iso) : 0);
 
-function toForm(f: ApiForm, latestVersion = 0): StoredForm {
+function toForm(f: ApiForm, latestVersion = 0, latestVersionSignedOff = false): StoredForm {
   return {
     id: f.id,
     code: f.code,
@@ -78,6 +80,7 @@ function toForm(f: ApiForm, latestVersion = 0): StoredForm {
     status: STATUS_IN[f.status] ?? "draft",
     publishedVersion: f.publishedVersion ?? undefined,
     latestVersion,
+    latestVersionSignedOff,
     lockedBy: f.lockedBy ?? null,
     deletedAt: f.deletedAt ? ms(f.deletedAt) : null,
     createdBy: f.createdBy ?? undefined,
@@ -96,6 +99,7 @@ const toArtifact = (v: ApiVersion): FormArtifact => ({
   schema: v.schema,
   checkedInAt: ms(v.checkedInAt),
   by: v.checkedInBy ?? undefined,
+  signedOffAt: v.signedOffAt ? ms(v.signedOffAt) : null,
 });
 
 const toAudit = (a: ApiAudit): AuditEvent => ({
@@ -127,7 +131,9 @@ export async function getForm(tenant: string, id: string): Promise<StoredForm> {
     req<ApiForm>(tenant, `${BASE}/${seg(id)}`),
     req<ApiVersion[]>(tenant, `${BASE}/${seg(id)}/versions`),
   ]);
-  return toForm(form, maxVersion(versions));
+  const max = maxVersion(versions);
+  const latestSignedOff = !!versions.find((v) => v.version === max)?.signedOffAt;
+  return toForm(form, max, latestSignedOff);
 }
 
 export async function createForm(tenant: string, name: string, description?: string): Promise<StoredForm> {
@@ -147,10 +153,12 @@ export function updateMeta(
   return req(tenant, `${BASE}/${seg(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
-export async function checkIn(tenant: string, id: string, schema: string, publish?: boolean): Promise<FormArtifact> {
+/** Check in (snapshot) the draft as a new immutable version. Never publishes — that's a
+ *  separate, sign-off-gated step ({@link publishVersion}). Errors / WIP are allowed. */
+export async function checkIn(tenant: string, id: string, schema: string): Promise<FormArtifact> {
   const v = await req<ApiVersion>(tenant, `${BASE}/${seg(id)}/versions`, {
     method: "POST",
-    body: JSON.stringify({ schema, publish: publish ?? false }),
+    body: JSON.stringify({ schema }),
   });
   return toArtifact(v);
 }

@@ -33,6 +33,7 @@ import {
   publishVersion,
   release,
   saveDraft,
+  signOffTest,
   updateMeta,
   type AuditEvent,
   type FormStatus,
@@ -91,6 +92,9 @@ export default function FormBuilderPage() {
   // "Test the form" (positive/negative validation runs + sign-off).
   const [testOpen, setTestOpen] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(null);
+  // Whether the LATEST checked-in version is signed off ⟺ Publish is allowed. A plain check-in
+  // creates an unsigned version (clears this); "Check in & sign off" sets it.
+  const [latestSignedOff, setLatestSignedOff] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
   // Advisory edit-lock: who (other than me) currently holds it, for the "being edited" banner.
   const [lockedByOther, setLockedByOther] = useState<string | null>(null);
@@ -125,6 +129,7 @@ export default function FormBuilderPage() {
         setStatus(f.status);
         setVersion(latestVersion(f));
         setLastTestedAt(f.lastTestedAt ?? null);
+        setLatestSignedOff(f.latestVersionSignedOff);
         const sm = readSubmitMessage(f.schema);
         setSubmitMessage(sm);
         submitMsgRef.current = sm;
@@ -221,6 +226,9 @@ export default function FormBuilderPage() {
     (schema: FormSchema) => {
       latestRef.current = schema;
       setLiveSchema(schema as unknown as BuilderSchemaLike); // keep the AI panel's view current
+      // The working draft now differs from the signed-off version, so Publish must re-gate:
+      // you sign off (check in + test) the CURRENT work before it can go live.
+      setLatestSignedOff(false);
       if (!canEdit) return; // view-only: never persist edits.
       scheduleSave(schema);
     },
@@ -276,14 +284,16 @@ export default function FormBuilderPage() {
     if (safe) navigate(to);
   };
 
+  // Check-in is a SNAPSHOT — allowed even with validation errors / work-in-progress. It never
+  // publishes (publish is a separate, sign-off-gated step) and the new version starts unsigned.
   const onCheckIn = () => runExclusive(async () => {
-    if (!tenant || !id || blocking.length) return; // never check in a schema with blocking problems
+    if (!tenant || !id) return;
     setBusy("checkin");
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     try {
       const art = await checkIn(tenant, id, currentJson());
       setVersion(art.version);
-      setStatus("published");
+      setLatestSignedOff(false); // a plain check-in is unsigned until it's tested + signed off
       setSaved(true);
       setSaveError(false);
     } catch (e) {
@@ -294,10 +304,10 @@ export default function FormBuilderPage() {
     }
   });
 
-  // The mutex guarantees a check-in (which sets `version`) has fully resolved before
-  // publish can start, so the version published here is never stale.
+  // Publish promotes the latest version live — gated on it being signed off (the server enforces
+  // this too). The mutex guarantees a check-in (which sets `version`) resolves first.
   const onPublish = () => runExclusive(async () => {
-    if (!tenant || !id || blocking.length) return; // never publish a schema with blocking problems
+    if (!tenant || !id || version < 1 || !latestSignedOff) return; // only a signed-off version can go live
     setBusy("publish");
     try {
       await publishVersion(tenant, id, version);
@@ -310,6 +320,20 @@ export default function FormBuilderPage() {
       setBusy(null);
     }
   });
+
+  // "Check in & sign off" from the Test panel: snapshot the current draft as the latest version,
+  // then sign THAT version off — so what was tested is exactly what becomes publishable. Throws on
+  // failure so the panel surfaces it.
+  const checkInAndSignOff = async (): Promise<void> => {
+    if (!tenant || !id) throw new Error("Form not loaded");
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    const art = await checkIn(tenant, id, currentJson());
+    setVersion(art.version);
+    const updated = await signOffTest(tenant, id);
+    setLatestSignedOff(true);
+    setLastTestedAt(updated.lastTestedAt ?? Date.now());
+    setSaved(true);
+  };
 
   const onDiscard = () => runExclusive(async () => {
     if (!tenant || !id) return;
@@ -412,9 +436,12 @@ export default function FormBuilderPage() {
         </button>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status]}`}>{status}</span>
         <span className="text-xs text-gray-400">v{version}</span>
-        {lastTestedAt && (
-          <span className="inline-flex items-center gap-1 text-xs text-success-600 dark:text-success-400">
-            <BadgeCheck className="size-3.5" />Tested
+        {latestSignedOff && (
+          <span
+            title={lastTestedAt ? `Signed off ${new Date(lastTestedAt).toLocaleString()}` : "Latest version is signed off"}
+            className="inline-flex items-center gap-1 text-xs text-success-600 dark:text-success-400"
+          >
+            <BadgeCheck className="size-3.5" />Signed off
           </span>
         )}
         <span className={`text-xs ${saveError ? "text-error-500" : "text-gray-400"}`}>{canEdit ? saveLabel : "View only"}</span>
@@ -433,7 +460,7 @@ export default function FormBuilderPage() {
             <>
               {blocking.length > 0 && (
                 <span
-                  title="Fix these before checking in or publishing — see the Problems list in the builder below."
+                  title="A form with errors can't be signed off or published. Fix these — see the Problems list in the builder below. (You can still check it in as a work-in-progress snapshot.)"
                   className="inline-flex items-center gap-1 rounded-lg bg-error-50 px-2.5 py-1.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400"
                 >
                   <span aria-hidden>⊘</span>{blocking.length} error{blocking.length > 1 ? "s" : ""}
@@ -450,8 +477,8 @@ export default function FormBuilderPage() {
               <button
                 type="button"
                 onClick={onCheckIn}
-                disabled={busy !== null || mutating || blocking.length > 0}
-                title={blocking.length ? "Fix the blocking problems before checking in." : undefined}
+                disabled={busy !== null || mutating}
+                title="Snapshot the current form as a new version. Errors / work-in-progress are fine — it won't go live until you sign off and publish."
                 className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10"
               >
                 {busy === "checkin" ? "Checking in…" : "Check in"}
@@ -459,8 +486,8 @@ export default function FormBuilderPage() {
               <button
                 type="button"
                 onClick={onPublish}
-                disabled={busy !== null || mutating || blocking.length > 0}
-                title={blocking.length ? "Fix the blocking problems before publishing." : undefined}
+                disabled={busy !== null || mutating || version < 1 || !latestSignedOff}
+                title={version < 1 ? "Check in a version first." : !latestSignedOff ? "Sign off the latest version first — open Test, get a clean run, then Sign off." : "Publish the latest version live."}
                 className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
               >
                 {busy === "publish" ? "Publishing…" : "Publish"}
@@ -504,12 +531,11 @@ export default function FormBuilderPage() {
         open={testOpen}
         onClose={() => setTestOpen(false)}
         tenant={tenant}
-        formId={id}
         formName={form.name}
         canEdit={canEdit}
         getJson={currentJson}
         onApplyAiSchema={applyAiSchema}
-        onSignedOff={setLastTestedAt}
+        onSignOff={checkInAndSignOff}
       />
 
       {/* Keyed by formId so navigating to another form's builder mints a fresh token. */}

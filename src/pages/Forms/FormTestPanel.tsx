@@ -4,8 +4,10 @@
  *
  * Positive run: fill VALID data → it must pass. Negative run: fill deliberately INVALID
  * data → validation must reject it. Both runs offer a deterministic "Local" heuristic fill
- * AND LukeTests-generated datasets (valid for positive, invalid for negative). Sign-off
- * records that the form passed its self-test (a clean positive run + the negative rejected).
+ * AND LukeTests-generated datasets (valid for positive, invalid for negative). Sign-off (a
+ * clean positive run + the negative rejected) hands off to the page, which checks the current
+ * draft in as a version and signs THAT version off — so what you tested is what becomes
+ * publishable.
  *
  * Local vs AI verdicts differ on the negative side: the Local heuristic knows WHICH field it
  * broke and why, so it checks each expected violation per-field; an AI invalid dataset has no
@@ -26,7 +28,6 @@ import LukeTestsMark from "../../components/branding/LukeTestsMark";
 import CapabilityBuildingAnimation from "./CapabilityBuildingAnimation";
 import { autofillSchema, negativeFillSchema, type NegativeExpectation } from "../../lib/autofill";
 import { generateSchema, generateTestData, type BuilderSchemaLike, type TestDataset } from "../../lib/formAgentApi";
-import { signOffTest } from "../../lib/formsApi";
 
 const TEST_GEN_STEPS = ["Reading the form…", "Inventing realistic answers…", "Filling the fields…"];
 const TEST_FIX_STEPS = ["Reviewing the failures…", "Pinpointing the validation gaps…", "Repairing the form…"];
@@ -58,25 +59,24 @@ export default function FormTestPanel({
   open,
   onClose,
   tenant,
-  formId,
   formName,
   canEdit,
   getJson,
   onApplyAiSchema,
-  onSignedOff,
+  onSignOff,
 }: {
   open: boolean;
   onClose: () => void;
   tenant: string;
-  formId: string;
   formName: string;
   canEdit: boolean;
   /** Snapshot of the live schema as JSON (settings merged) — read fresh on each open. */
   getJson: () => string;
   /** Apply an AI-repaired schema via the builder's imperative handle (no remount). */
   onApplyAiSchema: (schema: BuilderSchemaLike) => void;
-  /** Bubble a successful sign-off up so the page can light its "Tested" badge. */
-  onSignedOff: (lastTestedAt: number) => void;
+  /** Sign-off: the page checks the current draft in as a version and signs THAT version off.
+   *  Rejects on failure (e.g. the server's sign-off gate) so we can surface it. */
+  onSignOff: () => Promise<void>;
 }) {
   const [testSchema, setTestSchema] = useState("");
   const [posInitial, setPosInitial] = useState<Record<string, unknown>>({});
@@ -130,10 +130,12 @@ export default function FormTestPanel({
 
   const signOff = async () => {
     setSigning(true);
+    setAiTestError(null);
     try {
-      const updated = await signOffTest(tenant, formId);
-      onSignedOff(updated.lastTestedAt ?? Date.now());
+      await onSignOff(); // page: check the current draft in as a version, then sign that version off
       onClose();
+    } catch (e) {
+      setAiTestError((e as Error).message || "Sign-off failed.");
     } finally {
       setSigning(false);
     }
@@ -414,7 +416,7 @@ export default function FormTestPanel({
             )}
           </div>
           {canEdit ? (
-            <Tooltip content={canSignOff ? "Record that this form passed its self-test." : "Sign-off needs a clean positive run and the negative run rejected."}>
+            <Tooltip content={canSignOff ? "Check this version in and sign it off — it can then be published." : "Sign-off needs a clean positive run and the negative run rejected."}>
               <span>
                 <Button size="sm" onClick={signOff} disabled={!canSignOff || signing} startIcon={<BadgeCheck className="size-4" />}>
                   {signing ? "Signing off…" : "Sign off"}

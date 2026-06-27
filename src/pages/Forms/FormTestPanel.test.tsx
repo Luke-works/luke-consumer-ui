@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import FormTestPanel from "./FormTestPanel";
-import * as formsApi from "../../lib/formsApi";
 import * as agentApi from "../../lib/formAgentApi";
 
 // Stub the renderer: each instance exposes pass/fail buttons that fire onResult, so we
@@ -18,10 +17,8 @@ vi.mock("../../components/formBuilder/LukeFormRenderer", () => ({
 }));
 vi.mock("./CapabilityBuildingAnimation", () => ({ default: () => null }));
 vi.mock("../../components/branding/LukeTestsMark", () => ({ default: () => null }));
-vi.mock("../../lib/formsApi", () => ({ signOffTest: vi.fn() }));
 vi.mock("../../lib/formAgentApi", () => ({ generateSchema: vi.fn(), generateTestData: vi.fn() }));
 
-const mockedForms = vi.mocked(formsApi);
 const mockedAgent = vi.mocked(agentApi);
 
 // A schema with no negatively-testable fields → negative run is "n/a", so sign-off
@@ -31,22 +28,21 @@ const EMPTY_JSON = JSON.stringify({ root: [], entities: {} });
 function renderPanel(over: Partial<React.ComponentProps<typeof FormTestPanel>> = {}) {
   const onClose = vi.fn();
   const onApplyAiSchema = vi.fn();
-  const onSignedOff = vi.fn();
+  const onSignOff = vi.fn().mockResolvedValue(undefined);
   render(
     <FormTestPanel
       open
       onClose={onClose}
       tenant="t1"
-      formId="f1"
       formName="Contact"
       canEdit
       getJson={() => EMPTY_JSON}
       onApplyAiSchema={onApplyAiSchema}
-      onSignedOff={onSignedOff}
+      onSignOff={onSignOff}
       {...over}
     />,
   );
-  return { onClose, onApplyAiSchema, onSignedOff };
+  return { onClose, onApplyAiSchema, onSignOff };
 }
 
 beforeEach(() => {
@@ -54,10 +50,9 @@ beforeEach(() => {
 });
 
 describe("FormTestPanel", () => {
-  it("gates sign-off until the positive run passes, then signs off", async () => {
+  it("gates sign-off until the positive run passes, then signs off (via the page's onSignOff)", async () => {
     const user = userEvent.setup();
-    mockedForms.signOffTest.mockResolvedValue({ lastTestedAt: 1717000000000 } as formsApi.StoredForm);
-    const { onClose, onSignedOff } = renderPanel();
+    const { onClose, onSignOff } = renderPanel();
 
     // Before any result, sign-off is disabled.
     const signOff = screen.getByRole("button", { name: /sign off/i });
@@ -69,8 +64,8 @@ describe("FormTestPanel", () => {
     await waitFor(() => expect(signOff).toBeEnabled());
     await user.click(signOff);
 
-    await waitFor(() => expect(mockedForms.signOffTest).toHaveBeenCalledWith("t1", "f1"));
-    expect(onSignedOff).toHaveBeenCalledWith(1717000000000);
+    // v2: sign-off delegates to the page (check in + sign off the version), then closes.
+    await waitFor(() => expect(onSignOff).toHaveBeenCalled());
     expect(onClose).toHaveBeenCalled();
   });
 

@@ -33,10 +33,11 @@ vi.mock("../../lib/formsApi", () => ({
 
 const mocked = vi.mocked(formsApi);
 
-function form(schema: object): formsApi.StoredForm {
+function form(schema: object, over: Partial<formsApi.StoredForm> = {}): formsApi.StoredForm {
   return {
     id: "f1", code: "C1", name: "Contact", schema: JSON.stringify(schema),
-    status: "published", publishedVersion: 1, latestVersion: 1,
+    status: "published", publishedVersion: 1, latestVersion: 1, latestVersionSignedOff: false,
+    ...over,
   } as formsApi.StoredForm;
 }
 
@@ -64,22 +65,29 @@ beforeEach(() => {
   mocked.checkout.mockResolvedValue({} as formsApi.StoredForm);
 });
 
-describe("FormBuilderPage — problems gating", () => {
-  it("disables Check in / Publish and shows an error chip for a blocking schema", async () => {
-    mocked.getForm.mockResolvedValue(form(DUP));
+describe("FormBuilderPage — lifecycle gating", () => {
+  it("allows Check in even with a blocking schema (snapshot), but gates Publish and shows an error chip", async () => {
+    mocked.getForm.mockResolvedValue(form(DUP)); // not signed off (default)
     renderPage();
     const checkIn = await screen.findByRole("button", { name: /check in/i });
-    expect(checkIn).toBeDisabled();
-    expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
+    expect(checkIn).toBeEnabled(); // check-in is a snapshot — errors / WIP are allowed
+    expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled(); // unsigned → no publish
     expect(screen.getByText(/\d+ error/i)).toBeInTheDocument();
   });
 
-  it("enables Check in and shows no error chip for a clean schema", async () => {
+  it("shows no error chip for a clean schema and enables Check in", async () => {
     mocked.getForm.mockResolvedValue(form(CLEAN));
     renderPage();
     const checkIn = await screen.findByRole("button", { name: /check in/i });
     expect(checkIn).toBeEnabled();
     expect(screen.queryByText(/\d+ error/i)).not.toBeInTheDocument();
+  });
+
+  it("enables Publish only when the latest version is signed off", async () => {
+    mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true }));
+    renderPage();
+    await waitFor(() => expect(screen.getByRole("button", { name: /publish/i })).toBeEnabled());
+    expect(screen.getByText(/signed off/i)).toBeInTheDocument(); // the badge
   });
 });
 
