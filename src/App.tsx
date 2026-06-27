@@ -30,6 +30,8 @@ const EmailTemplateBuilderPage = lazy(() => import("./pages/EmailTemplates/Email
 // Code-split the signature pages (react-pdf + pdf.js) to their own chunk.
 const SignaturesList = lazy(() => import("./pages/Signatures/SignaturesList"));
 const SignPage = lazy(() => import("./pages/Signatures/SignPage"));
+// DEV-only ceremony showcase (no backend/auth); tree-shaken out of production builds.
+const SignaturesPreview = lazy(() => import("./pages/Signatures/SignaturesPreview"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import OnboardingGate from "./components/auth/OnboardingGate";
@@ -178,6 +180,18 @@ export default function App() {
               </Suspense>
             }
           />
+
+          {/* DEV-only: ceremony component showcase, no auth/backend. Not registered in prod. */}
+          {import.meta.env.DEV && (
+            <Route
+              path="/sign-preview"
+              element={
+                <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                  <SignaturesPreview />
+                </Suspense>
+              }
+            />
+          )}
 
           {/* Social / SSO redirect handler — outside the guards (no session yet). */}
           <Route path="/sso-callback" element={<SsoCallback />} />

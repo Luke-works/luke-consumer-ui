@@ -11,6 +11,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--lf-space, 12px);
+  /* Contain any residual horizontal overflow so it can NEVER make an ancestor (the page)
+     horizontally scrollable. Why this matters: native HTML5 drag-and-drop auto-scrolls the
+     nearest scrollable ancestor when you drag near its edge — so if the builder spilled even a
+     few px past the page width (often invisible at rest under macOS overlay scrollbars), the
+     whole page would slide sideways mid-drag and clip the palette. `clip` (NOT `hidden`)
+     contains it WITHOUT itself becoming a scroll container, so nothing here can be auto-scrolled
+     and sticky panes still track the viewport. The minmax() body tracks keep the panes from
+     overflowing in the first place; this is the belt-and-suspenders guarantee. */
+  overflow-x: clip;
   /* Inherit the host app's font by default (themeable via --lf-font); never force one. */
   font-family: var(--lf-font, inherit);
   color: var(--lf-text, #1a1a1a);

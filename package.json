@@ -16,6 +16,8 @@
     "@lukeflow/form-core": "file:./vendor/@lukeflow/form-core",
     "@lukeflow/form-react": "file:./vendor/@lukeflow/form-react",
     "@lukeflow/form-builder": "file:./vendor/@lukeflow/form-builder",
+    "@lukeflow/sign-core": "file:./vendor/@lukeflow/sign-core",
+    "@lukeflow/sign-react": "file:./vendor/@lukeflow/sign-react",
     "@fullcalendar/core": "^6.1.15",
     "@fullcalendar/daygrid": "^6.1.15",
     "@fullcalendar/interaction": "^6.1.15",
@@ -80,6 +82,8 @@
     "@lukeflow/form-core": "file:./vendor/@lukeflow/form-core",
     "@lukeflow/form-react": "file:./vendor/@lukeflow/form-react",
     "@lukeflow/form-builder": "file:./vendor/@lukeflow/form-builder",
+    "@lukeflow/sign-core": "file:./vendor/@lukeflow/sign-core",
+    "@lukeflow/sign-react": "file:./vendor/@lukeflow/sign-react",
     "react-helmet-async": {
       "react": "^16.8.0 || ^17 || ^18 || ^19"
     },
