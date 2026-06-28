@@ -7,6 +7,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { canRead, EMAIL, FORMS, SIGNATURES } from "../lib/capabilities";
 import SidebarFooter from "./SidebarFooter";
+import SidebarTenantSwitcher from "./SidebarTenantSwitcher";
 
 type NavItem = {
   name: string;
@@ -305,6 +306,9 @@ const AppSidebar: React.FC = () => {
           )}
         </Link>
       </div>
+      {/* Active organization (tenant) — a switcher for multi-org users, a label otherwise.
+          Lives ABOVE the scrolling nav so its dropdown isn't clipped by the overflow there. */}
+      <SidebarTenantSwitcher />
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">

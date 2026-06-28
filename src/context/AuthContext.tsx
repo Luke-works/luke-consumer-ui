@@ -38,6 +38,9 @@ type AuthValue = {
   deleteAccount: () => Promise<void>;
   createOrganization: (input: { name: string }) => Promise<api.CreateOrgResult>;
   refreshSession: (opts?: { fresh?: boolean }) => Promise<void>;
+  /** Re-scope the whole app to another tenant the user belongs to (re-reads the session
+   *  for that tenant). Callers should send the user to a tenant-agnostic route afterwards. */
+  switchTenant: (tenantId: string) => Promise<void>;
   getToken: () => string | null;
 };
 
@@ -156,6 +159,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(await api.getSession(sessionRef.current?.tenant ?? undefined, opts));
   }, []);
 
+  // Switch the active tenant: re-read the session scoped to it (fresh, to bypass the gateway's
+  // per-(user,tenant) cache so the new tenant's roles/capabilities are current). The active
+  // tenant flows into every tenant-scoped fetch via session.tenant, so the app re-scopes on the
+  // resulting re-render; the caller navigates to a tenant-agnostic route to avoid a stale
+  // resource id from the previous tenant.
+  const switchTenant = useCallback(async (tenantId: string) => {
+    if (tenantId === sessionRef.current?.tenant) return;
+    setSession(await api.getSession(tenantId, { fresh: true }));
+  }, []);
+
   const value: AuthValue = {
     isLoaded,
     isSignedIn: !!user,
@@ -171,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     deleteAccount,
     createOrganization,
     refreshSession,
+    switchTenant,
     getToken: api.getAccessToken,
   };
 

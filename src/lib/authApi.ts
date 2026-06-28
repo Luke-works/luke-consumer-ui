@@ -21,6 +21,9 @@ export type SessionView = {
   tenantAdmin: boolean;
   tenant: string | null;
   tenants: string[];
+  /** Display name per tenant id (for the org switcher). Optional: absent on older backends —
+   *  fall back to the id. */
+  tenantNames?: Record<string, string>;
   roles: Record<string, string>;
   candidateGroups: string[];
   capabilities: Record<string, string>;
