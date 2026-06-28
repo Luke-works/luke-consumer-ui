@@ -305,10 +305,10 @@ const AppSidebar: React.FC = () => {
             />
           )}
         </Link>
+        {/* Active org next to the logo — name only (no icon); a switcher when the user belongs
+            to more than one org. Its menu is portaled, so the header's overflow-hidden is fine. */}
+        <SidebarTenantSwitcher />
       </div>
-      {/* Active organization (tenant) — a switcher for multi-org users, a label otherwise.
-          Lives ABOVE the scrolling nav so its dropdown isn't clipped by the overflow there. */}
-      <SidebarTenantSwitcher />
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">

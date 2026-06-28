@@ -46,9 +46,9 @@ describe("SidebarTenantSwitcher", () => {
       tenantNames: { "TEN-ABC-01JAN26": "Acme Corp", "TEN-XYZ-02FEB26": "Globex" },
     };
     render(<SidebarTenantSwitcher />);
-    // Multi-org → a toggle opens the menu.
+    // Multi-org → the header label is a toggle that opens the (portaled) menu.
     await userEvent.click(screen.getByRole("button", { name: /acme corp/i }));
-    const globex = await screen.findByRole("button", { name: /globex/i });
+    const globex = await screen.findByRole("menuitem", { name: /globex/i });
     await userEvent.click(globex);
     await waitFor(() => expect(switchTenant).toHaveBeenCalledWith("TEN-XYZ-02FEB26"));
     expect(navigate).toHaveBeenCalledWith("/");
@@ -63,8 +63,7 @@ describe("SidebarTenantSwitcher", () => {
     render(<SidebarTenantSwitcher />);
     await userEvent.click(screen.getByRole("button", { name: /acme corp/i }));
     // The current org appears in the menu with a check; clicking it is a no-op.
-    const items = await screen.findAllByRole("button", { name: /acme corp/i });
-    await userEvent.click(items[items.length - 1]);
+    await userEvent.click(await screen.findByRole("menuitem", { name: /acme corp/i }));
     expect(switchTenant).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
   });
