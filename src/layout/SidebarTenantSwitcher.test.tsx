@@ -21,8 +21,12 @@ describe("SidebarTenantSwitcher", () => {
   it("shows the tenant NAME (not the id) and no switcher for a single-org user", () => {
     session = { tenant: "TEN-ABC-01JAN26", tenants: ["TEN-ABC-01JAN26"], tenantNames: { "TEN-ABC-01JAN26": "Acme Corp" } };
     render(<SidebarTenantSwitcher />);
-    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    const name = screen.getByText("Acme Corp");
+    expect(name).toBeInTheDocument();
     expect(screen.queryByText("TEN-ABC-01JAN26")).not.toBeInTheDocument();
+    // The name wraps to a second line when long — it must NOT be truncated.
+    expect(name.className).toContain("break-words");
+    expect(name.className).not.toContain("truncate");
     // Single org → static label, no toggle button and no menu.
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

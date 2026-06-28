@@ -69,13 +69,14 @@ export default function SidebarTenantSwitcher() {
     }
   };
 
+  // Wraps to the next line when long (no truncation), per request.
   const nameText = (
-    <span className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">{busy ? "Switching…" : current}</span>
+    <span className="text-sm font-semibold leading-tight text-gray-800 break-words dark:text-white/90">{busy ? "Switching…" : current}</span>
   );
 
   if (!multi) {
     return (
-      <div className="ml-auto flex min-w-0 items-center pl-3" title={current}>
+      <div className="flex min-w-0 items-center pl-2" title={current}>
         {nameText}
       </div>
     );
@@ -91,7 +92,7 @@ export default function SidebarTenantSwitcher() {
         title={current}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="ml-auto flex min-w-0 items-center gap-1 rounded-lg py-1 pl-2 pr-1.5 hover:bg-gray-100 dark:hover:bg-white/5"
+        className="flex min-w-0 items-center gap-1 rounded-lg py-1 pl-2 pr-1.5 hover:bg-gray-100 dark:hover:bg-white/5"
       >
         {nameText}
         <ChevronDown className={`size-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
