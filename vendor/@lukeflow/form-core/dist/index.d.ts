@@ -411,9 +411,10 @@ declare function repairSchema(schema: FormSchema): {
  * - `cycle`            — the container tree contains a cycle.
  * - `orphan`           — an entity is unreachable from `root`.
  * - `disabled-required`— a field is both disabled AND required with nothing to enable it (warning).
+ * - `required-excluded`— a field is required AND excluded from submission, so its value is dropped (warning).
  * - `partial-wizard`   — some (not all) top-level items are Pages, so wizard mode won't engage (warning).
  */
-type SchemaDiagnosticCode = "malformed-schema" | "dangling-root" | "dangling-child" | "parent-mismatch" | "cycle" | "orphan" | "disabled-required" | "partial-wizard";
+type SchemaDiagnosticCode = "malformed-schema" | "dangling-root" | "dangling-child" | "parent-mismatch" | "cycle" | "orphan" | "disabled-required" | "required-excluded" | "partial-wizard";
 /**
  * Key-namespace diagnostics — the invariants that keep submissions trustworthy.
  *

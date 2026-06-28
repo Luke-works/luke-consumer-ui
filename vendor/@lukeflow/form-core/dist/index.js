@@ -333,6 +333,19 @@ function validateSchema(schema) {
       )
     );
   }
+  for (const [id, e] of Object.entries(entities)) {
+    const at = e.attributes;
+    if (!at || at.required !== true || at.persistent !== false) continue;
+    out.push(
+      diag(
+        "required-excluded",
+        "warning",
+        `Field "${keyOf(id, e)}" is required but excluded from submission \u2014 a respondent must fill it, yet its value is dropped and never saved. Clear "Exclude from submission", or make the field optional.`,
+        { key: keyOf(id, e) },
+        id
+      )
+    );
+  }
   const rootPages = root.filter((id) => entities[id]?.type === "page").length;
   if (rootPages > 0 && rootPages < root.length) {
     out.push(
