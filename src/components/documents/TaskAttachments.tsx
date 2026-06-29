@@ -12,8 +12,10 @@ const DocumentView = lazy(() => import("./DocumentView"));
 
 export type TaskAttachmentsProps = {
   tenant: string;
-  /** Case-file folder = the form instance id (the documents' processRef / ownerEntityId). */
-  processRef: string;
+  /** The form instance id — the documents' ownerEntityId. We list by ownerEntityId (not processRef)
+   *  so EMBED attachments (uploaded under a random Flow-A processRef, then bound to the instance)
+   *  are included alongside authenticated ones. */
+  ownerEntityId: string;
   /** The selected Camunda task; documents carrying this taskId are "Task attachments". */
   taskId?: string;
   className?: string;
@@ -22,7 +24,7 @@ export type TaskAttachmentsProps = {
 type Scope = "TASK" | "PROCESS";
 const scopeOf = (d: Document): Scope => (d.taskId ? "TASK" : "PROCESS");
 
-export default function TaskAttachments({ tenant, processRef, taskId, className }: TaskAttachmentsProps) {
+export default function TaskAttachments({ tenant, ownerEntityId, taskId, className }: TaskAttachmentsProps) {
   const [docs, setDocs] = useState<Document[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,14 +33,14 @@ export default function TaskAttachments({ tenant, processRef, taskId, className 
 
   const refresh = useCallback(
     (signal?: AbortSignal) => {
-      if (!tenant || !processRef) return Promise.resolve();
+      if (!tenant || !ownerEntityId) return Promise.resolve();
       setLoading(true);
-      return listDocuments(tenant, { processRef, capability: "FORMS" }, signal)
+      return listDocuments(tenant, { capability: "FORMS", ownerEntityId }, signal)
         .then((list) => { setDocs(list); setError(null); })
         .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not load attachments."))
         .finally(() => setLoading(false));
     },
-    [tenant, processRef],
+    [tenant, ownerEntityId],
   );
 
   useEffect(() => {
@@ -143,8 +145,8 @@ export default function TaskAttachments({ tenant, processRef, taskId, className 
       {/* Reviewer can add a TASK-scoped attachment (taskId stamped → classified Task attachment). */}
       {taskId && (
         <DocumentUpload
-          processRef={processRef}
-          ownerEntityId={processRef}
+          processRef={ownerEntityId}
+          ownerEntityId={ownerEntityId}
           taskId={taskId}
           kind="FORM_ATTACHMENT"
           capability="FORMS"

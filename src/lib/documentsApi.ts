@@ -112,7 +112,7 @@ export async function getDocument(
 /** List documents for a process case file / task / kind / capability (no bytes). */
 export async function listDocuments(
   tenant: string,
-  query: { processRef?: string; taskId?: string; kind?: DocumentKind; capability?: string },
+  query: { processRef?: string; taskId?: string; kind?: DocumentKind; capability?: string; ownerEntityId?: string },
   signal?: AbortSignal,
 ): Promise<Document[]> {
   const qs = new URLSearchParams();
@@ -120,6 +120,7 @@ export async function listDocuments(
   if (query.taskId) qs.set("taskId", query.taskId);
   if (query.kind) qs.set("kind", query.kind);
   if (query.capability) qs.set("capability", query.capability);
+  if (query.ownerEntityId) qs.set("ownerEntityId", query.ownerEntityId);
   const suffix = qs.toString() ? `?${qs}` : "";
   const list = await authed<unknown>(`${BASE_PATH}${suffix}`, tenantInit(tenant, { signal }));
   return Array.isArray(list) ? (list as ApiDocument[]).map(toDocument) : [];

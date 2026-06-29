@@ -391,14 +391,21 @@ function ReviewBody({
   tenant: string | null;
   task: InboxTask | null;
 }) {
-  if (viewLoading) return <p className="py-8 text-center text-sm text-gray-400">Loading submission…</p>;
-  if (!view) return <p className="py-6 text-center text-sm text-gray-400">No linked submission to display.</p>;
-  const initialValues = { ...(view.instance.prefill ?? {}), ...(view.instance.data ?? {}) };
+  // The form instance id — from the loaded submission if present, else the inbox task. Attachments
+  // render off this independently of whether the submission view itself loaded.
+  const ownerEntityId = view?.instance.id ?? task?.instanceId ?? null;
+  const initialValues = view ? { ...(view.instance.prefill ?? {}), ...(view.instance.data ?? {}) } : {};
   return (
     <>
-      <FormRenderer schema={view.schema} initialValues={initialValues} readOnly />
-      {tenant && view.instance.id ? (
-        <TaskAttachments tenant={tenant} processRef={view.instance.id} taskId={task?.taskId} />
+      {viewLoading ? (
+        <p className="py-8 text-center text-sm text-gray-400">Loading submission…</p>
+      ) : view ? (
+        <FormRenderer schema={view.schema} initialValues={initialValues} readOnly />
+      ) : (
+        <p className="py-6 text-center text-sm text-gray-400">No linked submission to display.</p>
+      )}
+      {tenant && ownerEntityId ? (
+        <TaskAttachments tenant={tenant} ownerEntityId={ownerEntityId} taskId={task?.taskId} />
       ) : null}
     </>
   );
