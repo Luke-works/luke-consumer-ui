@@ -25,6 +25,14 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Keep the latest onClose in a ref so the focus-trap effect can call it without
+  // listing onClose as a dependency. Callers pass an inline `() => ...` that changes
+  // identity on every render; if the effect depended on it, each parent re-render
+  // (e.g. every keystroke in a child input) would re-run the effect and `node.focus()`
+  // would steal focus back to the dialog — losing focus from the input on each char.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   // Accessibility (#34): on open focus the dialog and trap Tab inside it; Esc closes;
   // restore focus to the trigger on close. Selecting a builder field opens this modal,
   // so this is also "focus moves to the settings panel on select".
@@ -36,7 +44,7 @@ export const Modal: React.FC<ModalProps> = ({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key === "Tab" && node) {
@@ -64,7 +72,7 @@ export const Modal: React.FC<ModalProps> = ({
       document.removeEventListener("keydown", onKeyDown);
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
