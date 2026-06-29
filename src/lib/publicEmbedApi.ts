@@ -90,11 +90,18 @@ export async function getEmbedForm(token: string, signal?: AbortSignal): Promise
 export async function submitEmbed(
   token: string,
   data: Record<string, unknown>,
+  attachmentRef?: string,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; instanceId: string }> {
   const res = await fetchWithRetry(
     `${BASE}/api/public/embed/${seg(token)}/submit`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) },
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // attachmentRef lets the server bind this session's uploads to the instance BEFORE it snapshots
+      // them into formMetaData (the post-submit /link call remains a best-effort fallback).
+      body: JSON.stringify({ data, attachmentRef }),
+    },
     { signal, label: "submit" },
   );
   return res.json();

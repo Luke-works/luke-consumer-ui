@@ -66,8 +66,9 @@ export default function FormEmbedView({ token }: { token?: string }) {
     setError(null);
     try {
       // Carry the honeypot value under the agreed key; the engine drops the submission if it's filled.
-      const res = await submitEmbed(token, { ...data, _lukehp: honeypot.current?.value ?? "" });
-      // Bind this session's attachments to the created instance (best-effort; never blocks success).
+      // attachmentRef is bound server-side at submit so the formMetaData snapshot captures the uploads.
+      const res = await submitEmbed(token, { ...data, _lukehp: honeypot.current?.value ?? "" }, attachmentRef);
+      // Belt-and-suspenders: re-bind any attachments to the created instance (idempotent; never blocks).
       if (res.instanceId) void linkEmbedDocuments(token, attachmentRef, res.instanceId);
       setDone(true);
       bridge.current?.submitted(res.instanceId);

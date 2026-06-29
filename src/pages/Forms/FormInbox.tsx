@@ -7,6 +7,7 @@ import DataTable, { type ManualTable } from "../../components/tables/DataTable";
 import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
+import TaskAttachments from "../../components/documents/TaskAttachments";
 import { completeTask, getInbox, type InboxTask } from "../../lib/formInboxApi";
 import { getInstance, type InstanceView } from "../../lib/formInstancesApi";
 import { isAbortError } from "../../lib/abort";
@@ -189,6 +190,7 @@ export default function FormInbox() {
         />
       ) : (
         <SplitInbox
+          tenant={tenant}
           tasks={tasks}
           total={total}
           pageIndex={pageIndex}
@@ -215,7 +217,7 @@ export default function FormInbox() {
           <div className="p-6 sm:p-8">
             <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">{selected.name ?? "Task"}</h2>
             <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Review the submission, then complete the task.</p>
-            <ReviewBody view={view} viewLoading={viewLoading} />
+            <ReviewBody view={view} viewLoading={viewLoading} tenant={tenant} task={selected} />
             <div className="mt-6 flex items-center gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
               <Button size="sm" onClick={complete} disabled={completing}>{completing ? "Completing…" : "Complete task"}</Button>
               <Button size="sm" variant="outline" onClick={() => { setSelected(null); setView(null); }}>Cancel</Button>
@@ -254,9 +256,10 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 
 // ── Outlook-style master/detail ────────────────────────────────────────────
 function SplitInbox({
-  tasks, total, pageIndex, pageSize, onPageChange, search, onSearchChange,
+  tenant, tasks, total, pageIndex, pageSize, onPageChange, search, onSearchChange,
   selected, onSelect, view, viewLoading, completing, onComplete,
 }: {
+  tenant: string | null;
   tasks: InboxTask[];
   total: number;
   pageIndex: number;
@@ -362,7 +365,7 @@ function SplitInbox({
               <Button size="sm" onClick={onComplete} disabled={completing}>{completing ? "Completing…" : "Complete task"}</Button>
             </div>
             <div className="overflow-y-auto p-6">
-              <ReviewBody view={view} viewLoading={viewLoading} />
+              <ReviewBody view={view} viewLoading={viewLoading} tenant={tenant} task={selected} />
             </div>
           </>
         ) : (
@@ -378,10 +381,25 @@ function SplitInbox({
   );
 }
 
-// Shared submission view used by both the modal and the reading pane.
-function ReviewBody({ view, viewLoading }: { view: InstanceView | null; viewLoading: boolean }) {
+// Shared submission view used by both the modal and the reading pane. Renders the read-only submission
+// plus its classified Attachments section (Task vs Process) for the selected task.
+function ReviewBody({
+  view, viewLoading, tenant, task,
+}: {
+  view: InstanceView | null;
+  viewLoading: boolean;
+  tenant: string | null;
+  task: InboxTask | null;
+}) {
   if (viewLoading) return <p className="py-8 text-center text-sm text-gray-400">Loading submission…</p>;
   if (!view) return <p className="py-6 text-center text-sm text-gray-400">No linked submission to display.</p>;
   const initialValues = { ...(view.instance.prefill ?? {}), ...(view.instance.data ?? {}) };
-  return <FormRenderer schema={view.schema} initialValues={initialValues} readOnly />;
+  return (
+    <>
+      <FormRenderer schema={view.schema} initialValues={initialValues} readOnly />
+      {tenant && view.instance.id ? (
+        <TaskAttachments tenant={tenant} processRef={view.instance.id} taskId={task?.taskId} />
+      ) : null}
+    </>
+  );
 }
