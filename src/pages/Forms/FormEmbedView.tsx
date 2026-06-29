@@ -29,6 +29,8 @@ export default function FormEmbedView({ token }: { token?: string }) {
   const [done, setDone] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); // bump to re-attempt a failed load
   const [attachmentRef] = useState(newAttachmentRef); // stable per fill session
+  const [tab, setTab] = useState<"form" | "files">("form"); // Attachments is a TAB, not an inline field
+  const [attachmentCount, setAttachmentCount] = useState(0); // drives the tab badge
 
   // The host-page bridge: auto-reports our height and emits ready/submitted/error to the embedding
   // site via @lukeflow/form-embed (a no-op when this page is opened standalone, i.e. not framed).
@@ -113,22 +115,81 @@ export default function FormEmbedView({ token }: { token?: string }) {
               style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, opacity: 0 }}
             />
             {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
+
+            {/* Attachments live in their own TAB, not as an inline form field. Both panels stay MOUNTED
+                (toggled with `hidden`) so typed form data and any in-progress upload survive a tab switch. */}
+            {token ? (
+              <div role="tablist" aria-label="Form sections" className="mb-5 flex gap-1 border-b border-gray-200 dark:border-gray-800">
+                <TabButton id="form" active={tab === "form"} onClick={() => setTab("form")}>
+                  Form
+                </TabButton>
+                <TabButton id="files" active={tab === "files"} onClick={() => setTab("files")} badge={attachmentCount}>
+                  Attachments
+                </TabButton>
+              </div>
+            ) : null}
+
+            <div role="tabpanel" hidden={token != null && tab !== "form"}>
+              {/* A bad schema must not blank the host's iframe — degrade to a message. */}
+              <ErrorBoundary
+                label="form-embed-renderer"
+                fallback={(e) => (
+                  <p className="py-8 text-center text-sm text-error-500">
+                    This form couldn't be displayed. {e.message}
+                  </p>
+                )}
+              >
+                <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+              </ErrorBoundary>
+            </div>
+
             {/* Token-scoped attachments (uploaded before submit, linked to the instance after). */}
-            {token ? <EmbedAttachments token={token} processRef={attachmentRef} /> : null}
-            {/* A bad schema must not blank the host's iframe — degrade to a message. */}
-            <ErrorBoundary
-              label="form-embed-renderer"
-              fallback={(e) => (
-                <p className="py-8 text-center text-sm text-error-500">
-                  This form couldn't be displayed. {e.message}
-                </p>
-              )}
-            >
-              <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
-            </ErrorBoundary>
+            {token ? (
+              <div role="tabpanel" hidden={tab !== "files"}>
+                <EmbedAttachments token={token} processRef={attachmentRef} onCountChange={setAttachmentCount} />
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>
     </div>
+  );
+}
+
+// A lightweight tab trigger (no router/UI-lib dep — the embed bundle stays small). The badge shows the
+// current attachment count so a filler sees their files without leaving the Form tab.
+function TabButton({
+  id,
+  active,
+  onClick,
+  badge,
+  children,
+}: {
+  id: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={`embed-tab-${id}`}
+      aria-selected={active}
+      onClick={onClick}
+      className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
+        active
+          ? "border-brand-500 text-brand-600 dark:text-brand-400"
+          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+      }`}
+    >
+      {children}
+      {badge != null && badge > 0 && (
+        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-50 px-1.5 text-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+          {badge}
+        </span>
+      )}
+    </button>
   );
 }

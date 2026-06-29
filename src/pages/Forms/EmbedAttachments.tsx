@@ -19,11 +19,14 @@ export default function EmbedAttachments({
   processRef,
   accept,
   maxBytes = 26_214_400, // 25 MiB — the server also enforces this (413)
+  onCountChange,
 }: {
   token: string;
   processRef: string;
   accept?: string;
   maxBytes?: number;
+  /** Reports the current attachment count up to the host (drives the tab badge). */
+  onCountChange?: (n: number) => void;
 }) {
   const [docs, setDocs] = useState<EmbedDoc[]>([]);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
@@ -45,6 +48,11 @@ export default function EmbedAttachments({
     void refresh(ctl.signal);
     return () => ctl.abort();
   }, [refresh]);
+
+  // Keep the host's tab badge in sync with the list.
+  useEffect(() => {
+    onCountChange?.(docs.length);
+  }, [docs.length, onCountChange]);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,12 +94,11 @@ export default function EmbedAttachments({
   const uploading = phase.state === "uploading";
 
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-      <div className="mb-3 flex items-center gap-2">
-        <Paperclip className="size-4 text-gray-500" />
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Attachments</span>
-        <span className="text-xs text-gray-400">(optional)</span>
-      </div>
+    <div>
+      <p className="mb-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        <Paperclip className="size-4" />
+        Add any supporting files for this submission <span className="text-gray-400">(optional)</span>
+      </p>
 
       <input ref={inputRef} type="file" accept={accept} className="sr-only" onChange={onPick} disabled={uploading} />
 
