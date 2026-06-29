@@ -2413,7 +2413,7 @@ function Field({ entity, fs, ctx }) {
           // so a value beyond the first page is still findable (unlike a static filter).
           /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
         ) : a.searchable ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
-          !fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: "", children: ph ?? "" }),
+          fs.isRequired ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: "", disabled: true, hidden: true, children: ph ?? "Select\u2026" }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: "", children: ph ?? "" }),
           fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: o.value, children: ctx.t(o.label) }, o.value))
         ] });
         break;
