@@ -21,6 +21,7 @@ import AccessManagement from "./pages/Access/AccessManagement";
 // Code-split the form designer (@lukeflow/form-builder) to its own route chunk.
 const FormBuilderPage = lazy(() => import("./pages/Forms/FormBuilderPage"));
 const FormFill = lazy(() => import("./pages/Forms/FormFill"));
+const FormPreview = lazy(() => import("./pages/Forms/FormPreview"));
 const FormResponses = lazy(() => import("./pages/Forms/FormResponses"));
 const FormEmbed = lazy(() => import("./pages/Forms/FormEmbed"));
 const FormInstancesList = lazy(() => import("./pages/Forms/FormInstancesList"));
@@ -57,6 +58,17 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             {/* Landing after login: onboarding for new users, app for provisioned. */}
             <Route index path="/" element={<OnboardingGate />} />
+
+            {/* Full-page form preview (Preview → New tab) — authed but OUTSIDE the dashboard shell,
+                so it's a clean standalone page. Schema is handed off via localStorage by the designer. */}
+            <Route
+              path="/forms/:id/preview"
+              element={
+                <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading preview…</div>}>
+                  <FormPreview />
+                </Suspense>
+              }
+            />
 
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<Home />} />

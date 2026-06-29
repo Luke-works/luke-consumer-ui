@@ -106,6 +106,20 @@ describe("FormBuilderPage — lifecycle gating", () => {
     renderPage();
     await waitFor(() => expect(screen.getByRole("button", { name: /^published$/i })).toBeDisabled());
   });
+
+  it("publishing drops back to view-only — same as a page refresh", async () => {
+    const user = userEvent.setup();
+    mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true, publishedVersion: undefined }));
+    renderPage();
+    // Enter an editing session, then publish the signed-off version.
+    await user.click(await screen.findByRole("button", { name: /^checkout$/i }));
+    expect(await screen.findByRole("button", { name: /undo checkout/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^publish$/i }));
+    // Back to view-only: Checkout returns and the view-only banner is shown again.
+    expect(await screen.findByRole("button", { name: /^checkout$/i })).toBeInTheDocument();
+    expect(screen.getByText(/you're looking at v/i)).toBeInTheDocument();
+    await waitFor(() => expect(mocked.publishVersion).toHaveBeenCalledWith("t1", "f1", 1));
+  });
 });
 
 describe("FormBuilderPage — settings modal", () => {

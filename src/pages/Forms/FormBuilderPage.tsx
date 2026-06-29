@@ -42,7 +42,7 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock } from "lucide-react";
+import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import FormTestPanel from "./FormTestPanel";
@@ -108,6 +108,10 @@ export default function FormBuilderPage() {
   // Whether the preview form has been submitted — drives the success screen so the configured
   // submission message is verifiable in the designer (the bare renderer doesn't show it).
   const [previewDone, setPreviewDone] = useState(false);
+  // Preview modal: render the live Form, or its raw schema JSON (the builder package's own preview
+  // had this view + an "Open in new tab"; we restore both here since we run our own Preview modal).
+  const [previewView, setPreviewView] = useState<"form" | "json">("form");
+  const [jsonCopied, setJsonCopied] = useState(false);
   // "Test the form" (positive/negative validation runs + sign-off).
   const [testOpen, setTestOpen] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(null);
@@ -312,7 +316,40 @@ export default function FormBuilderPage() {
   const openPreview = () => {
     setPreviewSchema(currentJson());
     setPreviewDone(false);
+    setPreviewView("form");
+    setJsonCopied(false);
     setPreviewOpen(true);
+  };
+
+  // Pretty-printed schema for the JSON view (falls back to the raw string if it won't parse).
+  const prettyPreviewJson = useMemo(() => {
+    try {
+      return JSON.stringify(JSON.parse(previewSchema), null, 2);
+    } catch {
+      return previewSchema;
+    }
+  }, [previewSchema]);
+
+  const copyPreviewJson = async () => {
+    try {
+      await navigator.clipboard.writeText(prettyPreviewJson);
+      setJsonCopied(true);
+    } catch {
+      /* clipboard blocked — ignore */
+    }
+  };
+
+  // Open the current working schema full-page in a new tab. We hand it off via localStorage (too big
+  // for a URL) and the standalone /forms/:id/preview route renders it — faithful to the unsaved draft,
+  // no publish required.
+  const openPreviewInNewTab = () => {
+    if (!id) return;
+    try {
+      localStorage.setItem(`lukeform:preview:${id}`, JSON.stringify({ schema: previewSchema, title: form?.name ?? "Form" }));
+    } catch {
+      /* storage blocked — the new tab will show the "expired" notice */
+    }
+    window.open(`/forms/${id}/preview`, "_blank", "noopener,noreferrer");
   };
 
   // Flush a pending autosave on demand, surfacing failures (returns success).
@@ -359,6 +396,12 @@ export default function FormBuilderPage() {
       setStatus("published");
       setPublishedVersion(version);
       setSaveError(false);
+      // Publishing finalizes the version — leave the editing session so the builder + Form settings
+      // drop to view-only, exactly as a page refresh would show (an existing/published form opens
+      // view-only). Without this the post-publish state stayed editable until a reload, which looked
+      // inconsistent. Check out again to start the next version.
+      setCheckedOut(false);
+      setDirtySinceCheckIn(false);
     } catch (e) {
       console.error("Publish failed", e);
       setSaveError(true);
@@ -638,8 +681,45 @@ export default function FormBuilderPage() {
           submission message, exactly as a real filler would see it after submit. */}
       <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
         <div className="p-6 sm:p-8">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Preview — {form.name}</h2>
-          {previewDone ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 pr-8">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Preview — {form.name}</h2>
+            <div className="flex items-center gap-2">
+              {/* Form ⇄ JSON view toggle. */}
+              <div className="inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700">
+                {(["form", "json"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setPreviewView(v)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition ${
+                      previewView === v
+                        ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400"
+                        : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              <Tooltip content="Open this preview full-page in a new browser tab.">
+                <button type="button" onClick={openPreviewInNewTab} className={TOOLBAR_BTN_NEUTRAL}>
+                  <ExternalLink className="size-4" />New tab
+                </button>
+              </Tooltip>
+            </div>
+          </div>
+
+          {previewView === "json" ? (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-sm text-gray-500 dark:text-gray-400">The form's raw schema JSON.</p>
+                <Button size="sm" variant="outline" onClick={copyPreviewJson}>{jsonCopied ? "Copied ✓" : "Copy JSON"}</Button>
+              </div>
+              <pre className="max-h-[64vh] overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300">
+                {prettyPreviewJson}
+              </pre>
+            </div>
+          ) : previewDone ? (
             <>
               <SubmissionSuccess message={readSubmitMessage(previewSchema)} />
               <div className="text-center">
