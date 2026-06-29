@@ -2,12 +2,14 @@
 // case file (processRef). It lists the documents already attached, uploads new ones, views them
 // inline (react-pdf / image / download), and deletes them — all through OUR API (/api/documents),
 // never S3. Designed to sit in a form/task header; the count badge reflects current attachments.
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ArrowLeft, FileText, Loader2, Paperclip, Trash2 } from "lucide-react";
 import { Modal } from "../ui/modal";
 import { useAuth } from "../../context/AuthContext";
 import DocumentUpload from "./DocumentUpload";
-import DocumentView from "./DocumentView";
+// Lazy so react-pdf (which needs DOMMatrix) loads only when a document is actually viewed —
+// not when this button mounts. Keeps react-pdf out of the host page's chunk + jsdom unit tests.
+const DocumentView = lazy(() => import("./DocumentView"));
 import {
   deleteDocument,
   listDocuments,
@@ -142,12 +144,20 @@ export default function AttachmentsButton({
               <p className="mb-3 truncate text-sm font-medium text-gray-700 dark:text-gray-200" title={selected.filename}>
                 {selected.filename}
               </p>
-              <DocumentView
-                docId={selected.docId}
-                contentType={selected.contentType}
-                filename={selected.filename}
-                width={600}
-              />
+              <Suspense
+                fallback={
+                  <div className="flex items-center gap-2 p-6 text-sm text-gray-400">
+                    <Loader2 className="size-4 animate-spin" /> Loading viewer…
+                  </div>
+                }
+              >
+                <DocumentView
+                  docId={selected.docId}
+                  contentType={selected.contentType}
+                  filename={selected.filename}
+                  width={600}
+                />
+              </Suspense>
             </div>
           ) : (
             // ── Upload + list ──────────────────────────────────────────────
