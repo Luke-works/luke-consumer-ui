@@ -67,7 +67,13 @@ export default function DocumentView({
         const blob = await fetchContent(tenant, docId);
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
-        setLoaded({ url: objectUrl, contentType: contentType || blob.type || "", filename: filename || "document" });
+        // Prefer a SPECIFIC type: a generic/missing declared type (e.g. application/octet-stream) hides
+        // images/PDFs behind the download fallback — fall back to the blob's actual MIME type.
+        const declared = (contentType || "").toLowerCase();
+        const effectiveType = !declared || declared === "application/octet-stream"
+          ? (blob.type || declared)
+          : (contentType as string);
+        setLoaded({ url: objectUrl, contentType: effectiveType, filename: filename || "document" });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Could not load the document.");
       }
@@ -99,8 +105,14 @@ export default function DocumentView({
   }
 
   const ct = loaded.contentType.toLowerCase();
+  // Also key off the filename extension so a file stored with a generic content type still previews.
+  const ext = (loaded.filename.split(".").pop() || "").toLowerCase();
+  const isPdf = ct.includes("pdf") || ext === "pdf";
+  const isImage =
+    ct.startsWith("image/") ||
+    ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "apng", "ico", "tif", "tiff"].includes(ext);
 
-  if (ct.includes("pdf")) {
+  if (isPdf) {
     return (
       <div className={className}>
         <PdfDocument
@@ -124,7 +136,7 @@ export default function DocumentView({
     );
   }
 
-  if (ct.startsWith("image/")) {
+  if (isImage) {
     return (
       <img
         src={loaded.url}
