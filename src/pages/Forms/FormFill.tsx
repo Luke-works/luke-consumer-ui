@@ -5,6 +5,7 @@ import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
+import AttachmentsButton from "../../components/documents/AttachmentsButton";
 import { readSubmitMessage } from "../../lib/formSchema";
 import {
   createInstance,
@@ -136,9 +137,19 @@ export default function FormFill() {
             </p>
           ) : (
             <>
-              <div className="mb-6 flex items-center justify-between">
+              <div className="mb-6 flex items-center justify-between gap-3">
                 <p className="text-xs uppercase tracking-wide text-gray-400">{instance?.definitionCode} · v{instance?.version}</p>
-                {saveError ? <span className="text-xs text-error-500">Couldn’t save — check your connection</span> : savedAt ? <span className="text-xs text-gray-400">Saved</span> : null}
+                <div className="flex items-center gap-3">
+                  {saveError ? <span className="text-xs text-error-500">Couldn’t save — check your connection</span> : savedAt ? <span className="text-xs text-gray-400">Saved</span> : null}
+                  {instance && (
+                    <AttachmentsButton
+                      processRef={instance.id}
+                      ownerEntityId={instance.id}
+                      kind="FORM_ATTACHMENT"
+                      capability="FORMS"
+                    />
+                  )}
+                </div>
               </div>
               <FormRenderer
                 schema={view!.schema}
