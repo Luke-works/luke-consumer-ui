@@ -3,7 +3,7 @@ import { connectEmbedFrame, type FrameBridge } from "@lukeflow/form-embed";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
-import { readSubmitMessage } from "../../lib/formSchema";
+import { readAttachmentsEnabled, readSubmitMessage } from "../../lib/formSchema";
 import { getEmbedForm, submitEmbed, type EmbedForm } from "../../lib/publicEmbedApi";
 import { linkEmbedDocuments } from "../../lib/publicDocumentsApi";
 import EmbedAttachments from "./EmbedAttachments";
@@ -82,6 +82,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
     }
   };
 
+  // Attachments are opt-in per form (Form settings → "Allow file attachments"). The tab only appears
+  // when the published schema enables it; otherwise the form renders on its own with no tabs.
+  const showAttachments = !!form && token != null && readAttachmentsEnabled(form.schema);
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-gray-950">
       <div ref={cardRef} className="mx-auto max-w-[640px] rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -116,9 +120,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
             />
             {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
 
-            {/* Attachments live in their own TAB, not as an inline form field. Both panels stay MOUNTED
-                (toggled with `hidden`) so typed form data and any in-progress upload survive a tab switch. */}
-            {token ? (
+            {/* Attachments live in their own TAB (opt-in per form), not as an inline form field. Both
+                panels stay MOUNTED (toggled with `hidden`) so typed form data and any in-progress upload
+                survive a tab switch. With attachments off, the form renders on its own — no tabs. */}
+            {showAttachments ? (
               <div role="tablist" aria-label="Form sections" className="mb-5 flex gap-1 border-b border-gray-200 dark:border-gray-800">
                 <TabButton id="form" active={tab === "form"} onClick={() => setTab("form")}>
                   Form
@@ -129,7 +134,7 @@ export default function FormEmbedView({ token }: { token?: string }) {
               </div>
             ) : null}
 
-            <div role="tabpanel" hidden={token != null && tab !== "form"}>
+            <div role="tabpanel" hidden={showAttachments && tab !== "form"}>
               {/* A bad schema must not blank the host's iframe — degrade to a message. */}
               <ErrorBoundary
                 label="form-embed-renderer"
@@ -144,7 +149,7 @@ export default function FormEmbedView({ token }: { token?: string }) {
             </div>
 
             {/* Token-scoped attachments (uploaded before submit, linked to the instance after). */}
-            {token ? (
+            {showAttachments && token ? (
               <div role="tabpanel" hidden={tab !== "files"}>
                 <EmbedAttachments token={token} processRef={attachmentRef} onCountChange={setAttachmentCount} />
               </div>

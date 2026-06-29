@@ -19,6 +19,7 @@ import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
 import { readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
+import { readAttachmentsEnabled } from "../../lib/formSchema";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import AiAssistPanel from "./AiAssistPanel";
@@ -41,8 +42,9 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft } from "lucide-react";
+import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
+import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
 import { guardedLeave } from "../../lib/leaveGuard";
@@ -50,6 +52,7 @@ import { useMutationLock } from "../../hooks/useMutationLock";
 import { PencilIcon } from "../../icons";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
+import Checkbox from "../../components/form/input/Checkbox";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import LifecycleActions from "./LifecycleActions";
@@ -102,6 +105,9 @@ export default function FormBuilderPage() {
   // Preview (read-only fill) — available even in view-only; opens from the top bar.
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewSchema, setPreviewSchema] = useState("");
+  // Whether the preview form has been submitted — drives the success screen so the configured
+  // submission message is verifiable in the designer (the bare renderer doesn't show it).
+  const [previewDone, setPreviewDone] = useState(false);
   // "Test the form" (positive/negative validation runs + sign-off).
   const [testOpen, setTestOpen] = useState(false);
   const [lastTestedAt, setLastTestedAt] = useState<number | null>(null);
@@ -115,11 +121,15 @@ export default function FormBuilderPage() {
   const [formSettingsOpen, setFormSettingsOpen] = useState(false);
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
+  // Opt-in file attachments: when on, the embedded form offers an Attachments tab to the filler.
+  // Stored in the schema settings (versioned), so the published embed knows whether to show it.
+  const [allowAttachments, setAllowAttachments] = useState(false);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
   const latestRef = useRef<FormSchema | null>(null);
   const submitMsgRef = useRef("");
+  const allowAttachmentsRef = useRef(false);
   const saveTimer = useRef<number | null>(null);
   const unsaved = useRef(false);
   // Imperative handle: lets the AI apply a new schema WITHOUT remounting the builder,
@@ -152,6 +162,9 @@ export default function FormBuilderPage() {
         const sm = readSubmitMessage(f.schema);
         setSubmitMessage(sm);
         submitMsgRef.current = sm;
+        const att = readAttachmentsEnabled(f.schema);
+        setAllowAttachments(att);
+        allowAttachmentsRef.current = att;
         latestRef.current = null;
         setLiveSchema(parseSchema(f.schema) as unknown as BuilderSchemaLike);
         // Show the "being edited" banner only if someone else holds the lock AND we haven't taken it.
@@ -208,7 +221,10 @@ export default function FormBuilderPage() {
   // any other settings), matching the legacy page's `withSettings`.
   const toJson = useCallback(
     (schema: FormSchema) =>
-      JSON.stringify({ ...schema, settings: { ...(schema.settings ?? {}), submitMessage: submitMsgRef.current } }),
+      JSON.stringify({
+        ...schema,
+        settings: { ...(schema.settings ?? {}), submitMessage: submitMsgRef.current, attachments: allowAttachmentsRef.current },
+      }),
     [],
   );
 
@@ -295,6 +311,7 @@ export default function FormBuilderPage() {
   // Preview snapshots the current schema into a read-only renderer (works in view-only too).
   const openPreview = () => {
     setPreviewSchema(currentJson());
+    setPreviewDone(false);
     setPreviewOpen(true);
   };
 
@@ -411,6 +428,17 @@ export default function FormBuilderPage() {
     scheduleSave(latestRef.current ?? initialSchema);
   };
 
+  // Toggle opt-in attachments. Lives in the schema settings (versioned), so flipping it dirties the
+  // draft and re-gates sign-off/publish exactly like a field or submit-message edit.
+  const onToggleAttachments = (on: boolean) => {
+    setAllowAttachments(on);
+    allowAttachmentsRef.current = on;
+    if (!canEdit) return;
+    setDirtySinceCheckIn(true);
+    setLatestSignedOff(false);
+    scheduleSave(latestRef.current ?? initialSchema);
+  };
+
   // Load the activity feed when the settings modal opens. The inputs are seeded by the
   // name button's onClick (NOT here) so a re-render mid-edit can't clobber what's typed.
   useEffect(() => {
@@ -427,9 +455,17 @@ export default function FormBuilderPage() {
   const saveFormSettings = async () => {
     if (!tenant || !id) return;
     const name = formName.trim() || form?.name || "";
+    const changed = name !== form?.name || (formDesc || "") !== (form?.description || "");
     setFormName(name);
     await updateMeta(tenant, id, { name, description: formDesc });
     setForm((f) => (f ? { ...f, name, description: formDesc } : f));
+    // Form metadata is part of the form's published identity, so a name/description change must go
+    // through the lifecycle like any edit: it dirties the draft (Check-in lights up) and invalidates
+    // the signed-off version, so Publish re-gates until the new state is signed off and published.
+    if (changed && canEdit && checkedOut) {
+      setDirtySinceCheckIn(true);
+      setLatestSignedOff(false);
+    }
     setFormSettingsOpen(false);
   };
 
@@ -565,8 +601,11 @@ export default function FormBuilderPage() {
 
       {/* View-only notice: an editor hasn't checked the form out yet (the Checkout button is above). */}
       {canEdit && !checkedOut && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300">
-          🔒 View-only — you're looking at v{version}. Use <span className="font-medium">Checkout</span> above to edit it.
+        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300">
+          <Tooltip content="Read-only — your edits won't be saved until you check the form out.">
+            <Lock className="size-4 shrink-0 text-gray-400" />
+          </Tooltip>
+          <span>View-only — you're looking at v{version}. Use <span className="font-medium">Checkout</span> above to edit it.</span>
         </div>
       )}
 
@@ -595,12 +634,24 @@ export default function FormBuilderPage() {
         />
       </div>
 
-      {/* Read-only live preview of the current form (top-bar Preview). */}
+      {/* Read-only live preview of the current form (top-bar Preview). Submitting shows the configured
+          submission message, exactly as a real filler would see it after submit. */}
       <Modal isOpen={previewOpen} onClose={() => setPreviewOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
         <div className="p-6 sm:p-8">
           <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Preview — {form.name}</h2>
-          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Fill it out to test conditions, calculated values and validation.</p>
-          <FormRenderer schema={previewSchema} />
+          {previewDone ? (
+            <>
+              <SubmissionSuccess message={readSubmitMessage(previewSchema)} />
+              <div className="text-center">
+                <Button size="sm" variant="outline" onClick={() => setPreviewDone(false)}>Fill again</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Fill it out to test conditions, calculated values and validation.</p>
+              <FormRenderer schema={previewSchema} onSubmit={() => setPreviewDone(true)} />
+            </>
+          )}
         </div>
       </Modal>
 
@@ -631,29 +682,48 @@ export default function FormBuilderPage() {
               {form.updatedByName && <>{form.createdByName ? " · " : ""}last edited by <span className="text-gray-600 dark:text-gray-300">{form.updatedByName}</span></>}
             </p>
           )}
+          {/* Editing settings is part of the edit lifecycle — changing the name, description,
+              submission message or attachments dirties the draft and re-gates publish, so it requires
+              a checkout (matching the builder canvas). View-only shows the values but disables editing. */}
+          {canEdit && !checkedOut && (
+            <p className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400">
+              Check the form out (Checkout in the toolbar) to edit these settings.
+            </p>
+          )}
           <div className="mb-4">
             <Label>Form name</Label>
-            <Input value={formName} onChange={(e) => setFormName(e.target.value)} disabled={!canEdit} />
+            <Input value={formName} onChange={(e) => setFormName(e.target.value)} disabled={!editable} />
           </div>
           <div className="mb-4">
             <Label>Description</Label>
-            <Input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Optional" disabled={!canEdit} />
+            <Input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Optional" disabled={!editable} />
           </div>
           <div className="mb-6">
             <Label>Submission message</Label>
             <textarea
               value={submitMessage}
               onChange={(e) => onSubmitMessage(e.target.value)}
-              disabled={!canEdit}
+              disabled={!editable}
               rows={3}
               placeholder="Thank you! Your response has been recorded."
               className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
             />
             <p className="mt-1 text-xs text-gray-400">Shown with a success animation after the form is submitted. Leave blank for the default.</p>
           </div>
+          <div className="mb-6">
+            <Checkbox
+              checked={allowAttachments}
+              onChange={onToggleAttachments}
+              disabled={!editable}
+              label="Allow file attachments"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Adds an Attachments tab to the embedded form so people can upload supporting files with their submission.
+            </p>
+          </div>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setFormSettingsOpen(false)}>{canEdit ? "Cancel" : "Close"}</Button>
-            {canEdit && <Button onClick={saveFormSettings} disabled={!formName.trim()}>Save</Button>}
+            <Button variant="outline" onClick={() => setFormSettingsOpen(false)}>{editable ? "Cancel" : "Close"}</Button>
+            {editable && <Button onClick={saveFormSettings} disabled={!formName.trim()}>Save</Button>}
           </div>
 
           {auditEvents.length > 0 && (

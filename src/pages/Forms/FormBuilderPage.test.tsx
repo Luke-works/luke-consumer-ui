@@ -109,12 +109,16 @@ describe("FormBuilderPage — lifecycle gating", () => {
 });
 
 describe("FormBuilderPage — settings modal", () => {
-  it("opens settings from the name, edits the name, and persists via updateMeta", async () => {
+  it("checks out, edits the name, persists via updateMeta, and the metadata change re-enables Check in", async () => {
     const user = userEvent.setup();
     mocked.getForm.mockResolvedValue(form(CLEAN)); // name "Contact", no description
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /contact/i })); // form-name button
+    // Editing settings is part of the edit lifecycle now — check out first (view-only disables them).
+    await user.click(await screen.findByRole("button", { name: /^checkout$/i }));
+    expect(await screen.findByRole("button", { name: /undo checkout/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /contact/i })); // form-name button
     const nameInput = await screen.findByDisplayValue("Contact"); // seeded from the saved form
     fireEvent.change(nameInput, { target: { value: "Contact Form" } });
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -122,6 +126,19 @@ describe("FormBuilderPage — settings modal", () => {
     await waitFor(() =>
       expect(mocked.updateMeta).toHaveBeenCalledWith("t1", "f1", { name: "Contact Form", description: "" }),
     );
+    // A metadata change dirties the draft, so Check in is actionable again.
+    await waitFor(() => expect(screen.getByRole("button", { name: /check in/i })).toBeEnabled());
+  });
+
+  it("view-only disables the settings fields and hides Save", async () => {
+    const user = userEvent.setup();
+    mocked.getForm.mockResolvedValue(form(CLEAN));
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /contact/i })); // open settings (still view-only)
+    expect(await screen.findByDisplayValue("Contact")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/check the form out/i)).toBeInTheDocument();
   });
 });
 

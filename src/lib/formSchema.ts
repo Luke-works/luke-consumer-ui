@@ -304,7 +304,11 @@ export function hasBlockingProblems(schema: FormSchema | null | undefined): bool
 // ── Form-level settings ──────────────────────────────────────────────────────
 // Stored alongside `entities`/`root` in the schema JSON (a `settings` sibling).
 // The builder preserves it across saves; the renderer reads it after submit.
-export type FormSettings = { submitMessage?: string };
+export type FormSettings = {
+  submitMessage?: string;
+  /** Opt-in: when true the form offers a file-attachments tab to the filler. Default off. */
+  attachments?: boolean;
+};
 
 /** Read form-level settings from a schema JSON string (tolerant of anything). */
 export function readSettings(rawSchema: string | null | undefined): FormSettings {
@@ -322,6 +326,11 @@ export function readSettings(rawSchema: string | null | undefined): FormSettings
 export function readSubmitMessage(rawSchema: string | null | undefined): string {
   const m = readSettings(rawSchema).submitMessage;
   return typeof m === "string" ? m : "";
+}
+
+/** Whether the form opts into a file-attachments tab for the filler (default off). */
+export function readAttachmentsEnabled(rawSchema: string | null | undefined): boolean {
+  return readSettings(rawSchema).attachments === true;
 }
 
 /**
