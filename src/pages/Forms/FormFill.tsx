@@ -3,8 +3,10 @@ import { useNavigate, useParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
+import { MinionProvider } from "@lukeflow/form-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
+import { createAuthedMinionClient } from "../../lib/minionsApi";
 import AttachmentsButton from "../../components/documents/AttachmentsButton";
 import { readSubmitMessage } from "../../lib/formSchema";
 import {
@@ -24,6 +26,9 @@ export default function FormFill() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
+  // Secure minion client (authed, tenant-scoped) — powers server-side field features like address
+  // autocomplete without exposing any provider key to the browser.
+  const minionClient = useMemo(() => (tenant ? createAuthedMinionClient(tenant) : null), [tenant]);
 
   const [view, setView] = useState<InstanceView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,13 +156,25 @@ export default function FormFill() {
                   )}
                 </div>
               </div>
-              <FormRenderer
-                schema={view!.schema}
-                initialValues={initialValues}
-                onChange={handleChange}
-                onSubmit={handleSubmit}
-                submitting={submitting}
-              />
+              {minionClient ? (
+                <MinionProvider client={minionClient}>
+                  <FormRenderer
+                    schema={view!.schema}
+                    initialValues={initialValues}
+                    onChange={handleChange}
+                    onSubmit={handleSubmit}
+                    submitting={submitting}
+                  />
+                </MinionProvider>
+              ) : (
+                <FormRenderer
+                  schema={view!.schema}
+                  initialValues={initialValues}
+                  onChange={handleChange}
+                  onSubmit={handleSubmit}
+                  submitting={submitting}
+                />
+              )}
             </>
           )}
         </div>

@@ -256,8 +256,11 @@ function createDefaultAttributeEditors() {
       label: "Minion data source",
       control: "dataSource",
       order: 2,
-      when: optioned,
-      hint: "Load options from a secure Minion (auth/authz stay server-side). Map params to other fields."
+      // Option-bearing fields load their options from a minion; an address block names a geocoding
+      // PROVIDER minion (Mapbox, Google, …) that returns address suggestions. Either way the key
+      // stays server-side and the form is provider-agnostic.
+      when: (e) => optioned(e) || e.type === "addressBlock",
+      hint: "Load from a secure Minion (auth/authz stay server-side). For an address, this is the geocoding provider; map params to other fields."
     },
     { id: "defaultValue", tab: "data", attribute: "defaultValue", label: "Default value", control: "text", order: 10, when: (e) => data(e) && e.type !== "checkbox" && !optioned(e) },
     { id: "defaultChecked", tab: "data", attribute: "defaultChecked", label: "Checked by default", control: "checkbox", order: 10, when: oneOf("checkbox") },
@@ -1806,7 +1809,10 @@ var PALETTE_GROUPS = [
       { type: "time", label: "Time" },
       { type: "day", label: "Date" },
       { type: "tags", label: "Tags" },
-      { type: "file", label: "File Upload" },
+      // File Upload intentionally removed from the palette: file attachments are handled by the host's
+      // dedicated Attachments section, not as a form field. The renderer/engine keep `file` support so
+      // any pre-existing schema with a file field still renders (backward-compatible), but new forms
+      // can't add one here.
       { type: "signature", label: "Signature" },
       { type: "rating", label: "Rating", defaults: { max: 5 } },
       { type: "ranking", label: "Ranking", defaults: OPTS },

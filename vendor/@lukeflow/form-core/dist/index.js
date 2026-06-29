@@ -2659,6 +2659,25 @@ function resolveMinionParams(ds, scope) {
   }
   return out;
 }
+var ADDR_KEYS = ["line1", "line2", "city", "region", "postalCode", "country"];
+function normalizeSuggestion(item) {
+  if (!item || typeof item !== "object") return null;
+  const o = item;
+  const label = stringify(o.label ?? o.place_name ?? o.text ?? o.description ?? "");
+  if (!label) return null;
+  const src = o.address && typeof o.address === "object" ? o.address : o;
+  const address = {};
+  for (const k of ADDR_KEYS) if (typeof src[k] === "string" && src[k]) address[k] = src[k];
+  if (typeof src.lat === "number") address.lat = src.lat;
+  if (typeof src.lng === "number") address.lng = src.lng;
+  return { id: typeof o.id === "string" ? o.id : void 0, label, address };
+}
+function toAddressSuggestions(result, ds) {
+  const envelope = result && typeof result === "object" ? result : void 0;
+  const arr = ds?.resultPath ? getPath(result, ds.resultPath) : Array.isArray(result) ? result : Array.isArray(envelope?.results) ? envelope.results : Array.isArray(envelope?.suggestions) ? envelope.suggestions : void 0;
+  if (!Array.isArray(arr)) return [];
+  return arr.map(normalizeSuggestion).filter((s) => s !== null);
+}
 function toOptions(result, ds) {
   const arr = ds.resultPath ? getPath(result, ds.resultPath) : result;
   if (!Array.isArray(arr)) return [];
@@ -2948,6 +2967,6 @@ function clampIndex(index, length) {
 // src/index.ts
 var VERSION = "0.1.0-alpha.0";
 
-export { BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

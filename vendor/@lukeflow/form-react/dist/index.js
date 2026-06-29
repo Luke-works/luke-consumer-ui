@@ -52,7 +52,7 @@ import {
   createDefaultFieldTypeRegistry,
   readAsyncValidation,
   runAsyncValidation,
-  readDataSource as readDataSource3
+  readDataSource as readDataSource4
 } from "@lukeflow/form-core";
 
 // src/minions.tsx
@@ -1415,6 +1415,12 @@ function DateField({
 
 // src/render/controls/richControls.tsx
 import { useEffect as useEffect6, useRef as useRef6, useState as useState9 } from "react";
+import { createPortal as createPortal4 } from "react-dom";
+import {
+  readDataSource as readDataSource3,
+  resolveMinionParams as resolveMinionParams3,
+  toAddressSuggestions
+} from "@lukeflow/form-core";
 import { jsx as jsx11, jsxs as jsxs7 } from "react/jsx-runtime";
 function RatingField({
   a11y,
@@ -1551,26 +1557,176 @@ var ADDRESS_PARTS = [
 ];
 function AddressBlockField({
   a11y,
+  entity,
   value,
+  scope,
   disabled,
   onChange
 }) {
   const data = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const setPart = (k, v) => !disabled && onChange({ ...data, [k]: v });
-  return /* @__PURE__ */ jsx11("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: ADDRESS_PARTS.map((p) => /* @__PURE__ */ jsxs7("div", { className: `lf-address-part lf-address-${p.key}`, children: [
-    /* @__PURE__ */ jsx11("label", { htmlFor: `${a11y.id}-${p.key}`, className: "lf-address-label", children: p.label }),
+  const fill = (addr) => {
+    if (disabled) return;
+    const next = { ...data };
+    for (const p of ADDRESS_PARTS) {
+      const v = addr[p.key];
+      if (v != null && v !== "") next[p.key] = String(v);
+    }
+    if (typeof addr.lat === "number") next.lat = addr.lat;
+    if (typeof addr.lng === "number") next.lng = addr.lng;
+    onChange(next);
+  };
+  const provider = entity ? readDataSource3(entity.attributes) : null;
+  return /* @__PURE__ */ jsxs7("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: [
+    provider && entity && /* @__PURE__ */ jsx11(AddressAutocomplete, { a11y, entity, scope: scope ?? {}, disabled, onPick: fill }),
+    ADDRESS_PARTS.map((p) => /* @__PURE__ */ jsxs7("div", { className: `lf-address-part lf-address-${p.key}`, children: [
+      /* @__PURE__ */ jsx11("label", { htmlFor: `${a11y.id}-${p.key}`, className: "lf-address-label", children: p.label }),
+      /* @__PURE__ */ jsx11(
+        "input",
+        {
+          id: `${a11y.id}-${p.key}`,
+          type: "text",
+          autoComplete: p.autocomplete,
+          value: asText(data[p.key]),
+          disabled,
+          onChange: (e) => setPart(p.key, e.target.value)
+        }
+      )
+    ] }, p.key))
+  ] });
+}
+function AddressAutocomplete({
+  a11y,
+  entity,
+  scope,
+  disabled,
+  onPick
+}) {
+  const client = useMinionClient();
+  const ds = readDataSource3(entity.attributes);
+  const dsRaw = entity.attributes?.dataSource;
+  const searchParam = typeof dsRaw?.searchParam === "string" ? dsRaw.searchParam : "q";
+  const [query, setQuery] = useState9("");
+  const [open, setOpen] = useState9(false);
+  const [suggestions, setSuggestions] = useState9([]);
+  const [loading, setLoading] = useState9(false);
+  const [active, setActive] = useState9(-1);
+  const timer = useRef6(null);
+  const blurTimer = useRef6(null);
+  const clearBlur = () => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    blurTimer.current = null;
+  };
+  useEffect6(() => () => clearBlur(), []);
+  const listId = `${a11y.id}-addr-listbox`;
+  const optionId = (i) => `${a11y.id}-addr-opt-${i}`;
+  useEffect6(() => {
+    if (open && active >= 0) scrollOptionIntoView(optionId(active));
+  }, [active, open]);
+  useEffect6(() => {
+    if (!client || !ds || !open || query.trim() === "") {
+      setSuggestions([]);
+      return;
+    }
+    if (timer.current) clearTimeout(timer.current);
+    const controller = new AbortController();
+    timer.current = setTimeout(() => {
+      setLoading(true);
+      client.request(ds.minion, { ...resolveMinionParams3(ds, scope), [searchParam]: query }, controller.signal).then((res) => {
+        if (!controller.signal.aborted) setSuggestions(toAddressSuggestions(res, ds));
+      }).catch(() => {
+      }).finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    }, 200);
+    return () => {
+      controller.abort();
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [query, open, client]);
+  const choose = (s) => {
+    clearBlur();
+    onPick(s.address);
+    setQuery(s.label);
+    setSuggestions([]);
+    setOpen(false);
+    setActive(-1);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (open && active >= 0 && suggestions[active]) {
+        e.preventDefault();
+        choose(suggestions[active]);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setActive(-1);
+    }
+  };
+  const wrapRef = useRef6(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && (loading || suggestions.length > 0));
+  const { dataTheme, themeStyle } = usePopoverTheme();
+  if (!client) return null;
+  return /* @__PURE__ */ jsxs7("div", { className: "lf-address-search lf-search-select", ref: wrapRef, children: [
+    /* @__PURE__ */ jsx11("label", { htmlFor: `${a11y.id}-addr-search`, className: "lf-address-label", children: "Search address" }),
     /* @__PURE__ */ jsx11(
       "input",
       {
-        id: `${a11y.id}-${p.key}`,
+        id: `${a11y.id}-addr-search`,
+        role: "combobox",
+        "aria-expanded": open,
+        "aria-controls": listId,
+        "aria-autocomplete": "list",
+        "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
+        autoComplete: "off",
         type: "text",
-        autoComplete: p.autocomplete,
-        value: asText(data[p.key]),
         disabled,
-        onChange: (e) => setPart(p.key, e.target.value)
+        value: query,
+        onFocus: () => {
+          clearBlur();
+          setOpen(true);
+        },
+        onChange: (e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          setActive(-1);
+        },
+        onKeyDown,
+        onBlur: () => {
+          blurTimer.current = setTimeout(() => setOpen(false), 150);
+        }
       }
+    ),
+    open && (loading || suggestions.length > 0) && popoverTarget(wrapRef) && createPortal4(
+      /* @__PURE__ */ jsxs7("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: [
+        loading && /* @__PURE__ */ jsx11("li", { className: "lf-search-loading", children: "Searching\u2026" }),
+        suggestions.map((s, i) => /* @__PURE__ */ jsx11(
+          "li",
+          {
+            id: optionId(i),
+            role: "option",
+            "aria-selected": i === active,
+            className: i === active ? "is-active" : void 0,
+            onMouseDown: (e) => {
+              e.preventDefault();
+              choose(s);
+            },
+            children: s.label
+          },
+          s.id ?? s.label
+        ))
+      ] }),
+      popoverTarget(wrapRef)
     )
-  ] }, p.key)) });
+  ] });
 }
 var RT_COMMANDS = [
   { cmd: "bold", label: "Bold", icon: "B" },
@@ -2374,7 +2530,7 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "select":
-        control = a.searchable && readDataSource3(a) ? (
+        control = a.searchable && readDataSource4(a) ? (
           // Searchable + Minion-backed → server-side type-ahead (re-queries as you type),
           // so a value beyond the first page is still findable (unlike a static filter).
           /* @__PURE__ */ jsx13(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
@@ -2421,7 +2577,7 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ jsx13(MatrixField, { a11y, entity, value: fs.value, disabled, onChange: set });
         break;
       case "addressBlock":
-        control = /* @__PURE__ */ jsx13(AddressBlockField, { a11y, value: fs.value, disabled, onChange: set });
+        control = /* @__PURE__ */ jsx13(AddressBlockField, { a11y, entity, value: fs.value, scope: ctx.scope, disabled, onChange: set });
         break;
       case "richText":
         control = /* @__PURE__ */ jsx13(RichTextField, { a11y, value: fs.value, disabled, onChange: set, sanitizeHtml: ctx.sanitizeHtml });

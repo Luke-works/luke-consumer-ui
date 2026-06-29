@@ -2148,6 +2148,31 @@ interface MinionOption {
 declare function readDataSource(attributes: Record<string, unknown> | undefined): DataSource | null;
 /** Build the request params by reading each mapped field KEY from the live scope. */
 declare function resolveMinionParams(ds: DataSource, scope: Readonly<Record<string, unknown>>): Record<string, unknown>;
+/** A normalized postal address. The six string parts match the structured address-block inputs;
+ *  `lat`/`lng` are optional coordinates a provider may also return (they ride along in the payload). */
+interface AddressValue {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    region?: string;
+    postalCode?: string;
+    country?: string;
+    lat?: number;
+    lng?: number;
+}
+/** One address suggestion from a provider minion: a human-readable `label` + the structured value
+ *  to fill on select. `id` is the provider's opaque result id (optional, for keys/dedupe). */
+interface AddressSuggestion {
+    id?: string;
+    label: string;
+    address: AddressValue;
+}
+/**
+ * Shape a provider minion's response into a list of {@link AddressSuggestion}. Reads the array via the
+ * data source's `resultPath`, else accepts the response itself, a `{ results: [...] }`, or a
+ * `{ suggestions: [...] }` envelope. Each item is normalized tolerantly (see {@link normalizeSuggestion}).
+ */
+declare function toAddressSuggestions(result: unknown, ds?: DataSource | null): AddressSuggestion[];
 /** Shape a minion response into `{label,value}` options per the data source's paths. */
 declare function toOptions(result: unknown, ds: DataSource): MinionOption[];
 /**
@@ -2252,4 +2277,4 @@ declare function setSettings(schema: FormSchema, patch: Partial<FormSettings>): 
 /** @lukeflow/form-core — the headless Lukeflow form engine. */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataSource, type DataSourceTrigger, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { type AddressSuggestion, type AddressValue, type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataSource, type DataSourceTrigger, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };

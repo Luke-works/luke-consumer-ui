@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MinionProvider } from "@lukeflow/form-react";
 import { connectEmbedFrame, type FrameBridge } from "@lukeflow/form-embed";
+import { createPublicMinionClient } from "../../lib/minionsApi";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
@@ -86,6 +88,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
   // when the published schema enables it; otherwise the form renders on its own with no tabs.
   const showAttachments = !!form && token != null && readAttachmentsEnabled(form.schema);
 
+  // Secure minion client for this embed: token-scoped, no auth header. Powers server-side field
+  // features (e.g. address autocomplete) without exposing any provider key to the browser.
+  const minionClient = useMemo(() => (token ? createPublicMinionClient(token) : null), [token]);
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-gray-950">
       <div ref={cardRef} className="mx-auto max-w-[640px] rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -144,7 +150,13 @@ export default function FormEmbedView({ token }: { token?: string }) {
                   </p>
                 )}
               >
-                <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+                {minionClient ? (
+                  <MinionProvider client={minionClient}>
+                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+                  </MinionProvider>
+                ) : (
+                  <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+                )}
               </ErrorBoundary>
             </div>
 

@@ -98,7 +98,7 @@ function useFormEngine(schema, options2) {
 
 // src/FormRenderer.tsx
 var import_react15 = require("react");
-var import_form_core7 = require("@lukeflow/form-core");
+var import_form_core8 = require("@lukeflow/form-core");
 
 // src/minions.tsx
 var import_react2 = require("react");
@@ -1452,6 +1452,8 @@ function DateField({
 
 // src/render/controls/richControls.tsx
 var import_react13 = require("react");
+var import_react_dom4 = require("react-dom");
+var import_form_core6 = require("@lukeflow/form-core");
 var import_jsx_runtime11 = require("react/jsx-runtime");
 function RatingField({
   a11y,
@@ -1588,26 +1590,176 @@ var ADDRESS_PARTS = [
 ];
 function AddressBlockField({
   a11y,
+  entity,
   value,
+  scope,
   disabled,
   onChange
 }) {
   const data = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const setPart = (k, v) => !disabled && onChange({ ...data, [k]: v });
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: ADDRESS_PARTS.map((p) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${p.key}`, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: `${a11y.id}-${p.key}`, className: "lf-address-label", children: p.label }),
+  const fill = (addr) => {
+    if (disabled) return;
+    const next = { ...data };
+    for (const p of ADDRESS_PARTS) {
+      const v = addr[p.key];
+      if (v != null && v !== "") next[p.key] = String(v);
+    }
+    if (typeof addr.lat === "number") next.lat = addr.lat;
+    if (typeof addr.lng === "number") next.lng = addr.lng;
+    onChange(next);
+  };
+  const provider = entity ? (0, import_form_core6.readDataSource)(entity.attributes) : null;
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: [
+    provider && entity && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressAutocomplete, { a11y, entity, scope: scope ?? {}, disabled, onPick: fill }),
+    ADDRESS_PARTS.map((p) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${p.key}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: `${a11y.id}-${p.key}`, className: "lf-address-label", children: p.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        "input",
+        {
+          id: `${a11y.id}-${p.key}`,
+          type: "text",
+          autoComplete: p.autocomplete,
+          value: asText(data[p.key]),
+          disabled,
+          onChange: (e) => setPart(p.key, e.target.value)
+        }
+      )
+    ] }, p.key))
+  ] });
+}
+function AddressAutocomplete({
+  a11y,
+  entity,
+  scope,
+  disabled,
+  onPick
+}) {
+  const client = useMinionClient();
+  const ds = (0, import_form_core6.readDataSource)(entity.attributes);
+  const dsRaw = entity.attributes?.dataSource;
+  const searchParam = typeof dsRaw?.searchParam === "string" ? dsRaw.searchParam : "q";
+  const [query, setQuery] = (0, import_react13.useState)("");
+  const [open, setOpen] = (0, import_react13.useState)(false);
+  const [suggestions, setSuggestions] = (0, import_react13.useState)([]);
+  const [loading, setLoading] = (0, import_react13.useState)(false);
+  const [active, setActive] = (0, import_react13.useState)(-1);
+  const timer = (0, import_react13.useRef)(null);
+  const blurTimer = (0, import_react13.useRef)(null);
+  const clearBlur = () => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    blurTimer.current = null;
+  };
+  (0, import_react13.useEffect)(() => () => clearBlur(), []);
+  const listId = `${a11y.id}-addr-listbox`;
+  const optionId = (i) => `${a11y.id}-addr-opt-${i}`;
+  (0, import_react13.useEffect)(() => {
+    if (open && active >= 0) scrollOptionIntoView(optionId(active));
+  }, [active, open]);
+  (0, import_react13.useEffect)(() => {
+    if (!client || !ds || !open || query.trim() === "") {
+      setSuggestions([]);
+      return;
+    }
+    if (timer.current) clearTimeout(timer.current);
+    const controller = new AbortController();
+    timer.current = setTimeout(() => {
+      setLoading(true);
+      client.request(ds.minion, { ...(0, import_form_core6.resolveMinionParams)(ds, scope), [searchParam]: query }, controller.signal).then((res) => {
+        if (!controller.signal.aborted) setSuggestions((0, import_form_core6.toAddressSuggestions)(res, ds));
+      }).catch(() => {
+      }).finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    }, 200);
+    return () => {
+      controller.abort();
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [query, open, client]);
+  const choose = (s) => {
+    clearBlur();
+    onPick(s.address);
+    setQuery(s.label);
+    setSuggestions([]);
+    setOpen(false);
+    setActive(-1);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setOpen(true);
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      if (open && active >= 0 && suggestions[active]) {
+        e.preventDefault();
+        choose(suggestions[active]);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setActive(-1);
+    }
+  };
+  const wrapRef = (0, import_react13.useRef)(null);
+  const popStyle = useAnchoredPosition(wrapRef, open && (loading || suggestions.length > 0));
+  const { dataTheme, themeStyle } = usePopoverTheme();
+  if (!client) return null;
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address-search lf-search-select", ref: wrapRef, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: `${a11y.id}-addr-search`, className: "lf-address-label", children: "Search address" }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       "input",
       {
-        id: `${a11y.id}-${p.key}`,
+        id: `${a11y.id}-addr-search`,
+        role: "combobox",
+        "aria-expanded": open,
+        "aria-controls": listId,
+        "aria-autocomplete": "list",
+        "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
+        autoComplete: "off",
         type: "text",
-        autoComplete: p.autocomplete,
-        value: asText(data[p.key]),
         disabled,
-        onChange: (e) => setPart(p.key, e.target.value)
+        value: query,
+        onFocus: () => {
+          clearBlur();
+          setOpen(true);
+        },
+        onChange: (e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          setActive(-1);
+        },
+        onKeyDown,
+        onBlur: () => {
+          blurTimer.current = setTimeout(() => setOpen(false), 150);
+        }
       }
+    ),
+    open && (loading || suggestions.length > 0) && popoverTarget(wrapRef) && (0, import_react_dom4.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: [
+        loading && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("li", { className: "lf-search-loading", children: "Searching\u2026" }),
+        suggestions.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          "li",
+          {
+            id: optionId(i),
+            role: "option",
+            "aria-selected": i === active,
+            className: i === active ? "is-active" : void 0,
+            onMouseDown: (e) => {
+              e.preventDefault();
+              choose(s);
+            },
+            children: s.label
+          },
+          s.id ?? s.label
+        ))
+      ] }),
+      popoverTarget(wrapRef)
     )
-  ] }, p.key)) });
+  ] });
 }
 var RT_COMMANDS = [
   { cmd: "bold", label: "Bold", icon: "B" },
@@ -1667,7 +1819,7 @@ function RichTextField({
 
 // src/render/containers.tsx
 var import_react14 = require("react");
-var import_form_core6 = require("@lukeflow/form-core");
+var import_form_core7 = require("@lukeflow/form-core");
 var import_jsx_runtime12 = require("react/jsx-runtime");
 function Group({
   entity,
@@ -1723,8 +1875,8 @@ function GridField({
             const ck = cellKey(c);
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
-            const visible = (0, import_form_core6.evaluateVisibility)(c.attributes, { ...top, ...row }, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator });
-            const required = (0, import_form_core6.evaluateRequired)(c.attributes, { ...top, ...row });
+            const visible = (0, import_form_core7.evaluateVisibility)(c.attributes, { ...top, ...row }, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator });
+            const required = (0, import_form_core7.evaluateRequired)(c.attributes, { ...top, ...row });
             return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("td", { children: visible && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               GridCell,
               {
@@ -2022,9 +2174,9 @@ function EditGridField({
       cells.map((c) => {
         const ck = cellKey(c);
         const rowScope = { ...top, ...editing.draft };
-        if (!(0, import_form_core6.evaluateVisibility)(c.attributes, rowScope, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator })) return null;
+        if (!(0, import_form_core7.evaluateVisibility)(c.attributes, rowScope, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator })) return null;
         const label = labelText(c.attributes) ?? ck;
-        const required = (0, import_form_core6.evaluateRequired)(c.attributes, rowScope);
+        const required = (0, import_form_core7.evaluateRequired)(c.attributes, rowScope);
         return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "lf-eg-cell", children: [
           /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "lf-eg-cell-label", children: [
             ctx.t(label),
@@ -2133,7 +2285,7 @@ function FormRenderer(props) {
       cancelled = true;
     };
   }, [playbackSignal]);
-  const reg = registry ?? (0, import_form_core7.createDefaultFieldTypeRegistry)();
+  const reg = registry ?? (0, import_form_core8.createDefaultFieldTypeRegistry)();
   const comps = components ?? {};
   const { t, dir } = useLocale();
   const themeCtx = useFormTheme();
@@ -2408,7 +2560,7 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "select":
-        control = a.searchable && (0, import_form_core7.readDataSource)(a) ? (
+        control = a.searchable && (0, import_form_core8.readDataSource)(a) ? (
           // Searchable + Minion-backed → server-side type-ahead (re-queries as you type),
           // so a value beyond the first page is still findable (unlike a static filter).
           /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
@@ -2455,7 +2607,7 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(MatrixField, { a11y, entity, value: fs.value, disabled, onChange: set });
         break;
       case "addressBlock":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(AddressBlockField, { a11y, value: fs.value, disabled, onChange: set });
+        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(AddressBlockField, { a11y, entity, value: fs.value, scope: ctx.scope, disabled, onChange: set });
         break;
       case "richText":
         control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RichTextField, { a11y, value: fs.value, disabled, onChange: set, sanitizeHtml: ctx.sanitizeHtml });
@@ -2516,10 +2668,10 @@ async function runAsyncValidations(schema, form, client) {
   const checks = [];
   for (const [id, fs] of Object.entries(form.state.fields)) {
     if (!fs.isVisible) continue;
-    const av = (0, import_form_core7.readAsyncValidation)(schema.entities[id]?.attributes);
+    const av = (0, import_form_core8.readAsyncValidation)(schema.entities[id]?.attributes);
     if (!av) continue;
     checks.push(
-      (0, import_form_core7.runAsyncValidation)(av, scope, fs.value, client).then((r) => [fs.key, r.valid ? null : r.message ?? "Invalid"]).catch(() => [fs.key, null])
+      (0, import_form_core8.runAsyncValidation)(av, scope, fs.value, client).then((r) => [fs.key, r.valid ? null : r.message ?? "Invalid"]).catch(() => [fs.key, null])
     );
   }
   const errs = {};
@@ -2528,9 +2680,9 @@ async function runAsyncValidations(schema, form, client) {
 }
 
 // src/print.ts
-var import_form_core8 = require("@lukeflow/form-core");
+var import_form_core9 = require("@lukeflow/form-core");
 function printSubmission(schema, data, options2) {
-  const html = (0, import_form_core8.toPrintableHtml)(schema, data, options2);
+  const html = (0, import_form_core9.toPrintableHtml)(schema, data, options2);
   const win = typeof window !== "undefined" ? window.open("", "_blank") : null;
   if (!win) return false;
   win.document.write(html);

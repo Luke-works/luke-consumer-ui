@@ -2661,6 +2661,25 @@ function resolveMinionParams(ds, scope) {
   }
   return out;
 }
+var ADDR_KEYS = ["line1", "line2", "city", "region", "postalCode", "country"];
+function normalizeSuggestion(item) {
+  if (!item || typeof item !== "object") return null;
+  const o = item;
+  const label = stringify(o.label ?? o.place_name ?? o.text ?? o.description ?? "");
+  if (!label) return null;
+  const src = o.address && typeof o.address === "object" ? o.address : o;
+  const address = {};
+  for (const k of ADDR_KEYS) if (typeof src[k] === "string" && src[k]) address[k] = src[k];
+  if (typeof src.lat === "number") address.lat = src.lat;
+  if (typeof src.lng === "number") address.lng = src.lng;
+  return { id: typeof o.id === "string" ? o.id : void 0, label, address };
+}
+function toAddressSuggestions(result, ds) {
+  const envelope = result && typeof result === "object" ? result : void 0;
+  const arr = ds?.resultPath ? getPath(result, ds.resultPath) : Array.isArray(result) ? result : Array.isArray(envelope?.results) ? envelope.results : Array.isArray(envelope?.suggestions) ? envelope.suggestions : void 0;
+  if (!Array.isArray(arr)) return [];
+  return arr.map(normalizeSuggestion).filter((s) => s !== null);
+}
 function toOptions(result, ds) {
   const arr = ds.resultPath ? getPath(result, ds.resultPath) : result;
   if (!Array.isArray(arr)) return [];
@@ -3040,6 +3059,7 @@ exports.sanitizeKey = sanitizeKey;
 exports.seedFields = seedFields;
 exports.setSettings = setSettings;
 exports.sourcePriority = sourcePriority;
+exports.toAddressSuggestions = toAddressSuggestions;
 exports.toCamelKey = toCamelKey;
 exports.toOptions = toOptions;
 exports.toPrintableHtml = toPrintableHtml;
