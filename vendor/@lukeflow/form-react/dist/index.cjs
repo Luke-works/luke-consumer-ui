@@ -1588,6 +1588,47 @@ var ADDRESS_PARTS = [
   { key: "postalCode", label: "Postal code", autocomplete: "postal-code" },
   { key: "country", label: "Country", autocomplete: "country-name" }
 ];
+var DEFAULT_COUNTRY_CONFIG = { regionLabel: "State / Province", postalLabel: "Postal code" };
+var COUNTRY_ADDRESS_CONFIG = {
+  US: { regionLabel: "State", postalLabel: "ZIP code", postalPattern: /^\d{5}(-\d{4})?$/, postalExample: "12345" },
+  GB: { regionLabel: "County", postalLabel: "Postcode", postalPattern: /^[A-Za-z]{1,2}\d[A-Za-z\d]?\s?\d[A-Za-z]{2}$/, postalExample: "SW1A 1AA" },
+  IN: { regionLabel: "State", postalLabel: "PIN code", postalPattern: /^\d{6}$/, postalExample: "560001" },
+  CA: { regionLabel: "Province", postalLabel: "Postal code", postalPattern: /^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/, postalExample: "K1A 0B1" },
+  AU: { regionLabel: "State / Territory", postalLabel: "Postcode", postalPattern: /^\d{4}$/, postalExample: "2000" },
+  DE: { regionLabel: "State", postalLabel: "Postal code", postalPattern: /^\d{5}$/, postalExample: "10115" },
+  FR: { regionLabel: "Region", postalLabel: "Postal code", postalPattern: /^\d{5}$/, postalExample: "75001" },
+  JP: { regionLabel: "Prefecture", postalLabel: "Postal code", postalPattern: /^\d{3}-?\d{4}$/, postalExample: "100-0001" },
+  BR: { regionLabel: "State", postalLabel: "CEP", postalPattern: /^\d{5}-?\d{3}$/, postalExample: "01000-000" }
+};
+var COUNTRY_NAME_TO_CODE = {
+  "united states": "US",
+  "united states of america": "US",
+  "usa": "US",
+  "us": "US",
+  "united kingdom": "GB",
+  "uk": "GB",
+  "great britain": "GB",
+  "england": "GB",
+  "scotland": "GB",
+  "wales": "GB",
+  india: "IN",
+  canada: "CA",
+  australia: "AU",
+  germany: "DE",
+  deutschland: "DE",
+  france: "FR",
+  japan: "JP",
+  brazil: "BR",
+  brasil: "BR"
+};
+function nameToCode(name) {
+  if (typeof name !== "string" || !name) return "";
+  return COUNTRY_NAME_TO_CODE[name.trim().toLowerCase()] ?? "";
+}
+function addressConfigFor(countryCode, countryName) {
+  const code = (typeof countryCode === "string" && countryCode ? countryCode : nameToCode(countryName)).toUpperCase();
+  return COUNTRY_ADDRESS_CONFIG[code] ?? DEFAULT_COUNTRY_CONFIG;
+}
 function AddressBlockField({
   a11y,
   entity,
@@ -1610,22 +1651,43 @@ function AddressBlockField({
     onChange(next);
   };
   const provider = entity ? (0, import_form_core6.readDataSource)(entity.attributes) : null;
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: [
+  const hasAddress = ADDRESS_PARTS.some((p) => asText(data[p.key]) !== "");
+  const showParts = !provider || hasAddress;
+  const cfg = addressConfigFor(data.countryCode, data.country);
+  const postal = asText(data.postalCode);
+  const postalInvalid = postal !== "" && cfg.postalPattern != null && !cfg.postalPattern.test(postal);
+  const labelFor = (key) => key === "region" ? cfg.regionLabel : key === "postalCode" ? cfg.postalLabel : ADDRESS_PARTS.find((p) => p.key === key).label;
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? hasAddress ? "filled" : "search" : "manual", children: [
     provider && entity && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressAutocomplete, { a11y, entity, scope: scope ?? {}, disabled, onPick: fill }),
-    ADDRESS_PARTS.map((p) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${p.key}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: `${a11y.id}-${p.key}`, className: "lf-address-label", children: p.label }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-        "input",
-        {
-          id: `${a11y.id}-${p.key}`,
-          type: "text",
-          autoComplete: p.autocomplete,
-          value: asText(data[p.key]),
-          disabled,
-          onChange: (e) => setPart(p.key, e.target.value)
-        }
-      )
-    ] }, p.key))
+    showParts && ADDRESS_PARTS.map((p) => {
+      const inputId = `${a11y.id}-${p.key}`;
+      const isPostal = p.key === "postalCode";
+      const invalid = isPostal && postalInvalid;
+      const errId = invalid ? `${inputId}-error` : void 0;
+      return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${p.key}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: inputId, className: "lf-address-label", children: labelFor(p.key) }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          "input",
+          {
+            id: inputId,
+            type: "text",
+            autoComplete: p.autocomplete,
+            placeholder: isPostal ? cfg.postalExample : void 0,
+            "aria-invalid": invalid || void 0,
+            "aria-describedby": errId,
+            value: asText(data[p.key]),
+            disabled,
+            onChange: (e) => setPart(p.key, e.target.value)
+          }
+        ),
+        invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: [
+          "Enter a valid ",
+          cfg.postalLabel.toLowerCase(),
+          cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : "",
+          "."
+        ] })
+      ] }, p.key);
+    })
   ] });
 }
 function AddressAutocomplete({

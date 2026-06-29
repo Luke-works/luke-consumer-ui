@@ -2661,7 +2661,7 @@ function resolveMinionParams(ds, scope) {
   }
   return out;
 }
-var ADDR_KEYS = ["line1", "line2", "city", "region", "postalCode", "country"];
+var ADDR_KEYS = ["line1", "line2", "city", "region", "postalCode", "country", "countryCode"];
 function normalizeSuggestion(item) {
   if (!item || typeof item !== "object") return null;
   const o = item;

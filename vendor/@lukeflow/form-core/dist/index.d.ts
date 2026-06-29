@@ -2157,6 +2157,9 @@ interface AddressValue {
     region?: string;
     postalCode?: string;
     country?: string;
+    /** ISO 3166-1 alpha-2 country code (e.g. "US", "GB", "IN"). Drives country-aware labels/validation
+     *  in the renderer; a provider should supply it when known (matching by name is the fallback). */
+    countryCode?: string;
     lat?: number;
     lng?: number;
 }
