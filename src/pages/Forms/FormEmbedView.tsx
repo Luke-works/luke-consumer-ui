@@ -5,7 +5,18 @@ import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readSubmitMessage } from "../../lib/formSchema";
 import { getEmbedForm, submitEmbed, type EmbedForm } from "../../lib/publicEmbedApi";
+import { linkEmbedDocuments } from "../../lib/publicDocumentsApi";
+import EmbedAttachments from "./EmbedAttachments";
 import { isAbortError } from "../../lib/abort";
+
+// High-entropy case-file key for this fill session (Flow-A): attachments upload under it before the
+// form is submitted, then bind to the created instance on submit. Unguessable so no other session can
+// target it; the embed token still scopes everything to the form's tenant.
+function newAttachmentRef(): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  const id = c?.randomUUID ? c.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return "embed-" + id.replace(/-/g, "");
+}
 
 // The public embed renderer — router-free so it mounts BOTH inside the SPA route (FormEmbed) and as
 // the standalone bundle (embed-main) that core-engine serves with a per-tenant frame-ancestors header.
@@ -17,6 +28,7 @@ export default function FormEmbedView({ token }: { token?: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [reloadKey, setReloadKey] = useState(0); // bump to re-attempt a failed load
+  const [attachmentRef] = useState(newAttachmentRef); // stable per fill session
 
   // The host-page bridge: auto-reports our height and emits ready/submitted/error to the embedding
   // site via @lukeflow/form-embed (a no-op when this page is opened standalone, i.e. not framed).
@@ -55,6 +67,8 @@ export default function FormEmbedView({ token }: { token?: string }) {
     try {
       // Carry the honeypot value under the agreed key; the engine drops the submission if it's filled.
       const res = await submitEmbed(token, { ...data, _lukehp: honeypot.current?.value ?? "" });
+      // Bind this session's attachments to the created instance (best-effort; never blocks success).
+      if (res.instanceId) void linkEmbedDocuments(token, attachmentRef, res.instanceId);
       setDone(true);
       bridge.current?.submitted(res.instanceId);
     } catch (e) {
@@ -98,6 +112,8 @@ export default function FormEmbedView({ token }: { token?: string }) {
               style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, opacity: 0 }}
             />
             {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
+            {/* Token-scoped attachments (uploaded before submit, linked to the instance after). */}
+            {token ? <EmbedAttachments token={token} processRef={attachmentRef} /> : null}
             {/* A bad schema must not blank the host's iframe — degrade to a message. */}
             <ErrorBoundary
               label="form-embed-renderer"
