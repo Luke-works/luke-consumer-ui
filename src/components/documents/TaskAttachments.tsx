@@ -1,12 +1,13 @@
-// TaskAttachments — an inline Attachments section for a task reading pane (the Form Inbox). Lists a
-// case file's documents through OUR API (/api/documents, never S3), CLASSIFIED as Task attachments
-// (bound to this Camunda task) vs Process attachments (case-level), lets a reviewer view them inline,
-// attach a new task-scoped document, and remove one. Mirrors AttachmentsButton's proven patterns
-// (lazy DocumentView so react-pdf stays out of jsdom + the host chunk).
+// TaskAttachments — the Attachments section for a task reading pane (the Form Inbox). Lists a case
+// file's documents through OUR API (/api/documents, never S3), CLASSIFIED as Task attachments (bound to
+// this Camunda task) vs Process attachments (case-level). A reviewer can PREVIEW each in a modal and
+// DOWNLOAD it — but NOT delete it (submitted attachments are read-only here). Reviewers may still attach
+// their own task-scoped document. Uses lazy DocumentView so react-pdf stays out of jsdom + the host chunk.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, FileText, Loader2, Paperclip, Trash2 } from "lucide-react";
+import { Download, Eye, FileText, Loader2, Paperclip } from "lucide-react";
+import { Modal } from "../ui/modal";
 import DocumentUpload from "./DocumentUpload";
-import { deleteDocument, listDocuments, type Document } from "../../lib/documentsApi";
+import { fetchContent, listDocuments, type Document } from "../../lib/documentsApi";
 
 const DocumentView = lazy(() => import("./DocumentView"));
 
@@ -28,8 +29,8 @@ export default function TaskAttachments({ tenant, ownerEntityId, taskId, classNa
   const [docs, setDocs] = useState<Document[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);   // inline viewer (no modal-in-modal)
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Document | null>(null);   // the doc shown in the preview modal
+  const [downloading, setDownloading] = useState(false);
 
   const refresh = useCallback(
     (signal?: AbortSignal) => {
@@ -46,20 +47,31 @@ export default function TaskAttachments({ tenant, ownerEntityId, taskId, classNa
   useEffect(() => {
     const ctrl = new AbortController();
     void refresh(ctrl.signal);
-    setOpenId(null);
+    setPreview(null);
     return () => ctrl.abort();
   }, [refresh]);
 
-  const onDelete = useCallback(
-    (doc: Document) => {
-      if (!tenant) return;
-      setBusyId(doc.docId);
-      deleteDocument(tenant, doc.docId)
-        .then(() => { if (openId === doc.docId) setOpenId(null); return refresh(); })
-        .catch((e: unknown) => setError(e instanceof Error ? e.message : "Could not delete this attachment."))
-        .finally(() => setBusyId(null));
+  // Download = fetch the bytes through the authed proxy (never S3) and save them with the real filename.
+  const download = useCallback(
+    async (doc: Document) => {
+      setDownloading(true);
+      try {
+        const blob = await fetchContent(tenant, doc.docId);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = doc.filename || "attachment";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not download this attachment.");
+      } finally {
+        setDownloading(false);
+      }
     },
-    [tenant, openId, refresh],
+    [tenant],
   );
 
   // Split into "Task attachments" (this task) and "Process attachments" (case-level / other tasks).
@@ -73,61 +85,34 @@ export default function TaskAttachments({ tenant, ownerEntityId, taskId, classNa
 
   const count = docs?.length ?? 0;
 
-  const row = (doc: Document) => {
-    const expanded = openId === doc.docId;
-    return (
-      <li key={doc.docId} className="py-2.5">
-        <div className="flex items-center gap-3">
-          <FileText className="size-5 shrink-0 text-gray-400" />
-          <button
-            type="button"
-            onClick={() => setOpenId(expanded ? null : doc.docId)}
-            className="min-w-0 flex-1 text-left"
-            title={doc.filename}
-          >
-            <span className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">{doc.filename}</span>
-              <ScopeBadge scope={scopeOf(doc)} />
-            </span>
-            <span className="block text-xs text-gray-400">
-              {formatBytes(doc.sizeBytes)}
-              {doc.status !== "READY" ? ` · ${doc.status}` : ""}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpenId(expanded ? null : doc.docId)}
-            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-50 hover:text-gray-700 dark:hover:bg-white/5"
-            aria-label={expanded ? `Hide ${doc.filename}` : `View ${doc.filename}`}
-          >
-            {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(doc)}
-            disabled={busyId === doc.docId}
-            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-error-50 hover:text-error-500 disabled:opacity-50 dark:hover:bg-error-500/10"
-            aria-label={`Delete ${doc.filename}`}
-          >
-            {busyId === doc.docId ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-          </button>
-        </div>
-        {expanded && (
-          <div className="mt-3 rounded-lg border border-gray-100 p-3 dark:border-gray-800">
-            <Suspense
-              fallback={
-                <div className="flex items-center gap-2 p-4 text-sm text-gray-400">
-                  <Loader2 className="size-4 animate-spin" /> Loading viewer…
-                </div>
-              }
-            >
-              <DocumentView docId={doc.docId} contentType={doc.contentType} filename={doc.filename} width={520} />
-            </Suspense>
-          </div>
-        )}
-      </li>
-    );
-  };
+  const row = (doc: Document) => (
+    <li key={doc.docId} className="flex items-center gap-3 py-2.5">
+      <FileText className="size-5 shrink-0 text-gray-400" />
+      <button
+        type="button"
+        onClick={() => setPreview(doc)}
+        className="min-w-0 flex-1 text-left"
+        title={`Preview ${doc.filename}`}
+      >
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">{doc.filename}</span>
+          <ScopeBadge scope={scopeOf(doc)} />
+        </span>
+        <span className="block text-xs text-gray-400">
+          {formatBytes(doc.sizeBytes)}
+          {doc.status !== "READY" ? ` · ${doc.status}` : ""}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setPreview(doc)}
+        className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-50 hover:text-brand-600 dark:hover:bg-white/5 dark:hover:text-brand-400"
+        aria-label={`Preview ${doc.filename}`}
+      >
+        <Eye className="size-4" />
+      </button>
+    </li>
+  );
 
   return (
     <section className={`mt-6 border-t border-gray-100 pt-5 dark:border-gray-800 ${className ?? ""}`}>
@@ -171,6 +156,55 @@ export default function TaskAttachments({ tenant, ownerEntityId, taskId, classNa
           <Group title="Process attachments" hint="Submitted with the form / case file" docs={processDocs} row={row} emptyHint="None." />
         </div>
       )}
+
+      {/* Preview modal: render the document + a Download action. No delete (read-only for reviewers). */}
+      <Modal
+        isOpen={!!preview}
+        onClose={() => setPreview(null)}
+        ariaLabel="Attachment preview"
+        className="mx-4 w-full max-w-[760px]"
+      >
+        {preview && (
+          <div className="flex max-h-[88vh] flex-col p-6 sm:p-8">
+            <div className="mb-4 flex items-center gap-2 pr-10">
+              <FileText className="size-5 shrink-0 text-gray-500" />
+              <h2 className="truncate text-base font-semibold text-gray-800 dark:text-white/90" title={preview.filename}>
+                {preview.filename}
+              </h2>
+              <ScopeBadge scope={scopeOf(preview)} />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-100 p-3 dark:border-gray-800">
+              <Suspense
+                fallback={
+                  <div className="flex items-center gap-2 p-6 text-sm text-gray-400">
+                    <Loader2 className="size-4 animate-spin" /> Loading preview…
+                  </div>
+                }
+              >
+                <DocumentView docId={preview.docId} contentType={preview.contentType} filename={preview.filename} width={680} />
+              </Suspense>
+            </div>
+            <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => void download(preview)}
+                disabled={downloading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
+              >
+                {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </section>
   );
 }
