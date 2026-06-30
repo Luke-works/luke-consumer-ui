@@ -19,7 +19,7 @@ import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
 import { readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
-import { readAttachmentsEnabled } from "../../lib/formSchema";
+import { readAttachmentsEnabled, readSaveSubmissionAsPdf } from "../../lib/formSchema";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import AiAssistPanel from "./AiAssistPanel";
@@ -128,12 +128,16 @@ export default function FormBuilderPage() {
   // Opt-in file attachments: when on, the embedded form offers an Attachments tab to the filler.
   // Stored in the schema settings (versioned), so the published embed knows whether to show it.
   const [allowAttachments, setAllowAttachments] = useState(false);
+  // Opt-in: render each completed submission to a PDF and attach it to the process instance
+  // (visible in the Form Inbox + Core UI Tasklist). Versioned in the schema settings.
+  const [saveSubmissionPdf, setSaveSubmissionPdf] = useState(false);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
   const latestRef = useRef<FormSchema | null>(null);
   const submitMsgRef = useRef("");
   const allowAttachmentsRef = useRef(false);
+  const saveSubmissionPdfRef = useRef(false);
   const saveTimer = useRef<number | null>(null);
   const unsaved = useRef(false);
   // Imperative handle: lets the AI apply a new schema WITHOUT remounting the builder,
@@ -169,6 +173,9 @@ export default function FormBuilderPage() {
         const att = readAttachmentsEnabled(f.schema);
         setAllowAttachments(att);
         allowAttachmentsRef.current = att;
+        const sap = readSaveSubmissionAsPdf(f.schema);
+        setSaveSubmissionPdf(sap);
+        saveSubmissionPdfRef.current = sap;
         latestRef.current = null;
         setLiveSchema(parseSchema(f.schema) as unknown as BuilderSchemaLike);
         // Show the "being edited" banner only if someone else holds the lock AND we haven't taken it.
@@ -227,7 +234,7 @@ export default function FormBuilderPage() {
     (schema: FormSchema) =>
       JSON.stringify({
         ...schema,
-        settings: { ...(schema.settings ?? {}), submitMessage: submitMsgRef.current, attachments: allowAttachmentsRef.current },
+        settings: { ...(schema.settings ?? {}), submitMessage: submitMsgRef.current, attachments: allowAttachmentsRef.current, saveSubmissionAsPdf: saveSubmissionPdfRef.current },
       }),
     [],
   );
@@ -476,6 +483,17 @@ export default function FormBuilderPage() {
   const onToggleAttachments = (on: boolean) => {
     setAllowAttachments(on);
     allowAttachmentsRef.current = on;
+    if (!canEdit) return;
+    setDirtySinceCheckIn(true);
+    setLatestSignedOff(false);
+    scheduleSave(latestRef.current ?? initialSchema);
+  };
+
+  // Toggle "save submission as PDF". Like attachments, it lives in the versioned schema settings, so
+  // flipping it dirties the draft and re-gates sign-off/publish.
+  const onToggleSaveSubmissionPdf = (on: boolean) => {
+    setSaveSubmissionPdf(on);
+    saveSubmissionPdfRef.current = on;
     if (!canEdit) return;
     setDirtySinceCheckIn(true);
     setLatestSignedOff(false);
@@ -799,6 +817,17 @@ export default function FormBuilderPage() {
             />
             <p className="mt-1 text-xs text-gray-400">
               Adds an Attachments tab to the embedded form so people can upload supporting files with their submission.
+            </p>
+          </div>
+          <div className="mb-6">
+            <Checkbox
+              checked={saveSubmissionPdf}
+              onChange={onToggleSaveSubmissionPdf}
+              disabled={!editable}
+              label="Save submission as Attachment"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              On submit, generates a PDF of the completed form and attaches it to the process instance — viewable in the Form Inbox and Core UI Tasklist.
             </p>
           </div>
           <div className="flex justify-end gap-3">

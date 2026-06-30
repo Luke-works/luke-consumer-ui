@@ -308,6 +308,9 @@ export type FormSettings = {
   submitMessage?: string;
   /** Opt-in: when true the form offers a file-attachments tab to the filler. Default off. */
   attachments?: boolean;
+  /** Opt-in: when true the completed submission is rendered to a PDF server-side and attached to
+   *  the process instance (visible in the Form Inbox + Core UI Tasklist). Default off. */
+  saveSubmissionAsPdf?: boolean;
 };
 
 /** Read form-level settings from a schema JSON string (tolerant of anything). */
@@ -331,6 +334,11 @@ export function readSubmitMessage(rawSchema: string | null | undefined): string 
 /** Whether the form opts into a file-attachments tab for the filler (default off). */
 export function readAttachmentsEnabled(rawSchema: string | null | undefined): boolean {
   return readSettings(rawSchema).attachments === true;
+}
+
+/** Whether the form renders each completed submission to a PDF attached to the process (default off). */
+export function readSaveSubmissionAsPdf(rawSchema: string | null | undefined): boolean {
+  return readSettings(rawSchema).saveSubmissionAsPdf === true;
 }
 
 /**

@@ -1,0 +1,52 @@
+/**
+ * Print/PDF stylesheet for the headless-Chromium render harness (render-main.tsx). Chromium loads the
+ * harness, mounts the real read-only FormRenderer, and calls page.pdf() — so this CSS controls the
+ * paper size, margins, and page-break behaviour of the generated submission PDF. Kept separate from
+ * the app/embed CSS: only the harness uses it.
+ */
+
+@page {
+  size: A4;
+  margin: 16mm 14mm;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+}
+
+/* A predictable print canvas — the form fills the page width, not the viewport. */
+#root {
+  width: 100%;
+  max-width: 180mm; /* A4 width (210mm) minus the @page side margins */
+  margin: 0 auto;
+  background: #ffffff;
+  color: #111827;
+}
+
+/* Keep a field (label + control + help/error) from splitting across a page boundary. */
+.lf-field,
+.lf-address,
+.lf-grid,
+.lf-matrix,
+.lf-container {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Read-only submission render: no interactive chrome in the paper output. */
+.lf-submit,
+.lf-actions,
+button[type="submit"],
+.lf-clear,
+.lf-file input[type="file"] {
+  display: none !important;
+}
+
+/* Print the real backgrounds/borders Chromium would otherwise drop (page.pdf printBackground=true also set). */
+* {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}

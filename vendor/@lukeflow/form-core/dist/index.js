@@ -400,6 +400,12 @@ function readSubmitMessage(rawSchema) {
   const m = readSettings(rawSchema).submitMessage;
   return typeof m === "string" ? m : "";
 }
+function readAttachmentsEnabled(rawSchema) {
+  return readSettings(rawSchema).attachments === true;
+}
+function readSaveSubmissionAsPdf(rawSchema) {
+  return readSettings(rawSchema).saveSubmissionAsPdf === true;
+}
 
 // src/schema/migrate.ts
 var CURRENT_SCHEMA_VERSION = 1;
@@ -2974,6 +2980,6 @@ function clampIndex(index, length) {
 // src/index.ts
 var VERSION = "0.1.0-alpha.0";
 
-export { ADDRESS_REQUIRED_PARTS, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { ADDRESS_REQUIRED_PARTS, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

@@ -402,6 +402,12 @@ function readSubmitMessage(rawSchema) {
   const m = readSettings(rawSchema).submitMessage;
   return typeof m === "string" ? m : "";
 }
+function readAttachmentsEnabled(rawSchema) {
+  return readSettings(rawSchema).attachments === true;
+}
+function readSaveSubmissionAsPdf(rawSchema) {
+  return readSettings(rawSchema).saveSubmissionAsPdf === true;
+}
 
 // src/schema/migrate.ts
 var CURRENT_SCHEMA_VERSION = 1;
@@ -3052,7 +3058,9 @@ exports.orderedIds = orderedIds;
 exports.parseExpression = parseExpression;
 exports.patternRule = patternRule;
 exports.readAsyncValidation = readAsyncValidation;
+exports.readAttachmentsEnabled = readAttachmentsEnabled;
 exports.readDataSource = readDataSource;
+exports.readSaveSubmissionAsPdf = readSaveSubmissionAsPdf;
 exports.readSettings = readSettings;
 exports.readSubmitMessage = readSubmitMessage;
 exports.registerValidator = registerValidator;

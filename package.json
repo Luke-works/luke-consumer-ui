@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && npm run build:embed",
+    "build": "tsc -b && vite build && npm run build:embed && npm run build:render",
     "build:embed": "vite build --config vite.embed.config.ts",
+    "build:render": "vite build --config vite.render.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

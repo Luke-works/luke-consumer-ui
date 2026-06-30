@@ -35,3 +35,5 @@ dist-ssr
 
 # Route B M2 embed bundle build output (vendored into core-engine static/embed-assets instead)
 dist-embed
+# Submission-PDF render harness bundle (vendored into luke-file-proxy render-assets instead)
+dist-render
