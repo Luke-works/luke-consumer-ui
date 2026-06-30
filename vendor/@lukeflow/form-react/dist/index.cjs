@@ -1651,60 +1651,88 @@ function AddressBlockField({
     onChange(next);
   };
   const provider = entity ? (0, import_form_core6.readDataSource)(entity.attributes) : null;
-  const hasAddress = ADDRESS_PARTS.some((p) => asText(data[p.key]) !== "");
-  const showParts = !provider || hasAddress;
   const cfg = addressConfigFor(data.countryCode, data.country);
   const postal = asText(data.postalCode);
   const postalInvalid = postal !== "" && cfg.postalPattern != null && !cfg.postalPattern.test(postal);
   const labelFor = (key) => key === "region" ? cfg.regionLabel : key === "postalCode" ? cfg.postalLabel : ADDRESS_PARTS.find((p) => p.key === key).label;
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? hasAddress ? "filled" : "search" : "manual", children: [
-    provider && entity && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressAutocomplete, { a11y, entity, scope: scope ?? {}, disabled, onPick: fill }),
-    showParts && ADDRESS_PARTS.map((p) => {
-      const inputId = `${a11y.id}-${p.key}`;
-      const isPostal = p.key === "postalCode";
-      const invalid = isPostal && postalInvalid;
-      const errId = invalid ? `${inputId}-error` : void 0;
-      return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${p.key}`, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: inputId, className: "lf-address-label", children: labelFor(p.key) }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-          "input",
-          {
-            id: inputId,
-            type: "text",
-            autoComplete: p.autocomplete,
-            placeholder: isPostal ? cfg.postalExample : void 0,
-            "aria-invalid": invalid || void 0,
-            "aria-describedby": errId,
-            value: asText(data[p.key]),
-            disabled,
-            onChange: (e) => setPart(p.key, e.target.value)
-          }
-        ),
-        invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: [
-          "Enter a valid ",
-          cfg.postalLabel.toLowerCase(),
-          cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : "",
-          "."
-        ] })
-      ] }, p.key);
-    })
+  const [manual, setManual] = (0, import_react13.useState)(false);
+  const hasStructured = ["line2", "city", "region", "postalCode", "country"].some((k) => asText(data[k]) !== "");
+  const showRest = !provider || hasStructured || manual;
+  const partInput = (key) => {
+    const part = ADDRESS_PARTS.find((p) => p.key === key);
+    const inputId = `${a11y.id}-${key}`;
+    const isPostal = key === "postalCode";
+    const invalid = isPostal && postalInvalid;
+    const errId = invalid ? `${inputId}-error` : void 0;
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${key}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: inputId, className: "lf-address-label", children: labelFor(key) }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        "input",
+        {
+          id: inputId,
+          type: "text",
+          autoComplete: part.autocomplete,
+          placeholder: isPostal ? cfg.postalExample : void 0,
+          "aria-invalid": invalid || void 0,
+          "aria-describedby": errId,
+          value: asText(data[key]),
+          disabled,
+          onChange: (e) => setPart(key, e.target.value)
+        }
+      ),
+      invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: [
+        "Enter a valid ",
+        cfg.postalLabel.toLowerCase(),
+        cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : "",
+        "."
+      ] })
+    ] }, key);
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? showRest ? "filled" : "search" : "manual", children: [
+    provider && entity ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+      AddressLine1Autocomplete,
+      {
+        a11y,
+        entity,
+        scope: scope ?? {},
+        disabled,
+        value: asText(data.line1),
+        onType: (v) => setPart("line1", v),
+        onPick: fill
+      }
+    ) : partInput("line1"),
+    showRest ? ["line2", "city", "region", "postalCode", "country"].map(partInput) : provider && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "lf-address-manual", onClick: () => setManual(true), disabled, children: "Enter address manually" })
   ] });
 }
-function AddressAutocomplete({
+function AddressSpinner() {
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("svg", { className: "lf-spinner", width: "15", height: "15", viewBox: "0 0 24 24", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "12", r: "9", fill: "none", stroke: "currentColor", strokeOpacity: "0.25", strokeWidth: "3" }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M21 12a9 9 0 0 0-9-9", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("animateTransform", { attributeName: "transform", type: "rotate", from: "0 12 12", to: "360 12 12", dur: "0.7s", repeatCount: "indefinite" }) })
+  ] });
+}
+function AddressPin() {
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("svg", { className: "lf-address-pin", width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "11", r: "2" })
+  ] });
+}
+function AddressLine1Autocomplete({
   a11y,
   entity,
   scope,
   disabled,
+  value,
+  onType,
   onPick
 }) {
   const client = useMinionClient();
   const ds = (0, import_form_core6.readDataSource)(entity.attributes);
   const dsRaw = entity.attributes?.dataSource;
   const searchParam = typeof dsRaw?.searchParam === "string" ? dsRaw.searchParam : "q";
-  const [query, setQuery] = (0, import_react13.useState)("");
   const [open, setOpen] = (0, import_react13.useState)(false);
   const [suggestions, setSuggestions] = (0, import_react13.useState)([]);
   const [loading, setLoading] = (0, import_react13.useState)(false);
+  const [searched, setSearched] = (0, import_react13.useState)(false);
   const [active, setActive] = (0, import_react13.useState)(-1);
   const timer = (0, import_react13.useRef)(null);
   const blurTimer = (0, import_react13.useRef)(null);
@@ -1713,22 +1741,27 @@ function AddressAutocomplete({
     blurTimer.current = null;
   };
   (0, import_react13.useEffect)(() => () => clearBlur(), []);
+  const inputId = `${a11y.id}-line1`;
   const listId = `${a11y.id}-addr-listbox`;
   const optionId = (i) => `${a11y.id}-addr-opt-${i}`;
   (0, import_react13.useEffect)(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
   (0, import_react13.useEffect)(() => {
-    if (!client || !ds || !open || query.trim() === "") {
+    if (!client || !ds || !open || value.trim() === "") {
       setSuggestions([]);
+      setSearched(false);
       return;
     }
     if (timer.current) clearTimeout(timer.current);
     const controller = new AbortController();
     timer.current = setTimeout(() => {
       setLoading(true);
-      client.request(ds.minion, { ...(0, import_form_core6.resolveMinionParams)(ds, scope), [searchParam]: query }, controller.signal).then((res) => {
-        if (!controller.signal.aborted) setSuggestions((0, import_form_core6.toAddressSuggestions)(res, ds));
+      client.request(ds.minion, { ...(0, import_form_core6.resolveMinionParams)(ds, scope), [searchParam]: value }, controller.signal).then((res) => {
+        if (!controller.signal.aborted) {
+          setSuggestions((0, import_form_core6.toAddressSuggestions)(res, ds));
+          setSearched(true);
+        }
       }).catch(() => {
       }).finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -1738,11 +1771,10 @@ function AddressAutocomplete({
       controller.abort();
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [query, open, client]);
+  }, [value, open, client]);
   const choose = (s) => {
     clearBlur();
     onPick(s.address);
-    setQuery(s.label);
     setSuggestions([]);
     setOpen(false);
     setActive(-1);
@@ -1767,32 +1799,34 @@ function AddressAutocomplete({
     }
   };
   const wrapRef = (0, import_react13.useRef)(null);
-  const popStyle = useAnchoredPosition(wrapRef, open && (loading || suggestions.length > 0));
+  const dropdownOpen = !!client && open && value.trim() !== "" && (loading || suggestions.length > 0 || searched);
+  const popStyle = useAnchoredPosition(wrapRef, dropdownOpen);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  if (!client) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address-search lf-search-select", ref: wrapRef, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: `${a11y.id}-addr-search`, className: "lf-address-label", children: "Search address" }),
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address-part lf-address-line1", ref: wrapRef, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: inputId, className: "lf-address-label", children: "Address line 1" }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       "input",
       {
-        id: `${a11y.id}-addr-search`,
-        role: "combobox",
-        "aria-expanded": open,
-        "aria-controls": listId,
-        "aria-autocomplete": "list",
+        id: inputId,
+        role: client ? "combobox" : void 0,
+        "aria-expanded": client ? open : void 0,
+        "aria-controls": client ? listId : void 0,
+        "aria-autocomplete": client ? "list" : void 0,
         "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
-        autoComplete: "off",
+        autoComplete: client ? "off" : "address-line1",
         type: "text",
         disabled,
-        value: query,
+        value,
+        placeholder: client ? "Start typing an address\u2026" : void 0,
         onFocus: () => {
           clearBlur();
           setOpen(true);
         },
         onChange: (e) => {
-          setQuery(e.target.value);
+          onType(e.target.value);
           setOpen(true);
           setActive(-1);
+          setSearched(false);
         },
         onKeyDown,
         onBlur: () => {
@@ -1800,25 +1834,28 @@ function AddressAutocomplete({
         }
       }
     ),
-    open && (loading || suggestions.length > 0) && popoverTarget(wrapRef) && (0, import_react_dom4.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: [
-        loading && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("li", { className: "lf-search-loading", children: "Searching\u2026" }),
-        suggestions.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-          "li",
-          {
-            id: optionId(i),
-            role: "option",
-            "aria-selected": i === active,
-            className: i === active ? "is-active" : void 0,
-            onMouseDown: (e) => {
-              e.preventDefault();
-              choose(s);
-            },
-            children: s.label
+    dropdownOpen && popoverTarget(wrapRef) && (0, import_react_dom4.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list lf-address-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: loading ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("li", { className: "lf-search-loading", "aria-live": "polite", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressSpinner, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Searching addresses\u2026" })
+      ] }) : suggestions.length > 0 ? suggestions.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        "li",
+        {
+          id: optionId(i),
+          role: "option",
+          "aria-selected": i === active,
+          className: `lf-address-option${i === active ? " is-active" : ""}`,
+          onMouseDown: (e) => {
+            e.preventDefault();
+            choose(s);
           },
-          s.id ?? s.label
-        ))
-      ] }),
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressPin, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-option-label", children: s.label })
+          ]
+        },
+        s.id ?? s.label
+      )) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("li", { className: "lf-search-empty", children: "No matching addresses" }) }),
       popoverTarget(wrapRef)
     )
   ] });

@@ -1590,6 +1590,18 @@ function previewControl(entity, field) {
     case "divider":
     case "hr":
       return /* @__PURE__ */ jsx6("hr", { className: "lf-pv-hr" });
+    case "addressBlock":
+      return /* @__PURE__ */ jsx6("div", { className: "lf-address", children: [
+        ["line1", "Address line 1"],
+        ["line2", "Address line 2"],
+        ["city", "City"],
+        ["region", "State / Province"],
+        ["postalCode", "Postal code"],
+        ["country", "Country"]
+      ].map(([key, label]) => /* @__PURE__ */ jsxs6("div", { className: `lf-address-part lf-address-${key}`, children: [
+        /* @__PURE__ */ jsx6("label", { className: "lf-address-label", children: label }),
+        /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "text", value: "", readOnly: true })
+      ] }, key)) });
     default:
       return /* @__PURE__ */ jsx6("input", { className: "lf-pv-input", disabled: true, type: "text", value: dv, placeholder: ph2 });
   }

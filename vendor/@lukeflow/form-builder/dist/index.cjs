@@ -1615,6 +1615,18 @@ function previewControl(entity, field) {
     case "divider":
     case "hr":
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("hr", { className: "lf-pv-hr" });
+    case "addressBlock":
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lf-address", children: [
+        ["line1", "Address line 1"],
+        ["line2", "Address line 2"],
+        ["city", "City"],
+        ["region", "State / Province"],
+        ["postalCode", "Postal code"],
+        ["country", "Country"]
+      ].map(([key, label]) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `lf-address-part lf-address-${key}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("label", { className: "lf-address-label", children: label }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: "text", value: "", readOnly: true })
+      ] }, key)) });
     default:
       return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { className: "lf-pv-input", disabled: true, type: "text", value: dv, placeholder: ph2 });
   }
