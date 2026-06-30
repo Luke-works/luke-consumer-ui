@@ -512,13 +512,20 @@ function isEmptyValue(v) {
 }
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var URL_RE = /^https?:\/\/\S+$/;
+var ADDRESS_REQUIRED_PARTS = ["line1", "city", "region", "postalCode", "country"];
 var requiredRule = {
   code: "required",
   build(attributes) {
     if (!asBool(attributes.required)) return null;
     const label = labelOf(attributes);
     const custom = customMessageOf(attributes);
+    const isAddress = attributes.type === "addressBlock";
     return ({ field, value }) => {
+      if (isAddress) {
+        const v = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+        const complete = ADDRESS_REQUIRED_PARTS.every((k) => !isEmptyValue(v[k]));
+        return complete ? ok(field) : fail(field, "required", { label }, custom);
+      }
       const empty = value === true ? false : isEmptyValue(value);
       const checkboxUnchecked = typeof value === "boolean" && value !== true;
       if (empty || checkboxUnchecked) {
@@ -2969,6 +2976,7 @@ function clampIndex(index, length) {
 // src/index.ts
 var VERSION = "0.1.0-alpha.0";
 
+exports.ADDRESS_REQUIRED_PARTS = ADDRESS_REQUIRED_PARTS;
 exports.BUILTIN_RULES = BUILTIN_RULES;
 exports.CURRENT_SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
 exports.DEFAULT_MAX_PASSES = DEFAULT_MAX_PASSES;

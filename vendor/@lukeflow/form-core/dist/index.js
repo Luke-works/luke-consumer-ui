@@ -510,13 +510,20 @@ function isEmptyValue(v) {
 }
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var URL_RE = /^https?:\/\/\S+$/;
+var ADDRESS_REQUIRED_PARTS = ["line1", "city", "region", "postalCode", "country"];
 var requiredRule = {
   code: "required",
   build(attributes) {
     if (!asBool(attributes.required)) return null;
     const label = labelOf(attributes);
     const custom = customMessageOf(attributes);
+    const isAddress = attributes.type === "addressBlock";
     return ({ field, value }) => {
+      if (isAddress) {
+        const v = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+        const complete = ADDRESS_REQUIRED_PARTS.every((k) => !isEmptyValue(v[k]));
+        return complete ? ok(field) : fail(field, "required", { label }, custom);
+      }
       const empty = value === true ? false : isEmptyValue(value);
       const checkboxUnchecked = typeof value === "boolean" && value !== true;
       if (empty || checkboxUnchecked) {
@@ -2967,6 +2974,6 @@ function clampIndex(index, length) {
 // src/index.ts
 var VERSION = "0.1.0-alpha.0";
 
-export { BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { ADDRESS_REQUIRED_PARTS, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readDataSource, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

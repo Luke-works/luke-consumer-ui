@@ -1581,13 +1581,14 @@ function MatrixField({
   ] });
 }
 var ADDRESS_PARTS = [
-  { key: "line1", label: "Address line 1", autocomplete: "address-line1" },
-  { key: "line2", label: "Address line 2", autocomplete: "address-line2" },
+  { key: "line1", label: "Street address", autocomplete: "address-line1" },
+  { key: "line2", label: "Apt, suite, etc.", autocomplete: "address-line2" },
   { key: "city", label: "City", autocomplete: "address-level2" },
   { key: "region", label: "State / Province", autocomplete: "address-level1" },
   { key: "postalCode", label: "Postal code", autocomplete: "postal-code" },
   { key: "country", label: "Country", autocomplete: "country-name" }
 ];
+var ADDRESS_REQUIRED = new Set(import_form_core6.ADDRESS_REQUIRED_PARTS);
 var DEFAULT_COUNTRY_CONFIG = { regionLabel: "State / Province", postalLabel: "Postal code" };
 var COUNTRY_ADDRESS_CONFIG = {
   US: { regionLabel: "State", postalLabel: "ZIP code", postalPattern: /^\d{5}(-\d{4})?$/, postalExample: "12345" },
@@ -1656,16 +1657,24 @@ function AddressBlockField({
   const postalInvalid = postal !== "" && cfg.postalPattern != null && !cfg.postalPattern.test(postal);
   const labelFor = (key) => key === "region" ? cfg.regionLabel : key === "postalCode" ? cfg.postalLabel : ADDRESS_PARTS.find((p) => p.key === key).label;
   const [manual, setManual] = (0, import_react13.useState)(false);
+  const useAutocomplete = !!provider && !manual;
   const hasStructured = ["line2", "city", "region", "postalCode", "country"].some((k) => asText(data[k]) !== "");
-  const showRest = !provider || hasStructured || manual;
+  const showRest = !useAutocomplete || hasStructured;
+  const blockRequired = a11y["aria-required"] === true;
+  const blockInvalid = a11y["aria-invalid"] === true;
   const partInput = (key) => {
     const part = ADDRESS_PARTS.find((p) => p.key === key);
     const inputId = `${a11y.id}-${key}`;
     const isPostal = key === "postalCode";
-    const invalid = isPostal && postalInvalid;
+    const partRequired = blockRequired && ADDRESS_REQUIRED.has(key);
+    const emptyRequired = partRequired && blockInvalid && asText(data[key]) === "";
+    const invalid = emptyRequired || isPostal && postalInvalid;
     const errId = invalid ? `${inputId}-error` : void 0;
     return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${key}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: inputId, className: "lf-address-label", children: labelFor(key) }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { htmlFor: inputId, className: "lf-address-label", children: [
+        labelFor(key),
+        partRequired && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { "aria-hidden": "true", children: " *" })
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "input",
         {
@@ -1673,6 +1682,7 @@ function AddressBlockField({
           type: "text",
           autoComplete: part.autocomplete,
           placeholder: isPostal ? cfg.postalExample : void 0,
+          "aria-required": partRequired || void 0,
           "aria-invalid": invalid || void 0,
           "aria-describedby": errId,
           value: asText(data[key]),
@@ -1680,16 +1690,26 @@ function AddressBlockField({
           onChange: (e) => setPart(key, e.target.value)
         }
       ),
-      invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: [
-        "Enter a valid ",
-        cfg.postalLabel.toLowerCase(),
-        cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : "",
-        "."
-      ] })
+      invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: emptyRequired ? `${labelFor(key)} is required.` : `Enter a valid ${cfg.postalLabel.toLowerCase()}${cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : ""}.` })
     ] }, key);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? showRest ? "filled" : "search" : "manual", children: [
-    provider && entity ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? manual ? "manual" : showRest ? "filled" : "search" : "manual", children: [
+    provider && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { className: "lf-address-toggle", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        "input",
+        {
+          type: "checkbox",
+          role: "switch",
+          className: "lf-address-toggle-input",
+          checked: manual,
+          disabled,
+          onChange: (e) => setManual(e.target.checked)
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-toggle-track", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-toggle-thumb" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-toggle-text", children: "Enter address manually" })
+    ] }),
+    useAutocomplete && entity ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       AddressLine1Autocomplete,
       {
         a11y,
@@ -1697,11 +1717,13 @@ function AddressBlockField({
         scope: scope ?? {},
         disabled,
         value: asText(data.line1),
+        required: blockRequired,
+        invalid: blockRequired && blockInvalid && asText(data.line1) === "",
         onType: (v) => setPart("line1", v),
         onPick: fill
       }
     ) : partInput("line1"),
-    showRest ? ["line2", "city", "region", "postalCode", "country"].map(partInput) : provider && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "lf-address-manual", onClick: () => setManual(true), disabled, children: "Enter address manually" })
+    showRest && ["line2", "city", "region", "postalCode", "country"].map(partInput)
   ] });
 }
 function AddressSpinner() {
@@ -1722,6 +1744,8 @@ function AddressLine1Autocomplete({
   scope,
   disabled,
   value,
+  required,
+  invalid,
   onType,
   onPick
 }) {
@@ -1803,7 +1827,10 @@ function AddressLine1Autocomplete({
   const popStyle = useAnchoredPosition(wrapRef, dropdownOpen);
   const { dataTheme, themeStyle } = usePopoverTheme();
   return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address-part lf-address-line1", ref: wrapRef, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { htmlFor: inputId, className: "lf-address-label", children: "Address line 1" }),
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { htmlFor: inputId, className: "lf-address-label", children: [
+      "Street address",
+      required && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { "aria-hidden": "true", children: " *" })
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       "input",
       {
@@ -1813,6 +1840,9 @@ function AddressLine1Autocomplete({
         "aria-controls": client ? listId : void 0,
         "aria-autocomplete": client ? "list" : void 0,
         "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
+        "aria-required": required || void 0,
+        "aria-invalid": invalid || void 0,
+        "aria-describedby": invalid ? `${inputId}-error` : void 0,
         autoComplete: client ? "off" : "address-line1",
         type: "text",
         disabled,
@@ -1834,6 +1864,7 @@ function AddressLine1Autocomplete({
         }
       }
     ),
+    invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { id: `${inputId}-error`, className: "lf-address-error lf-error", role: "alert", children: "Street address is required." }),
     dropdownOpen && popoverTarget(wrapRef) && (0, import_react_dom4.createPortal)(
       /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list lf-address-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: loading ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("li", { className: "lf-search-loading", "aria-live": "polite", children: [
         /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressSpinner, {}),
