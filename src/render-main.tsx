@@ -7,6 +7,10 @@
 import { createRoot } from "react-dom/client";
 import { FormThemeProvider, type FormTheme } from "@lukeflow/form-react";
 import LukeFormRenderer from "./components/formBuilder/LukeFormRenderer";
+// Load the SAME global stylesheet the live form gets (Tailwind base + the app's "Anek Telugu" web
+// font) FIRST — otherwise the headless render falls back to the browser's serif default with the
+// wrong metrics (looks nothing like the app + fields appear cramped/combined). Print overrides last.
+import "./index.css";
 import "./styles/render-print.css";
 
 type RenderPayload = {
