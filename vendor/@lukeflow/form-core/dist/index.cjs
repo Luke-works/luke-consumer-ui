@@ -512,7 +512,7 @@ function isEmptyValue(v) {
 }
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var URL_RE = /^https?:\/\/\S+$/;
-var ADDRESS_REQUIRED_PARTS = ["line1", "city", "region", "postalCode", "country"];
+var ADDRESS_REQUIRED_PARTS = ["streetAddress", "city", "region", "postalCode", "country"];
 var requiredRule = {
   code: "required",
   build(attributes) {
@@ -2668,7 +2668,7 @@ function resolveMinionParams(ds, scope) {
   }
   return out;
 }
-var ADDR_KEYS = ["line1", "line2", "city", "region", "postalCode", "country", "countryCode"];
+var ADDR_KEYS = ["streetAddress", "steNumber", "city", "region", "postalCode", "country", "countryCode"];
 function normalizeSuggestion(item) {
   if (!item || typeof item !== "object") return null;
   const o = item;

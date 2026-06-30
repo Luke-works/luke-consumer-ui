@@ -885,7 +885,7 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 .lf-matrix-corner { border: none; background: transparent; }
 
 .lf-address { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
-.lf-address-line1, .lf-address-line2 { grid-column: 1 / -1; }
+.lf-address-streetAddress, .lf-address-steNumber { grid-column: 1 / -1; }
 .lf-address-part { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .lf-address-label { font-size: 12px; color: var(--lf-muted); }
 /* "Enter address manually" — a switch toggle (provider mode) that flips the block between the

@@ -755,8 +755,8 @@ declare function isEmptyValue(v: unknown): boolean;
  * `required` attribute is truthy.
  */
 /** The structured-address parts mandatory when an `addressBlock` is required — everything EXCEPT
- *  `line2` (apt/suite, always optional). Shared with the renderer's per-part required markers. */
-declare const ADDRESS_REQUIRED_PARTS: readonly ["line1", "city", "region", "postalCode", "country"];
+ *  `steNumber` (apt/suite, always optional). Shared with the renderer's per-part required markers. */
+declare const ADDRESS_REQUIRED_PARTS: readonly ["streetAddress", "city", "region", "postalCode", "country"];
 declare const requiredRule: ValidatorRule;
 /** `minLength` — string shorter than `minLength` chars fails. */
 declare const minLengthRule: ValidatorRule;
@@ -2154,8 +2154,8 @@ declare function resolveMinionParams(ds: DataSource, scope: Readonly<Record<stri
 /** A normalized postal address. The six string parts match the structured address-block inputs;
  *  `lat`/`lng` are optional coordinates a provider may also return (they ride along in the payload). */
 interface AddressValue {
-    line1?: string;
-    line2?: string;
+    streetAddress?: string;
+    steNumber?: string;
     city?: string;
     region?: string;
     postalCode?: string;

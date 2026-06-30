@@ -1566,8 +1566,8 @@ function MatrixField({
   ] });
 }
 var ADDRESS_PARTS = [
-  { key: "line1", label: "Street address" },
-  { key: "line2", label: "Apt, suite, etc." },
+  { key: "streetAddress", label: "Street address" },
+  { key: "steNumber", label: "Apt, suite, etc." },
   { key: "city", label: "City" },
   { key: "region", label: "State / Province" },
   { key: "postalCode", label: "Postal code" },
@@ -1643,7 +1643,7 @@ function AddressBlockField({
   const labelFor = (key) => key === "region" ? cfg.regionLabel : key === "postalCode" ? cfg.postalLabel : ADDRESS_PARTS.find((p) => p.key === key).label;
   const [manual, setManual] = useState9(false);
   const useAutocomplete = !!provider && !manual;
-  const hasStructured = ["line2", "city", "region", "postalCode", "country"].some((k) => asText(data[k]) !== "");
+  const hasStructured = ["steNumber", "city", "region", "postalCode", "country"].some((k) => asText(data[k]) !== "");
   const showRest = !useAutocomplete || hasStructured;
   const blockRequired = a11y["aria-required"] === true;
   const blockInvalid = a11y["aria-invalid"] === true;
@@ -1700,14 +1700,14 @@ function AddressBlockField({
         entity,
         scope: scope ?? {},
         disabled,
-        value: asText(data.line1),
+        value: asText(data.streetAddress),
         required: blockRequired,
-        invalid: blockRequired && blockInvalid && asText(data.line1) === "",
-        onType: (v) => setPart("line1", v),
+        invalid: blockRequired && blockInvalid && asText(data.streetAddress) === "",
+        onType: (v) => setPart("streetAddress", v),
         onPick: fill
       }
-    ) : partInput("line1"),
-    showRest && ["line2", "city", "region", "postalCode", "country"].map(partInput)
+    ) : partInput("streetAddress"),
+    showRest && ["steNumber", "city", "region", "postalCode", "country"].map(partInput)
   ] });
 }
 function AddressSpinner() {
@@ -1749,7 +1749,7 @@ function AddressLine1Autocomplete({
     blurTimer.current = null;
   };
   useEffect6(() => () => clearBlur(), []);
-  const inputId = `${a11y.id}-line1`;
+  const inputId = `${a11y.id}-streetAddress`;
   const listId = `${a11y.id}-addr-listbox`;
   const optionId = (i) => `${a11y.id}-addr-opt-${i}`;
   useEffect6(() => {
@@ -1810,7 +1810,7 @@ function AddressLine1Autocomplete({
   const dropdownOpen = !!client && open && value.trim() !== "" && (loading || suggestions.length > 0 || searched);
   const popStyle = useAnchoredPosition(wrapRef, dropdownOpen);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  return /* @__PURE__ */ jsxs7("div", { className: "lf-address-part lf-address-line1", ref: wrapRef, children: [
+  return /* @__PURE__ */ jsxs7("div", { className: "lf-address-part lf-address-streetAddress", ref: wrapRef, children: [
     /* @__PURE__ */ jsxs7("label", { htmlFor: inputId, className: "lf-address-label", children: [
       "Street address",
       required && /* @__PURE__ */ jsx11("span", { "aria-hidden": "true", children: " *" })

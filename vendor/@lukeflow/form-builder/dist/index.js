@@ -1592,8 +1592,8 @@ function previewControl(entity, field) {
       return /* @__PURE__ */ jsx6("hr", { className: "lf-pv-hr" });
     case "addressBlock":
       return /* @__PURE__ */ jsx6("div", { className: "lf-address", children: [
-        ["line1", "Address line 1"],
-        ["line2", "Address line 2"],
+        ["streetAddress", "Street address"],
+        ["steNumber", "Apt, suite, etc."],
         ["city", "City"],
         ["region", "State / Province"],
         ["postalCode", "Postal code"],
