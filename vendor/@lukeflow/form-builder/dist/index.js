@@ -354,7 +354,7 @@ function createDefaultAttributeEditors() {
     { id: "key", tab: "api", attribute: "key", label: "Key", control: "text", order: 1, when: (e) => !isStaticType(e.type), hint: "Submission/scope key \u2014 letters, numbers, underscore; auto-made unique." },
     { id: "tags", tab: "api", attribute: "tags", label: "Field tags", control: "text", order: 10, placeholder: "comma,separated" },
     { id: "tabIndex", tab: "api", attribute: "tabIndex", label: "Tab index", control: "number", order: 20, when: data },
-    { id: "autocomplete", tab: "api", attribute: "autocomplete", label: "Autocomplete", control: "checkbox", order: 30, when: textual },
+    // No "Autocomplete" editor: autofill is suppressed on every input platform-wide (no escape hatch).
     { id: "spellcheck", tab: "api", attribute: "spellcheck", label: "Spellcheck", control: "checkbox", order: 31, when: textual },
     { id: "autofocus", tab: "api", attribute: "autofocus", label: "Autofocus", control: "checkbox", order: 32, when: textual },
     // ── CONDITIONAL ─────────────────────────────────────────────────────────────

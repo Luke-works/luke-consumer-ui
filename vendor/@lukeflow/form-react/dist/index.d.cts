@@ -322,6 +322,22 @@ declare function useLocale(): LocaleInfo;
 declare function useTranslate(): TranslateFn;
 
 /**
+ * Pure helpers shared across the renderer's tree walk, controls and containers. No
+ * React, no component dependencies — just schema/value plumbing extracted from the
+ * orchestrator for reuse and testability.
+ *
+ * @packageDocumentation
+ */
+
+/**
+ * Toggle the platform-wide autofill suppression. Call once at app boot (e.g. from an env var); passing
+ * `false` lets the browser/password-manager autofill forms normally. Default (unset): suppressed.
+ */
+declare function setAutofillSuppression(enabled: boolean): void;
+/** Whether autofill is currently suppressed platform-wide (default true). */
+declare function isAutofillSuppressed(): boolean;
+
+/**
  * `printSubmission` — open a form submission's printable HTML in a new window and
  * trigger the browser print dialog (which offers "Save as PDF"). Thin wrapper over
  * {@link toPrintableHtml} from `@lukeflow/form-core`; returns `false` if the window
@@ -342,4 +358,4 @@ declare function printSubmission(schema: FormSchema, data: FormData, options?: P
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type ColorScheme, type Direction, type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, type FormTheme, FormThemeProvider, type FormTokenName, type LocaleInfo, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, dataThemeAttr, defaultSanitizeHtml, getLocaleDirection, printSubmission, useFormEngine, useFormTheme, useLocale, useMinionClient, useMinionData, usePopoverTheme, useTranslate };
+export { type ColorScheme, type Direction, type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, type FormTheme, FormThemeProvider, type FormTokenName, type LocaleInfo, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, dataThemeAttr, defaultSanitizeHtml, getLocaleDirection, isAutofillSuppressed, printSubmission, setAutofillSuppression, useFormEngine, useFormTheme, useLocale, useMinionClient, useMinionData, usePopoverTheme, useTranslate };

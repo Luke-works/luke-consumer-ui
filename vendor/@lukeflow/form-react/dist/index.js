@@ -259,6 +259,22 @@ var defaultSanitizeHtml = (dirty) => {
 
 // src/render/helpers.ts
 import "@lukeflow/form-core";
+var autofillSuppressed = true;
+function setAutofillSuppression(enabled) {
+  autofillSuppressed = enabled !== false;
+}
+function isAutofillSuppressed() {
+  return autofillSuppressed;
+}
+function noAutofill(seed) {
+  if (!autofillSuppressed) return {};
+  return {
+    autoComplete: `nf-${seed || "x"}`,
+    "data-lpignore": "true",
+    "data-1p-ignore": "true",
+    "data-form-type": "other"
+  };
+}
 function scrollOptionIntoView(id) {
   if (typeof document === "undefined") return;
   const el = document.getElementById(id);
@@ -1107,6 +1123,7 @@ function SignatureField({
       {
         type: "text",
         className: "lf-signature-typed",
+        ...noAutofill(`${a11y.id}-typed`),
         "aria-label": "Typed signature name",
         placeholder: "Type your full name",
         value: typed,
@@ -1549,12 +1566,12 @@ function MatrixField({
   ] });
 }
 var ADDRESS_PARTS = [
-  { key: "line1", label: "Street address", autocomplete: "address-line1" },
-  { key: "line2", label: "Apt, suite, etc.", autocomplete: "address-line2" },
-  { key: "city", label: "City", autocomplete: "address-level2" },
-  { key: "region", label: "State / Province", autocomplete: "address-level1" },
-  { key: "postalCode", label: "Postal code", autocomplete: "postal-code" },
-  { key: "country", label: "Country", autocomplete: "country-name" }
+  { key: "line1", label: "Street address" },
+  { key: "line2", label: "Apt, suite, etc." },
+  { key: "city", label: "City" },
+  { key: "region", label: "State / Province" },
+  { key: "postalCode", label: "Postal code" },
+  { key: "country", label: "Country" }
 ];
 var ADDRESS_REQUIRED = new Set(ADDRESS_REQUIRED_PARTS);
 var DEFAULT_COUNTRY_CONFIG = { regionLabel: "State / Province", postalLabel: "Postal code" };
@@ -1631,7 +1648,6 @@ function AddressBlockField({
   const blockRequired = a11y["aria-required"] === true;
   const blockInvalid = a11y["aria-invalid"] === true;
   const partInput = (key) => {
-    const part = ADDRESS_PARTS.find((p) => p.key === key);
     const inputId = `${a11y.id}-${key}`;
     const isPostal = key === "postalCode";
     const partRequired = blockRequired && ADDRESS_REQUIRED.has(key);
@@ -1648,7 +1664,7 @@ function AddressBlockField({
         {
           id: inputId,
           type: "text",
-          autoComplete: part.autocomplete,
+          ...noAutofill(inputId),
           placeholder: isPostal ? cfg.postalExample : void 0,
           "aria-required": partRequired || void 0,
           "aria-invalid": invalid || void 0,
@@ -1811,7 +1827,7 @@ function AddressLine1Autocomplete({
         "aria-required": required || void 0,
         "aria-invalid": invalid || void 0,
         "aria-describedby": invalid ? `${inputId}-error` : void 0,
-        autoComplete: client ? "off" : "address-line1",
+        ...noAutofill(inputId),
         type: "text",
         disabled,
         value,
@@ -2035,7 +2051,7 @@ function GridCell({
 }) {
   const a = entity?.attributes ?? {};
   const ariaRequired = required || void 0;
-  const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"], "aria-required": ariaRequired };
+  const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"], "aria-required": ariaRequired, ...noAutofill(id ?? "") };
   if (type === "checkbox") {
     return /* @__PURE__ */ jsx12("input", { type: "checkbox", ...rest, "aria-required": ariaRequired, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
   }
@@ -2067,7 +2083,7 @@ function GridCell({
     return /* @__PURE__ */ jsx12(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
   }
   if (type === "textarea") {
-    return /* @__PURE__ */ jsx12("textarea", { ...rest, "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
+    return /* @__PURE__ */ jsx12("textarea", { ...rest, ...noAutofill(id ?? ""), "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
   }
   const mask = typeof a.inputMask === "string" ? a.inputMask : "";
   const numeric = type === "number" || type === "currency";
@@ -2077,6 +2093,7 @@ function GridCell({
       type: mask || numeric ? "text" : inputType(type),
       inputMode: numeric ? "decimal" : void 0,
       ...rest,
+      ...noAutofill(id ?? ""),
       "aria-required": ariaRequired,
       value: mask ? applyMask(asText(value), mask) : asText(value),
       disabled,
@@ -2586,7 +2603,9 @@ function Field({ entity, fs, ctx }) {
     disabled,
     "aria-invalid": error || asyncErrId ? true : void 0,
     "aria-required": fs.isRequired ? true : void 0,
-    "aria-describedby": [descId, errId, asyncErrId].filter(Boolean).join(" ") || void 0
+    "aria-describedby": [descId, errId, asyncErrId].filter(Boolean).join(" ") || void 0,
+    // Autofill is suppressed on every input, platform-wide (no escape hatch).
+    ...noAutofill(id)
   };
   const ph = typeof a.placeholder === "string" ? a.placeholder : void 0;
   const inputProps = {};
@@ -2594,7 +2613,6 @@ function Field({ entity, fs, ctx }) {
   if (typeof a.maxLength === "number") inputProps.maxLength = a.maxLength;
   if (typeof a.minLength === "number") inputProps.minLength = a.minLength;
   if (typeof a.pattern === "string" && a.pattern) inputProps.pattern = a.pattern;
-  if (a.autocomplete) inputProps.autoComplete = typeof a.autocompleteToken === "string" ? a.autocompleteToken : "on";
   if (typeof a.tabIndex === "number") inputProps.tabIndex = a.tabIndex;
   if (a.spellcheck !== void 0) inputProps.spellCheck = Boolean(a.spellcheck);
   if (a.autofocus) inputProps.autoFocus = true;
@@ -2805,7 +2823,9 @@ export {
   dataThemeAttr,
   defaultSanitizeHtml,
   getLocaleDirection,
+  isAutofillSuppressed,
   printSubmission,
+  setAutofillSuppression,
   useFormEngine,
   useFormTheme,
   useLocale,

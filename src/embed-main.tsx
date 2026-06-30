@@ -2,6 +2,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import FormEmbedView from "./pages/Forms/FormEmbedView.tsx";
+import { applyFormsAutofillSetting } from "./lib/formsConfig.ts";
+
+applyFormsAutofillSetting(); // forms autofill suppressed by default; VITE_FORMS_ALLOW_AUTOFILL=true opts out
 
 // Standalone entry for the embed bundle that core-engine serves (Route B M2). No router, no app
 // chrome, no auth context — just the form renderer. The token is injected by the server into the
