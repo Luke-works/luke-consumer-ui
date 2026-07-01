@@ -223,32 +223,32 @@ import { useCallback, useEffect, useMemo, useState as useState2 } from "react";
 import { END_NODE as END_NODE3 } from "@lukeflow/workflow-core";
 import { useState } from "react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
-var label = { display: "block", marginBottom: 10, fontSize: 12, color: "#374151" };
+var label = { display: "block", marginBottom: 10, fontSize: 12, color: "var(--wf-fg)" };
 var control = {
   width: "100%",
   marginTop: 4,
   padding: "6px 8px",
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--wf-border-2)",
   borderRadius: 6,
   fontSize: 13,
   boxSizing: "border-box",
-  background: "#fff",
-  color: "#111827"
+  background: "var(--wf-input)",
+  color: "var(--wf-fg)"
 };
 var rowStyle = { display: "flex", gap: 6, alignItems: "center", marginBottom: 6 };
 var smallBtn = {
   padding: "4px 8px",
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--wf-border-2)",
   borderRadius: 6,
-  background: "#fff",
+  background: "var(--wf-card)",
   fontSize: 12,
   cursor: "pointer",
-  color: "#374151"
+  color: "var(--wf-fg)"
 };
 var linkBtn = {
   background: "none",
   border: "none",
-  color: "#4f46e5",
+  color: "var(--wf-accent)",
   fontSize: 12,
   cursor: "pointer",
   padding: 0
@@ -261,7 +261,7 @@ var sectionHead = {
   fontSize: 11,
   fontWeight: 700,
   textTransform: "uppercase",
-  color: "#6b7280",
+  color: "var(--wf-muted)",
   margin: "14px 0 8px",
   userSelect: "none"
 };
@@ -369,7 +369,7 @@ function InputField({ field, value, onChange }) {
   } else if (type === "boolean") {
     node = /* @__PURE__ */ jsxs("label", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 4 }, children: [
       /* @__PURE__ */ jsx("input", { type: "checkbox", checked: !!value, onChange: (e) => onChange(e.target.checked) }),
-      /* @__PURE__ */ jsx("span", { style: { fontSize: 12, color: "#6b7280" }, children: field.placeholder ?? "Enabled" })
+      /* @__PURE__ */ jsx("span", { style: { fontSize: 12, color: "var(--wf-muted)" }, children: field.placeholder ?? "Enabled" })
     ] });
   } else if (type === "select") {
     node = /* @__PURE__ */ jsxs("select", { style: control, value: String(value ?? ""), onChange: (e) => onChange(e.target.value), children: [
@@ -382,7 +382,7 @@ function InputField({ field, value, onChange }) {
   return /* @__PURE__ */ jsxs("div", { style: label, children: [
     title,
     node,
-    field.help ? /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "#9ca3af", marginTop: 3 }, children: field.help }) : null
+    field.help ? /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "var(--wf-faint)", marginTop: 3 }, children: field.help }) : null
   ] });
 }
 function TypedInputForm({ fields, value, onChange }) {
@@ -403,7 +403,7 @@ function TypedInputForm({ fields, value, onChange }) {
   return /* @__PURE__ */ jsxs("div", { children: [
     fields.map((f) => /* @__PURE__ */ jsx(InputField, { field: f, value: v[f.key], onChange: (val) => setField(f.key, val) }, f.key)),
     Object.keys(extra).length > 0 ? /* @__PURE__ */ jsxs("div", { style: { marginTop: 8 }, children: [
-      /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "#9ca3af", marginBottom: 4 }, children: "Other inputs" }),
+      /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "var(--wf-faint)", marginBottom: 4 }, children: "Other inputs" }),
       /* @__PURE__ */ jsx(KvEditor, { value: extra, onChange: setExtra })
     ] }) : null
   ] });
@@ -416,7 +416,7 @@ function ConnectionSelect({
 }) {
   const matches = connections.filter((c) => !provider || c.providerKey.toLowerCase() === provider.toLowerCase());
   if (connections.length === 0) {
-    return /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "#9ca3af", marginTop: 4 }, children: "No connections yet \u2014 add one on the Connections page." });
+    return /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "var(--wf-faint)", marginTop: 4 }, children: "No connections yet \u2014 add one on the Connections page." });
   }
   return /* @__PURE__ */ jsxs("select", { style: control, value: value ?? "", onChange: (e) => onChange(e.target.value), children: [
     /* @__PURE__ */ jsx("option", { value: "", children: "\u2014 Select a connection \u2014" }),
@@ -478,7 +478,7 @@ function NodeConfig({ doc, node, stepTypes = [], connections = [], onPatch, onDe
   const inputsEditor = inputFields.length > 0 ? /* @__PURE__ */ jsx(TypedInputForm, { fields: inputFields, value: nodeInput, onChange: (input) => onPatch({ input }) }) : /* @__PURE__ */ jsx(KvEditor, { value: nodeInput, onChange: (input) => onPatch({ input }) });
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsx("div", { style: { fontWeight: 700, marginBottom: 4, fontSize: 13 }, children: "Step" }),
-    /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "#6b7280", marginBottom: 12, textTransform: "capitalize" }, children: node.kind }),
+    /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "var(--wf-muted)", marginBottom: 12, textTransform: "capitalize" }, children: node.kind }),
     /* @__PURE__ */ jsx(Field, { title: "Name", children: /* @__PURE__ */ jsx("input", { style: control, value: node.name ?? "", placeholder: nodeLabel2(node), onChange: (e) => onPatch({ name: e.target.value }) }) }),
     node.kind === "action" ? /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx(Field, { title: "Action", children: /* @__PURE__ */ jsx("input", { style: control, value: node.action ?? "", placeholder: "e.g. send", onChange: (e) => onPatch({ action: e.target.value }) }) }),
@@ -518,7 +518,7 @@ function NodeConfig({ doc, node, stepTypes = [], connections = [], onPatch, onDe
       ) }),
       /* @__PURE__ */ jsx(Field, { title: "Then go to", children: /* @__PURE__ */ jsx(TargetSelect, { value: node.next, options: opts, onChange: (v) => onPatch({ next: v }) }) })
     ] }) : null,
-    /* @__PURE__ */ jsx("button", { type: "button", style: { ...smallBtn, marginTop: 14, color: "#b91c1c", borderColor: "#fecaca" }, onClick: onDelete, children: "Delete step" })
+    /* @__PURE__ */ jsx("button", { type: "button", style: { ...smallBtn, marginTop: 14, color: "var(--wf-danger)", borderColor: "#fecaca" }, onClick: onDelete, children: "Delete step" })
   ] });
 }
 function BranchConfig({
@@ -534,8 +534,8 @@ function BranchConfig({
   const addCond = () => onPatch({ conditions: [...conditions, { expr: "", next: END_NODE3 }] });
   const removeCond = (i) => onPatch({ conditions: conditions.filter((_, j) => j !== i) });
   return /* @__PURE__ */ jsxs(Fragment, { children: [
-    /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "#374151", marginBottom: 6 }, children: "Conditions (first match wins)" }),
-    conditions.map((c, i) => /* @__PURE__ */ jsxs("div", { style: { border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, marginBottom: 8 }, children: [
+    /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "var(--wf-fg)", marginBottom: 6 }, children: "Conditions (first match wins)" }),
+    conditions.map((c, i) => /* @__PURE__ */ jsxs("div", { style: { border: "1px solid var(--wf-border)", borderRadius: 6, padding: 8, marginBottom: 8 }, children: [
       /* @__PURE__ */ jsx(
         "input",
         {
@@ -546,7 +546,7 @@ function BranchConfig({
         }
       ),
       /* @__PURE__ */ jsx("div", { style: { marginTop: 6 }, children: /* @__PURE__ */ jsx(TargetSelect, { value: c.next, options, onChange: (v) => setCond(i, { next: v }) }) }),
-      /* @__PURE__ */ jsx("button", { type: "button", style: { ...linkBtn, color: "#b91c1c", marginTop: 6 }, onClick: () => removeCond(i), children: "Remove condition" })
+      /* @__PURE__ */ jsx("button", { type: "button", style: { ...linkBtn, color: "var(--wf-danger)", marginTop: 6 }, onClick: () => removeCond(i), children: "Remove condition" })
     ] }, i)),
     /* @__PURE__ */ jsx("button", { type: "button", style: linkBtn, onClick: addCond, children: "+ Add condition" }),
     /* @__PURE__ */ jsx("div", { style: { marginTop: 12 }, children: /* @__PURE__ */ jsx(Field, { title: "Otherwise (else)", children: /* @__PURE__ */ jsx(TargetSelect, { value: node.else, options, onChange: (v) => onPatch({ else: v }) }) }) })
@@ -562,7 +562,7 @@ function ParallelConfig({
   const addBranch = () => onPatch({ branches: [...branches, END_NODE3] });
   const removeBranch = (i) => onPatch({ branches: branches.filter((_, j) => j !== i) });
   return /* @__PURE__ */ jsxs(Fragment, { children: [
-    /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "#374151", marginBottom: 6 }, children: "Run in parallel" }),
+    /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "var(--wf-fg)", marginBottom: 6 }, children: "Run in parallel" }),
     branches.map((b, i) => /* @__PURE__ */ jsxs("div", { style: rowStyle, children: [
       /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(TargetSelect, { value: b, options, onChange: (v) => setBranch(i, v) }) }),
       /* @__PURE__ */ jsx("button", { type: "button", style: smallBtn, onClick: () => removeBranch(i), "aria-label": "Remove", children: "\xD7" })
@@ -580,7 +580,7 @@ function TriggerConfig({
   const config = trigger.config ?? {};
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsx("div", { style: { fontWeight: 700, marginBottom: 4, fontSize: 13 }, children: "Trigger" }),
-    /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "#6b7280", marginBottom: 12 }, children: "How this workflow starts" }),
+    /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "var(--wf-muted)", marginBottom: 12 }, children: "How this workflow starts" }),
     /* @__PURE__ */ jsx(Field, { title: "When", children: /* @__PURE__ */ jsxs(
       "select",
       {
@@ -615,7 +615,7 @@ var CAP = {
   forms: { color: "#16a34a", glyph: "\u25A4" },
   documents: { color: "#0d9488", glyph: "\u{1F5CE}" }
 };
-var capMeta = (c) => (c ? CAP[c] : void 0) ?? { color: "#6b7280", glyph: "\u25CF" };
+var capMeta = (c) => (c ? CAP[c] : void 0) ?? { color: "var(--wf-muted)", glyph: "\u25CF" };
 var chip = (color) => ({
   display: "inline-flex",
   alignItems: "center",
@@ -631,7 +631,7 @@ var chip = (color) => ({
 function borderColor(selected, severity) {
   if (severity === "error") return "#ef4444";
   if (severity === "warning") return "#f59e0b";
-  return selected ? "#4f46e5" : "#d1d5db";
+  return selected ? "var(--wf-accent)" : "var(--wf-border-2)";
 }
 function Card({
   selected,
@@ -647,8 +647,8 @@ function Card({
     {
       style: {
         position: "relative",
-        background: "#fff",
-        color: "#111827",
+        background: "var(--wf-card)",
+        color: "var(--wf-fg)",
         border: `2px solid ${borderColor(selected, severity)}`,
         borderLeft: `4px solid ${accent}`,
         borderRadius: 9,
@@ -670,8 +670,8 @@ function titled(glyphColor, glyph, title, subtitle) {
   return /* @__PURE__ */ jsxs2("div", { style: { display: "flex", gap: 9, alignItems: "center" }, children: [
     /* @__PURE__ */ jsx2("span", { style: chip(glyphColor), children: glyph }),
     /* @__PURE__ */ jsxs2("div", { style: { minWidth: 0 }, children: [
-      /* @__PURE__ */ jsx2("div", { style: { fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }, children: title }),
-      /* @__PURE__ */ jsx2("div", { style: { fontSize: 9, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 }, children: subtitle })
+      /* @__PURE__ */ jsx2("div", { style: { fontWeight: 600, color: "var(--wf-fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }, children: title }),
+      /* @__PURE__ */ jsx2("div", { style: { fontSize: 9, color: "var(--wf-faint)", textTransform: "uppercase", letterSpacing: 0.4 }, children: subtitle })
     ] })
   ] });
 }
@@ -683,19 +683,19 @@ function ActionNode({ data, selected }) {
 function TaskNode({ data, selected }) {
   const d = data;
   const m = capMeta(d.capability);
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#4f46e5", children: titled("#4f46e5", "\u{1F464}", d.label, `${d.capability ?? ""} task`.trim()) });
+  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "var(--wf-accent)", children: titled("var(--wf-accent)", "\u{1F464}", d.label, `${d.capability ?? ""} task`.trim()) });
 }
 function TriggerNode({ data, selected }) {
   const d = data;
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#16a34a", target: false, style: { borderRadius: 999, background: "#f0fdf4" }, children: titled("#16a34a", "\u26A1", d.label, "trigger") });
+  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#16a34a", target: false, style: { borderRadius: 999, background: "rgba(22,163,74,0.12)" }, children: titled("#16a34a", "\u26A1", d.label, "trigger") });
 }
 function WaitNode({ data, selected }) {
   const d = data;
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#6b7280", children: titled("#6b7280", "\u23F1", d.label, "wait") });
+  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "var(--wf-muted)", children: titled("var(--wf-muted)", "\u23F1", d.label, "wait") });
 }
 function GatewayNode({ data, selected, glyph, kind }) {
   const d = data;
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#d97706", style: { background: "#fffbeb" }, children: titled("#d97706", glyph, d.label, kind) });
+  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#d97706", style: { background: "rgba(217,119,6,0.14)" }, children: titled("#d97706", glyph, d.label, kind) });
 }
 var BranchNode = (p) => /* @__PURE__ */ jsx2(GatewayNode, { ...p, glyph: "\u22D4", kind: "branch" });
 var ParallelNode = (p) => /* @__PURE__ */ jsx2(GatewayNode, { ...p, glyph: "\u29C9", kind: "parallel" });
@@ -708,9 +708,9 @@ function TerminalNode({ data, selected, source, target: target2, label: label2 }
       textAlign: "center",
       padding: "6px 0",
       borderRadius: 999,
-      border: `2px solid ${selected ? "#4f46e5" : "#9ca3af"}`,
-      background: "#f9fafb",
-      color: "#374151",
+      border: `2px solid ${selected ? "var(--wf-accent)" : "var(--wf-faint)"}`,
+      background: "var(--wf-surface-2)",
+      color: "var(--wf-fg)",
       fontSize: 11,
       fontWeight: 600
     }, children: d.label ?? label2 }),
@@ -752,6 +752,10 @@ function nodeTypeFor(kind) {
 import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
 var STEP_MIME = "application/x-luke-step";
 var STRUCTURAL_PREFIX = "__structural:";
+var WF_THEME_CSS = `
+.wf-root{--wf-surface:#fff;--wf-surface-2:#f9fafb;--wf-card:#fff;--wf-fg:#111827;--wf-muted:#6b7280;--wf-faint:#9ca3af;--wf-border:#e5e7eb;--wf-border-2:#d1d5db;--wf-input:#fff;--wf-accent:#4f46e5;--wf-danger:#b91c1c;--wf-warn:#b45309;}
+.wf-root[data-wf-theme="dark"]{--wf-surface:#1f2937;--wf-surface-2:#111827;--wf-card:#1f2937;--wf-fg:#e5e7eb;--wf-muted:#9ca3af;--wf-faint:#6b7280;--wf-border:#374151;--wf-border-2:#4b5563;--wf-input:#111827;--wf-accent:#818cf8;--wf-danger:#f87171;--wf-warn:#fbbf24;}
+`;
 var STRUCTURAL = [
   { kind: "branch", label: "Branch (if / else)" },
   { kind: "parallel", label: "Parallel" },
@@ -771,10 +775,10 @@ function toReactFlow(value) {
     target: e.target,
     label: e.label,
     animated: e.role === "fallback",
-    markerEnd: { type: MarkerType.ArrowClosed, color: e.role === "fallback" ? "#ef4444" : "#9ca3af" },
-    style: { stroke: e.role === "fallback" ? "#ef4444" : "#9ca3af" },
-    labelStyle: { fontSize: 10, fill: "#6b7280" },
-    labelBgStyle: { fill: "#ffffff" },
+    markerEnd: { type: MarkerType.ArrowClosed, color: e.role === "fallback" ? "#ef4444" : "var(--wf-faint)" },
+    style: { stroke: e.role === "fallback" ? "#ef4444" : "var(--wf-faint)" },
+    labelStyle: { fontSize: 10, fill: "var(--wf-muted)" },
+    labelBgStyle: { fill: "var(--wf-surface)" },
     labelBgPadding: [4, 2],
     labelBgBorderRadius: 4
   }));
@@ -783,14 +787,14 @@ function toReactFlow(value) {
 var paletteItemStyle = {
   padding: "6px 8px",
   margin: "4px 0",
-  border: "1px solid #e5e7eb",
+  border: "1px solid var(--wf-border)",
   borderRadius: 6,
   fontSize: 13,
   cursor: "grab",
-  background: "#fff",
-  color: "#111827"
+  background: "var(--wf-card)",
+  color: "var(--wf-fg)"
 };
-function WorkflowBuilder({ value, stepTypes, connections, onChange, className }) {
+function WorkflowBuilder({ value, stepTypes, connections, theme = "light", onChange, className }) {
   const palette = useMemo(() => buildPalette(stepTypes), [stepTypes]);
   const triggerTypes = useMemo(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
   const [selectedId, setSelectedId] = useState2(null);
@@ -872,69 +876,79 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
     },
     key
   );
-  return /* @__PURE__ */ jsxs3("div", { className, style: { display: "flex", width: "100%", height: "100%" }, children: [
-    onChange ? /* @__PURE__ */ jsxs3("aside", { style: { width: 190, overflowY: "auto", borderRight: "1px solid #e5e7eb", padding: 8 }, children: [
-      palette.map((group) => /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 12 }, children: [
-        /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "#6b7280" }, children: group.group }),
-        group.items.map((item) => draggable(item.id, item.label, item.id))
-      ] }, group.group)),
-      /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 12 }, children: [
-        /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "#6b7280" }, children: "Flow" }),
-        STRUCTURAL.map((s) => draggable(`${STRUCTURAL_PREFIX}${s.kind}`, s.label, s.kind))
-      ] })
-    ] }) : null,
-    /* @__PURE__ */ jsxs3(
-      "div",
-      {
-        style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
-        onDrop,
-        onDragOver: (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-        },
-        children: [
-          /* @__PURE__ */ jsx3("div", { style: { flex: 1, minHeight: 0 }, children: /* @__PURE__ */ jsxs3(
-            ReactFlow,
-            {
-              nodes,
-              edges,
-              nodeTypes,
-              onNodesChange,
-              onEdgesChange,
-              onConnect,
-              onNodesDelete,
-              onNodeClick: (_, node) => setSelectedId(node.id),
-              fitView: true,
-              children: [
-                /* @__PURE__ */ jsx3(Background, {}),
-                /* @__PURE__ */ jsx3(Controls, {})
-              ]
-            }
-          ) }),
-          /* @__PURE__ */ jsx3(
-            ProblemsStrip,
-            {
-              problems,
-              open: showProblems,
-              onToggle: () => setShowProblems((o) => !o),
-              onSelect: (nodeId) => nodeId && setSelectedId(nodeId)
-            }
-          )
-        ]
-      }
-    ),
-    onChange && (triggerSelected || selected) ? /* @__PURE__ */ jsx3("aside", { style: { width: 288, overflowY: "auto", borderLeft: "1px solid #e5e7eb", padding: 14, fontSize: 13 }, children: triggerSelected ? /* @__PURE__ */ jsx3(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ jsx3(
-      NodeConfig,
-      {
-        doc: value,
-        node: selected,
-        stepTypes,
-        connections,
-        onPatch: patchSelected,
-        onDelete: () => onNodesDelete([{ id: selected.id }])
-      }
-    ) : null }) : null
-  ] });
+  return /* @__PURE__ */ jsxs3(
+    "div",
+    {
+      className: `wf-root${className ? ` ${className}` : ""}`,
+      "data-wf-theme": theme,
+      style: { display: "flex", width: "100%", height: "100%", background: "var(--wf-surface)", color: "var(--wf-fg)" },
+      children: [
+        /* @__PURE__ */ jsx3("style", { children: WF_THEME_CSS }),
+        onChange ? /* @__PURE__ */ jsxs3("aside", { style: { width: 190, overflowY: "auto", borderRight: "1px solid var(--wf-border)", padding: 8, background: "var(--wf-surface)" }, children: [
+          palette.map((group) => /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 12 }, children: [
+            /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--wf-muted)" }, children: group.group }),
+            group.items.map((item) => draggable(item.id, item.label, item.id))
+          ] }, group.group)),
+          /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 12 }, children: [
+            /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--wf-muted)" }, children: "Flow" }),
+            STRUCTURAL.map((s) => draggable(`${STRUCTURAL_PREFIX}${s.kind}`, s.label, s.kind))
+          ] })
+        ] }) : null,
+        /* @__PURE__ */ jsxs3(
+          "div",
+          {
+            style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
+            onDrop,
+            onDragOver: (e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            },
+            children: [
+              /* @__PURE__ */ jsx3("div", { style: { flex: 1, minHeight: 0 }, children: /* @__PURE__ */ jsxs3(
+                ReactFlow,
+                {
+                  colorMode: theme,
+                  nodes,
+                  edges,
+                  nodeTypes,
+                  onNodesChange,
+                  onEdgesChange,
+                  onConnect,
+                  onNodesDelete,
+                  onNodeClick: (_, node) => setSelectedId(node.id),
+                  fitView: true,
+                  children: [
+                    /* @__PURE__ */ jsx3(Background, {}),
+                    /* @__PURE__ */ jsx3(Controls, {})
+                  ]
+                }
+              ) }),
+              /* @__PURE__ */ jsx3(
+                ProblemsStrip,
+                {
+                  problems,
+                  open: showProblems,
+                  onToggle: () => setShowProblems((o) => !o),
+                  onSelect: (nodeId) => nodeId && setSelectedId(nodeId)
+                }
+              )
+            ]
+          }
+        ),
+        onChange && (triggerSelected || selected) ? /* @__PURE__ */ jsx3("aside", { style: { width: 288, overflowY: "auto", borderLeft: "1px solid var(--wf-border)", padding: 14, background: "var(--wf-surface)", fontSize: 13 }, children: triggerSelected ? /* @__PURE__ */ jsx3(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ jsx3(
+          NodeConfig,
+          {
+            doc: value,
+            node: selected,
+            stepTypes,
+            connections,
+            onPatch: patchSelected,
+            onDelete: () => onNodesDelete([{ id: selected.id }])
+          }
+        ) : null }) : null
+      ]
+    }
+  );
 }
 function ProblemsStrip({
   problems,
@@ -945,8 +959,8 @@ function ProblemsStrip({
   if (problems.length === 0) return null;
   const errors = problems.filter((d) => d.severity === "error").length;
   const warnings = problems.length - errors;
-  const summaryColor = errors > 0 ? "#b91c1c" : "#b45309";
-  return /* @__PURE__ */ jsxs3("div", { style: { borderTop: "1px solid #e5e7eb", background: "#fff", display: "flex", flexDirection: "column", maxHeight: open ? 168 : 34, flex: "0 0 auto" }, children: [
+  const summaryColor = errors > 0 ? "var(--wf-danger)" : "var(--wf-warn)";
+  return /* @__PURE__ */ jsxs3("div", { style: { borderTop: "1px solid var(--wf-border)", background: "var(--wf-surface)", display: "flex", flexDirection: "column", maxHeight: open ? 168 : 34, flex: "0 0 auto" }, children: [
     /* @__PURE__ */ jsxs3("div", { onClick: onToggle, style: { cursor: "pointer", padding: "7px 12px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: summaryColor, userSelect: "none" }, children: [
       /* @__PURE__ */ jsxs3("span", { children: [
         "\u26A0 ",
@@ -958,7 +972,7 @@ function ProblemsStrip({
         " warning",
         warnings === 1 ? "" : "s"
       ] }),
-      /* @__PURE__ */ jsx3("span", { style: { marginLeft: "auto", color: "#9ca3af" }, children: open ? "\u25BE" : "\u25B8" })
+      /* @__PURE__ */ jsx3("span", { style: { marginLeft: "auto", color: "var(--wf-faint)" }, children: open ? "\u25BE" : "\u25B8" })
     ] }),
     open ? /* @__PURE__ */ jsx3("div", { style: { overflowY: "auto" }, children: problems.map((d, i) => /* @__PURE__ */ jsxs3(
       "div",
@@ -967,9 +981,9 @@ function ProblemsStrip({
         style: {
           padding: "5px 12px",
           fontSize: 12,
-          borderTop: "1px solid #f3f4f6",
+          borderTop: "1px solid var(--wf-border)",
           cursor: d.nodeId ? "pointer" : "default",
-          color: d.severity === "error" ? "#b91c1c" : "#b45309"
+          color: d.severity === "error" ? "var(--wf-danger)" : "var(--wf-warn)"
         },
         children: [
           d.severity === "error" ? "\u2715" : "\u26A0",

@@ -119,12 +119,14 @@ interface WorkflowBuilderProps {
     /** Tenant integration connections (from `GET /api/workflow/integrations/connections`), for the
      *  integration-action connection picker. Optional — the picker shows an empty-state hint without them. */
     connections?: readonly ConnectionOption[];
+    /** Colour theme; drives the canvas `colorMode` and the panel/node CSS variables. Default `"light"`. */
+    theme?: "light" | "dark";
     /** Notified with the next document on every edit. Omit for a read-only canvas. */
     onChange?: (doc: WorkflowDoc) => void;
     /** Optional class for the outer container. */
     className?: string;
 }
 /** The visual workflow designer. */
-declare function WorkflowBuilder({ value, stepTypes, connections, onChange, className }: WorkflowBuilderProps): react.JSX.Element;
+declare function WorkflowBuilder({ value, stepTypes, connections, theme, onChange, className }: WorkflowBuilderProps): react.JSX.Element;
 
 export { type ConnectionOption, END_ID, type PaletteGroup, START_ID, type WfFlow, type WfFlowEdge, type WfFlowNode, WorkflowBuilder, type WorkflowBuilderProps, addStep, addStructural, buildPalette, connectNodes, docToFlow, flowToDoc, newNodeId, removeNode, updateNode };

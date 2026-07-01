@@ -7,6 +7,7 @@ import { useNavigate, useParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import WorkflowAiAssistPanel from "./WorkflowAiAssistPanel";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { WORKFLOW, canWrite } from "../../lib/capabilities";
 import {
   blankWorkflow,
@@ -37,6 +38,7 @@ export default function WorkflowBuilderPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const { session } = useAuth();
+  const { theme } = useTheme();
   const tenant = session?.tenant ?? null;
   const canEdit = canWrite(session, WORKFLOW);
 
@@ -176,7 +178,7 @@ export default function WorkflowBuilderPage() {
 
       <div className="flex h-[72vh] flex-col gap-4 lg:flex-row">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-          <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} onChange={canEdit ? setDoc : undefined} />
+          <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} theme={theme} onChange={canEdit ? setDoc : undefined} />
         </div>
         {canEdit && tenant ? (
           <div className="h-full w-full shrink-0 lg:w-[340px]">
