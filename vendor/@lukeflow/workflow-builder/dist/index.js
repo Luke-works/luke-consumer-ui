@@ -1,7 +1,83 @@
 // src/graph.ts
-import { END_NODE, isTerminal, nodeRefs, startNodeId } from "@lukeflow/workflow-core";
+import { END_NODE as END_NODE2, isTerminal as isTerminal2, nodeRefs as nodeRefs2, startNodeId as startNodeId2 } from "@lukeflow/workflow-core";
+
+// src/layout.ts
+import { isTerminal, nodeRefs, startNodeId } from "@lukeflow/workflow-core";
+
+// src/ids.ts
+import { END_NODE } from "@lukeflow/workflow-core";
 var START_ID = "__start";
 var END_ID = END_NODE;
+
+// src/layout.ts
+var X_GAP = 220;
+var Y_GAP = 100;
+var X0 = 40;
+var Y0 = 40;
+function computeAutoLayout(doc) {
+  const real = (doc.nodes ?? []).filter((n) => !!n && typeof n.id === "string");
+  const byId = new Map(real.map((n) => [n.id, n]));
+  const succ = /* @__PURE__ */ new Map();
+  const pred = /* @__PURE__ */ new Map();
+  const link = (u, v) => {
+    (succ.get(u) ?? succ.set(u, []).get(u)).push(v);
+    (pred.get(v) ?? pred.set(v, []).get(v)).push(u);
+  };
+  const start = startNodeId(doc);
+  if (start) link(START_ID, start);
+  for (const n of real) {
+    for (const ref of nodeRefs(n)) {
+      const t = isTerminal(ref.target) ? END_ID : ref.target;
+      if (t === END_ID || byId.has(t)) link(n.id, t);
+    }
+  }
+  const allIds = [START_ID, ...real.map((n) => n.id), END_ID];
+  const layer = /* @__PURE__ */ new Map();
+  layer.set(START_ID, 0);
+  const queue = [START_ID];
+  while (queue.length > 0) {
+    const u = queue.shift();
+    for (const v of succ.get(u) ?? []) {
+      if (!layer.has(v)) {
+        layer.set(v, (layer.get(u) ?? 0) + 1);
+        queue.push(v);
+      }
+    }
+  }
+  let maxReal = 0;
+  for (const id of allIds) {
+    if (id === END_ID) continue;
+    if (!layer.has(id)) layer.set(id, 1);
+    maxReal = Math.max(maxReal, layer.get(id) ?? 0);
+  }
+  layer.set(END_ID, Math.max(layer.get(END_ID) ?? 0, maxReal + 1));
+  const maxLayer = Math.max(...allIds.map((id) => layer.get(id) ?? 0));
+  const layers = Array.from({ length: maxLayer + 1 }, () => []);
+  for (const id of allIds) (layers[layer.get(id) ?? 0] ??= []).push(id);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let d = 1; d <= maxLayer; d++) {
+      const prevIndex = new Map((layers[d - 1] ?? []).map((id, i) => [id, i]));
+      const cur = layers[d] ?? [];
+      const bary = /* @__PURE__ */ new Map();
+      cur.forEach((id, i) => {
+        const ps = (pred.get(id) ?? []).map((p) => prevIndex.get(p)).filter((x) => x !== void 0);
+        bary.set(id, ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : i);
+      });
+      layers[d] = cur.map((id, i) => ({ id, i })).sort((a, b) => (bary.get(a.id) ?? 0) - (bary.get(b.id) ?? 0) || a.i - b.i).map((e) => e.id);
+    }
+  }
+  const maxCount = Math.max(1, ...layers.map((l) => l.length));
+  const out = {};
+  layers.forEach((ids, d) => {
+    const offset = (maxCount - ids.length) * Y_GAP / 2;
+    ids.forEach((id, i) => {
+      out[id] = { x: X0 + d * X_GAP, y: Y0 + offset + i * Y_GAP };
+    });
+  });
+  return out;
+}
+
+// src/graph.ts
 function triggerLabel(doc) {
   const t = doc.trigger;
   return t ? `${t.capability}.${t.type}` : "Trigger";
@@ -31,7 +107,7 @@ function docToFlow(doc) {
     if (n && typeof n.id === "string" && !byId.has(n.id)) byId.set(n.id, n);
   }
   const depth = /* @__PURE__ */ new Map();
-  const start = startNodeId(doc);
+  const start = startNodeId2(doc);
   if (start) {
     const queue = [[start, 1]];
     while (queue.length > 0) {
@@ -40,19 +116,17 @@ function docToFlow(doc) {
       depth.set(id, d);
       const n = byId.get(id);
       if (n) {
-        for (const ref of nodeRefs(n)) if (!depth.has(ref.target)) queue.push([ref.target, d + 1]);
+        for (const ref of nodeRefs2(n)) if (!depth.has(ref.target)) queue.push([ref.target, d + 1]);
       }
     }
   }
   const maxDepth = depth.size > 0 ? Math.max(...depth.values()) : 0;
-  const perDepth = /* @__PURE__ */ new Map();
   const layout = doc.layout ?? {};
+  const auto = computeAutoLayout(doc);
   const place = (id, d) => {
     const saved = layout[id];
     if (saved && typeof saved.x === "number" && typeof saved.y === "number") return saved;
-    const i = perDepth.get(d) ?? 0;
-    perDepth.set(d, i + 1);
-    return { x: d * 220 + 40, y: i * 110 + 40 };
+    return auto[id] ?? { x: d * 220 + 40, y: 40 };
   };
   nodes.push({ id: START_ID, kind: "start", label: triggerLabel(doc), position: place(START_ID, 0), data: { trigger: doc.trigger } });
   for (const n of doc.nodes ?? []) {
@@ -62,7 +136,7 @@ function docToFlow(doc) {
   nodes.push({ id: END_ID, kind: "end", label: "End", position: place(END_ID, maxDepth + 1), data: {} });
   let seq = 0;
   const push = (source, target2, role, label2) => {
-    const t = isTerminal(target2) ? END_ID : target2;
+    const t = isTerminal2(target2) ? END_ID : target2;
     edges.push({ id: `e${seq++}_${source}_${role}`, source, target: t, role, label: label2 });
   };
   if (start) push(START_ID, start, "next");
@@ -72,7 +146,7 @@ function docToFlow(doc) {
       case "action":
       case "task":
         push(n.id, n.next, "next");
-        if (n.onError && !isTerminal(n.onError.fallback)) push(n.id, n.onError.fallback, "fallback");
+        if (n.onError && !isTerminal2(n.onError.fallback)) push(n.id, n.onError.fallback, "fallback");
         break;
       case "wait":
         push(n.id, n.next, "next");
@@ -96,7 +170,7 @@ function flowToDoc(flow, base) {
     if (list) list.push(e);
     else outgoing.set(e.source, [e]);
   }
-  const mapTarget = (t) => t === END_ID ? END_NODE : t;
+  const mapTarget = (t) => t === END_ID ? END_NODE2 : t;
   const nodes = [];
   for (const fn of flow.nodes) {
     if (!fn.data.node) continue;
@@ -107,7 +181,7 @@ function flowToDoc(flow, base) {
       case "task":
       case "wait": {
         const next = outs.find((e) => e.role === "next");
-        n.next = next ? mapTarget(next.target) : END_NODE;
+        n.next = next ? mapTarget(next.target) : END_NODE2;
         if (n.kind !== "wait" && n.onError) {
           const fb = outs.find((e) => e.role === "fallback");
           n.onError = { ...n.onError, fallback: fb ? mapTarget(fb.target) : n.onError.fallback ?? null };
@@ -118,7 +192,7 @@ function flowToDoc(flow, base) {
         const conditions = outs.filter((e) => e.role === "branch").map((e) => ({ expr: e.label ?? "", next: mapTarget(e.target) }));
         n.conditions = conditions;
         const elseEdge = outs.find((e) => e.role === "else");
-        n.else = elseEdge ? mapTarget(elseEdge.target) : END_NODE;
+        n.else = elseEdge ? mapTarget(elseEdge.target) : END_NODE2;
         break;
       }
       case "parallel": {
@@ -146,7 +220,7 @@ function buildPalette(steps) {
 }
 
 // src/operations.ts
-import { END_NODE as END_NODE2, repairWorkflow } from "@lukeflow/workflow-core";
+import { END_NODE as END_NODE3, repairWorkflow } from "@lukeflow/workflow-core";
 function newNodeId(doc) {
   let max = 0;
   for (const n of doc.nodes ?? []) {
@@ -163,7 +237,7 @@ function addStep(doc, descriptor) {
   const id = newNodeId(doc);
   const capability = descriptor.capability.toLowerCase();
   const op = operationOf(descriptor.id);
-  const node = descriptor.kind === "task" ? { id, kind: "task", capability, task: op, next: END_NODE2 } : { id, kind: "action", capability, action: op, next: END_NODE2 };
+  const node = descriptor.kind === "task" ? { id, kind: "task", capability, task: op, next: END_NODE3 } : { id, kind: "action", capability, action: op, next: END_NODE3 };
   return { ...doc, nodes: [...doc.nodes ?? [], node] };
 }
 function addStructural(doc, kind) {
@@ -171,13 +245,13 @@ function addStructural(doc, kind) {
   let node;
   switch (kind) {
     case "branch":
-      node = { id, kind: "branch", conditions: [], else: END_NODE2 };
+      node = { id, kind: "branch", conditions: [], else: END_NODE3 };
       break;
     case "parallel":
-      node = { id, kind: "parallel", branches: [], join: END_NODE2 };
+      node = { id, kind: "parallel", branches: [], join: END_NODE3 };
       break;
     case "wait":
-      node = { id, kind: "wait", mode: "timer", duration: "PT1H", next: END_NODE2 };
+      node = { id, kind: "wait", mode: "timer", duration: "PT1H", next: END_NODE3 };
       break;
   }
   return { ...doc, nodes: [...doc.nodes ?? [], node] };
@@ -193,7 +267,7 @@ function removeNode(doc, id) {
   return repairWorkflow({ ...doc, nodes }).doc;
 }
 function target(id) {
-  return id === END_ID ? END_NODE2 : id;
+  return id === END_ID ? END_NODE3 : id;
 }
 function connectNodes(doc, sourceId, targetId, role = "next") {
   const to = target(targetId);
@@ -223,7 +297,7 @@ import { Background, Controls, MarkerType, Panel, ReactFlow, useEdgesState, useN
 import { useCallback, useEffect, useMemo, useState as useState2 } from "react";
 
 // src/config.tsx
-import { END_NODE as END_NODE3 } from "@lukeflow/workflow-core";
+import { END_NODE as END_NODE4 } from "@lukeflow/workflow-core";
 import { useState } from "react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 var label = { display: "block", marginBottom: 10, fontSize: 12, color: "var(--wf-fg)" };
@@ -286,7 +360,7 @@ function Section({ title, defaultOpen = false, children }) {
 }
 function nodeOptions(doc, excludeId) {
   const opts = (doc.nodes ?? []).filter((n) => n.id !== excludeId).map((n) => ({ value: n.id, label: nodeLabel2(n) }));
-  opts.push({ value: END_NODE3, label: "\u25AA End" });
+  opts.push({ value: END_NODE4, label: "\u25AA End" });
   return opts;
 }
 function nodeLabel2(n) {
@@ -311,7 +385,7 @@ function TargetSelect({
   options,
   onChange
 }) {
-  const v = value == null || value === "" ? END_NODE3 : value;
+  const v = value == null || value === "" ? END_NODE4 : value;
   return /* @__PURE__ */ jsxs("select", { style: control, value: v, onChange: (e) => onChange(e.target.value), children: [
     options.some((o) => o.value === v) ? null : /* @__PURE__ */ jsx("option", { value: v, children: v }),
     options.map((o) => /* @__PURE__ */ jsx("option", { value: o.value, children: o.label }, o.value))
@@ -534,7 +608,7 @@ function BranchConfig({
     const next = conditions.map((c, j) => j === i ? { ...c, ...patch } : c);
     onPatch({ conditions: next });
   };
-  const addCond = () => onPatch({ conditions: [...conditions, { expr: "", next: END_NODE3 }] });
+  const addCond = () => onPatch({ conditions: [...conditions, { expr: "", next: END_NODE4 }] });
   const removeCond = (i) => onPatch({ conditions: conditions.filter((_, j) => j !== i) });
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "var(--wf-fg)", marginBottom: 6 }, children: "Conditions (first match wins)" }),
@@ -562,7 +636,7 @@ function ParallelConfig({
 }) {
   const branches = node.branches ?? [];
   const setBranch = (i, v) => onPatch({ branches: branches.map((b, j) => j === i ? v : b) });
-  const addBranch = () => onPatch({ branches: [...branches, END_NODE3] });
+  const addBranch = () => onPatch({ branches: [...branches, END_NODE4] });
   const removeBranch = (i) => onPatch({ branches: branches.filter((_, j) => j !== i) });
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "var(--wf-fg)", marginBottom: 6 }, children: "Run in parallel" }),

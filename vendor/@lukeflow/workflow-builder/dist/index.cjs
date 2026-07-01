@@ -36,9 +36,85 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/graph.ts
+var import_workflow_core3 = require("@lukeflow/workflow-core");
+
+// src/layout.ts
+var import_workflow_core2 = require("@lukeflow/workflow-core");
+
+// src/ids.ts
 var import_workflow_core = require("@lukeflow/workflow-core");
 var START_ID = "__start";
 var END_ID = import_workflow_core.END_NODE;
+
+// src/layout.ts
+var X_GAP = 220;
+var Y_GAP = 100;
+var X0 = 40;
+var Y0 = 40;
+function computeAutoLayout(doc) {
+  const real = (doc.nodes ?? []).filter((n) => !!n && typeof n.id === "string");
+  const byId = new Map(real.map((n) => [n.id, n]));
+  const succ = /* @__PURE__ */ new Map();
+  const pred = /* @__PURE__ */ new Map();
+  const link = (u, v) => {
+    (succ.get(u) ?? succ.set(u, []).get(u)).push(v);
+    (pred.get(v) ?? pred.set(v, []).get(v)).push(u);
+  };
+  const start = (0, import_workflow_core2.startNodeId)(doc);
+  if (start) link(START_ID, start);
+  for (const n of real) {
+    for (const ref of (0, import_workflow_core2.nodeRefs)(n)) {
+      const t = (0, import_workflow_core2.isTerminal)(ref.target) ? END_ID : ref.target;
+      if (t === END_ID || byId.has(t)) link(n.id, t);
+    }
+  }
+  const allIds = [START_ID, ...real.map((n) => n.id), END_ID];
+  const layer = /* @__PURE__ */ new Map();
+  layer.set(START_ID, 0);
+  const queue = [START_ID];
+  while (queue.length > 0) {
+    const u = queue.shift();
+    for (const v of succ.get(u) ?? []) {
+      if (!layer.has(v)) {
+        layer.set(v, (layer.get(u) ?? 0) + 1);
+        queue.push(v);
+      }
+    }
+  }
+  let maxReal = 0;
+  for (const id of allIds) {
+    if (id === END_ID) continue;
+    if (!layer.has(id)) layer.set(id, 1);
+    maxReal = Math.max(maxReal, layer.get(id) ?? 0);
+  }
+  layer.set(END_ID, Math.max(layer.get(END_ID) ?? 0, maxReal + 1));
+  const maxLayer = Math.max(...allIds.map((id) => layer.get(id) ?? 0));
+  const layers = Array.from({ length: maxLayer + 1 }, () => []);
+  for (const id of allIds) (layers[layer.get(id) ?? 0] ??= []).push(id);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let d = 1; d <= maxLayer; d++) {
+      const prevIndex = new Map((layers[d - 1] ?? []).map((id, i) => [id, i]));
+      const cur = layers[d] ?? [];
+      const bary = /* @__PURE__ */ new Map();
+      cur.forEach((id, i) => {
+        const ps = (pred.get(id) ?? []).map((p) => prevIndex.get(p)).filter((x) => x !== void 0);
+        bary.set(id, ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : i);
+      });
+      layers[d] = cur.map((id, i) => ({ id, i })).sort((a, b) => (bary.get(a.id) ?? 0) - (bary.get(b.id) ?? 0) || a.i - b.i).map((e) => e.id);
+    }
+  }
+  const maxCount = Math.max(1, ...layers.map((l) => l.length));
+  const out = {};
+  layers.forEach((ids, d) => {
+    const offset = (maxCount - ids.length) * Y_GAP / 2;
+    ids.forEach((id, i) => {
+      out[id] = { x: X0 + d * X_GAP, y: Y0 + offset + i * Y_GAP };
+    });
+  });
+  return out;
+}
+
+// src/graph.ts
 function triggerLabel(doc) {
   const t = doc.trigger;
   return t ? `${t.capability}.${t.type}` : "Trigger";
@@ -68,7 +144,7 @@ function docToFlow(doc) {
     if (n && typeof n.id === "string" && !byId.has(n.id)) byId.set(n.id, n);
   }
   const depth = /* @__PURE__ */ new Map();
-  const start = (0, import_workflow_core.startNodeId)(doc);
+  const start = (0, import_workflow_core3.startNodeId)(doc);
   if (start) {
     const queue = [[start, 1]];
     while (queue.length > 0) {
@@ -77,19 +153,17 @@ function docToFlow(doc) {
       depth.set(id, d);
       const n = byId.get(id);
       if (n) {
-        for (const ref of (0, import_workflow_core.nodeRefs)(n)) if (!depth.has(ref.target)) queue.push([ref.target, d + 1]);
+        for (const ref of (0, import_workflow_core3.nodeRefs)(n)) if (!depth.has(ref.target)) queue.push([ref.target, d + 1]);
       }
     }
   }
   const maxDepth = depth.size > 0 ? Math.max(...depth.values()) : 0;
-  const perDepth = /* @__PURE__ */ new Map();
   const layout = doc.layout ?? {};
+  const auto = computeAutoLayout(doc);
   const place = (id, d) => {
     const saved = layout[id];
     if (saved && typeof saved.x === "number" && typeof saved.y === "number") return saved;
-    const i = perDepth.get(d) ?? 0;
-    perDepth.set(d, i + 1);
-    return { x: d * 220 + 40, y: i * 110 + 40 };
+    return auto[id] ?? { x: d * 220 + 40, y: 40 };
   };
   nodes.push({ id: START_ID, kind: "start", label: triggerLabel(doc), position: place(START_ID, 0), data: { trigger: doc.trigger } });
   for (const n of doc.nodes ?? []) {
@@ -99,7 +173,7 @@ function docToFlow(doc) {
   nodes.push({ id: END_ID, kind: "end", label: "End", position: place(END_ID, maxDepth + 1), data: {} });
   let seq = 0;
   const push = (source, target2, role, label2) => {
-    const t = (0, import_workflow_core.isTerminal)(target2) ? END_ID : target2;
+    const t = (0, import_workflow_core3.isTerminal)(target2) ? END_ID : target2;
     edges.push({ id: `e${seq++}_${source}_${role}`, source, target: t, role, label: label2 });
   };
   if (start) push(START_ID, start, "next");
@@ -109,7 +183,7 @@ function docToFlow(doc) {
       case "action":
       case "task":
         push(n.id, n.next, "next");
-        if (n.onError && !(0, import_workflow_core.isTerminal)(n.onError.fallback)) push(n.id, n.onError.fallback, "fallback");
+        if (n.onError && !(0, import_workflow_core3.isTerminal)(n.onError.fallback)) push(n.id, n.onError.fallback, "fallback");
         break;
       case "wait":
         push(n.id, n.next, "next");
@@ -133,7 +207,7 @@ function flowToDoc(flow, base) {
     if (list) list.push(e);
     else outgoing.set(e.source, [e]);
   }
-  const mapTarget = (t) => t === END_ID ? import_workflow_core.END_NODE : t;
+  const mapTarget = (t) => t === END_ID ? import_workflow_core3.END_NODE : t;
   const nodes = [];
   for (const fn of flow.nodes) {
     if (!fn.data.node) continue;
@@ -144,7 +218,7 @@ function flowToDoc(flow, base) {
       case "task":
       case "wait": {
         const next = outs.find((e) => e.role === "next");
-        n.next = next ? mapTarget(next.target) : import_workflow_core.END_NODE;
+        n.next = next ? mapTarget(next.target) : import_workflow_core3.END_NODE;
         if (n.kind !== "wait" && n.onError) {
           const fb = outs.find((e) => e.role === "fallback");
           n.onError = { ...n.onError, fallback: fb ? mapTarget(fb.target) : n.onError.fallback ?? null };
@@ -155,7 +229,7 @@ function flowToDoc(flow, base) {
         const conditions = outs.filter((e) => e.role === "branch").map((e) => ({ expr: e.label ?? "", next: mapTarget(e.target) }));
         n.conditions = conditions;
         const elseEdge = outs.find((e) => e.role === "else");
-        n.else = elseEdge ? mapTarget(elseEdge.target) : import_workflow_core.END_NODE;
+        n.else = elseEdge ? mapTarget(elseEdge.target) : import_workflow_core3.END_NODE;
         break;
       }
       case "parallel": {
@@ -183,7 +257,7 @@ function buildPalette(steps) {
 }
 
 // src/operations.ts
-var import_workflow_core2 = require("@lukeflow/workflow-core");
+var import_workflow_core4 = require("@lukeflow/workflow-core");
 function newNodeId(doc) {
   let max = 0;
   for (const n of doc.nodes ?? []) {
@@ -200,7 +274,7 @@ function addStep(doc, descriptor) {
   const id = newNodeId(doc);
   const capability = descriptor.capability.toLowerCase();
   const op = operationOf(descriptor.id);
-  const node = descriptor.kind === "task" ? { id, kind: "task", capability, task: op, next: import_workflow_core2.END_NODE } : { id, kind: "action", capability, action: op, next: import_workflow_core2.END_NODE };
+  const node = descriptor.kind === "task" ? { id, kind: "task", capability, task: op, next: import_workflow_core4.END_NODE } : { id, kind: "action", capability, action: op, next: import_workflow_core4.END_NODE };
   return { ...doc, nodes: [...doc.nodes ?? [], node] };
 }
 function addStructural(doc, kind) {
@@ -208,13 +282,13 @@ function addStructural(doc, kind) {
   let node;
   switch (kind) {
     case "branch":
-      node = { id, kind: "branch", conditions: [], else: import_workflow_core2.END_NODE };
+      node = { id, kind: "branch", conditions: [], else: import_workflow_core4.END_NODE };
       break;
     case "parallel":
-      node = { id, kind: "parallel", branches: [], join: import_workflow_core2.END_NODE };
+      node = { id, kind: "parallel", branches: [], join: import_workflow_core4.END_NODE };
       break;
     case "wait":
-      node = { id, kind: "wait", mode: "timer", duration: "PT1H", next: import_workflow_core2.END_NODE };
+      node = { id, kind: "wait", mode: "timer", duration: "PT1H", next: import_workflow_core4.END_NODE };
       break;
   }
   return { ...doc, nodes: [...doc.nodes ?? [], node] };
@@ -227,10 +301,10 @@ function updateNode(doc, id, patch) {
 }
 function removeNode(doc, id) {
   const nodes = (doc.nodes ?? []).filter((n) => n.id !== id);
-  return (0, import_workflow_core2.repairWorkflow)({ ...doc, nodes }).doc;
+  return (0, import_workflow_core4.repairWorkflow)({ ...doc, nodes }).doc;
 }
 function target(id) {
-  return id === END_ID ? import_workflow_core2.END_NODE : id;
+  return id === END_ID ? import_workflow_core4.END_NODE : id;
 }
 function connectNodes(doc, sourceId, targetId, role = "next") {
   const to = target(targetId);
@@ -255,12 +329,12 @@ function connectNodes(doc, sourceId, targetId, role = "next") {
 }
 
 // src/WorkflowBuilder.tsx
-var import_workflow_core4 = require("@lukeflow/workflow-core");
+var import_workflow_core6 = require("@lukeflow/workflow-core");
 var import_react3 = require("@xyflow/react");
 var import_react4 = require("react");
 
 // src/config.tsx
-var import_workflow_core3 = require("@lukeflow/workflow-core");
+var import_workflow_core5 = require("@lukeflow/workflow-core");
 var import_react = require("react");
 var import_jsx_runtime = require("react/jsx-runtime");
 var label = { display: "block", marginBottom: 10, fontSize: 12, color: "var(--wf-fg)" };
@@ -323,7 +397,7 @@ function Section({ title, defaultOpen = false, children }) {
 }
 function nodeOptions(doc, excludeId) {
   const opts = (doc.nodes ?? []).filter((n) => n.id !== excludeId).map((n) => ({ value: n.id, label: nodeLabel2(n) }));
-  opts.push({ value: import_workflow_core3.END_NODE, label: "\u25AA End" });
+  opts.push({ value: import_workflow_core5.END_NODE, label: "\u25AA End" });
   return opts;
 }
 function nodeLabel2(n) {
@@ -348,7 +422,7 @@ function TargetSelect({
   options,
   onChange
 }) {
-  const v = value == null || value === "" ? import_workflow_core3.END_NODE : value;
+  const v = value == null || value === "" ? import_workflow_core5.END_NODE : value;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { style: control, value: v, onChange: (e) => onChange(e.target.value), children: [
     options.some((o) => o.value === v) ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: v, children: v }),
     options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: o.value, children: o.label }, o.value))
@@ -571,7 +645,7 @@ function BranchConfig({
     const next = conditions.map((c, j) => j === i ? { ...c, ...patch } : c);
     onPatch({ conditions: next });
   };
-  const addCond = () => onPatch({ conditions: [...conditions, { expr: "", next: import_workflow_core3.END_NODE }] });
+  const addCond = () => onPatch({ conditions: [...conditions, { expr: "", next: import_workflow_core5.END_NODE }] });
   const removeCond = (i) => onPatch({ conditions: conditions.filter((_, j) => j !== i) });
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 12, color: "var(--wf-fg)", marginBottom: 6 }, children: "Conditions (first match wins)" }),
@@ -599,7 +673,7 @@ function ParallelConfig({
 }) {
   const branches = node.branches ?? [];
   const setBranch = (i, v) => onPatch({ branches: branches.map((b, j) => j === i ? v : b) });
-  const addBranch = () => onPatch({ branches: [...branches, import_workflow_core3.END_NODE] });
+  const addBranch = () => onPatch({ branches: [...branches, import_workflow_core5.END_NODE] });
   const removeBranch = (i) => onPatch({ branches: branches.filter((_, j) => j !== i) });
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 12, color: "var(--wf-fg)", marginBottom: 6 }, children: "Run in parallel" }),
@@ -839,7 +913,7 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", onCha
   const triggerTypes = (0, import_react4.useMemo)(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
   const [selectedId, setSelectedId] = (0, import_react4.useState)(null);
   const [showProblems, setShowProblems] = (0, import_react4.useState)(true);
-  const diagnostics = (0, import_react4.useMemo)(() => (0, import_workflow_core4.validateWorkflow)(value), [value]);
+  const diagnostics = (0, import_react4.useMemo)(() => (0, import_workflow_core6.validateWorkflow)(value), [value]);
   const severityByNode = (0, import_react4.useMemo)(() => {
     const rank = { info: 0, warning: 1, error: 2 };
     const m = /* @__PURE__ */ new Map();

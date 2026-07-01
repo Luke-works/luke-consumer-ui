@@ -1,6 +1,11 @@
 import { WorkflowNode, WorkflowTrigger, WorkflowDoc, StepTypeDescriptor, NodeId } from '@lukeflow/workflow-core';
 import * as react from 'react';
 
+/** The synthetic trigger node's id (not a real workflow node). */
+declare const START_ID = "__start";
+/** The shared terminal node's id — equals the model's {@link END_NODE} sentinel. */
+declare const END_ID = "end";
+
 /**
  * The doc ↔ visual-graph mapping — the pure, React-free core of the builder.
  *
@@ -16,10 +21,6 @@ import * as react from 'react';
  * @packageDocumentation
  */
 
-/** The synthetic trigger node's id (not a real workflow node). */
-declare const START_ID = "__start";
-/** The shared terminal node's id — equals the model's {@link END_NODE} sentinel. */
-declare const END_ID = "end";
 /** A positioned node in the visual graph. `data.node` is absent for start/end. */
 interface WfFlowNode {
     id: string;
