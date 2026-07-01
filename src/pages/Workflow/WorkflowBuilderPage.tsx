@@ -13,9 +13,11 @@ import {
   checkIn as apiCheckIn,
   getCatalog,
   getDefinition,
+  listConnections,
   publish as apiPublish,
   signOff as apiSignOff,
   updateDraft,
+  type IntegrationConnection,
   type WorkflowDefinition,
 } from "../../lib/workflowApi";
 import type { StepTypeDescriptor } from "@lukeflow/workflow-core";
@@ -41,6 +43,7 @@ export default function WorkflowBuilderPage() {
   const [def, setDef] = useState<WorkflowDefinition | null>(null);
   const [doc, setDoc] = useState<WorkflowDoc | null>(null);
   const [stepTypes, setStepTypes] = useState<StepTypeDescriptor[]>([]);
+  const [connections, setConnections] = useState<IntegrationConnection[]>([]);
   const [version, setVersion] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -57,6 +60,10 @@ export default function WorkflowBuilderPage() {
         setDoc(parseDoc(d));
         setStepTypes(cat);
         setVersion(d.publishedVersion ?? (d.latestVersion > 0 ? d.latestVersion : null));
+        // Connections power the integration-action picker; best-effort (never blocks the builder).
+        listConnections(tenant)
+          .then((c) => alive && setConnections(c))
+          .catch(() => alive && setConnections([]));
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Failed to load workflow");
       }
@@ -169,7 +176,7 @@ export default function WorkflowBuilderPage() {
 
       <div className="flex h-[72vh] flex-col gap-4 lg:flex-row">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-          <WorkflowBuilder value={doc} stepTypes={stepTypes} onChange={canEdit ? setDoc : undefined} />
+          <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} onChange={canEdit ? setDoc : undefined} />
         </div>
         {canEdit && tenant ? (
           <div className="h-full w-full shrink-0 lg:w-[340px]">

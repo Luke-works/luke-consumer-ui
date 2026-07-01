@@ -98,18 +98,33 @@ declare function removeNode(doc: WorkflowDoc, id: NodeId): WorkflowDoc;
  */
 declare function connectNodes(doc: WorkflowDoc, sourceId: NodeId, targetId: NodeId, role?: "next" | "else" | "branch" | "join" | "parallel-branch"): WorkflowDoc;
 
+/**
+ * A tenant integration connection the host injects for the connection picker (a
+ * projection of the engine's IntegrationConnection — the builder stays free of any
+ * consumer types).
+ */
+interface ConnectionOption {
+    id: string;
+    providerKey: string;
+    status?: string;
+    externalAccount?: string | null;
+}
+
 /** Props for {@link WorkflowBuilder}. */
 interface WorkflowBuilderProps {
     /** The workflow document to render/edit. */
     value: WorkflowDoc;
     /** The step-type catalog (from `GET /api/workflow/catalog`), for the palette + trigger picker. */
     stepTypes: readonly StepTypeDescriptor[];
+    /** Tenant integration connections (from `GET /api/workflow/integrations/connections`), for the
+     *  integration-action connection picker. Optional — the picker shows an empty-state hint without them. */
+    connections?: readonly ConnectionOption[];
     /** Notified with the next document on every edit. Omit for a read-only canvas. */
     onChange?: (doc: WorkflowDoc) => void;
     /** Optional class for the outer container. */
     className?: string;
 }
 /** The visual workflow designer. */
-declare function WorkflowBuilder({ value, stepTypes, onChange, className }: WorkflowBuilderProps): react.JSX.Element;
+declare function WorkflowBuilder({ value, stepTypes, connections, onChange, className }: WorkflowBuilderProps): react.JSX.Element;
 
-export { END_ID, type PaletteGroup, START_ID, type WfFlow, type WfFlowEdge, type WfFlowNode, WorkflowBuilder, type WorkflowBuilderProps, addStep, addStructural, buildPalette, connectNodes, docToFlow, flowToDoc, newNodeId, removeNode, updateNode };
+export { type ConnectionOption, END_ID, type PaletteGroup, START_ID, type WfFlow, type WfFlowEdge, type WfFlowNode, WorkflowBuilder, type WorkflowBuilderProps, addStep, addStructural, buildPalette, connectNodes, docToFlow, flowToDoc, newNodeId, removeNode, updateNode };

@@ -347,7 +347,70 @@ function KvEditor({ value, onChange }) {
     /* @__PURE__ */ jsx("button", { type: "button", style: linkBtn, onClick: addEntry, children: "+ Add field" })
   ] });
 }
-function NodeConfig({ doc, node, onPatch, onDelete }) {
+function ConnectionSelect({
+  provider,
+  value,
+  connections,
+  onChange
+}) {
+  const matches = connections.filter((c) => !provider || c.providerKey.toLowerCase() === provider.toLowerCase());
+  if (connections.length === 0) {
+    return /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "#9ca3af", marginTop: 4 }, children: "No connections yet \u2014 add one on the Connections page." });
+  }
+  return /* @__PURE__ */ jsxs("select", { style: control, value: value ?? "", onChange: (e) => onChange(e.target.value), children: [
+    /* @__PURE__ */ jsx("option", { value: "", children: "\u2014 Select a connection \u2014" }),
+    matches.map((c) => /* @__PURE__ */ jsx("option", { value: c.id, children: (c.externalAccount || c.id) + (c.status && c.status !== "ACTIVE" ? ` (${c.status})` : "") }, c.id))
+  ] });
+}
+function ErrorPolicyEditor({
+  policy,
+  options,
+  onChange
+}) {
+  const p = policy ?? {};
+  const retry = p.retry;
+  const attempts = retry?.maxAttempts ?? 1;
+  const setAttempts = (n) => {
+    if (!n || n <= 1) {
+      const next = { ...p };
+      delete next.retry;
+      onChange(Object.keys(next).length ? next : void 0);
+    } else {
+      const nextRetry = {
+        maxAttempts: n,
+        backoff: retry?.backoff ?? "exponential",
+        initialDelay: retry?.initialDelay ?? "30s"
+      };
+      onChange({ ...p, retry: nextRetry });
+    }
+  };
+  const patchRetry = (patch) => {
+    if (!retry) return;
+    onChange({ ...p, retry: { ...retry, ...patch } });
+  };
+  const setFallback = (v) => onChange({ ...p, fallback: v });
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx(Field, { title: "Retry attempts", children: /* @__PURE__ */ jsx(
+      "input",
+      {
+        style: control,
+        type: "number",
+        min: 1,
+        value: attempts,
+        onChange: (e) => setAttempts(Number(e.target.value))
+      }
+    ) }),
+    retry ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx(Field, { title: "Backoff", children: /* @__PURE__ */ jsxs("select", { style: control, value: retry.backoff, onChange: (e) => patchRetry({ backoff: e.target.value }), children: [
+        /* @__PURE__ */ jsx("option", { value: "fixed", children: "Fixed" }),
+        /* @__PURE__ */ jsx("option", { value: "exponential", children: "Exponential" })
+      ] }) }),
+      /* @__PURE__ */ jsx(Field, { title: "Initial delay", children: /* @__PURE__ */ jsx("input", { style: control, value: retry.initialDelay, placeholder: "e.g. 30s, 5m", onChange: (e) => patchRetry({ initialDelay: e.target.value }) }) })
+    ] }) : null,
+    /* @__PURE__ */ jsx(Field, { title: "On failure go to", children: /* @__PURE__ */ jsx(TargetSelect, { value: p.fallback, options, onChange: setFallback }) })
+  ] });
+}
+function NodeConfig({ doc, node, connections = [], onPatch, onDelete }) {
   const opts = nodeOptions(doc, node.id);
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsx("div", { style: { fontWeight: 700, marginBottom: 4, fontSize: 13 }, children: "Step" }),
@@ -355,15 +418,23 @@ function NodeConfig({ doc, node, onPatch, onDelete }) {
     /* @__PURE__ */ jsx(Field, { title: "Name", children: /* @__PURE__ */ jsx("input", { style: control, value: node.name ?? "", placeholder: nodeLabel2(node), onChange: (e) => onPatch({ name: e.target.value }) }) }),
     node.kind === "action" ? /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx(Field, { title: "Action", children: /* @__PURE__ */ jsx("input", { style: control, value: node.action ?? "", placeholder: "e.g. send", onChange: (e) => onPatch({ action: e.target.value }) }) }),
+      node.capability === "integrations" ? /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsx(Field, { title: "Provider", children: /* @__PURE__ */ jsx("input", { style: control, value: node.provider ?? "", placeholder: "e.g. salesforce", onChange: (e) => onPatch({ provider: e.target.value }) }) }),
+        /* @__PURE__ */ jsx(Field, { title: "Connection", children: /* @__PURE__ */ jsx(ConnectionSelect, { provider: node.provider, value: node.connection, connections, onChange: (v) => onPatch({ connection: v }) }) })
+      ] }) : null,
       /* @__PURE__ */ jsx(Field, { title: "Then go to", children: /* @__PURE__ */ jsx(TargetSelect, { value: node.next, options: opts, onChange: (v) => onPatch({ next: v }) }) }),
       /* @__PURE__ */ jsx(Section, { title: "Inputs", children: /* @__PURE__ */ jsx(KvEditor, { value: node.input, onChange: (input) => onPatch({ input }) }) }),
-      /* @__PURE__ */ jsx(Section, { title: "Advanced", children: /* @__PURE__ */ jsx(Field, { title: "Store result in variable", children: /* @__PURE__ */ jsx("input", { style: control, value: node.output ?? "", placeholder: "e.g. emailResult", onChange: (e) => onPatch({ output: e.target.value }) }) }) })
+      /* @__PURE__ */ jsxs(Section, { title: "Advanced", children: [
+        /* @__PURE__ */ jsx(Field, { title: "Store result in variable", children: /* @__PURE__ */ jsx("input", { style: control, value: node.output ?? "", placeholder: "e.g. emailResult", onChange: (e) => onPatch({ output: e.target.value }) }) }),
+        /* @__PURE__ */ jsx(ErrorPolicyEditor, { policy: node.onError, options: opts, onChange: (onError) => onPatch({ onError }) })
+      ] })
     ] }) : null,
     node.kind === "task" ? /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx(Field, { title: "Task", children: /* @__PURE__ */ jsx("input", { style: control, value: node.task ?? "", placeholder: "e.g. review", onChange: (e) => onPatch({ task: e.target.value }) }) }),
       /* @__PURE__ */ jsx(Field, { title: "Assignee", children: /* @__PURE__ */ jsx("input", { style: control, value: node.assignee ?? "", placeholder: "e.g. queue:ops", onChange: (e) => onPatch({ assignee: e.target.value }) }) }),
       /* @__PURE__ */ jsx(Field, { title: "Then go to", children: /* @__PURE__ */ jsx(TargetSelect, { value: node.next, options: opts, onChange: (v) => onPatch({ next: v }) }) }),
-      /* @__PURE__ */ jsx(Section, { title: "Inputs", children: /* @__PURE__ */ jsx(KvEditor, { value: node.input, onChange: (input) => onPatch({ input }) }) })
+      /* @__PURE__ */ jsx(Section, { title: "Inputs", children: /* @__PURE__ */ jsx(KvEditor, { value: node.input, onChange: (input) => onPatch({ input }) }) }),
+      /* @__PURE__ */ jsx(Section, { title: "Advanced", children: /* @__PURE__ */ jsx(ErrorPolicyEditor, { policy: node.onError, options: opts, onChange: (onError) => onPatch({ onError }) }) })
     ] }) : null,
     node.kind === "branch" ? /* @__PURE__ */ jsx(BranchConfig, { node, options: opts, onPatch }) : null,
     node.kind === "parallel" ? /* @__PURE__ */ jsx(ParallelConfig, { node, options: opts, onPatch }) : null,
@@ -505,7 +576,7 @@ var paletteItemStyle = {
   background: "#fff",
   color: "#111827"
 };
-function WorkflowBuilder({ value, stepTypes, onChange, className }) {
+function WorkflowBuilder({ value, stepTypes, connections, onChange, className }) {
   const palette = useMemo(() => buildPalette(stepTypes), [stepTypes]);
   const triggerTypes = useMemo(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
   const [selectedId, setSelectedId] = useState2(null);
@@ -612,6 +683,7 @@ function WorkflowBuilder({ value, stepTypes, onChange, className }) {
       {
         doc: value,
         node: selected,
+        connections,
         onPatch: patchSelected,
         onDelete: () => onNodesDelete([{ id: selected.id }])
       }
