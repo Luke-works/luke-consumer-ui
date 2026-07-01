@@ -15,12 +15,14 @@ import {
   checkIn as apiCheckIn,
   getCatalog,
   getDefinition,
+  getRun,
   listConnections,
   publish as apiPublish,
   signOff as apiSignOff,
   updateDraft,
   type IntegrationConnection,
   type WorkflowDefinition,
+  type WorkflowRunDetail,
 } from "../../lib/workflowApi";
 import type { StepTypeDescriptor } from "@lukeflow/workflow-core";
 
@@ -52,6 +54,8 @@ export default function WorkflowBuilderPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runsOpen, setRunsOpen] = useState(false);
+  const [watchRunId, setWatchRunId] = useState<string | null>(null);
+  const [watchDetail, setWatchDetail] = useState<WorkflowRunDetail | null>(null);
 
   useEffect(() => {
     if (!tenant || !id) return;
@@ -79,6 +83,40 @@ export default function WorkflowBuilderPage() {
 
   const diagnostics = useMemo(() => (doc ? validateWorkflow(doc) : []), [doc]);
   const errorCount = diagnostics.filter((d) => d.severity === "error").length;
+
+  // Live run watching (Pillar 4c): poll the watched run and highlight its nodes on the canvas.
+  useEffect(() => {
+    if (!tenant || !watchRunId) {
+      setWatchDetail(null);
+      return;
+    }
+    let alive = true;
+    const poll = async () => {
+      try {
+        const d = await getRun(tenant, watchRunId);
+        if (alive) setWatchDetail(d);
+      } catch {
+        /* transient — keep the last snapshot */
+      }
+    };
+    void poll();
+    const timer = setInterval(poll, 2000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [tenant, watchRunId]);
+
+  const highlight = useMemo(
+    () =>
+      watchDetail && watchDetail.found
+        ? {
+            active: watchDetail.currentActivityIds,
+            incident: watchDetail.incidents.map((i) => i.activityId).filter((a): a is string => !!a),
+          }
+        : undefined,
+    [watchDetail],
+  );
 
   const run = useCallback(
     async (label: string, fn: () => Promise<string | void>) => {
@@ -180,10 +218,22 @@ export default function WorkflowBuilderPage() {
       {error ? (
         <div className="mb-3 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-600 dark:bg-error-500/15">{error}</div>
       ) : null}
+      {watchRunId ? (
+        <div className="mb-3 flex items-center justify-between rounded-lg bg-brand-50 px-4 py-2 text-sm text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+          <span className="flex items-center gap-2">
+            <span className="inline-block size-2 animate-pulse rounded-full bg-brand-500" />
+            Watching run <span className="font-mono text-xs">{watchRunId.slice(0, 12)}</span>
+            {watchDetail?.state ? <span className="opacity-70">· {watchDetail.state}</span> : null}
+          </span>
+          <button type="button" onClick={() => setWatchRunId(null)} className="font-medium hover:underline">
+            Stop
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex h-[72vh] flex-col gap-4 lg:flex-row">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-          <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} theme={theme} onChange={canEdit ? setDoc : undefined} />
+          <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} theme={theme} highlight={highlight} onChange={canEdit ? setDoc : undefined} />
         </div>
         {canEdit && tenant ? (
           <div className="h-full w-full shrink-0 lg:w-[340px]">
@@ -211,6 +261,7 @@ export default function WorkflowBuilderPage() {
           canRun={def?.publishedVersion != null}
           isOpen={runsOpen}
           onClose={() => setRunsOpen(false)}
+          onWatch={(instanceId) => setWatchRunId(instanceId)}
         />
       ) : null}
     </>

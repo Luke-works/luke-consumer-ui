@@ -195,6 +195,23 @@ export function getRun(tenant: string, instanceId: string): Promise<WorkflowRunD
   return req<WorkflowRunDetail>(tenant, `/api/workflow/runs/${seg(instanceId)}`);
 }
 
+/** Retry a stuck run — optionally set variables first — giving failed jobs fresh retries. */
+export function retryRun(
+  tenant: string,
+  instanceId: string,
+  variables?: Record<string, unknown>,
+): Promise<WorkflowRunDetail> {
+  return req<WorkflowRunDetail>(tenant, `/api/workflow/runs/${seg(instanceId)}/retry`, {
+    method: "POST",
+    body: JSON.stringify({ variables: variables ?? {} }),
+  });
+}
+
+/** Cancel a running instance. */
+export function cancelRun(tenant: string, instanceId: string): Promise<WorkflowRunDetail> {
+  return req<WorkflowRunDetail>(tenant, `/api/workflow/runs/${seg(instanceId)}/cancel`, { method: "POST" });
+}
+
 /** A blank starter document for a new workflow (a trigger + nothing else). */
 export function blankWorkflow(name: string): WorkflowDoc {
   return {

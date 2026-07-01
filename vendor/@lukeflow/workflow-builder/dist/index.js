@@ -705,28 +705,31 @@ var chip = (color) => ({
   fontSize: 13,
   flex: "0 0 auto"
 });
-function borderColor(selected, severity) {
-  if (severity === "error") return "#ef4444";
-  if (severity === "warning") return "#f59e0b";
+function borderColor(d, selected) {
+  if (d.incidentLive || d.severity === "error") return "#ef4444";
+  if (d.running) return "#4f46e5";
+  if (d.severity === "warning") return "#f59e0b";
   return selected ? "var(--wf-accent)" : "var(--wf-border-2)";
 }
 function Card({
+  data,
   selected,
-  severity,
   accent,
   children,
   source = true,
   target: target2 = true,
   style
 }) {
+  const pulse = data.incidentLive ? " wf-node-incident" : data.running ? " wf-node-running" : "";
   return /* @__PURE__ */ jsxs2(
     "div",
     {
+      className: `wf-node${pulse}`,
       style: {
         position: "relative",
         background: "var(--wf-card)",
         color: "var(--wf-fg)",
-        border: `2px solid ${borderColor(selected, severity)}`,
+        border: `2px solid ${borderColor(data, selected)}`,
         borderLeft: `4px solid ${accent}`,
         borderRadius: 9,
         padding: "8px 12px",
@@ -755,24 +758,24 @@ function titled(glyphColor, glyph, title, subtitle) {
 function ActionNode({ data, selected }) {
   const d = data;
   const m = capMeta(d.capability);
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: m.color, children: titled(m.color, m.glyph, d.label, d.capability ?? "action") });
+  return /* @__PURE__ */ jsx2(Card, { data: d, selected, accent: m.color, children: titled(m.color, m.glyph, d.label, d.capability ?? "action") });
 }
 function TaskNode({ data, selected }) {
   const d = data;
   const m = capMeta(d.capability);
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "var(--wf-accent)", children: titled("var(--wf-accent)", "\u{1F464}", d.label, `${d.capability ?? ""} task`.trim()) });
+  return /* @__PURE__ */ jsx2(Card, { data: d, selected, accent: "var(--wf-accent)", children: titled("var(--wf-accent)", "\u{1F464}", d.label, `${d.capability ?? ""} task`.trim()) });
 }
 function TriggerNode({ data, selected }) {
   const d = data;
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#16a34a", target: false, style: { borderRadius: 999, background: "rgba(22,163,74,0.12)" }, children: titled("#16a34a", "\u26A1", d.label, "trigger") });
+  return /* @__PURE__ */ jsx2(Card, { data: d, selected, accent: "#16a34a", target: false, style: { borderRadius: 999, background: "rgba(22,163,74,0.12)" }, children: titled("#16a34a", "\u26A1", d.label, "trigger") });
 }
 function WaitNode({ data, selected }) {
   const d = data;
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "var(--wf-muted)", children: titled("var(--wf-muted)", "\u23F1", d.label, "wait") });
+  return /* @__PURE__ */ jsx2(Card, { data: d, selected, accent: "var(--wf-muted)", children: titled("var(--wf-muted)", "\u23F1", d.label, "wait") });
 }
 function GatewayNode({ data, selected, glyph, kind }) {
   const d = data;
-  return /* @__PURE__ */ jsx2(Card, { selected, severity: d.severity, accent: "#d97706", style: { background: "rgba(217,119,6,0.14)" }, children: titled("#d97706", glyph, d.label, kind) });
+  return /* @__PURE__ */ jsx2(Card, { data: d, selected, accent: "#d97706", style: { background: "rgba(217,119,6,0.14)" }, children: titled("#d97706", glyph, d.label, kind) });
 }
 var BranchNode = (p) => /* @__PURE__ */ jsx2(GatewayNode, { ...p, glyph: "\u22D4", kind: "branch" });
 var ParallelNode = (p) => /* @__PURE__ */ jsx2(GatewayNode, { ...p, glyph: "\u29C9", kind: "parallel" });
@@ -832,6 +835,10 @@ var STRUCTURAL_PREFIX = "__structural:";
 var WF_THEME_CSS = `
 .wf-root{--wf-surface:#fff;--wf-surface-2:#f9fafb;--wf-card:#fff;--wf-fg:#111827;--wf-muted:#6b7280;--wf-faint:#9ca3af;--wf-border:#e5e7eb;--wf-border-2:#d1d5db;--wf-input:#fff;--wf-accent:#4f46e5;--wf-danger:#b91c1c;--wf-warn:#b45309;}
 .wf-root[data-wf-theme="dark"]{--wf-surface:#1f2937;--wf-surface-2:#111827;--wf-card:#1f2937;--wf-fg:#e5e7eb;--wf-muted:#9ca3af;--wf-faint:#6b7280;--wf-border:#374151;--wf-border-2:#4b5563;--wf-input:#111827;--wf-accent:#818cf8;--wf-danger:#f87171;--wf-warn:#fbbf24;}
+@keyframes wf-pulse{0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,.45)}50%{box-shadow:0 0 0 6px rgba(79,70,229,0)}}
+@keyframes wf-pulse-err{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}50%{box-shadow:0 0 0 7px rgba(239,68,68,0)}}
+.wf-node-running{animation:wf-pulse 1.4s ease-in-out infinite}
+.wf-node-incident{animation:wf-pulse-err 1.1s ease-in-out infinite}
 `;
 var STRUCTURAL = [
   { kind: "branch", label: "Branch (if / else)" },
@@ -871,7 +878,7 @@ var paletteItemStyle = {
   background: "var(--wf-card)",
   color: "var(--wf-fg)"
 };
-function WorkflowBuilder({ value, stepTypes, connections, theme = "light", onChange, className }) {
+function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highlight, onChange, className }) {
   const palette = useMemo(() => buildPalette(stepTypes), [stepTypes]);
   const triggerTypes = useMemo(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
   const [selectedId, setSelectedId] = useState2(null);
@@ -888,6 +895,16 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", onCha
     return m;
   }, [diagnostics]);
   const problems = useMemo(() => diagnostics.filter((d) => d.severity !== "info"), [diagnostics]);
+  const activeSet = useMemo(() => {
+    const s = new Set(highlight?.active ?? []);
+    if (s.has("start")) s.add(START_ID);
+    return s;
+  }, [highlight]);
+  const incidentSet = useMemo(() => {
+    const s = new Set(highlight?.incident ?? []);
+    if (s.has("start")) s.add(START_ID);
+    return s;
+  }, [highlight]);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   useEffect(() => {
@@ -896,11 +913,19 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", onCha
       flow.nodes.map((n) => {
         const sev = severityByNode.get(n.id);
         const s = sev === "error" || sev === "warning" ? sev : void 0;
-        return s ? { ...n, data: { ...n.data, severity: s } } : n;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            severity: s,
+            running: activeSet.has(n.id) || void 0,
+            incidentLive: incidentSet.has(n.id) || void 0
+          }
+        };
       })
     );
     setEdges(flow.edges);
-  }, [value, severityByNode, setNodes, setEdges]);
+  }, [value, severityByNode, activeSet, incidentSet, setNodes, setEdges]);
   const selected = value.nodes.find((n) => n.id === selectedId);
   const triggerSelected = selectedId === START_ID;
   const onConnect = useCallback(
