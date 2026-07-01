@@ -385,6 +385,66 @@ function KvEditor({ value, onChange }) {
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", style: linkBtn, onClick: addEntry, children: "+ Add field" })
   ] });
 }
+function descriptorFor(stepTypes, node) {
+  if (node.kind !== "action" && node.kind !== "task") return void 0;
+  const op = node.kind === "action" ? node.action : node.task;
+  if (!node.capability || !op) return void 0;
+  const cap = node.capability.toLowerCase();
+  return stepTypes.find(
+    (s) => s.kind === node.kind && s.capability.toLowerCase() === cap && operationOf2(s.id) === op
+  );
+}
+function InputField({ field, value, onChange }) {
+  const type = field.type ?? "text";
+  const title = `${field.label}${field.required ? " *" : ""}`;
+  const common = { style: control, placeholder: field.placeholder };
+  let node;
+  if (type === "textarea") {
+    node = /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", { ...common, rows: 3, value: String(value ?? ""), onChange: (e) => onChange(e.target.value) });
+  } else if (type === "number") {
+    node = /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ...common, type: "number", value: value == null ? "" : String(value), onChange: (e) => onChange(e.target.value === "" ? void 0 : Number(e.target.value)) });
+  } else if (type === "boolean") {
+    node = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 4 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: !!value, onChange: (e) => onChange(e.target.checked) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { style: { fontSize: 12, color: "#6b7280" }, children: field.placeholder ?? "Enabled" })
+    ] });
+  } else if (type === "select") {
+    node = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { style: control, value: String(value ?? ""), onChange: (e) => onChange(e.target.value), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "\u2014 Select \u2014" }),
+      (field.options ?? []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: o.value, children: o.label }, o.value))
+    ] });
+  } else {
+    node = /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { ...common, value: String(value ?? ""), onChange: (e) => onChange(e.target.value) });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: label, children: [
+    title,
+    node,
+    field.help ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 11, color: "#9ca3af", marginTop: 3 }, children: field.help }) : null
+  ] });
+}
+function TypedInputForm({ fields, value, onChange }) {
+  const v = value ?? {};
+  const declared = new Set(fields.map((f) => f.key));
+  const extra = Object.fromEntries(Object.entries(v).filter(([k]) => !declared.has(k)));
+  const setField = (key, val) => {
+    const next = { ...v };
+    if (val === void 0 || val === "") delete next[key];
+    else next[key] = val;
+    onChange(next);
+  };
+  const setExtra = (nextExtra) => {
+    const kept = {};
+    for (const f of fields) if (f.key in v) kept[f.key] = v[f.key];
+    onChange({ ...kept, ...nextExtra });
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+    fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(InputField, { field: f, value: v[f.key], onChange: (val) => setField(f.key, val) }, f.key)),
+    Object.keys(extra).length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { marginTop: 8 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 11, color: "#9ca3af", marginBottom: 4 }, children: "Other inputs" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KvEditor, { value: extra, onChange: setExtra })
+    ] }) : null
+  ] });
+}
 function ConnectionSelect({
   provider,
   value,
@@ -448,8 +508,11 @@ function ErrorPolicyEditor({
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { title: "On failure go to", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TargetSelect, { value: p.fallback, options, onChange: setFallback }) })
   ] });
 }
-function NodeConfig({ doc, node, connections = [], onPatch, onDelete }) {
+function NodeConfig({ doc, node, stepTypes = [], connections = [], onPatch, onDelete }) {
   const opts = nodeOptions(doc, node.id);
+  const inputFields = descriptorFor(stepTypes, node)?.inputs ?? [];
+  const nodeInput = node.input;
+  const inputsEditor = inputFields.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TypedInputForm, { fields: inputFields, value: nodeInput, onChange: (input) => onPatch({ input }) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KvEditor, { value: nodeInput, onChange: (input) => onPatch({ input }) });
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontWeight: 700, marginBottom: 4, fontSize: 13 }, children: "Step" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { fontSize: 11, color: "#6b7280", marginBottom: 12, textTransform: "capitalize" }, children: node.kind }),
@@ -461,7 +524,7 @@ function NodeConfig({ doc, node, connections = [], onPatch, onDelete }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { title: "Connection", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConnectionSelect, { provider: node.provider, value: node.connection, connections, onChange: (v) => onPatch({ connection: v }) }) })
       ] }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { title: "Then go to", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TargetSelect, { value: node.next, options: opts, onChange: (v) => onPatch({ next: v }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { title: "Inputs", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KvEditor, { value: node.input, onChange: (input) => onPatch({ input }) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { title: "Inputs", children: inputsEditor }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Section, { title: "Advanced", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { title: "Store result in variable", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { style: control, value: node.output ?? "", placeholder: "e.g. emailResult", onChange: (e) => onPatch({ output: e.target.value }) }) }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorPolicyEditor, { policy: node.onError, options: opts, onChange: (onError) => onPatch({ onError }) })
@@ -471,7 +534,7 @@ function NodeConfig({ doc, node, connections = [], onPatch, onDelete }) {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { title: "Task", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { style: control, value: node.task ?? "", placeholder: "e.g. review", onChange: (e) => onPatch({ task: e.target.value }) }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { title: "Assignee", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { style: control, value: node.assignee ?? "", placeholder: "e.g. queue:ops", onChange: (e) => onPatch({ assignee: e.target.value }) }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { title: "Then go to", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TargetSelect, { value: node.next, options: opts, onChange: (v) => onPatch({ next: v }) }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { title: "Inputs", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KvEditor, { value: node.input, onChange: (input) => onPatch({ input }) }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { title: "Inputs", children: inputsEditor }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { title: "Advanced", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorPolicyEditor, { policy: node.onError, options: opts, onChange: (onError) => onPatch({ onError }) }) })
     ] }) : null,
     node.kind === "branch" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BranchConfig, { node, options: opts, onPatch }) : null,
@@ -750,6 +813,7 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
       {
         doc: value,
         node: selected,
+        stepTypes,
         connections,
         onPatch: patchSelected,
         onDelete: () => onNodesDelete([{ id: selected.id }])

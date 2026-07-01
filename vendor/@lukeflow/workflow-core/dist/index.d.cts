@@ -655,6 +655,33 @@ declare const workflowJsonSchema: {
 
 /** A JSON-Schema-shaped object (kept loose so descriptors stay plain data). */
 type JsonSchemaObject = Record<string, unknown>;
+/** The control kinds the builder's auto-generated input form knows how to render. */
+type StepFieldType = "text" | "textarea" | "number" | "boolean" | "select" | "expression";
+/** One option for a {@link StepFieldDescriptor} of type `"select"`. */
+interface StepFieldOption {
+    value: string;
+    label: string;
+}
+/**
+ * A single typed input a step type declares — a flat, purpose-built field descriptor
+ * the builder auto-renders into a labelled control (vs. the raw key/value editor).
+ * A capability publishes these on its {@link StepTypeDescriptor.inputs}; unknown/extra
+ * keys on a node still fall back to the generic key/value editor, so this is additive.
+ */
+interface StepFieldDescriptor {
+    /** The node-input key this field writes, e.g. `"to"`, `"subject"`. */
+    key: string;
+    /** Human label for the control. */
+    label: string;
+    /** Control kind; defaults to `"text"`. */
+    type?: StepFieldType;
+    required?: boolean;
+    placeholder?: string;
+    /** Short helper text under the control. */
+    help?: string;
+    /** Options for `type: "select"`. */
+    options?: StepFieldOption[];
+}
 /**
  * The three step kinds a capability can contribute, mirroring the Trigger / Action
  * / Task duality:
@@ -679,6 +706,9 @@ interface StepTypeDescriptor {
     kind: StepTypeKind;
     /** Palette grouping hint for the builder. */
     paletteGroup?: string;
+    /** Typed input fields the builder auto-renders for this step (additive to the raw
+     *  key/value editor). Absent/empty → the generic editor only. */
+    inputs?: StepFieldDescriptor[];
     /** Schema for the node's authoring config (drives the auto-generated panel). */
     configSchema?: JsonSchemaObject;
     /** Schema for the runtime input map. */
@@ -833,4 +863,4 @@ declare const referenceStepTypes: StepTypeDescriptor[];
 /** @lukeflow/workflow-core — the headless Lukeflow workflow engine (authoring model). */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type ActionNode, type BackoffStrategy, type BranchCondition, type BranchNode, type CapabilityId, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, END_NODE, type ErrorPolicy, type ExpressionString, type JsonSchemaObject, type NodeId, type NodeKind, type NodeRef, type ParallelNode, type RepairResult, type RetryPolicy, type StepTypeCatalog, type StepTypeDescriptor, type StepTypeKind, type StepTypeRegistry, type TaskNode, VERSION, type WaitMode, type WaitNode, type WorkflowCommandEnvelope, type WorkflowDiagnosticCode, type WorkflowDoc, type WorkflowEngine, type WorkflowEngineOptions, type WorkflowEventEnvelope, type WorkflowNode, type WorkflowSettings, type WorkflowTrigger, createStepTypeRegistry, createWorkflowEngine, diag, goldenWorkflow, isTerminal, missingStepTypes, nodeRefs, reachableFrom, referenceStepTypes, repairWorkflow, startNodeId, toReport, validateWorkflow, validateWorkflowReport, workflowJsonSchema };
+export { type ActionNode, type BackoffStrategy, type BranchCondition, type BranchNode, type CapabilityId, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, END_NODE, type ErrorPolicy, type ExpressionString, type JsonSchemaObject, type NodeId, type NodeKind, type NodeRef, type ParallelNode, type RepairResult, type RetryPolicy, type StepFieldDescriptor, type StepFieldOption, type StepFieldType, type StepTypeCatalog, type StepTypeDescriptor, type StepTypeKind, type StepTypeRegistry, type TaskNode, VERSION, type WaitMode, type WaitNode, type WorkflowCommandEnvelope, type WorkflowDiagnosticCode, type WorkflowDoc, type WorkflowEngine, type WorkflowEngineOptions, type WorkflowEventEnvelope, type WorkflowNode, type WorkflowSettings, type WorkflowTrigger, createStepTypeRegistry, createWorkflowEngine, diag, goldenWorkflow, isTerminal, missingStepTypes, nodeRefs, reachableFrom, referenceStepTypes, repairWorkflow, startNodeId, toReport, validateWorkflow, validateWorkflowReport, workflowJsonSchema };
