@@ -253,8 +253,8 @@ function connectNodes(doc, sourceId, targetId, role = "next") {
 
 // src/WorkflowBuilder.tsx
 var import_workflow_core4 = require("@lukeflow/workflow-core");
-var import_react2 = require("@xyflow/react");
-var import_react3 = require("react");
+var import_react3 = require("@xyflow/react");
+var import_react4 = require("react");
 
 // src/config.tsx
 var import_workflow_core3 = require("@lukeflow/workflow-core");
@@ -641,8 +641,152 @@ function operationOf2(descriptorId) {
   return i >= 0 ? descriptorId.slice(i + 1) : descriptorId;
 }
 
-// src/WorkflowBuilder.tsx
+// src/nodes.tsx
+var import_react2 = require("@xyflow/react");
 var import_jsx_runtime2 = require("react/jsx-runtime");
+var CAP = {
+  email: { color: "#2563eb", glyph: "\u2709" },
+  phone: { color: "#7c3aed", glyph: "\u260E" },
+  signatures: { color: "#0891b2", glyph: "\u270D" },
+  integrations: { color: "#ea580c", glyph: "\u{1F50C}" },
+  forms: { color: "#16a34a", glyph: "\u25A4" },
+  documents: { color: "#0d9488", glyph: "\u{1F5CE}" }
+};
+var capMeta = (c) => (c ? CAP[c] : void 0) ?? { color: "#6b7280", glyph: "\u25CF" };
+var chip = (color) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 24,
+  height: 24,
+  borderRadius: 6,
+  background: color,
+  color: "#fff",
+  fontSize: 13,
+  flex: "0 0 auto"
+});
+function borderColor(selected, severity) {
+  if (severity === "error") return "#ef4444";
+  if (severity === "warning") return "#f59e0b";
+  return selected ? "#4f46e5" : "#d1d5db";
+}
+function Card({
+  selected,
+  severity,
+  accent,
+  children,
+  source = true,
+  target: target2 = true,
+  style
+}) {
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+    "div",
+    {
+      style: {
+        position: "relative",
+        background: "#fff",
+        color: "#111827",
+        border: `2px solid ${borderColor(selected, severity)}`,
+        borderLeft: `4px solid ${accent}`,
+        borderRadius: 9,
+        padding: "8px 12px",
+        minWidth: 132,
+        fontSize: 12,
+        boxShadow: selected ? "0 0 0 3px rgba(79,70,229,0.15)" : "0 1px 2px rgba(0,0,0,0.06)",
+        ...style
+      },
+      children: [
+        target2 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Handle, { type: "target", position: import_react2.Position.Left }) : null,
+        children,
+        source ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Handle, { type: "source", position: import_react2.Position.Right }) : null
+      ]
+    }
+  );
+}
+function titled(glyphColor, glyph, title, subtitle) {
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { display: "flex", gap: 9, alignItems: "center" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: chip(glyphColor), children: glyph }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { minWidth: 0 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }, children: title }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { fontSize: 9, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 }, children: subtitle })
+    ] })
+  ] });
+}
+function ActionNode({ data, selected }) {
+  const d = data;
+  const m = capMeta(d.capability);
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Card, { selected, severity: d.severity, accent: m.color, children: titled(m.color, m.glyph, d.label, d.capability ?? "action") });
+}
+function TaskNode({ data, selected }) {
+  const d = data;
+  const m = capMeta(d.capability);
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Card, { selected, severity: d.severity, accent: "#4f46e5", children: titled("#4f46e5", "\u{1F464}", d.label, `${d.capability ?? ""} task`.trim()) });
+}
+function TriggerNode({ data, selected }) {
+  const d = data;
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Card, { selected, severity: d.severity, accent: "#16a34a", target: false, style: { borderRadius: 999, background: "#f0fdf4" }, children: titled("#16a34a", "\u26A1", d.label, "trigger") });
+}
+function WaitNode({ data, selected }) {
+  const d = data;
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Card, { selected, severity: d.severity, accent: "#6b7280", children: titled("#6b7280", "\u23F1", d.label, "wait") });
+}
+function GatewayNode({ data, selected, glyph, kind }) {
+  const d = data;
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Card, { selected, severity: d.severity, accent: "#d97706", style: { background: "#fffbeb" }, children: titled("#d97706", glyph, d.label, kind) });
+}
+var BranchNode = (p) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(GatewayNode, { ...p, glyph: "\u22D4", kind: "branch" });
+var ParallelNode = (p) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(GatewayNode, { ...p, glyph: "\u29C9", kind: "parallel" });
+function TerminalNode({ data, selected, source, target: target2, label: label2 }) {
+  const d = data;
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { position: "relative" }, children: [
+    target2 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Handle, { type: "target", position: import_react2.Position.Left }) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: {
+      width: 54,
+      textAlign: "center",
+      padding: "6px 0",
+      borderRadius: 999,
+      border: `2px solid ${selected ? "#4f46e5" : "#9ca3af"}`,
+      background: "#f9fafb",
+      color: "#374151",
+      fontSize: 11,
+      fontWeight: 600
+    }, children: d.label ?? label2 }),
+    source ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Handle, { type: "source", position: import_react2.Position.Right }) : null
+  ] });
+}
+var EndNode = (p) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TerminalNode, { ...p, source: false, target: true, label: "End" });
+var nodeTypes = {
+  wfTrigger: TriggerNode,
+  wfAction: ActionNode,
+  wfTask: TaskNode,
+  wfBranch: BranchNode,
+  wfParallel: ParallelNode,
+  wfWait: WaitNode,
+  wfEnd: EndNode
+};
+function nodeTypeFor(kind) {
+  switch (kind) {
+    case "start":
+      return "wfTrigger";
+    case "end":
+      return "wfEnd";
+    case "action":
+      return "wfAction";
+    case "task":
+      return "wfTask";
+    case "branch":
+      return "wfBranch";
+    case "parallel":
+      return "wfParallel";
+    case "wait":
+      return "wfWait";
+    default:
+      return "wfAction";
+  }
+}
+
+// src/WorkflowBuilder.tsx
+var import_jsx_runtime3 = require("react/jsx-runtime");
 var STEP_MIME = "application/x-luke-step";
 var STRUCTURAL_PREFIX = "__structural:";
 var STRUCTURAL = [
@@ -655,15 +799,21 @@ function toReactFlow(value) {
   const nodes = flow.nodes.map((n) => ({
     id: n.id,
     position: n.position,
-    data: { label: n.label },
-    type: n.kind === "start" ? "input" : n.kind === "end" ? "output" : "default"
+    data: { label: n.label, kind: n.kind, capability: n.data.node?.capability },
+    type: nodeTypeFor(n.kind)
   }));
   const edges = flow.edges.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
     label: e.label,
-    animated: e.role === "fallback"
+    animated: e.role === "fallback",
+    markerEnd: { type: import_react3.MarkerType.ArrowClosed, color: e.role === "fallback" ? "#ef4444" : "#9ca3af" },
+    style: { stroke: e.role === "fallback" ? "#ef4444" : "#9ca3af" },
+    labelStyle: { fontSize: 10, fill: "#6b7280" },
+    labelBgStyle: { fill: "#ffffff" },
+    labelBgPadding: [4, 2],
+    labelBgBorderRadius: 4
   }));
   return { nodes, edges };
 }
@@ -678,12 +828,12 @@ var paletteItemStyle = {
   color: "#111827"
 };
 function WorkflowBuilder({ value, stepTypes, connections, onChange, className }) {
-  const palette = (0, import_react3.useMemo)(() => buildPalette(stepTypes), [stepTypes]);
-  const triggerTypes = (0, import_react3.useMemo)(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
-  const [selectedId, setSelectedId] = (0, import_react3.useState)(null);
-  const [showProblems, setShowProblems] = (0, import_react3.useState)(true);
-  const diagnostics = (0, import_react3.useMemo)(() => (0, import_workflow_core4.validateWorkflow)(value), [value]);
-  const severityByNode = (0, import_react3.useMemo)(() => {
+  const palette = (0, import_react4.useMemo)(() => buildPalette(stepTypes), [stepTypes]);
+  const triggerTypes = (0, import_react4.useMemo)(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
+  const [selectedId, setSelectedId] = (0, import_react4.useState)(null);
+  const [showProblems, setShowProblems] = (0, import_react4.useState)(true);
+  const diagnostics = (0, import_react4.useMemo)(() => (0, import_workflow_core4.validateWorkflow)(value), [value]);
+  const severityByNode = (0, import_react4.useMemo)(() => {
     const rank = { info: 0, warning: 1, error: 2 };
     const m = /* @__PURE__ */ new Map();
     for (const d of diagnostics) {
@@ -693,28 +843,29 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
     }
     return m;
   }, [diagnostics]);
-  const problems = (0, import_react3.useMemo)(() => diagnostics.filter((d) => d.severity !== "info"), [diagnostics]);
-  const [nodes, setNodes, onNodesChange] = (0, import_react2.useNodesState)([]);
-  const [edges, setEdges, onEdgesChange] = (0, import_react2.useEdgesState)([]);
-  (0, import_react3.useEffect)(() => {
+  const problems = (0, import_react4.useMemo)(() => diagnostics.filter((d) => d.severity !== "info"), [diagnostics]);
+  const [nodes, setNodes, onNodesChange] = (0, import_react3.useNodesState)([]);
+  const [edges, setEdges, onEdgesChange] = (0, import_react3.useEdgesState)([]);
+  (0, import_react4.useEffect)(() => {
     const flow = toReactFlow(value);
     setNodes(
       flow.nodes.map((n) => {
         const sev = severityByNode.get(n.id);
-        return sev ? { ...n, style: { ...n.style ?? {}, border: `2px solid ${sev === "error" ? "#ef4444" : "#f59e0b"}` } } : n;
+        const s = sev === "error" || sev === "warning" ? sev : void 0;
+        return s ? { ...n, data: { ...n.data, severity: s } } : n;
       })
     );
     setEdges(flow.edges);
   }, [value, severityByNode, setNodes, setEdges]);
   const selected = value.nodes.find((n) => n.id === selectedId);
   const triggerSelected = selectedId === START_ID;
-  const onConnect = (0, import_react3.useCallback)(
+  const onConnect = (0, import_react4.useCallback)(
     (c) => {
       if (onChange && c.source && c.target) onChange(connectNodes(value, c.source, c.target));
     },
     [onChange, value]
   );
-  const onNodesDelete = (0, import_react3.useCallback)(
+  const onNodesDelete = (0, import_react4.useCallback)(
     (deleted) => {
       if (!onChange) return;
       let next = value;
@@ -724,7 +875,7 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
     },
     [onChange, value]
   );
-  const onDrop = (0, import_react3.useCallback)(
+  const onDrop = (0, import_react4.useCallback)(
     (event) => {
       event.preventDefault();
       if (!onChange) return;
@@ -745,7 +896,7 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
   const setTrigger = (t) => {
     if (onChange) onChange({ ...value, trigger: t });
   };
-  const draggable = (mime, labelText, key) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+  const draggable = (mime, labelText, key) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
     "div",
     {
       draggable: true,
@@ -758,18 +909,18 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
     },
     key
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className, style: { display: "flex", width: "100%", height: "100%" }, children: [
-    onChange ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("aside", { style: { width: 190, overflowY: "auto", borderRight: "1px solid #e5e7eb", padding: 8 }, children: [
-      palette.map((group) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { marginBottom: 12 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "#6b7280" }, children: group.group }),
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className, style: { display: "flex", width: "100%", height: "100%" }, children: [
+    onChange ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("aside", { style: { width: 190, overflowY: "auto", borderRight: "1px solid #e5e7eb", padding: 8 }, children: [
+      palette.map((group) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { marginBottom: 12 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "#6b7280" }, children: group.group }),
         group.items.map((item) => draggable(item.id, item.label, item.id))
       ] }, group.group)),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { marginBottom: 12 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "#6b7280" }, children: "Flow" }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { marginBottom: 12 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "#6b7280" }, children: "Flow" }),
         STRUCTURAL.map((s) => draggable(`${STRUCTURAL_PREFIX}${s.kind}`, s.label, s.kind))
       ] })
     ] }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
       "div",
       {
         style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
@@ -779,11 +930,12 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
           e.dataTransfer.dropEffect = "move";
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-            import_react2.ReactFlow,
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { flex: 1, minHeight: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+            import_react3.ReactFlow,
             {
               nodes,
               edges,
+              nodeTypes,
               onNodesChange,
               onEdgesChange,
               onConnect,
@@ -791,12 +943,12 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
               onNodeClick: (_, node) => setSelectedId(node.id),
               fitView: true,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Background, {}),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Controls, {})
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react3.Background, {}),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react3.Controls, {})
               ]
             }
           ) }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
             ProblemsStrip,
             {
               problems,
@@ -808,7 +960,7 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
         ]
       }
     ),
-    onChange && (triggerSelected || selected) ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("aside", { style: { width: 288, overflowY: "auto", borderLeft: "1px solid #e5e7eb", padding: 14, fontSize: 13 }, children: triggerSelected ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    onChange && (triggerSelected || selected) ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("aside", { style: { width: 288, overflowY: "auto", borderLeft: "1px solid #e5e7eb", padding: 14, fontSize: 13 }, children: triggerSelected ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       NodeConfig,
       {
         doc: value,
@@ -831,9 +983,9 @@ function ProblemsStrip({
   const errors = problems.filter((d) => d.severity === "error").length;
   const warnings = problems.length - errors;
   const summaryColor = errors > 0 ? "#b91c1c" : "#b45309";
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { borderTop: "1px solid #e5e7eb", background: "#fff", display: "flex", flexDirection: "column", maxHeight: open ? 168 : 34, flex: "0 0 auto" }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { onClick: onToggle, style: { cursor: "pointer", padding: "7px 12px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: summaryColor, userSelect: "none" }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { borderTop: "1px solid #e5e7eb", background: "#fff", display: "flex", flexDirection: "column", maxHeight: open ? 168 : 34, flex: "0 0 auto" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { onClick: onToggle, style: { cursor: "pointer", padding: "7px 12px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: summaryColor, userSelect: "none" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { children: [
         "\u26A0 ",
         errors,
         " error",
@@ -843,9 +995,9 @@ function ProblemsStrip({
         " warning",
         warnings === 1 ? "" : "s"
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { marginLeft: "auto", color: "#9ca3af" }, children: open ? "\u25BE" : "\u25B8" })
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { marginLeft: "auto", color: "#9ca3af" }, children: open ? "\u25BE" : "\u25B8" })
     ] }),
-    open ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { overflowY: "auto" }, children: problems.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+    open ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { overflowY: "auto" }, children: problems.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
       "div",
       {
         onClick: () => onSelect(d.nodeId),
