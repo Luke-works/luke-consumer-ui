@@ -102,7 +102,7 @@ declare function connectNodes(doc: WorkflowDoc, sourceId: NodeId, targetId: Node
 interface WorkflowBuilderProps {
     /** The workflow document to render/edit. */
     value: WorkflowDoc;
-    /** The step-type catalog (from `GET /api/workflow/catalog`), for the palette. */
+    /** The step-type catalog (from `GET /api/workflow/catalog`), for the palette + trigger picker. */
     stepTypes: readonly StepTypeDescriptor[];
     /** Notified with the next document on every edit. Omit for a read-only canvas. */
     onChange?: (doc: WorkflowDoc) => void;
