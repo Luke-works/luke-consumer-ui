@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, Rocket, Save, Stamp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
+import WorkflowAiAssistPanel from "./WorkflowAiAssistPanel";
 import { useAuth } from "../../context/AuthContext";
 import { WORKFLOW, canWrite } from "../../lib/capabilities";
 import {
@@ -166,8 +167,26 @@ export default function WorkflowBuilderPage() {
         <div className="mb-3 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-600 dark:bg-error-500/15">{error}</div>
       ) : null}
 
-      <div className="h-[72vh] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-        <WorkflowBuilder value={doc} stepTypes={stepTypes} onChange={canEdit ? setDoc : undefined} />
+      <div className="flex h-[72vh] flex-col gap-4 lg:flex-row">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
+          <WorkflowBuilder value={doc} stepTypes={stepTypes} onChange={canEdit ? setDoc : undefined} />
+        </div>
+        {canEdit && tenant ? (
+          <div className="h-full w-full shrink-0 lg:w-[340px]">
+            <WorkflowAiAssistPanel
+              tenant={tenant}
+              workflowId={id}
+              workflowName={doc.name ?? "Workflow"}
+              doc={doc}
+              catalog={stepTypes}
+              onApplied={(next) => {
+                setDoc(next);
+                setMessage("LukeBuilds updated your workflow ✓");
+                setError(null);
+              }}
+            />
+          </div>
+        ) : null}
       </div>
     </>
   );
