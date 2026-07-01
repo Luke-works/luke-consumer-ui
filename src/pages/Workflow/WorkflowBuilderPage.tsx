@@ -1,11 +1,12 @@
 import "@xyflow/react/dist/style.css";
 import { validateWorkflow, type WorkflowDoc } from "@lukeflow/workflow-core";
 import { WorkflowBuilder } from "@lukeflow/workflow-builder";
-import { ArrowLeft, CheckCircle2, Rocket, Save, Stamp } from "lucide-react";
+import { ArrowLeft, CheckCircle2, PlayCircle, Rocket, Save, Stamp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import WorkflowAiAssistPanel from "./WorkflowAiAssistPanel";
+import WorkflowRunsModal from "./WorkflowRunsModal";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { WORKFLOW, canWrite } from "../../lib/capabilities";
@@ -50,6 +51,7 @@ export default function WorkflowBuilderPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runsOpen, setRunsOpen] = useState(false);
 
   useEffect(() => {
     if (!tenant || !id) return;
@@ -165,6 +167,9 @@ export default function WorkflowBuilderPage() {
             <button type="button" onClick={publish} disabled={busy || version == null} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60">
               <Rocket className="size-4" /> Publish
             </button>
+            <button type="button" onClick={() => setRunsOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5">
+              <PlayCircle className="size-4" /> Runs
+            </button>
           </div>
         ) : null}
       </div>
@@ -197,6 +202,17 @@ export default function WorkflowBuilderPage() {
           </div>
         ) : null}
       </div>
+
+      {tenant ? (
+        <WorkflowRunsModal
+          tenant={tenant}
+          definitionId={id}
+          doc={doc}
+          canRun={def?.publishedVersion != null}
+          isOpen={runsOpen}
+          onClose={() => setRunsOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

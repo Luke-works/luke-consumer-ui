@@ -131,6 +131,70 @@ export function disconnect(tenant: string, id: string): Promise<void> {
   return req<void>(tenant, `${INT}/connections/${seg(id)}`, { method: "DELETE" });
 }
 
+// ── Runs (Pillar 4: runtime) ───────────────────────────────────────────────────
+
+export type WorkflowRunSummary = {
+  id: string;
+  businessKey?: string | null;
+  /** ACTIVE | COMPLETED | EXTERNALLY_TERMINATED | INTERNALLY_TERMINATED | SUSPENDED */
+  state: string;
+  ended: boolean;
+  startTime?: number | null;
+  endTime?: number | null;
+};
+
+export type WorkflowRunTask = {
+  id: string;
+  name?: string | null;
+  activityId?: string | null;
+  assignee?: string | null;
+  created?: number | null;
+  candidateGroups?: string[];
+};
+
+export type WorkflowRunIncident = {
+  id: string;
+  type: string;
+  message?: string | null;
+  activityId?: string | null;
+  timestamp?: number | null;
+};
+
+export type WorkflowRunDetail = {
+  found: boolean;
+  instanceId: string;
+  processDefinitionKey?: string | null;
+  state?: string | null;
+  ended: boolean;
+  startTime?: number | null;
+  endTime?: number | null;
+  currentActivityIds: string[];
+  activeTasks: WorkflowRunTask[];
+  incidents: WorkflowRunIncident[];
+};
+
+/** Start a test instance of the definition's published version. */
+export function startRun(
+  tenant: string,
+  id: string,
+  variables?: Record<string, unknown>,
+): Promise<{ instanceId: string }> {
+  return req<{ instanceId: string }>(tenant, `${BASE}/${seg(id)}/runs`, {
+    method: "POST",
+    body: JSON.stringify({ variables: variables ?? {} }),
+  });
+}
+
+/** Recent runs (running + finished) for the definition. */
+export async function listRuns(tenant: string, id: string): Promise<WorkflowRunSummary[]> {
+  return asArray<WorkflowRunSummary>(await req<WorkflowRunSummary[]>(tenant, `${BASE}/${seg(id)}/runs`));
+}
+
+/** Full status of one run — state, current activities, active tasks, incidents. */
+export function getRun(tenant: string, instanceId: string): Promise<WorkflowRunDetail> {
+  return req<WorkflowRunDetail>(tenant, `/api/workflow/runs/${seg(instanceId)}`);
+}
+
 /** A blank starter document for a new workflow (a trigger + nothing else). */
 export function blankWorkflow(name: string): WorkflowDoc {
   return {
