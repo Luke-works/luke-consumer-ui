@@ -274,9 +274,15 @@ function toReactFlow(value) {
   return { nodes, edges };
 }
 function WorkflowBuilder({ value, stepTypes, onChange, className }) {
-  const { nodes, edges } = (0, import_react2.useMemo)(() => toReactFlow(value), [value]);
   const palette = (0, import_react2.useMemo)(() => buildPalette(stepTypes), [stepTypes]);
   const [selectedId, setSelectedId] = (0, import_react2.useState)(null);
+  const [nodes, setNodes, onNodesChange] = (0, import_react.useNodesState)([]);
+  const [edges, setEdges, onEdgesChange] = (0, import_react.useEdgesState)([]);
+  (0, import_react2.useEffect)(() => {
+    const flow = toReactFlow(value);
+    setNodes(flow.nodes);
+    setEdges(flow.edges);
+  }, [value, setNodes, setEdges]);
   const selected = value.nodes.find((n) => n.id === selectedId);
   const onConnect = (0, import_react2.useCallback)(
     (c) => {
@@ -338,7 +344,8 @@ function WorkflowBuilder({ value, stepTypes, onChange, className }) {
           {
             nodes,
             edges,
-            nodesDraggable: false,
+            onNodesChange,
+            onEdgesChange,
             onConnect,
             onNodesDelete,
             onNodeClick: (_, node) => setSelectedId(node.id),

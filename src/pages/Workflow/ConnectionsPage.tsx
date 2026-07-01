@@ -24,8 +24,24 @@ const STATUS_LABEL: Record<IntegrationConnectionStatus, string> = {
   REVOKED: "Revoked",
 };
 
-// Common providers to offer; a free-text field covers anything else Nango supports.
-const COMMON_PROVIDERS = ["salesforce", "hubspot", "slack", "google-mail", "google-sheet"];
+// Common providers to offer in the dropdown; the "Other…" option reveals a free-text
+// field for anything else Nango supports. Keyed by Nango provider key, labelled for humans.
+const COMMON_PROVIDERS: Array<{ key: string; label: string }> = [
+  { key: "salesforce", label: "Salesforce" },
+  { key: "hubspot", label: "HubSpot" },
+  { key: "slack", label: "Slack" },
+  { key: "google-mail", label: "Gmail" },
+  { key: "google-sheet", label: "Google Sheets" },
+  { key: "google-calendar", label: "Google Calendar" },
+  { key: "microsoft-teams", label: "Microsoft Teams" },
+  { key: "outlook", label: "Outlook" },
+  { key: "notion", label: "Notion" },
+  { key: "github", label: "GitHub" },
+  { key: "jira", label: "Jira" },
+  { key: "stripe", label: "Stripe" },
+  { key: "zendesk", label: "Zendesk" },
+];
+const OTHER = "__other";
 
 const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString() : "—");
 
@@ -37,7 +53,11 @@ export default function ConnectionsPage() {
   const [rows, setRows] = useState<IntegrationConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState("salesforce");
+  // The dropdown selection (a provider key or the OTHER sentinel) and, when OTHER,
+  // the free-text provider key. `provider` is the effective key passed to Connect.
+  const [selection, setSelection] = useState<string>(COMMON_PROVIDERS[0].key);
+  const [otherProvider, setOtherProvider] = useState("");
+  const provider = selection === OTHER ? otherProvider.trim() : selection;
 
   const refresh = useCallback(async () => {
     if (!tenant) return;
@@ -81,19 +101,30 @@ export default function ConnectionsPage() {
 
       {canEdit ? (
         <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-          <label className="text-sm text-gray-600 dark:text-gray-300">Connect an app</label>
-          <input
-            list="wf-providers"
-            value={provider}
-            onChange={(e) => setProvider(e.target.value.trim())}
+          <label htmlFor="wf-provider" className="text-sm text-gray-600 dark:text-gray-300">
+            Connect an app
+          </label>
+          <select
+            id="wf-provider"
+            value={selection}
+            onChange={(e) => setSelection(e.target.value)}
             className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-white/5"
-            placeholder="provider key, e.g. salesforce"
-          />
-          <datalist id="wf-providers">
+          >
             {COMMON_PROVIDERS.map((p) => (
-              <option key={p} value={p} />
+              <option key={p.key} value={p.key}>
+                {p.label}
+              </option>
             ))}
-          </datalist>
+            <option value={OTHER}>Other…</option>
+          </select>
+          {selection === OTHER ? (
+            <input
+              value={otherProvider}
+              onChange={(e) => setOtherProvider(e.target.value.trim())}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-white/5"
+              placeholder="Nango provider key, e.g. airtable"
+            />
+          ) : null}
           {tenant ? (
             <ConnectIntegration
               tenant={tenant}

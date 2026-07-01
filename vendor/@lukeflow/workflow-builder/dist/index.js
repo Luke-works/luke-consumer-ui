@@ -215,8 +215,8 @@ function connectNodes(doc, sourceId, targetId, role = "next") {
 }
 
 // src/WorkflowBuilder.tsx
-import { Background, Controls, ReactFlow } from "@xyflow/react";
-import { useCallback, useMemo, useState } from "react";
+import { Background, Controls, ReactFlow, useEdgesState, useNodesState } from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { jsx, jsxs } from "react/jsx-runtime";
 var STEP_MIME = "application/x-luke-step";
 function toReactFlow(value) {
@@ -237,9 +237,15 @@ function toReactFlow(value) {
   return { nodes, edges };
 }
 function WorkflowBuilder({ value, stepTypes, onChange, className }) {
-  const { nodes, edges } = useMemo(() => toReactFlow(value), [value]);
   const palette = useMemo(() => buildPalette(stepTypes), [stepTypes]);
   const [selectedId, setSelectedId] = useState(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  useEffect(() => {
+    const flow = toReactFlow(value);
+    setNodes(flow.nodes);
+    setEdges(flow.edges);
+  }, [value, setNodes, setEdges]);
   const selected = value.nodes.find((n) => n.id === selectedId);
   const onConnect = useCallback(
     (c) => {
@@ -301,7 +307,8 @@ function WorkflowBuilder({ value, stepTypes, onChange, className }) {
           {
             nodes,
             edges,
-            nodesDraggable: false,
+            onNodesChange,
+            onEdgesChange,
             onConnect,
             onNodesDelete,
             onNodeClick: (_, node) => setSelectedId(node.id),

@@ -2,6 +2,10 @@ import { Plus, Workflow as WorkflowIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
+import { Modal } from "../../components/ui/modal";
+import Button from "../../components/ui/button/Button";
+import Label from "../../components/form/Label";
+import Input from "../../components/form/input/InputField";
 import { useAuth } from "../../context/AuthContext";
 import { WORKFLOW, canWrite } from "../../lib/capabilities";
 import {
@@ -27,6 +31,8 @@ export default function WorkflowsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [name, setName] = useState("");
 
   const refresh = useCallback(async () => {
     if (!tenant) return;
@@ -45,23 +51,30 @@ export default function WorkflowsList() {
     if (isLoaded && tenant) void refresh();
   }, [isLoaded, tenant, refresh]);
 
-  const onCreate = useCallback(async () => {
-    if (!tenant) return;
-    const name = window.prompt("Name this workflow")?.trim();
-    if (!name) return;
+  const openModal = () => {
+    setName("");
+    setModalOpen(true);
+  };
+
+  const handleCreate = useCallback(async () => {
+    const trimmed = name.trim();
+    if (!tenant || !trimmed || creating) return;
     setCreating(true);
+    setError(null);
     try {
       const def = await createDefinition(tenant, {
-        name,
-        json: JSON.stringify(blankWorkflow(name)),
+        name: trimmed,
+        json: JSON.stringify(blankWorkflow(trimmed)),
       });
+      setModalOpen(false);
+      setName("");
       navigate(`/workflow/${def.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create workflow");
     } finally {
       setCreating(false);
     }
-  }, [tenant, navigate]);
+  }, [tenant, name, creating, navigate]);
 
   return (
     <>
@@ -76,8 +89,7 @@ export default function WorkflowsList() {
         {canEdit ? (
           <button
             type="button"
-            onClick={onCreate}
-            disabled={creating}
+            onClick={openModal}
             className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60"
           >
             <Plus className="size-4" /> New workflow
@@ -97,6 +109,13 @@ export default function WorkflowsList() {
         <div className="rounded-2xl border border-dashed border-gray-200 py-16 text-center dark:border-gray-800">
           <WorkflowIcon className="mx-auto mb-3 size-8 text-gray-300" />
           <p className="text-sm text-gray-500 dark:text-gray-400">No workflows yet.</p>
+          {canEdit ? (
+            <div className="mt-6">
+              <Button startIcon={<Plus className="size-4" />} onClick={openModal}>
+                New workflow
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
@@ -134,6 +153,43 @@ export default function WorkflowsList() {
           </table>
         </div>
       )}
+
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => (creating ? undefined : setModalOpen(false))}
+        className="mx-4 w-full max-w-[480px]"
+      >
+        <div className="p-6 sm:p-8">
+          <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white/90">
+            Name your workflow
+          </h2>
+          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+            Give your workflow a name to get started. You can change it later.
+          </p>
+
+          <div>
+            <Label>
+              Workflow name <span className="text-error-500">*</span>
+            </Label>
+            <Input
+              name="workflowName"
+              placeholder="New-hire onboarding"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <div className="mt-8 flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={creating}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!name.trim() || creating}>
+              {creating ? "Creating…" : "Create & design"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }
