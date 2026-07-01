@@ -10,6 +10,8 @@ export type CapabilityLevel = "none" | "read" | "read-write";
 export const FORMS = "FORMS";
 export const EMAIL = "EMAIL";
 export const SIGNATURES = "SIGNATURES";
+export const PHONE = "PHONE";
+export const WORKFLOW = "WORKFLOW";
 
 /** The caller's effective level for a capability, or "none" if not granted. */
 export function capabilityLevel(

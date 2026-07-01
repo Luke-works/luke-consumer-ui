@@ -29,14 +29,19 @@ const FormInbox = lazy(() => import("./pages/Forms/FormInbox"));
 // Code-split the email-template builder (react-email render) to its own chunk.
 const EmailTemplateBuilderPage = lazy(() => import("./pages/EmailTemplates/EmailTemplateBuilderPage"));
 // Code-split the signature pages (react-pdf + pdf.js) to their own chunk.
+const CallDetail = lazy(() => import("./pages/Phone/CallDetail"));
 const SignaturesList = lazy(() => import("./pages/Signatures/SignaturesList"));
 const SignatureBuilderPage = lazy(() => import("./pages/Signatures/SignatureBuilderPage"));
 const SignPage = lazy(() => import("./pages/Signatures/SignPage"));
+// Code-split the workflow pages (react-flow) to their own chunk.
+const WorkflowsList = lazy(() => import("./pages/Workflow/WorkflowsList"));
+const WorkflowBuilderPage = lazy(() => import("./pages/Workflow/WorkflowBuilderPage"));
+const ConnectionsPage = lazy(() => import("./pages/Workflow/ConnectionsPage"));
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import GuestRoute from "./components/auth/GuestRoute";
 import OnboardingGate from "./components/auth/OnboardingGate";
 import CapabilityRoute from "./components/auth/CapabilityRoute";
-import { EMAIL, FORMS, SIGNATURES } from "./lib/capabilities";
+import { EMAIL, FORMS, PHONE, SIGNATURES, WORKFLOW } from "./lib/capabilities";
 import { loadFreeEmailDomains } from "./lib/emailDomains";
 
 if (!import.meta.env.VITE_AUTH_API_URL) {
@@ -111,7 +116,45 @@ export default function App() {
                   }
                 />
               </Route>
-              <Route path="/phone" element={<Phone />} />
+              {/* Phone / Voice — gated behind the PHONE capability (read to view, write to place calls). */}
+              <Route element={<CapabilityRoute code={PHONE} />}>
+                <Route path="/phone" element={<Phone />} />
+                <Route
+                  path="/phone/:id"
+                  element={
+                    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                      <CallDetail />
+                    </Suspense>
+                  }
+                />
+              </Route>
+              {/* Workflow — gated behind the WORKFLOW capability (read to view, write to edit/publish). */}
+              <Route element={<CapabilityRoute code={WORKFLOW} />}>
+                <Route
+                  path="/workflow"
+                  element={
+                    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                      <WorkflowsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/workflow/connections"
+                  element={
+                    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                      <ConnectionsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/workflow/:id"
+                  element={
+                    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading builder…</div>}>
+                      <WorkflowBuilderPage />
+                    </Suspense>
+                  }
+                />
+              </Route>
               <Route path="/account/profile" element={<Profile />} />
               <Route path="/account/settings" element={<Settings />} />
               <Route path="/access" element={<AccessManagement />} />

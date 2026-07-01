@@ -1,0 +1,15 @@
+{
+  "name": "@lukeflow/workflow-core",
+  "version": "0.1.0-alpha.0",
+  "description": "Headless, framework-agnostic JSON workflow engine (Trigger/Action/Task model).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" }
+  }
+}

@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { ChevronDownIcon, GridIcon, HorizontaLDots, ListIcon, LockIcon, MailIcon, PhoneIcon } from "../icons";
-import { FileText, Inbox, Mail, MailPlus, PenLine } from "lucide-react";
+import { FileText, Inbox, Link2, Mail, MailPlus, PenLine, Workflow } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { canRead, EMAIL, FORMS, SIGNATURES } from "../lib/capabilities";
+import { canRead, EMAIL, FORMS, PHONE, SIGNATURES, WORKFLOW } from "../lib/capabilities";
 import SidebarFooter from "./SidebarFooter";
 import SidebarTenantSwitcher from "./SidebarTenantSwitcher";
 
@@ -45,7 +45,15 @@ const navItems: NavItem[] = [
   FORMS_ITEM,
   EMAIL_ITEM,
   SIGNATURES_ITEM,
-  { icon: <PhoneIcon />, name: "Phone", path: "/phone", comingSoon: true },
+  { icon: <PhoneIcon />, name: "Phone", path: "/phone" },
+  {
+    icon: <Workflow className="size-5" />,
+    name: "Workflow",
+    subItems: [
+      { name: "Workflows", path: "/workflow", icon: <Workflow className="size-4" /> },
+      { name: "Connections", path: "/workflow/connections", icon: <Link2 className="size-4" /> },
+    ],
+  },
 ];
 
 const AppSidebar: React.FC = () => {
@@ -60,6 +68,8 @@ const AppSidebar: React.FC = () => {
     if (item.name === "Forms") return canRead(session, FORMS);
     if (item.name === "Email") return canRead(session, EMAIL);
     if (item.name === "Signatures") return canRead(session, SIGNATURES);
+    if (item.name === "Phone") return canRead(session, PHONE);
+    if (item.name === "Workflow") return canRead(session, WORKFLOW);
     return true;
   });
   if (session) {
