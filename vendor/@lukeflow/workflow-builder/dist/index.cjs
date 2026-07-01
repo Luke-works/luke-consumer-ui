@@ -83,17 +83,20 @@ function docToFlow(doc) {
   }
   const maxDepth = depth.size > 0 ? Math.max(...depth.values()) : 0;
   const perDepth = /* @__PURE__ */ new Map();
-  const place = (d) => {
+  const layout = doc.layout ?? {};
+  const place = (id, d) => {
+    const saved = layout[id];
+    if (saved && typeof saved.x === "number" && typeof saved.y === "number") return saved;
     const i = perDepth.get(d) ?? 0;
     perDepth.set(d, i + 1);
     return { x: d * 220 + 40, y: i * 110 + 40 };
   };
-  nodes.push({ id: START_ID, kind: "start", label: triggerLabel(doc), position: place(0), data: { trigger: doc.trigger } });
+  nodes.push({ id: START_ID, kind: "start", label: triggerLabel(doc), position: place(START_ID, 0), data: { trigger: doc.trigger } });
   for (const n of doc.nodes ?? []) {
     if (!n || typeof n.id !== "string") continue;
-    nodes.push({ id: n.id, kind: n.kind, label: nodeLabel(n), position: place(depth.get(n.id) ?? 1), data: { node: n } });
+    nodes.push({ id: n.id, kind: n.kind, label: nodeLabel(n), position: place(n.id, depth.get(n.id) ?? 1), data: { node: n } });
   }
-  nodes.push({ id: END_ID, kind: "end", label: "End", position: place(maxDepth + 1), data: {} });
+  nodes.push({ id: END_ID, kind: "end", label: "End", position: place(END_ID, maxDepth + 1), data: {} });
   let seq = 0;
   const push = (source, target2, role, label2) => {
     const t = (0, import_workflow_core.isTerminal)(target2) ? END_ID : target2;
@@ -900,6 +903,20 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", onCha
   const setTrigger = (t) => {
     if (onChange) onChange({ ...value, trigger: t });
   };
+  const onNodeDragStop = (0, import_react4.useCallback)(
+    (_, dragged) => {
+      if (!onChange) return;
+      const layout = Object.fromEntries(nodes.map((n) => [n.id, n.id === dragged.id ? dragged.position : n.position]));
+      onChange({ ...value, layout });
+    },
+    [onChange, nodes, value]
+  );
+  const tidy = () => {
+    if (!onChange) return;
+    const next = { ...value };
+    delete next.layout;
+    onChange(next);
+  };
   const draggable = (mime, labelText, key) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
     "div",
     {
@@ -952,11 +969,30 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", onCha
                   onEdgesChange,
                   onConnect,
                   onNodesDelete,
+                  onNodeDragStop,
                   onNodeClick: (_, node) => setSelectedId(node.id),
                   fitView: true,
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react3.Background, {}),
-                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react3.Controls, {})
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react3.Controls, {}),
+                    onChange ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react3.Panel, { position: "top-right", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                      "button",
+                      {
+                        type: "button",
+                        onClick: tidy,
+                        title: "Auto-arrange the layout",
+                        style: {
+                          padding: "5px 10px",
+                          fontSize: 12,
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          border: "1px solid var(--wf-border-2)",
+                          background: "var(--wf-card)",
+                          color: "var(--wf-fg)"
+                        },
+                        children: "\u21B9 Tidy"
+                      }
+                    ) }) : null
                   ]
                 }
               ) }),

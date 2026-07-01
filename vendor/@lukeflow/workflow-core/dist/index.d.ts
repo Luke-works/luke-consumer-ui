@@ -193,6 +193,15 @@ interface WorkflowDoc {
     /** Explicit start node id; defaults to `nodes[0]`. */
     start?: NodeId;
     settings?: WorkflowSettings;
+    /**
+     * Optional persisted canvas positions, keyed by node id (plus the synthetic
+     * `"__start"` / `"end"` ids). Pure view-state for the builder — the compiler
+     * ignores it. Absent ids fall back to auto-layout; clearing the map re-tidies.
+     */
+    layout?: Record<string, {
+        x: number;
+        y: number;
+    }>;
 }
 
 /**
