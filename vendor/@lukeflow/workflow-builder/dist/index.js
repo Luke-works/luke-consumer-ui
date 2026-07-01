@@ -215,6 +215,7 @@ function connectNodes(doc, sourceId, targetId, role = "next") {
 }
 
 // src/WorkflowBuilder.tsx
+import { validateWorkflow } from "@lukeflow/workflow-core";
 import { Background, Controls, ReactFlow, useEdgesState, useNodesState } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState as useState2 } from "react";
 
@@ -580,13 +581,31 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
   const palette = useMemo(() => buildPalette(stepTypes), [stepTypes]);
   const triggerTypes = useMemo(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
   const [selectedId, setSelectedId] = useState2(null);
+  const [showProblems, setShowProblems] = useState2(true);
+  const diagnostics = useMemo(() => validateWorkflow(value), [value]);
+  const severityByNode = useMemo(() => {
+    const rank = { info: 0, warning: 1, error: 2 };
+    const m = /* @__PURE__ */ new Map();
+    for (const d of diagnostics) {
+      if (!d.nodeId) continue;
+      const cur = m.get(d.nodeId);
+      if (!cur || rank[d.severity] > rank[cur]) m.set(d.nodeId, d.severity);
+    }
+    return m;
+  }, [diagnostics]);
+  const problems = useMemo(() => diagnostics.filter((d) => d.severity !== "info"), [diagnostics]);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   useEffect(() => {
     const flow = toReactFlow(value);
-    setNodes(flow.nodes);
+    setNodes(
+      flow.nodes.map((n) => {
+        const sev = severityByNode.get(n.id);
+        return sev ? { ...n, style: { ...n.style ?? {}, border: `2px solid ${sev === "error" ? "#ef4444" : "#f59e0b"}` } } : n;
+      })
+    );
     setEdges(flow.edges);
-  }, [value, setNodes, setEdges]);
+  }, [value, severityByNode, setNodes, setEdges]);
   const selected = value.nodes.find((n) => n.id === selectedId);
   const triggerSelected = selectedId === START_ID;
   const onConnect = useCallback(
@@ -650,32 +669,43 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
         STRUCTURAL.map((s) => draggable(`${STRUCTURAL_PREFIX}${s.kind}`, s.label, s.kind))
       ] })
     ] }) : null,
-    /* @__PURE__ */ jsx2(
+    /* @__PURE__ */ jsxs2(
       "div",
       {
-        style: { flex: 1, minWidth: 0 },
+        style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
         onDrop,
         onDragOver: (e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
         },
-        children: /* @__PURE__ */ jsxs2(
-          ReactFlow,
-          {
-            nodes,
-            edges,
-            onNodesChange,
-            onEdgesChange,
-            onConnect,
-            onNodesDelete,
-            onNodeClick: (_, node) => setSelectedId(node.id),
-            fitView: true,
-            children: [
-              /* @__PURE__ */ jsx2(Background, {}),
-              /* @__PURE__ */ jsx2(Controls, {})
-            ]
-          }
-        )
+        children: [
+          /* @__PURE__ */ jsx2("div", { style: { flex: 1, minHeight: 0 }, children: /* @__PURE__ */ jsxs2(
+            ReactFlow,
+            {
+              nodes,
+              edges,
+              onNodesChange,
+              onEdgesChange,
+              onConnect,
+              onNodesDelete,
+              onNodeClick: (_, node) => setSelectedId(node.id),
+              fitView: true,
+              children: [
+                /* @__PURE__ */ jsx2(Background, {}),
+                /* @__PURE__ */ jsx2(Controls, {})
+              ]
+            }
+          ) }),
+          /* @__PURE__ */ jsx2(
+            ProblemsStrip,
+            {
+              problems,
+              open: showProblems,
+              onToggle: () => setShowProblems((o) => !o),
+              onSelect: (nodeId) => nodeId && setSelectedId(nodeId)
+            }
+          )
+        ]
       }
     ),
     onChange && (triggerSelected || selected) ? /* @__PURE__ */ jsx2("aside", { style: { width: 288, overflowY: "auto", borderLeft: "1px solid #e5e7eb", padding: 14, fontSize: 13 }, children: triggerSelected ? /* @__PURE__ */ jsx2(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ jsx2(
@@ -688,6 +718,51 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
         onDelete: () => onNodesDelete([{ id: selected.id }])
       }
     ) : null }) : null
+  ] });
+}
+function ProblemsStrip({
+  problems,
+  open,
+  onToggle,
+  onSelect
+}) {
+  if (problems.length === 0) return null;
+  const errors = problems.filter((d) => d.severity === "error").length;
+  const warnings = problems.length - errors;
+  const summaryColor = errors > 0 ? "#b91c1c" : "#b45309";
+  return /* @__PURE__ */ jsxs2("div", { style: { borderTop: "1px solid #e5e7eb", background: "#fff", display: "flex", flexDirection: "column", maxHeight: open ? 168 : 34, flex: "0 0 auto" }, children: [
+    /* @__PURE__ */ jsxs2("div", { onClick: onToggle, style: { cursor: "pointer", padding: "7px 12px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: summaryColor, userSelect: "none" }, children: [
+      /* @__PURE__ */ jsxs2("span", { children: [
+        "\u26A0 ",
+        errors,
+        " error",
+        errors === 1 ? "" : "s",
+        ", ",
+        warnings,
+        " warning",
+        warnings === 1 ? "" : "s"
+      ] }),
+      /* @__PURE__ */ jsx2("span", { style: { marginLeft: "auto", color: "#9ca3af" }, children: open ? "\u25BE" : "\u25B8" })
+    ] }),
+    open ? /* @__PURE__ */ jsx2("div", { style: { overflowY: "auto" }, children: problems.map((d, i) => /* @__PURE__ */ jsxs2(
+      "div",
+      {
+        onClick: () => onSelect(d.nodeId),
+        style: {
+          padding: "5px 12px",
+          fontSize: 12,
+          borderTop: "1px solid #f3f4f6",
+          cursor: d.nodeId ? "pointer" : "default",
+          color: d.severity === "error" ? "#b91c1c" : "#b45309"
+        },
+        children: [
+          d.severity === "error" ? "\u2715" : "\u26A0",
+          " ",
+          d.message
+        ]
+      },
+      i
+    )) }) : null
   ] });
 }
 export {

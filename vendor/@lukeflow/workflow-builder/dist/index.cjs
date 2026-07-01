@@ -252,6 +252,7 @@ function connectNodes(doc, sourceId, targetId, role = "next") {
 }
 
 // src/WorkflowBuilder.tsx
+var import_workflow_core4 = require("@lukeflow/workflow-core");
 var import_react2 = require("@xyflow/react");
 var import_react3 = require("react");
 
@@ -617,13 +618,31 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
   const palette = (0, import_react3.useMemo)(() => buildPalette(stepTypes), [stepTypes]);
   const triggerTypes = (0, import_react3.useMemo)(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
   const [selectedId, setSelectedId] = (0, import_react3.useState)(null);
+  const [showProblems, setShowProblems] = (0, import_react3.useState)(true);
+  const diagnostics = (0, import_react3.useMemo)(() => (0, import_workflow_core4.validateWorkflow)(value), [value]);
+  const severityByNode = (0, import_react3.useMemo)(() => {
+    const rank = { info: 0, warning: 1, error: 2 };
+    const m = /* @__PURE__ */ new Map();
+    for (const d of diagnostics) {
+      if (!d.nodeId) continue;
+      const cur = m.get(d.nodeId);
+      if (!cur || rank[d.severity] > rank[cur]) m.set(d.nodeId, d.severity);
+    }
+    return m;
+  }, [diagnostics]);
+  const problems = (0, import_react3.useMemo)(() => diagnostics.filter((d) => d.severity !== "info"), [diagnostics]);
   const [nodes, setNodes, onNodesChange] = (0, import_react2.useNodesState)([]);
   const [edges, setEdges, onEdgesChange] = (0, import_react2.useEdgesState)([]);
   (0, import_react3.useEffect)(() => {
     const flow = toReactFlow(value);
-    setNodes(flow.nodes);
+    setNodes(
+      flow.nodes.map((n) => {
+        const sev = severityByNode.get(n.id);
+        return sev ? { ...n, style: { ...n.style ?? {}, border: `2px solid ${sev === "error" ? "#ef4444" : "#f59e0b"}` } } : n;
+      })
+    );
     setEdges(flow.edges);
-  }, [value, setNodes, setEdges]);
+  }, [value, severityByNode, setNodes, setEdges]);
   const selected = value.nodes.find((n) => n.id === selectedId);
   const triggerSelected = selectedId === START_ID;
   const onConnect = (0, import_react3.useCallback)(
@@ -687,32 +706,43 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
         STRUCTURAL.map((s) => draggable(`${STRUCTURAL_PREFIX}${s.kind}`, s.label, s.kind))
       ] })
     ] }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
       "div",
       {
-        style: { flex: 1, minWidth: 0 },
+        style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
         onDrop,
         onDragOver: (e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
         },
-        children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-          import_react2.ReactFlow,
-          {
-            nodes,
-            edges,
-            onNodesChange,
-            onEdgesChange,
-            onConnect,
-            onNodesDelete,
-            onNodeClick: (_, node) => setSelectedId(node.id),
-            fitView: true,
-            children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Background, {}),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Controls, {})
-            ]
-          }
-        )
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { flex: 1, minHeight: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+            import_react2.ReactFlow,
+            {
+              nodes,
+              edges,
+              onNodesChange,
+              onEdgesChange,
+              onConnect,
+              onNodesDelete,
+              onNodeClick: (_, node) => setSelectedId(node.id),
+              fitView: true,
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Background, {}),
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_react2.Controls, {})
+              ]
+            }
+          ) }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+            ProblemsStrip,
+            {
+              problems,
+              open: showProblems,
+              onToggle: () => setShowProblems((o) => !o),
+              onSelect: (nodeId) => nodeId && setSelectedId(nodeId)
+            }
+          )
+        ]
       }
     ),
     onChange && (triggerSelected || selected) ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("aside", { style: { width: 288, overflowY: "auto", borderLeft: "1px solid #e5e7eb", padding: 14, fontSize: 13 }, children: triggerSelected ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
@@ -725,6 +755,51 @@ function WorkflowBuilder({ value, stepTypes, connections, onChange, className })
         onDelete: () => onNodesDelete([{ id: selected.id }])
       }
     ) : null }) : null
+  ] });
+}
+function ProblemsStrip({
+  problems,
+  open,
+  onToggle,
+  onSelect
+}) {
+  if (problems.length === 0) return null;
+  const errors = problems.filter((d) => d.severity === "error").length;
+  const warnings = problems.length - errors;
+  const summaryColor = errors > 0 ? "#b91c1c" : "#b45309";
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { style: { borderTop: "1px solid #e5e7eb", background: "#fff", display: "flex", flexDirection: "column", maxHeight: open ? 168 : 34, flex: "0 0 auto" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { onClick: onToggle, style: { cursor: "pointer", padding: "7px 12px", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, color: summaryColor, userSelect: "none" }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
+        "\u26A0 ",
+        errors,
+        " error",
+        errors === 1 ? "" : "s",
+        ", ",
+        warnings,
+        " warning",
+        warnings === 1 ? "" : "s"
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { marginLeft: "auto", color: "#9ca3af" }, children: open ? "\u25BE" : "\u25B8" })
+    ] }),
+    open ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { style: { overflowY: "auto" }, children: problems.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+      "div",
+      {
+        onClick: () => onSelect(d.nodeId),
+        style: {
+          padding: "5px 12px",
+          fontSize: 12,
+          borderTop: "1px solid #f3f4f6",
+          cursor: d.nodeId ? "pointer" : "default",
+          color: d.severity === "error" ? "#b91c1c" : "#b45309"
+        },
+        children: [
+          d.severity === "error" ? "\u2715" : "\u26A0",
+          " ",
+          d.message
+        ]
+      },
+      i
+    )) }) : null
   ] });
 }
 // Annotate the CommonJS export names for ESM import in node:
