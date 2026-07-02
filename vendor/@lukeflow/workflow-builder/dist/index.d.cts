@@ -110,6 +110,14 @@ interface ConnectionOption {
     status?: string;
     externalAccount?: string | null;
 }
+/**
+ * A published form the host injects for the forms-trigger "Which form?" picker (a
+ * projection of the engine's form definition — the builder stays free of consumer types).
+ */
+interface FormOption {
+    code: string;
+    name: string;
+}
 
 /** Props for {@link WorkflowBuilder}. */
 interface WorkflowBuilderProps {
@@ -120,6 +128,8 @@ interface WorkflowBuilderProps {
     /** Tenant integration connections (from `GET /api/workflow/integrations/connections`), for the
      *  integration-action connection picker. Optional — the picker shows an empty-state hint without them. */
     connections?: readonly ConnectionOption[];
+    /** Published forms (from `GET /api/forms`), for the forms-trigger "Which form?" picker. */
+    forms?: readonly FormOption[];
     /** Colour theme; drives the canvas `colorMode` and the panel/node CSS variables. Default `"light"`. */
     theme?: "light" | "dark";
     /** Live-run highlighting (Pillar 4c): BPMN activity ids currently active / with an open
@@ -134,6 +144,6 @@ interface WorkflowBuilderProps {
     className?: string;
 }
 /** The visual workflow designer. */
-declare function WorkflowBuilder({ value, stepTypes, connections, theme, highlight, onChange, className }: WorkflowBuilderProps): react.JSX.Element;
+declare function WorkflowBuilder({ value, stepTypes, connections, forms, theme, highlight, onChange, className }: WorkflowBuilderProps): react.JSX.Element;
 
-export { type ConnectionOption, END_ID, type PaletteGroup, START_ID, type WfFlow, type WfFlowEdge, type WfFlowNode, WorkflowBuilder, type WorkflowBuilderProps, addStep, addStructural, buildPalette, connectNodes, docToFlow, flowToDoc, newNodeId, removeNode, updateNode };
+export { type ConnectionOption, END_ID, type FormOption, type PaletteGroup, START_ID, type WfFlow, type WfFlowEdge, type WfFlowNode, WorkflowBuilder, type WorkflowBuilderProps, addStep, addStructural, buildPalette, connectNodes, docToFlow, flowToDoc, newNodeId, removeNode, updateNode };

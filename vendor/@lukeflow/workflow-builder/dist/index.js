@@ -649,10 +649,21 @@ function ParallelConfig({
 function TriggerConfig({
   trigger,
   triggers,
+  forms = [],
   onChange
 }) {
   const current = `${trigger.capability}.${trigger.type}`;
   const config = trigger.config ?? {};
+  const isForms = trigger.capability?.toLowerCase() === "forms";
+  const formCode = typeof config.formCode === "string" ? config.formCode : "";
+  const setConfig = (next) => onChange({ ...trigger, config: next });
+  const setFormCode = (code) => {
+    const next = { ...config };
+    if (code) next.formCode = code;
+    else delete next.formCode;
+    setConfig(next);
+  };
+  const advancedConfig = Object.fromEntries(Object.entries(config).filter(([k]) => k !== "formCode"));
   return /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsx(Field, { title: "When", children: /* @__PURE__ */ jsxs(
       "select",
@@ -669,7 +680,16 @@ function TriggerConfig({
         ]
       }
     ) }),
-    /* @__PURE__ */ jsx(Section, { title: "Trigger settings", defaultOpen: true, children: /* @__PURE__ */ jsx(KvEditor, { value: config, onChange: (next) => onChange({ ...trigger, config: next }) }) })
+    isForms ? /* @__PURE__ */ jsx(Field, { title: "Which form?", children: forms.length === 0 ? /* @__PURE__ */ jsx("div", { style: { fontSize: 12, color: "var(--wf-faint)", marginTop: 4 }, children: "No published forms yet \u2014 this fires for any form." }) : /* @__PURE__ */ jsxs("select", { style: control, value: formCode, onChange: (e) => setFormCode(e.target.value), children: [
+      /* @__PURE__ */ jsx("option", { value: "", children: "Any form" }),
+      forms.map((f) => /* @__PURE__ */ jsxs("option", { value: f.code, children: [
+        f.name,
+        " (",
+        f.code,
+        ")"
+      ] }, f.code))
+    ] }) }) : null,
+    /* @__PURE__ */ jsx(Section, { title: "Trigger settings", children: /* @__PURE__ */ jsx(KvEditor, { value: advancedConfig, onChange: (next) => setConfig(isForms && formCode ? { ...next, formCode } : next) }) })
   ] });
 }
 function operationOf2(descriptorId) {
@@ -928,7 +948,7 @@ var paletteItemStyle = {
   background: "var(--wf-card)",
   color: "var(--wf-fg)"
 };
-function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highlight, onChange, className }) {
+function WorkflowBuilder({ value, stepTypes, connections, forms, theme = "light", highlight, onChange, className }) {
   const palette = useMemo(() => buildPalette(stepTypes.filter((s) => s.kind !== "trigger")), [stepTypes]);
   const triggerTypes = useMemo(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
   const nativeInits = useMemo(() => nativeInitiators(stepTypes), [stepTypes]);
@@ -1138,7 +1158,7 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highl
             title: triggerSelected ? "Trigger" : nodeLabel2(selected),
             subtitle: triggerSelected ? "How this workflow starts" : selected.kind.replace(/^./, (c) => c.toUpperCase()),
             onClose: () => setSelectedId(null),
-            children: triggerSelected ? /* @__PURE__ */ jsx3(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ jsx3(
+            children: triggerSelected ? /* @__PURE__ */ jsx3(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, forms, onChange: setTrigger }) : selected ? /* @__PURE__ */ jsx3(
               NodeConfig,
               {
                 doc: value,

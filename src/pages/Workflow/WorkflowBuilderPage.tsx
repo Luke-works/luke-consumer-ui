@@ -7,6 +7,7 @@ import { useNavigate, useParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import WorkflowAiAssistPanel from "./WorkflowAiAssistPanel";
 import WorkflowRunsModal from "./WorkflowRunsModal";
+import { listForms } from "../../lib/formsApi";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { WORKFLOW, canWrite } from "../../lib/capabilities";
@@ -49,6 +50,7 @@ export default function WorkflowBuilderPage() {
   const [doc, setDoc] = useState<WorkflowDoc | null>(null);
   const [stepTypes, setStepTypes] = useState<StepTypeDescriptor[]>([]);
   const [connections, setConnections] = useState<IntegrationConnection[]>([]);
+  const [forms, setForms] = useState<{ code: string; name: string }[]>([]);
   const [version, setVersion] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -72,6 +74,17 @@ export default function WorkflowBuilderPage() {
         listConnections(tenant)
           .then((c) => alive && setConnections(c))
           .catch(() => alive && setConnections([]));
+        // Published forms power the forms-trigger "Which form?" picker; best-effort.
+        listForms(tenant)
+          .then((fs) =>
+            alive &&
+            setForms(
+              fs
+                .filter((f) => f.publishedVersion != null || f.status === "published")
+                .map((f) => ({ code: f.code, name: f.name })),
+            ),
+          )
+          .catch(() => alive && setForms([]));
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Failed to load workflow");
       }
@@ -233,7 +246,7 @@ export default function WorkflowBuilderPage() {
 
       <div className="flex h-[72vh] flex-col gap-4 lg:flex-row">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-          <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} theme={theme} highlight={highlight} onChange={canEdit ? setDoc : undefined} />
+          <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} forms={forms} theme={theme} highlight={highlight} onChange={canEdit ? setDoc : undefined} />
         </div>
         {canEdit && tenant ? (
           <div className="h-full w-full shrink-0 lg:w-[340px]">
