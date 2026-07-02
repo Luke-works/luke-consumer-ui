@@ -9,6 +9,8 @@
     "build:embed": "vite build --config vite.embed.config.ts",
     "build:respond": "vite build --config vite.respond.config.ts",
     "build:render": "vite build --config vite.render.config.ts",
+    "vendor:respond": "npm run build:respond && node scripts/vendor-bundle.mjs respond",
+    "vendor:embed": "npm run build:embed && node scripts/vendor-bundle.mjs embed",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
