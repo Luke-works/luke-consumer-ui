@@ -163,10 +163,11 @@ export function generateSchema(
   title?: string,
   tenant?: string,
   signal?: AbortSignal,
+  kind?: string,
 ): Promise<AgentResult> {
   return postWithRetry<AgentResult>(
     "/agents/form/chat",
-    { message, schema, title }, // no client user id — the tenant scopes the call
+    { message, schema, title, kind }, // no client user id — the tenant scopes the call
     tenant,
     signal,
   );

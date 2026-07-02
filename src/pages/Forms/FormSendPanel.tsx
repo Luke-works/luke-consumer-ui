@@ -9,13 +9,7 @@ import { Modal } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
-import {
-  getFields,
-  sendOutbound,
-  type FieldContract,
-  type FieldRole,
-  type OutboundSendResult,
-} from "../../lib/formsApi";
+import { getFields, sendOutbound, type FieldContract, type OutboundSendResult } from "../../lib/formsApi";
 
 export default function FormSendPanel({
   open,
@@ -23,14 +17,12 @@ export default function FormSendPanel({
   tenant,
   formId,
   code,
-  roles,
 }: {
   open: boolean;
   onClose: () => void;
   tenant: string;
   formId: string;
   code: string;
-  roles?: Record<string, FieldRole>;
 }) {
   const [fields, setFields] = useState<FieldContract[] | null>(null);
   const [firstName, setFirstName] = useState("");
@@ -61,11 +53,9 @@ export default function FormSendPanel({
     };
   }, [open, tenant, code]);
 
-  // Only fields the PREPARER fills (PREPARER or EITHER) are prefillable here; RECIPIENT fields are theirs.
-  const preparerFields = (fields ?? []).filter((f) => {
-    const r = roles?.[f.key] ?? "RECIPIENT";
-    return r === "PREPARER" || r === "EITHER";
-  });
+  // Disabled fields are the preparer-provided / display fields (AI sets them read-only for the
+  // recipient) — those are what you prefill here. Editable fields are the recipient's to fill.
+  const preparerFields = (fields ?? []).filter((f) => f.disabled);
 
   const send = async () => {
     if (!email.trim() || sending) return;
@@ -149,7 +139,7 @@ export default function FormSendPanel({
                 <div className="space-y-3">
                   {preparerFields.map((f) => (
                     <div key={f.key}>
-                      <Label>{f.key}</Label>
+                      <Label>{f.label || f.key}</Label>
                       <Input
                         value={prefill[f.key] ?? ""}
                         onChange={(e) => setPrefill((p) => ({ ...p, [f.key]: e.target.value }))}

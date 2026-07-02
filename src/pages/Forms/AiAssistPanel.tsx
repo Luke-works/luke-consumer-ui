@@ -29,6 +29,7 @@ export default function AiAssistPanel({
   tenant,
   formId,
   formName,
+  kind,
   schema,
   onApplied,
   onRunLifecycle,
@@ -36,6 +37,8 @@ export default function AiAssistPanel({
   tenant: string;
   formId: string;
   formName: string;
+  /** Form kind — "OUTBOUND" switches the agent to two-party (disabled/required) field guidance. */
+  kind?: string;
   schema: BuilderSchemaLike | null;
   onApplied: (schema: BuilderSchemaLike, title: string) => void;
   /** Run a lifecycle action the user asked for conversationally (check in / publish / undo).
@@ -67,7 +70,7 @@ export default function AiAssistPanel({
     // After a few seconds, hint that the free-tier service may be waking up.
     const coldTimer = setTimeout(() => setColdHint(true), 5000);
     try {
-      const result = await generateSchema(msg, schema ?? EMPTY, formName, session?.tenant ?? undefined, controller.signal);
+      const result = await generateSchema(msg, schema ?? EMPTY, formName, session?.tenant ?? undefined, controller.signal, kind);
       setBrain(result.brain);
       if (result.action && onRunLifecycle) {
         // A conversational lifecycle command (check in / publish / undo) — run it instead of

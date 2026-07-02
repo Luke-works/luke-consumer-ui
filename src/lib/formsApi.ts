@@ -213,7 +213,7 @@ export function sendOutbound(
 }
 
 /** The field→variable contract for a form's resolved schema (pin: published | latest | draft | v{n}). */
-export type FieldContract = { key: string; type: string; required: boolean; conditional: boolean };
+export type FieldContract = { key: string; type: string; required: boolean; conditional: boolean; disabled?: boolean; label?: string };
 export async function getFields(tenant: string, code: string, pin = "latest"): Promise<FieldContract[]> {
   const r = await req<{ fields: FieldContract[] }>(tenant, `${BASE}/by-code/${seg(code)}/fields?pin=${pin}`);
   return asArray<FieldContract>(r.fields);
