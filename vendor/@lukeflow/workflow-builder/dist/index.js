@@ -554,8 +554,6 @@ function NodeConfig({ doc, node, stepTypes = [], connections = [], onPatch, onDe
   const nodeInput = node.input;
   const inputsEditor = inputFields.length > 0 ? /* @__PURE__ */ jsx(TypedInputForm, { fields: inputFields, value: nodeInput, onChange: (input) => onPatch({ input }) }) : /* @__PURE__ */ jsx(KvEditor, { value: nodeInput, onChange: (input) => onPatch({ input }) });
   return /* @__PURE__ */ jsxs("div", { children: [
-    /* @__PURE__ */ jsx("div", { style: { fontWeight: 700, marginBottom: 4, fontSize: 13 }, children: "Step" }),
-    /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "var(--wf-muted)", marginBottom: 12, textTransform: "capitalize" }, children: node.kind }),
     /* @__PURE__ */ jsx(Field, { title: "Name", children: /* @__PURE__ */ jsx("input", { style: control, value: node.name ?? "", placeholder: nodeLabel2(node), onChange: (e) => onPatch({ name: e.target.value }) }) }),
     node.kind === "action" ? /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx(Field, { title: "Action", children: /* @__PURE__ */ jsx("input", { style: control, value: node.action ?? "", placeholder: "e.g. send", onChange: (e) => onPatch({ action: e.target.value }) }) }),
@@ -656,8 +654,6 @@ function TriggerConfig({
   const current = `${trigger.capability}.${trigger.type}`;
   const config = trigger.config ?? {};
   return /* @__PURE__ */ jsxs("div", { children: [
-    /* @__PURE__ */ jsx("div", { style: { fontWeight: 700, marginBottom: 4, fontSize: 13 }, children: "Trigger" }),
-    /* @__PURE__ */ jsx("div", { style: { fontSize: 11, color: "var(--wf-muted)", marginBottom: 12 }, children: "How this workflow starts" }),
     /* @__PURE__ */ jsx(Field, { title: "When", children: /* @__PURE__ */ jsxs(
       "select",
       {
@@ -997,7 +993,7 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highl
     {
       className: `wf-root${className ? ` ${className}` : ""}`,
       "data-wf-theme": theme,
-      style: { display: "flex", width: "100%", height: "100%", background: "var(--wf-surface)", color: "var(--wf-fg)" },
+      style: { position: "relative", display: "flex", width: "100%", height: "100%", background: "var(--wf-surface)", color: "var(--wf-fg)" },
       children: [
         /* @__PURE__ */ jsx3("style", { children: WF_THEME_CSS }),
         onChange ? /* @__PURE__ */ jsxs3("aside", { style: { width: 190, overflowY: "auto", borderRight: "1px solid var(--wf-border)", padding: 8, background: "var(--wf-surface)" }, children: [
@@ -1070,18 +1066,111 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highl
             ]
           }
         ),
-        onChange && (triggerSelected || selected) ? /* @__PURE__ */ jsx3("aside", { style: { width: 288, overflowY: "auto", borderLeft: "1px solid var(--wf-border)", padding: 14, background: "var(--wf-surface)", fontSize: 13 }, children: triggerSelected ? /* @__PURE__ */ jsx3(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ jsx3(
-          NodeConfig,
+        onChange && (triggerSelected || selected) ? /* @__PURE__ */ jsx3(
+          ConfigModal,
           {
-            doc: value,
-            node: selected,
-            stepTypes,
-            connections,
-            onPatch: patchSelected,
-            onDelete: () => onNodesDelete([{ id: selected.id }])
+            title: triggerSelected ? "Trigger" : nodeLabel2(selected),
+            subtitle: triggerSelected ? "How this workflow starts" : selected.kind.replace(/^./, (c) => c.toUpperCase()),
+            onClose: () => setSelectedId(null),
+            children: triggerSelected ? /* @__PURE__ */ jsx3(TriggerConfig, { trigger: value.trigger, triggers: triggerTypes, onChange: setTrigger }) : selected ? /* @__PURE__ */ jsx3(
+              NodeConfig,
+              {
+                doc: value,
+                node: selected,
+                stepTypes,
+                connections,
+                onPatch: patchSelected,
+                onDelete: () => onNodesDelete([{ id: selected.id }])
+              }
+            ) : null
           }
-        ) : null }) : null
+        ) : null
       ]
+    }
+  );
+}
+function ConfigModal({
+  title,
+  subtitle,
+  onClose,
+  children
+}) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return /* @__PURE__ */ jsx3(
+    "div",
+    {
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-label": title,
+      onClick: onClose,
+      style: {
+        position: "absolute",
+        inset: 0,
+        zIndex: 20,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(15,23,42,0.45)",
+        padding: 24
+      },
+      children: /* @__PURE__ */ jsxs3(
+        "div",
+        {
+          onClick: (e) => e.stopPropagation(),
+          style: {
+            width: "100%",
+            maxWidth: 460,
+            maxHeight: "90%",
+            display: "flex",
+            flexDirection: "column",
+            background: "var(--wf-surface)",
+            color: "var(--wf-fg)",
+            borderRadius: 14,
+            border: "1px solid var(--wf-border)",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
+            overflow: "hidden"
+          },
+          children: [
+            /* @__PURE__ */ jsxs3("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "14px 18px", borderBottom: "1px solid var(--wf-border)", flex: "0 0 auto" }, children: [
+              /* @__PURE__ */ jsxs3("div", { style: { minWidth: 0 }, children: [
+                /* @__PURE__ */ jsx3("div", { style: { fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: title }),
+                subtitle ? /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, color: "var(--wf-muted)", marginTop: 2 }, children: subtitle }) : null
+              ] }),
+              /* @__PURE__ */ jsx3(
+                "button",
+                {
+                  type: "button",
+                  onClick: onClose,
+                  "aria-label": "Close",
+                  style: {
+                    flex: "0 0 auto",
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    cursor: "pointer",
+                    border: "1px solid var(--wf-border-2)",
+                    background: "var(--wf-card)",
+                    color: "var(--wf-muted)",
+                    fontSize: 18,
+                    lineHeight: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  },
+                  children: "\xD7"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsx3("div", { style: { padding: 18, overflowY: "auto", fontSize: 13 }, children })
+          ]
+        }
+      )
     }
   );
 }
