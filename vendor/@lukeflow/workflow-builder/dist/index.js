@@ -677,6 +677,57 @@ function operationOf2(descriptorId) {
   return i >= 0 ? descriptorId.slice(i + 1) : descriptorId;
 }
 
+// src/initiators.ts
+function opOf(id) {
+  const i = id.indexOf(".");
+  return i >= 0 ? id.slice(i + 1) : id;
+}
+function nativeInitiators(steps) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const s of steps) {
+    if (s.kind !== "trigger") continue;
+    const item = {
+      key: `native:${s.id}`,
+      label: s.label,
+      trigger: { capability: s.capability.toLowerCase(), type: opOf(s.id) }
+    };
+    const g = s.paletteGroup ?? s.capability;
+    const list = groups.get(g);
+    if (list) list.push(item);
+    else groups.set(g, [item]);
+  }
+  return [...groups.entries()].map(([group, items]) => ({ group, items }));
+}
+var CONNECTION_LIFECYCLE = [
+  { type: "record.created", label: "Record created" },
+  { type: "record.updated", label: "Record updated" },
+  { type: "record.deleted", label: "Record deleted" }
+];
+function connectionLabel(c) {
+  return c.externalAccount ? `${c.providerKey} \xB7 ${c.externalAccount}` : c.providerKey;
+}
+function connectionInitiators(connections) {
+  return connections.map((c) => ({
+    group: connectionLabel(c),
+    items: CONNECTION_LIFECYCLE.map((l) => ({
+      key: `conn:${c.id}:${l.type}`,
+      label: l.label,
+      trigger: {
+        capability: "integrations",
+        type: l.type,
+        config: { connection: c.id, provider: c.providerKey }
+      }
+    }))
+  }));
+}
+function isActiveInitiator(item, trigger) {
+  if (!trigger) return false;
+  if (item.trigger.capability !== trigger.capability || item.trigger.type !== trigger.type) return false;
+  const wantConn = item.trigger.config?.connection;
+  if (wantConn == null) return true;
+  return (trigger.config?.connection ?? void 0) === wantConn;
+}
+
 // src/nodes.tsx
 import { Handle, Position } from "@xyflow/react";
 import { jsx as jsx2, jsxs as jsxs2 } from "react/jsx-runtime";
@@ -875,8 +926,10 @@ var paletteItemStyle = {
   color: "var(--wf-fg)"
 };
 function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highlight, onChange, className }) {
-  const palette = useMemo(() => buildPalette(stepTypes), [stepTypes]);
+  const palette = useMemo(() => buildPalette(stepTypes.filter((s) => s.kind !== "trigger")), [stepTypes]);
   const triggerTypes = useMemo(() => stepTypes.filter((s) => s.kind === "trigger"), [stepTypes]);
+  const nativeInits = useMemo(() => nativeInitiators(stepTypes), [stepTypes]);
+  const connectionInits = useMemo(() => connectionInitiators(connections ?? []), [connections]);
   const [selectedId, setSelectedId] = useState2(null);
   const [showProblems, setShowProblems] = useState2(true);
   const diagnostics = useMemo(() => validateWorkflow(value), [value]);
@@ -961,6 +1014,11 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highl
   const setTrigger = (t) => {
     if (onChange) onChange({ ...value, trigger: t });
   };
+  const selectInitiator = (item) => {
+    if (!onChange) return;
+    onChange({ ...value, trigger: item.trigger });
+    setSelectedId(START_ID);
+  };
   const onNodeDragStop = useCallback(
     (_, dragged) => {
       if (!onChange) return;
@@ -996,15 +1054,20 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highl
       style: { position: "relative", display: "flex", width: "100%", height: "100%", background: "var(--wf-surface)", color: "var(--wf-fg)" },
       children: [
         /* @__PURE__ */ jsx3("style", { children: WF_THEME_CSS }),
-        onChange ? /* @__PURE__ */ jsxs3("aside", { style: { width: 190, overflowY: "auto", borderRight: "1px solid var(--wf-border)", padding: 8, background: "var(--wf-surface)" }, children: [
-          palette.map((group) => /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 12 }, children: [
-            /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--wf-muted)" }, children: group.group }),
+        onChange ? /* @__PURE__ */ jsxs3("aside", { style: { width: 210, overflowY: "auto", borderRight: "1px solid var(--wf-border)", padding: 10, background: "var(--wf-surface)" }, children: [
+          /* @__PURE__ */ jsx3(SectionHeading, { children: "Initiators" }),
+          /* @__PURE__ */ jsx3(SubHeading, { children: "Native initiators" }),
+          nativeInits.length === 0 ? /* @__PURE__ */ jsx3(Hint, { children: "No native initiators available." }) : nativeInits.map((g) => /* @__PURE__ */ jsx3(InitiatorGroupView, { group: g, trigger: value.trigger, onSelect: selectInitiator }, `native-${g.group}`)),
+          /* @__PURE__ */ jsx3(SubHeading, { children: "Connection initiators" }),
+          connectionInits.length === 0 ? /* @__PURE__ */ jsx3(Hint, { children: "Connect an integration to add initiators." }) : connectionInits.map((g) => /* @__PURE__ */ jsx3(InitiatorGroupView, { group: g, trigger: value.trigger, onSelect: selectInitiator }, `conn-${g.group}`)),
+          /* @__PURE__ */ jsx3("div", { style: { height: 1, background: "var(--wf-border)", margin: "14px 0 10px" } }),
+          /* @__PURE__ */ jsx3(SectionHeading, { children: "Steps" }),
+          palette.map((group) => /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 10 }, children: [
+            /* @__PURE__ */ jsx3(SubHeading, { children: group.group }),
             group.items.map((item) => draggable(item.id, item.label, item.id))
           ] }, group.group)),
-          /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 12 }, children: [
-            /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--wf-muted)" }, children: "Flow" }),
-            STRUCTURAL.map((s) => draggable(`${STRUCTURAL_PREFIX}${s.kind}`, s.label, s.kind))
-          ] })
+          /* @__PURE__ */ jsx3(SubHeading, { children: "Flow" }),
+          STRUCTURAL.map((s) => draggable(`${STRUCTURAL_PREFIX}${s.kind}`, s.label, s.kind))
         ] }) : null,
         /* @__PURE__ */ jsxs3(
           "div",
@@ -1173,6 +1236,61 @@ function ConfigModal({
       )
     }
   );
+}
+function SectionHeading({ children }) {
+  return /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--wf-fg)", margin: "0 0 8px" }, children });
+}
+function SubHeading({ children }) {
+  return /* @__PURE__ */ jsx3("div", { style: { fontSize: 10, fontWeight: 600, textTransform: "uppercase", color: "var(--wf-muted)", margin: "10px 0 4px" }, children });
+}
+function Hint({ children }) {
+  return /* @__PURE__ */ jsx3("div", { style: { fontSize: 11, color: "var(--wf-faint)", padding: "2px 0 4px" }, children });
+}
+function InitiatorGroupView({
+  group,
+  trigger,
+  onSelect
+}) {
+  return /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 6 }, children: [
+    /* @__PURE__ */ jsx3(SubHeading, { children: group.group }),
+    group.items.map((item) => {
+      const active = isActiveInitiator(item, trigger);
+      return /* @__PURE__ */ jsxs3(
+        "div",
+        {
+          role: "button",
+          tabIndex: 0,
+          onClick: () => onSelect(item),
+          onKeyDown: (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect(item);
+            }
+          },
+          title: `Start when: ${item.label}`,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "5px 8px",
+            margin: "3px 0",
+            borderRadius: 6,
+            fontSize: 12.5,
+            cursor: "pointer",
+            border: `1px solid ${active ? "var(--wf-accent)" : "var(--wf-border)"}`,
+            background: active ? "color-mix(in srgb, var(--wf-accent) 12%, var(--wf-card))" : "var(--wf-card)",
+            color: "var(--wf-fg)",
+            fontWeight: active ? 600 : 400
+          },
+          children: [
+            /* @__PURE__ */ jsx3("span", { style: { color: active ? "var(--wf-accent)" : "var(--wf-faint)", fontSize: 11 }, children: active ? "\u25C9" : "\u25CB" }),
+            /* @__PURE__ */ jsx3("span", { style: { minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: item.label })
+          ]
+        },
+        item.key
+      );
+    })
+  ] });
 }
 function ProblemsStrip({
   problems,
