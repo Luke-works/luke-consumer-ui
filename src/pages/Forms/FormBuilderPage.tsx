@@ -42,12 +42,13 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink } from "lucide-react";
+import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink, Send } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
 import FormOutboundPanel from "./FormOutboundPanel";
+import FormSendPanel from "./FormSendPanel";
 import { guardedLeave } from "../../lib/leaveGuard";
 import { useMutationLock } from "../../hooks/useMutationLock";
 import { PencilIcon } from "../../icons";
@@ -121,6 +122,7 @@ export default function FormBuilderPage() {
   const [latestSignedOff, setLatestSignedOff] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
   const [outboundOpen, setOutboundOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
   const isOutbound = form?.kind === "OUTBOUND";
   // Advisory edit-lock: who (other than me) currently holds it, for the "being edited" banner.
   const [lockedByOther, setLockedByOther] = useState<string | null>(null);
@@ -652,11 +654,20 @@ export default function FormBuilderPage() {
                 onPublish={onPublish}
               />
               {isOutbound ? (
-                <Tooltip content="Outbound forms are prefilled and sent to a recipient — set who fills each field.">
-                  <button type="button" onClick={() => setOutboundOpen(true)} className={TOOLBAR_BTN_NEUTRAL}>
-                    <CodeXml className="size-4" />Outbound setup
-                  </button>
-                </Tooltip>
+                <>
+                  <Tooltip content="Outbound forms are prefilled and sent to a recipient — set who fills each field.">
+                    <button type="button" onClick={() => setOutboundOpen(true)} className={TOOLBAR_BTN_NEUTRAL}>
+                      <CodeXml className="size-4" />Outbound setup
+                    </button>
+                  </Tooltip>
+                  <Tooltip content={publishedVersion != null
+                    ? "Send a prefilled copy to a recipient by email."
+                    : "Publish a version first — you send the published version."}>
+                    <button type="button" onClick={() => setSendOpen(true)} disabled={publishedVersion == null} className={TOOLBAR_BTN_NEUTRAL}>
+                      <Send className="size-4" />Send
+                    </button>
+                  </Tooltip>
+                </>
               ) : (
                 <Tooltip content={publishedVersion != null
                   ? `Embed the published version (v${publishedVersion}) — get an iframe snippet for any website.`
@@ -795,6 +806,16 @@ export default function FormBuilderPage() {
           code={form.code}
           initialRoles={form.outboundRoles}
           onSaved={(roles) => setForm((prev) => (prev ? { ...prev, outboundRoles: roles } : prev))}
+        />
+      ) : null}
+      {form ? (
+        <FormSendPanel
+          open={sendOpen}
+          onClose={() => setSendOpen(false)}
+          tenant={tenant}
+          formId={id}
+          code={form.code}
+          roles={form.outboundRoles}
         />
       ) : null}
 

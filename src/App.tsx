@@ -24,6 +24,7 @@ const FormFill = lazy(() => import("./pages/Forms/FormFill"));
 const FormPreview = lazy(() => import("./pages/Forms/FormPreview"));
 const FormResponses = lazy(() => import("./pages/Forms/FormResponses"));
 const FormEmbed = lazy(() => import("./pages/Forms/FormEmbed"));
+const FormRespond = lazy(() => import("./pages/Forms/FormRespond"));
 const FormInstancesList = lazy(() => import("./pages/Forms/FormInstancesList"));
 const FormInbox = lazy(() => import("./pages/Forms/FormInbox"));
 // Code-split the email-template builder (react-email render) to its own chunk.
@@ -229,6 +230,16 @@ export default function App() {
             element={
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
                 <FormEmbed />
+              </Suspense>
+            }
+          />
+
+          {/* Public outbound recipient fill page — no auth; the instance token + emailed OTP are the auth. */}
+          <Route
+            path="/respond/:token"
+            element={
+              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                <FormRespond />
               </Suspense>
             }
           />

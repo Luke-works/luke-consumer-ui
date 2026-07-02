@@ -197,6 +197,21 @@ export async function setOutboundConfig(
   return toForm(f);
 }
 
+/** Outbound send: create a prefilled instance for a recipient and email them the /respond link. */
+export type OutboundSendResult = { instanceId: string; token: string; link: string; emailStatus: string };
+export function sendOutbound(
+  tenant: string,
+  id: string,
+  recipient: { firstName?: string; lastName?: string; email: string },
+  prefill?: Record<string, unknown>,
+  expiresAt?: number,
+): Promise<OutboundSendResult> {
+  return req(tenant, `${BASE}/${seg(id)}/send`, {
+    method: "POST",
+    body: JSON.stringify({ recipient, prefill, expiresAt }),
+  });
+}
+
 /** The field→variable contract for a form's resolved schema (pin: published | latest | draft | v{n}). */
 export type FieldContract = { key: string; type: string; required: boolean; conditional: boolean };
 export async function getFields(tenant: string, code: string, pin = "latest"): Promise<FieldContract[]> {
