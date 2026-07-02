@@ -10,6 +10,13 @@ const seg = (s: string) => encodeURIComponent(s);
 // ── View models (what the UI works with) ────────────────────────────────────
 export type FormStatus = "draft" | "published" | "archived";
 
+/** Authoring intent, chosen at creation. INBOUND = embedded (public submissions);
+ *  OUTBOUND = prefilled by a preparer and sent to a named recipient (never embeddable). */
+export type FormKind = "INBOUND" | "OUTBOUND";
+
+/** Who fills an outbound field. */
+export type FieldRole = "PREPARER" | "RECIPIENT" | "EITHER";
+
 export type StoredForm = {
   id: string;
   code: string;
@@ -17,6 +24,12 @@ export type StoredForm = {
   description?: string;
   /** Editable working draft (coltorapps schema JSON, "" when empty). */
   schema: string;
+  /** Inbound vs outbound (defaults to INBOUND for legacy forms). */
+  kind: FormKind;
+  /** Inbound only: chosen submission handling (e.g. "COLLECT"); null = undecided → embed stays gated. */
+  submissionHandling?: string | null;
+  /** Outbound only: fieldKey → role map. */
+  outboundRoles?: Record<string, FieldRole>;
   status: FormStatus;
   publishedVersion?: number;
   /** Highest checked-in version (0 when none). Populated on single-form loads. */
@@ -50,6 +63,9 @@ type ApiForm = {
   name: string;
   description?: string | null;
   status: string; // DRAFT | PUBLISHED | RETIRED
+  kind?: string | null; // INBOUND | OUTBOUND
+  submissionHandling?: string | null;
+  outboundRolesJson?: string | null;
   publishedVersion?: number | null;
   draftSchema?: string | null;
   deletedAt?: string | null;
@@ -77,6 +93,9 @@ function toForm(f: ApiForm, latestVersion = 0, latestVersionSignedOff = false): 
     name: f.name,
     description: f.description ?? undefined,
     schema: f.draftSchema ?? "",
+    kind: f.kind === "OUTBOUND" ? "OUTBOUND" : "INBOUND",
+    submissionHandling: f.submissionHandling ?? null,
+    outboundRoles: parseRoles(f.outboundRolesJson),
     status: STATUS_IN[f.status] ?? "draft",
     publishedVersion: f.publishedVersion ?? undefined,
     latestVersion,
@@ -136,9 +155,53 @@ export async function getForm(tenant: string, id: string): Promise<StoredForm> {
   return toForm(form, max, latestSignedOff);
 }
 
-export async function createForm(tenant: string, name: string, description?: string): Promise<StoredForm> {
-  const f = await req<ApiForm>(tenant, BASE, { method: "POST", body: JSON.stringify({ name, description }) });
+function parseRoles(json?: string | null): Record<string, FieldRole> | undefined {
+  if (!json) return undefined;
+  try {
+    const v = JSON.parse(json);
+    return v && typeof v === "object" ? (v as Record<string, FieldRole>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function createForm(
+  tenant: string,
+  name: string,
+  description?: string,
+  kind: FormKind = "INBOUND",
+): Promise<StoredForm> {
+  const f = await req<ApiForm>(tenant, BASE, { method: "POST", body: JSON.stringify({ name, description, kind }) });
   return toForm(f);
+}
+
+/** Inbound only: choose what happens to submissions (defaults to "COLLECT"). Unlocks embedding. */
+export async function setSubmissionHandling(tenant: string, id: string, mode = "COLLECT"): Promise<StoredForm> {
+  const f = await req<ApiForm>(tenant, `${BASE}/${seg(id)}/submission-handling`, {
+    method: "PUT",
+    body: JSON.stringify({ mode }),
+  });
+  return toForm(f);
+}
+
+/** Outbound only: store the per-field fill-role map (fieldKey → PREPARER | RECIPIENT | EITHER). */
+export async function setOutboundConfig(
+  tenant: string,
+  id: string,
+  roles: Record<string, FieldRole>,
+): Promise<StoredForm> {
+  const f = await req<ApiForm>(tenant, `${BASE}/${seg(id)}/outbound-config`, {
+    method: "PUT",
+    body: JSON.stringify({ roles }),
+  });
+  return toForm(f);
+}
+
+/** The field→variable contract for a form's resolved schema (pin: published | latest | draft | v{n}). */
+export type FieldContract = { key: string; type: string; required: boolean; conditional: boolean };
+export async function getFields(tenant: string, code: string, pin = "latest"): Promise<FieldContract[]> {
+  const r = await req<{ fields: FieldContract[] }>(tenant, `${BASE}/by-code/${seg(code)}/fields?pin=${pin}`);
+  return asArray<FieldContract>(r.fields);
 }
 
 export function saveDraft(tenant: string, id: string, schema: string): Promise<unknown> {

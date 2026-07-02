@@ -47,6 +47,7 @@ import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
+import FormOutboundPanel from "./FormOutboundPanel";
 import { guardedLeave } from "../../lib/leaveGuard";
 import { useMutationLock } from "../../hooks/useMutationLock";
 import { PencilIcon } from "../../icons";
@@ -119,6 +120,8 @@ export default function FormBuilderPage() {
   // creates an unsigned version (clears this); "Check in & sign off" sets it.
   const [latestSignedOff, setLatestSignedOff] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
+  const [outboundOpen, setOutboundOpen] = useState(false);
+  const isOutbound = form?.kind === "OUTBOUND";
   // Advisory edit-lock: who (other than me) currently holds it, for the "being edited" banner.
   const [lockedByOther, setLockedByOther] = useState<string | null>(null);
   // Form settings modal (name / description / submission message + activity feed).
@@ -648,13 +651,21 @@ export default function FormBuilderPage() {
                 onCheckIn={onCheckIn}
                 onPublish={onPublish}
               />
-              <Tooltip content={publishedVersion != null
-                ? `Embed the published version (v${publishedVersion}) — get an iframe snippet for any website.`
-                : "Publish a version first — the embed always serves the published version."}>
-                <button type="button" onClick={() => setEmbedOpen(true)} disabled={publishedVersion == null} className={TOOLBAR_BTN_NEUTRAL}>
-                  <CodeXml className="size-4" />Embed
-                </button>
-              </Tooltip>
+              {isOutbound ? (
+                <Tooltip content="Outbound forms are prefilled and sent to a recipient — set who fills each field.">
+                  <button type="button" onClick={() => setOutboundOpen(true)} className={TOOLBAR_BTN_NEUTRAL}>
+                    <CodeXml className="size-4" />Outbound setup
+                  </button>
+                </Tooltip>
+              ) : (
+                <Tooltip content={publishedVersion != null
+                  ? `Embed the published version (v${publishedVersion}) — get an iframe snippet for any website.`
+                  : "Publish a version first — the embed always serves the published version."}>
+                  <button type="button" onClick={() => setEmbedOpen(true)} disabled={publishedVersion == null} className={TOOLBAR_BTN_NEUTRAL}>
+                    <CodeXml className="size-4" />Embed
+                  </button>
+                </Tooltip>
+              )}
             </>
           )}
         </div>
@@ -765,7 +776,27 @@ export default function FormBuilderPage() {
       />
 
       {/* Keyed by formId so navigating to another form's builder mints a fresh token. */}
-      <FormEmbedPanel key={id} open={embedOpen} onClose={() => setEmbedOpen(false)} tenant={tenant} formId={id} publishedVersion={publishedVersion} />
+      <FormEmbedPanel
+        key={id}
+        open={embedOpen}
+        onClose={() => setEmbedOpen(false)}
+        tenant={tenant}
+        formId={id}
+        publishedVersion={publishedVersion}
+        submissionHandling={form?.submissionHandling}
+        onSubmissionHandled={() => setForm((prev) => (prev ? { ...prev, submissionHandling: "COLLECT" } : prev))}
+      />
+      {form ? (
+        <FormOutboundPanel
+          open={outboundOpen}
+          onClose={() => setOutboundOpen(false)}
+          tenant={tenant}
+          formId={id}
+          code={form.code}
+          initialRoles={form.outboundRoles}
+          onSaved={(roles) => setForm((prev) => (prev ? { ...prev, outboundRoles: roles } : prev))}
+        />
+      ) : null}
 
       <Modal isOpen={formSettingsOpen} onClose={() => setFormSettingsOpen(false)} className="mx-4 w-full max-w-[480px]">
         <div className="p-6">

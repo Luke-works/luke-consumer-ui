@@ -58,7 +58,10 @@ export function useForms() {
     [tenant, refresh],
   );
 
-  const createForm = useCallback((name: string) => op((t) => api.createForm(t, name)), [op]);
+  const createForm = useCallback(
+    (name: string, kind: api.FormKind = "INBOUND") => op((t) => api.createForm(t, name, undefined, kind)),
+    [op],
+  );
   const clone = useCallback((id: string) => op((t) => api.cloneForm(t, id)), [op]);
   const archive = useCallback((id: string, archived: boolean) => op((t) => api.archiveForm(t, id, archived)), [op]);
   const softDelete = useCallback((id: string) => op((t) => api.softDelete(t, id)), [op]);

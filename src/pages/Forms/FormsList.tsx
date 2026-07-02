@@ -14,7 +14,7 @@ import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import { PlusIcon, ListIcon, TrashBinIcon, TimeIcon, CopyIcon, BoxIcon, PaperPlaneIcon, EyeIcon } from "../../icons";
 import { useForms, type StoredForm, type FormStatus } from "../../lib/formsStore";
-import { listVersions, publishVersion, restoreVersion, type FormArtifact } from "../../lib/formsApi";
+import { listVersions, publishVersion, restoreVersion, type FormArtifact, type FormKind } from "../../lib/formsApi";
 const FormRenderer = lazy(() => import("../../components/formBuilder/LukeFormRenderer"));
 
 const STATUS_BADGE: Record<FormStatus, string> = {
@@ -74,6 +74,7 @@ export default function FormsList() {
 
   const [isModalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
+  const [kind, setKind] = useState<FormKind>("INBOUND");
   const [creating, setCreating] = useState(false);
   const [historyForm, setHistoryForm] = useState<StoredForm | null>(null);
   const [historyVersions, setHistoryVersions] = useState<FormArtifact[]>([]);
@@ -120,6 +121,7 @@ export default function FormsList() {
 
   const openModal = () => {
     setName("");
+    setKind("INBOUND");
     setModalOpen(true);
   };
 
@@ -128,7 +130,7 @@ export default function FormsList() {
     if (!trimmed || creating) return;
     setCreating(true);
     try {
-      const form = await createForm(trimmed);
+      const form = await createForm(trimmed, kind);
       setModalOpen(false);
       setName("");
       if (form) navigate(`/forms/${form.id}`);
@@ -425,6 +427,36 @@ export default function FormsList() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+          </div>
+
+          <div className="mt-6">
+            <Label>Form type</Label>
+            <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {([
+                { k: "INBOUND", title: "Inbound", desc: "Embed it somewhere — anyone can submit." },
+                { k: "OUTBOUND", title: "Outbound", desc: "Prefill it and send to a specific recipient." },
+              ] as const).map((opt) => {
+                const active = kind === opt.k;
+                return (
+                  <button
+                    type="button"
+                    key={opt.k}
+                    onClick={() => setKind(opt.k)}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      active
+                        ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+                        : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-800 dark:text-white/90">{opt.title}</span>
+                      <span className={`size-3.5 rounded-full border ${active ? "border-brand-500 bg-brand-500" : "border-gray-300 dark:border-gray-600"}`} />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{opt.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-8 flex justify-end gap-3">

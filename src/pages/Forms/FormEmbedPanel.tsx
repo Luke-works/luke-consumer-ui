@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import { MonitorPlay } from "lucide-react";
-import { getEmbedToken, rotateEmbedToken, updateMeta } from "../../lib/formsApi";
+import { getEmbedToken, rotateEmbedToken, setSubmissionHandling, updateMeta } from "../../lib/formsApi";
 
 export default function FormEmbedPanel({
   open,
@@ -22,6 +22,8 @@ export default function FormEmbedPanel({
   tenant,
   formId,
   publishedVersion,
+  submissionHandling,
+  onSubmissionHandled,
 }: {
   open: boolean;
   onClose: () => void;
@@ -29,7 +31,14 @@ export default function FormEmbedPanel({
   formId: string;
   /** The live version the embed serves (the engine resolves @published). Null = not published. */
   publishedVersion?: number | null;
+  /** Inbound gate: null/blank = the user hasn't decided what happens to submissions → embed stays locked. */
+  submissionHandling?: string | null;
+  /** Called after the user picks a submission handling, so the parent can refresh the form. */
+  onSubmissionHandled?: () => void;
 }) {
+  // Embedding is gated until the user decides what happens to submissions (inbound rule).
+  const needsHandling = publishedVersion != null && !submissionHandling;
+  const [deciding, setDeciding] = useState(false);
   const [embedToken, setEmbedToken] = useState<string | null>(null);
   const [embedErr, setEmbedErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -42,7 +51,7 @@ export default function FormEmbedPanel({
   // Mint the token lazily on first open (cached after). A published version is required —
   // the engine 404s an unpublished form; that surfaces here as an error.
   useEffect(() => {
-    if (!open || embedToken) return;
+    if (!open || embedToken || needsHandling) return;
     let active = true;
     getEmbedToken(tenant, formId)
       .then(({ token, allowedEmbedOrigins }) => {
@@ -52,7 +61,21 @@ export default function FormEmbedPanel({
       })
       .catch((e) => active && setEmbedErr((e as { message?: string })?.message ?? "Couldn’t generate the embed code."));
     return () => { active = false; };
-  }, [open, embedToken, tenant, formId]);
+  }, [open, embedToken, tenant, formId, needsHandling]);
+
+  // Inbound gate: record "collect submissions" as the handling, which unlocks the embed.
+  const decideCollect = async () => {
+    setDeciding(true);
+    setEmbedErr(null);
+    try {
+      await setSubmissionHandling(tenant, formId, "COLLECT");
+      onSubmissionHandled?.();
+    } catch (e) {
+      setEmbedErr((e as { message?: string })?.message ?? "Couldn’t save your choice.");
+    } finally {
+      setDeciding(false);
+    }
+  };
 
   // Reset the transient affordances each time the modal reopens.
   useEffect(() => { if (open) { setCopied(false); setEmbedErr(null); } }, [open]);
@@ -116,7 +139,21 @@ export default function FormEmbedPanel({
             <> It always serves the <span className="font-medium text-gray-700 dark:text-gray-200">published version (v{publishedVersion})</span> — re-publish to update what visitors see.</>
           )}
         </p>
-        {embedErr ? (
+        {needsHandling ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white/5">
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">First, decide what happens to submissions</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              This form can’t be embedded until you choose how submissions are handled. For now you can start collecting
+              them — you can add follow-up actions (email, call) later.
+            </p>
+            {embedErr ? <p className="mt-3 text-sm text-error-500">{embedErr}</p> : null}
+            <div className="mt-4">
+              <Button size="sm" onClick={decideCollect} disabled={deciding}>
+                {deciding ? "Saving…" : "Collect submissions & enable embed"}
+              </Button>
+            </div>
+          </div>
+        ) : embedErr ? (
           <p className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-500 dark:bg-error-500/10">{embedErr}</p>
         ) : !embedToken ? (
           <p className="py-6 text-center text-sm text-gray-400">Generating…</p>
