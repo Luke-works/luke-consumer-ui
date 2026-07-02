@@ -3,6 +3,8 @@
 // access token lives in memory here; the long-lived refresh token is an HttpOnly
 // cookie set by the gateway (sent via credentials:"include").
 
+import { isCapabilityVisible } from "./capabilities";
+
 const BASE = (import.meta.env.VITE_AUTH_API_URL || "").replace(/\/$/, "");
 
 export type WorkosUser = {
@@ -366,12 +368,16 @@ export function removeUserFromGroup(tenantId: string, userId: string, groupId: s
 }
 
 export async function listCapabilities(tenantId: string): Promise<CapabilityCatalogItem[]> {
-  return asArray<CapabilityCatalogItem>(await authed("/api/org/capabilities", tenantInit(tenantId)));
+  const all = asArray<CapabilityCatalogItem>(await authed("/api/org/capabilities", tenantInit(tenantId)));
+  // Drop force-hidden capabilities (e.g. WORKFLOW until launch) so they never appear in the
+  // admin grant selector or the request-access list.
+  return all.filter((c) => isCapabilityVisible(c.code));
 }
 
 /** Capabilities active for the caller's tenant (org-level, not capability-gated). */
 export async function getMySubscriptions(tenantId: string): Promise<SubscribedCapability[]> {
-  return asArray<SubscribedCapability>(await authed("/api/my-subscriptions", tenantInit(tenantId)));
+  const all = asArray<SubscribedCapability>(await authed("/api/my-subscriptions", tenantInit(tenantId)));
+  return all.filter((s) => isCapabilityVisible(s.code));
 }
 
 export async function getUserCapabilities(tenantId: string, userId: string): Promise<CapabilityGrant[]> {

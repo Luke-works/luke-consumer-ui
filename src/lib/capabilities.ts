@@ -13,11 +13,26 @@ export const SIGNATURES = "SIGNATURES";
 export const PHONE = "PHONE";
 export const WORKFLOW = "WORKFLOW";
 
-/** The caller's effective level for a capability, or "none" if not granted. */
+/**
+ * Capabilities hidden from the ENTIRE UI until we flip them on — regardless of any grant or
+ * subscription. WORKFLOW is off by default; set VITE_WORKFLOW_ENABLED=true to reveal it. Hidden
+ * capabilities report level "none" (gating nav + routes) AND are filtered out of the capability
+ * catalog / request / my-access lists (see isCapabilityVisible).
+ */
+const workflowEnabled = String(import.meta.env.VITE_WORKFLOW_ENABLED).toLowerCase() === "true";
+export const HIDDEN_CAPABILITIES: ReadonlySet<string> = new Set<string>(workflowEnabled ? [] : [WORKFLOW]);
+
+/** False when a capability is force-hidden (not ready) — filter catalog/access lists by this. */
+export function isCapabilityVisible(code: string): boolean {
+  return !HIDDEN_CAPABILITIES.has(code);
+}
+
+/** The caller's effective level for a capability, or "none" if not granted (or force-hidden). */
 export function capabilityLevel(
   session: SessionView | null | undefined,
   code: string,
 ): CapabilityLevel {
+  if (HIDDEN_CAPABILITIES.has(code)) return "none"; // gate nav + routes for not-yet-ready features
   const v = session?.capabilities?.[code];
   return v === "read" || v === "read-write" ? v : "none";
 }

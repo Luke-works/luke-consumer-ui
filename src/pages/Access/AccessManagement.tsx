@@ -42,6 +42,7 @@ import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
 import {
   EMAIL,
+  isCapabilityVisible,
   LEVEL_LABEL,
   TIER_BADGE,
   TIER_LABEL,
@@ -279,7 +280,9 @@ function ManageMyAccessSection({
     }
   }
 
-  const codes = Object.keys(capabilities);
+  // Exclude force-hidden capabilities (e.g. WORKFLOW until launch) even if the session still
+  // carries a grant for them, so they don't surface in "My access".
+  const codes = Object.keys(capabilities).filter(isCapabilityVisible);
   const meta = (c: string) => catalog.find((x) => x.code === c);
 
   return (
