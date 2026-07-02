@@ -706,8 +706,11 @@ var CONNECTION_LIFECYCLE = [
 function connectionLabel(c) {
   return c.externalAccount ? `${c.providerKey} \xB7 ${c.externalAccount}` : c.providerKey;
 }
+function isActiveConnection(c) {
+  return (c.status ?? "").toUpperCase() === "ACTIVE";
+}
 function connectionInitiators(connections) {
-  return connections.map((c) => ({
+  return connections.filter(isActiveConnection).map((c) => ({
     group: connectionLabel(c),
     items: CONNECTION_LIFECYCLE.map((l) => ({
       key: `conn:${c.id}:${l.type}`,
@@ -1059,7 +1062,7 @@ function WorkflowBuilder({ value, stepTypes, connections, theme = "light", highl
           /* @__PURE__ */ jsx3(SubHeading, { children: "Native initiators" }),
           nativeInits.length === 0 ? /* @__PURE__ */ jsx3(Hint, { children: "No native initiators available." }) : nativeInits.map((g) => /* @__PURE__ */ jsx3(InitiatorGroupView, { group: g, trigger: value.trigger, onSelect: selectInitiator }, `native-${g.group}`)),
           /* @__PURE__ */ jsx3(SubHeading, { children: "Connection initiators" }),
-          connectionInits.length === 0 ? /* @__PURE__ */ jsx3(Hint, { children: "Connect an integration to add initiators." }) : connectionInits.map((g) => /* @__PURE__ */ jsx3(InitiatorGroupView, { group: g, trigger: value.trigger, onSelect: selectInitiator }, `conn-${g.group}`)),
+          connectionInits.length === 0 ? /* @__PURE__ */ jsx3(Hint, { children: "Connect and activate an integration to add initiators." }) : connectionInits.map((g) => /* @__PURE__ */ jsx3(InitiatorGroupView, { group: g, trigger: value.trigger, onSelect: selectInitiator }, `conn-${g.group}`)),
           /* @__PURE__ */ jsx3("div", { style: { height: 1, background: "var(--wf-border)", margin: "14px 0 10px" } }),
           /* @__PURE__ */ jsx3(SectionHeading, { children: "Steps" }),
           palette.map((group) => /* @__PURE__ */ jsxs3("div", { style: { marginBottom: 10 }, children: [
