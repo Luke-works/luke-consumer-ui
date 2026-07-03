@@ -53,6 +53,8 @@ type Screen = {
   opts?: StubOptions;
   /** Optional stable landmark asserted once (content proof beyond "didn't crash"). */
   ready?: (page: Page) => Promise<void>;
+  /** Runs right after goto, before the assertions — e.g. to let a redirect settle. */
+  afterGoto?: (page: Page) => Promise<void>;
 };
 
 const heading = (re: RegExp) => async (page: Page) =>
@@ -88,7 +90,9 @@ const SCREENS: Screen[] = [
     "/api/workflow/catalog": ok({ triggers: [], actions: [], tasks: [] }),
     "/api/workflow/integrations": ok([]),
   } } },
-  { name: "sso-callback", path: "/sso-callback" },
+  // A transient handler: it restores the session then redirects. Wait for it to
+  // leave /sso-callback so we assert on the settled landing page, not mid-redirect.
+  { name: "sso-callback", path: "/sso-callback", afterGoto: (page) => page.waitForURL((u) => !u.pathname.includes("/sso-callback"), { timeout: 10_000 }) },
 
   // ── Public screens (no session) ──
   { name: "signin", path: "/signin", opts: { loggedOut: true } },
@@ -106,6 +110,7 @@ for (const s of SCREENS) {
         await stubBackend(page, s.opts);
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await page.goto(s.path);
+        if (s.afterGoto) await s.afterGoto(page);
         await expectRendered(page);
         await expectHealthy(page);
         if (s.ready) await s.ready(page);

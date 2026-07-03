@@ -303,7 +303,7 @@ function Builder({ tenant, templateId, template }: {
             {dirty && (<><span className="size-1 rounded-full bg-amber-400" /><span className="text-amber-500">unchecked-in changes</span></>)}
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {!canEdit ? (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:bg-white/10 dark:text-gray-400">View only</span>
           ) : (
