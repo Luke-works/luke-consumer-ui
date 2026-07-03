@@ -214,12 +214,17 @@ export default function EmailRenderer({
 
   useEffect(() => {
     let active = true;
-    const parsed: EmailDoc = typeof doc === "string" ? parseEmailDoc(doc) : doc;
-    render(<Email doc={parsed} />)
-      .then((out) => active && setHtml(out))
-      .catch(() => active && setHtml(""));
+    // Debounce: the doc changes on every keystroke (subject / AI chat); compiling the
+    // full react-email tree each time janks the main thread. Coalesce rapid edits.
+    const id = setTimeout(() => {
+      const parsed: EmailDoc = typeof doc === "string" ? parseEmailDoc(doc) : doc;
+      render(<Email doc={parsed} />)
+        .then((out) => active && setHtml(out))
+        .catch(() => active && setHtml(""));
+    }, 200);
     return () => {
       active = false;
+      clearTimeout(id);
     };
     // Re-render whenever the doc content changes (string form is the stable key).
     // eslint-disable-next-line react-hooks/exhaustive-deps

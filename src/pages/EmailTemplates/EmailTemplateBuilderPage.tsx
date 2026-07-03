@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useMutationLock } from "../../hooks/useMutationLock";
 import { guardedLeave } from "../../lib/leaveGuard";
@@ -12,7 +12,9 @@ import { useAuth } from "../../context/AuthContext";
 import { canWrite, EMAIL } from "../../lib/capabilities";
 import { ChevronLeftIcon, CheckLineIcon, PaperPlaneIcon, PencilIcon } from "../../icons";
 import { FlaskConical, BadgeCheck } from "lucide-react";
-import EmailRenderer, { compileEmail } from "../../components/emailBuilder/EmailRenderer";
+// Lazy-load the react-email renderer (~510 KB gz) so it's not in this route's initial
+// chunk — it loads when the preview mounts, and the compiler loads on check-in.
+const EmailRenderer = lazy(() => import("../../components/emailBuilder/EmailRenderer"));
 import EmailAiAssistPanel from "./EmailAiAssistPanel";
 import {
   checkIn,
@@ -190,6 +192,7 @@ function Builder({ tenant, templateId, template }: {
     try {
       await persistDraft();
       const current = { ...docRef.current, subject: subjectRef.current };
+      const { compileEmail } = await import("../../components/emailBuilder/EmailRenderer");
       const { html, text } = await compileEmail(current);
       const ver = await checkIn(tenant, templateId, {
         doc: JSON.stringify(current),
@@ -359,7 +362,9 @@ function Builder({ tenant, templateId, template }: {
 
           {/* Center: live preview. */}
           <div className="rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-white/[0.03]">
-            <EmailRenderer doc={doc} height={680} />
+            <Suspense fallback={<div className="flex h-[680px] items-center justify-center text-sm text-gray-400">Loading preview…</div>}>
+              <EmailRenderer doc={doc} height={680} />
+            </Suspense>
           </div>
         </div>
 
