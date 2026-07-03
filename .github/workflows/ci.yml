@@ -36,6 +36,6 @@ jobs:
         run: npm test --if-present
 
       - name: Lint
-        # Gating: fails the build on any ESLint error. (Remaining react-refresh
-        # fast-refresh hints are warnings and stay advisory, not blocking.)
+        # Gating, zero-tolerance: `npm run lint` is `eslint . --max-warnings 0`, so any
+        # error OR warning fails the build.
         run: npm run lint --if-present

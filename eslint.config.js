@@ -19,10 +19,11 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      // Off by design: this is a Vite fast-refresh (HMR) hint with no production or
+      // correctness impact, and it flags our idiomatic co-location of a context's hook
+      // with its provider (e.g. useAuth + AuthProvider). Turning it off lets lint run as
+      // a zero-warning gate (`--max-warnings 0`) on the rules that actually matter.
+      'react-refresh/only-export-components': 'off',
     },
   },
 )

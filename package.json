@@ -18,7 +18,7 @@
     "build:render": "vite build --config vite.render.config.ts",
     "vendor:respond": "npm run build:respond && node scripts/vendor-bundle.mjs respond",
     "vendor:embed": "npm run build:embed && node scripts/vendor-bundle.mjs embed",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test"
