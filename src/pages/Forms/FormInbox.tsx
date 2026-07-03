@@ -305,7 +305,7 @@ function SplitInbox({
             className="h-9 w-full rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:placeholder:text-white/30"
           />
         </div>
-        <div className="divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
+        <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
           {tasks.length === 0 ? (
             <p className="py-10 text-center text-sm text-gray-400">{search ? "No matches." : "Inbox empty."}</p>
           ) : (
@@ -353,8 +353,10 @@ function SplitInbox({
         )}
       </div>
 
-      {/* Reading pane */}
-      <div className="flex min-h-[60vh] flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+      {/* Reading pane — bounded to the same height as the list so its (potentially tall)
+          submission scrolls WITHIN this pane instead of growing the page and dragging the
+          list along with it. Header stays fixed; only the body below scrolls. */}
+      <div className="flex max-h-[72vh] min-h-[60vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         {selected ? (
           <>
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
@@ -364,7 +366,7 @@ function SplitInbox({
               </div>
               <Button size="sm" onClick={onComplete} disabled={completing}>{completing ? "Completing…" : "Complete task"}</Button>
             </div>
-            <div className="overflow-y-auto p-6">
+            <div className="min-h-0 flex-1 overflow-y-auto p-6">
               <ReviewBody view={view} viewLoading={viewLoading} tenant={tenant} task={selected} />
             </div>
           </>
