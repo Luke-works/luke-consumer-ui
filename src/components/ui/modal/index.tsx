@@ -93,7 +93,15 @@ export const Modal: React.FC<ModalProps> = ({
     : "relative w-full rounded-3xl bg-white  dark:bg-gray-900";
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-y-auto modal z-99999">
+    // Pad the viewport for non-fullscreen dialogs so a `w-full` content box (the
+    // common caller pattern) can never exceed the screen on phones — this is what
+    // keeps every modal in the app inset from the edges uniformly instead of each
+    // caller having to remember `mx-4`.
+    <div
+      className={`fixed inset-0 flex items-center justify-center overflow-y-auto modal z-99999 ${
+        isFullscreen ? "" : "p-4 sm:p-6"
+      }`}
+    >
       {!isFullscreen && (
         <div
           className="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]"
