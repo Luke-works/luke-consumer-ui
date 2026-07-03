@@ -13,6 +13,9 @@ export type InboxTask = {
   processDefinitionKey?: string;
   /** The FormInstance id this task is about (the process business key). */
   instanceId?: string | null;
+  /** The form definition (code) this task's submission belongs to — for grouping the
+   *  inbox by form. Absent on older engines (falls back to "ungrouped" in the UI). */
+  definitionCode?: string | null;
 };
 
 /** A page of inbox tasks plus the full server-side total (#26). */

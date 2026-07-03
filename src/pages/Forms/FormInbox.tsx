@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, Columns2, Inbox as InboxIcon, LayoutList } from "lucide-react";
+import { Columns2, FileText, Inbox as InboxIcon, LayoutList } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import DataTable, { type ManualTable } from "../../components/tables/DataTable";
@@ -8,9 +8,13 @@ import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import TaskAttachments from "../../components/documents/TaskAttachments";
-import { completeTask, getInbox, type InboxTask } from "../../lib/formInboxApi";
+import { completeTask, getInbox, INBOX_PAGE_MAX, type InboxTask } from "../../lib/formInboxApi";
 import { getInstance, type InstanceView } from "../../lib/formInstancesApi";
+import { listForms } from "../../lib/formsApi";
 import { isAbortError } from "../../lib/abort";
+
+/** A form definition that has open tasks, with how many (for the inbox's Forms column). */
+type FormGroup = { code: string; name: string; count: number };
 
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "—");
 const who = (a?: string | null) => (a ? a.replace(/^workos:/, "") : null);
@@ -41,6 +45,11 @@ export default function FormInbox() {
   const [search, setSearch] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Split view "by Form Definition": the selected form filter (null = all forms) and a
+  // code→name map so the Forms column shows friendly names instead of raw codes.
+  const [formFilter, setFormFilter] = useState<string | null>(null);
+  const [formNames, setFormNames] = useState<Record<string, string>>({});
+
   const [mode, setMode] = useState<ViewMode>(
     () => (localStorage.getItem(VIEW_KEY) as ViewMode) || "table",
   );
@@ -68,9 +77,12 @@ export default function FormInbox() {
     if (!tenant) return;
     const ctl = new AbortController();
     setLoading(true);
+    // Split view groups by form, so it loads all open tasks (up to the cap) at once and
+    // filters/paginates client-side; table view stays server-paged.
+    const splitting = mode === "split";
     getInbox(tenant, {
-      firstResult: pageIndex * PAGE_SIZE,
-      maxResults: PAGE_SIZE,
+      firstResult: splitting ? 0 : pageIndex * PAGE_SIZE,
+      maxResults: splitting ? INBOX_PAGE_MAX : PAGE_SIZE,
       search: search || undefined,
       sort: sortField,
       order: sortOrder,
@@ -91,7 +103,41 @@ export default function FormInbox() {
         setLoading(false);
       });
     return () => ctl.abort();
-  }, [tenant, pageIndex, sortField, sortOrder, search, reloadKey]);
+  }, [tenant, mode, pageIndex, sortField, sortOrder, search, reloadKey]);
+
+  // Form code → name (for the Forms column labels). Loaded once per tenant; the inbox
+  // still works if this fails (labels fall back to the raw code).
+  useEffect(() => {
+    if (!tenant) return;
+    let active = true;
+    listForms(tenant)
+      .then((fs) => {
+        if (!active) return;
+        const m: Record<string, string> = {};
+        for (const f of fs) m[f.code] = f.name;
+        setFormNames(m);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [tenant]);
+
+  // Forms that have open tasks (+counts), derived from the loaded tasks, and the tasks
+  // visible under the current form filter. Both drive the split view's three panes.
+  const formGroups = useMemo<FormGroup[]>(() => {
+    const counts = new Map<string, number>();
+    for (const t of tasks) {
+      const code = t.definitionCode ?? "";
+      counts.set(code, (counts.get(code) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([code, count]) => ({ code, count, name: formNames[code] || code || "Ungrouped" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks, formNames]);
+
+  const visibleTasks = useMemo(
+    () => (formFilter == null ? tasks : tasks.filter((t) => (t.definitionCode ?? "") === formFilter)),
+    [tasks, formFilter],
+  );
 
   const openTask = async (task: InboxTask) => {
     setSelected(task);
@@ -107,14 +153,17 @@ export default function FormInbox() {
     }
   };
 
-  // Outlook behaviour: auto-open the first task when entering split view.
+  // Outlook behaviour: keep a task open in split view. Opens the first visible task on
+  // entry, and re-selects when the current one drops out of view (e.g. the form filter
+  // changed or its task was completed); clears when nothing is visible.
   useEffect(() => {
-    if (mode === "split" && !selected && tasks.length > 0) {
-      void openTask(tasks[0]);
-    }
+    if (mode !== "split") return;
+    if (selected && visibleTasks.some((t) => t.taskId === selected.taskId)) return;
+    if (visibleTasks.length > 0) void openTask(visibleTasks[0]);
+    else { setSelected(null); setView(null); }
     // openTask is stable enough here; selecting sets `selected` so this won't loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, tasks, selected]);
+  }, [mode, visibleTasks, selected]);
 
   const complete = async () => {
     if (!tenant || !selected) return;
@@ -129,10 +178,16 @@ export default function FormInbox() {
       const remaining = tasks.filter((t) => t.taskId !== completedId);
       setTasks(remaining);
       setTotal((n) => Math.max(0, n - 1));
-      if (mode === "split" && remaining.length > 0) {
-        // Advance to the next task (Outlook-style) rather than clearing the pane.
-        const pos = Math.max(0, tasks.findIndex((t) => t.taskId === completedId));
-        void openTask(remaining[Math.min(pos, remaining.length - 1)]);
+      if (mode === "split") {
+        // Advance to the next task in the SAME form filter (Outlook-style).
+        const remainingVisible = visibleTasks.filter((t) => t.taskId !== completedId);
+        if (remainingVisible.length > 0) {
+          const pos = Math.max(0, visibleTasks.findIndex((t) => t.taskId === completedId));
+          void openTask(remainingVisible[Math.min(pos, remainingVisible.length - 1)]);
+        } else {
+          setSelected(null);
+          setView(null);
+        }
       } else {
         setSelected(null);
         setView(null);
@@ -217,11 +272,11 @@ export default function FormInbox() {
       ) : (
         <SplitInbox
           tenant={tenant}
-          tasks={tasks}
+          tasks={visibleTasks}
+          groups={formGroups}
+          formFilter={formFilter}
+          onFormFilter={setFormFilter}
           total={total}
-          pageIndex={pageIndex}
-          pageSize={PAGE_SIZE}
-          onPageChange={setPageIndex}
           search={search}
           onSearchChange={(q) => { setSearch(q); setPageIndex(0); }}
           selected={selected}
@@ -280,17 +335,39 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
   );
 }
 
-// ── Outlook-style master/detail ────────────────────────────────────────────
+// A row in the Forms column: form name + open-task count, highlighted when selected.
+function FormRow({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition ${
+        active
+          ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+          : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+      }`}
+    >
+      <FileText className={`size-4 shrink-0 ${active ? "text-brand-500" : "text-gray-400"}`} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs ${
+        active ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200" : "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400"
+      }`}>{count}</span>
+    </button>
+  );
+}
+
+// ── Outlook-style three-pane: Forms │ Tasks │ Submission ────────────────────
 function SplitInbox({
-  tenant, tasks, total, pageIndex, pageSize, onPageChange, search, onSearchChange,
+  tenant, tasks, groups, formFilter, onFormFilter, total, search, onSearchChange,
   selected, onSelect, view, viewLoading, completing, onComplete,
 }: {
   tenant: string | null;
   tasks: InboxTask[];
+  groups: FormGroup[];
+  formFilter: string | null;
+  onFormFilter: (code: string | null) => void;
   total: number;
-  pageIndex: number;
-  pageSize: number;
-  onPageChange: (pageIndex: number) => void;
   search: string;
   onSearchChange: (search: string) => void;
   selected: InboxTask | null;
@@ -317,12 +394,39 @@ function SplitInbox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.taskId]);
 
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const allCount = groups.reduce((n, g) => n + g.count, 0);
+  const truncated = total > allCount; // more open tasks than we loaded for grouping
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
-      {/* List pane */}
+    <div className="grid gap-4 lg:grid-cols-[210px_300px_1fr]">
+      {/* Forms pane — pick a form definition to scope the task list. Vertical rail on large
+          screens; on small screens it collapses to the dropdown inside the task pane. */}
+      <div className="hidden max-h-[72vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] lg:flex">
+        <div className="border-b border-gray-100 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">Forms</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+          <FormRow label="All forms" count={allCount} active={formFilter == null} onClick={() => onFormFilter(null)} />
+          {groups.map((g) => (
+            <FormRow key={g.code || "ungrouped"} label={g.name} count={g.count} active={formFilter === g.code} onClick={() => onFormFilter(g.code)} />
+          ))}
+        </div>
+      </div>
+
+      {/* Task pane */}
       <div className="flex max-h-[72vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        {/* Form filter dropdown — only on small screens (the Forms rail is hidden there). */}
+        <div className="border-b border-gray-100 p-3 lg:hidden dark:border-gray-800">
+          <select
+            value={formFilter ?? "__all__"}
+            onChange={(e) => onFormFilter(e.target.value === "__all__" ? null : e.target.value)}
+            aria-label="Filter by form"
+            className="h-9 w-full rounded-lg border border-gray-200 bg-transparent px-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden dark:border-gray-800 dark:text-white/90"
+          >
+            <option value="__all__">All forms ({allCount})</option>
+            {groups.map((g) => (
+              <option key={g.code || "ungrouped"} value={g.code}>{g.name} ({g.count})</option>
+            ))}
+          </select>
+        </div>
         <div className="border-b border-gray-100 p-3 dark:border-gray-800">
           <input
             value={input}
@@ -333,7 +437,7 @@ function SplitInbox({
         </div>
         <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
           {tasks.length === 0 ? (
-            <p className="py-10 text-center text-sm text-gray-400">{search ? "No matches." : "Inbox empty."}</p>
+            <p className="py-10 text-center text-sm text-gray-400">{search ? "No matches." : "No tasks here."}</p>
           ) : (
             tasks.map((t) => {
               const active = selected?.taskId === t.taskId;
@@ -354,27 +458,9 @@ function SplitInbox({
             })
           )}
         </div>
-        {pageCount > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
-            <button
-              type="button"
-              onClick={() => onPageChange(Math.max(0, pageIndex - 1))}
-              disabled={pageIndex === 0}
-              aria-label="Previous page"
-              className="inline-flex size-7 items-center justify-center rounded-md border border-gray-200 transition hover:bg-gray-50 disabled:opacity-40 dark:border-gray-800 dark:hover:bg-white/5"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <span>Page {pageIndex + 1} of {pageCount}</span>
-            <button
-              type="button"
-              onClick={() => onPageChange(Math.min(pageCount - 1, pageIndex + 1))}
-              disabled={pageIndex + 1 >= pageCount}
-              aria-label="Next page"
-              className="inline-flex size-7 items-center justify-center rounded-md border border-gray-200 transition hover:bg-gray-50 disabled:opacity-40 dark:border-gray-800 dark:hover:bg-white/5"
-            >
-              <ChevronRight className="size-4" />
-            </button>
+        {truncated && (
+          <div className="border-t border-gray-100 px-3 py-2 text-center text-xs text-gray-400 dark:border-gray-800">
+            Showing the first {allCount} of {total} open tasks.
           </div>
         )}
       </div>
