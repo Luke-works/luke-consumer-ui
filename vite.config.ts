@@ -16,6 +16,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Hidden source maps: uploadable to Sentry for readable prod stack traces, but
+    // not referenced from (or served with) the shipped JS.
+    sourcemap: "hidden",
+    rollupOptions: {
+      output: {
+        // Keep the stable React runtime (react, react-dom, router, scheduler) in its own
+        // long-cached chunk so ordinary app churn doesn't invalidate it on every deploy.
+        manualChunks(id) {
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/.test(id)) {
+            return "react-vendor";
+          }
+        },
+      },
+    },
+  },
   test: {
     // jsdom so component tests (FormRenderer) can mount; the pure-logic suites
     // (formSchema, expression) run fine under it too.

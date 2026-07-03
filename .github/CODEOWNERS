@@ -1,0 +1,12 @@
+# Default owners for everything in this repo — required reviewers on every PR
+# (enforced once branch protection requires CODEOWNERS review).
+* @lukeadministrator
+
+# Build, CI, and deploy config warrant extra care.
+/.github/            @lukeadministrator
+/vite.*.config.ts    @lukeadministrator
+/package.json        @lukeadministrator
+
+# The vendored @lukeflow form/email/signature dist is generated from the
+# luke-forms monorepo — changes here should be re-vendored, not hand-edited.
+/vendor/             @lukeadministrator
