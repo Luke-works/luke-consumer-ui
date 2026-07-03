@@ -35,8 +35,7 @@ jobs:
         # Runs the vitest suite once (skips automatically if there's no test script).
         run: npm test --if-present
 
-      - name: Lint (informational for now)
-        # Shown but does NOT block merges yet — we can make it required later
-        # once the existing lint warnings are cleaned up.
+      - name: Lint
+        # Gating: fails the build on any ESLint error. (Remaining react-refresh
+        # fast-refresh hints are warnings and stay advisory, not blocking.)
         run: npm run lint --if-present
-        continue-on-error: true

@@ -1,0 +1,26 @@
+# Automated dependency update PRs. Grouped to keep noise down; security updates
+# come through regardless of the schedule.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # One PR for routine minor/patch bumps across the tree.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # Majors land as individual PRs (they need a migration pass).
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci

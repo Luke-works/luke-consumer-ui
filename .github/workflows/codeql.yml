@@ -1,0 +1,36 @@
+# Static security analysis (GitHub CodeQL) for JS/TS. Surfaces injection,
+# prototype-pollution, unsafe-DOM and similar classes in first-party code.
+name: CodeQL
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Mondays 06:00 UTC
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # First-party source only — skip the vendored @lukeflow dist and build output.
+          config: |
+            paths-ignore:
+              - vendor
+              - dist
+              - dist-render
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
