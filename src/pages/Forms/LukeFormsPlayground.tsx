@@ -53,7 +53,7 @@ export default function LukeFormsPlayground() {
       <section>
         <h3>Live form — @lukeflow/form-react</h3>
         <MinionProvider client={minionClient}>
-          <FormRenderer schema={schema} onSubmit={(data) => console.log("submit", data)} />
+          <FormRenderer schema={schema} onSubmit={() => {}} />
         </MinionProvider>
       </section>
     </div>

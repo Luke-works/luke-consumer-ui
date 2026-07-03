@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import ErrorBoundary from "./components/common/ErrorBoundary.tsx";
 import FormEmbedView from "./pages/Forms/FormEmbedView.tsx";
 import { applyFormsAutofillSetting } from "./lib/formsConfig.ts";
 
@@ -19,6 +20,8 @@ function resolveToken(): string | undefined {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <FormEmbedView token={resolveToken()} />
+    <ErrorBoundary label="embed-root">
+      <FormEmbedView token={resolveToken()} />
+    </ErrorBoundary>
   </StrictMode>,
 );

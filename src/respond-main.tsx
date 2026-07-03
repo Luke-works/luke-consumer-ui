@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import ErrorBoundary from "./components/common/ErrorBoundary.tsx";
 import FormRespondView from "./pages/Forms/FormRespondView.tsx";
 import { applyFormsAutofillSetting } from "./lib/formsConfig.ts";
 
@@ -20,6 +21,8 @@ function resolveToken(): string | undefined {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <FormRespondView token={resolveToken()} />
+    <ErrorBoundary label="respond-root">
+      <FormRespondView token={resolveToken()} />
+    </ErrorBoundary>
   </StrictMode>,
 );
