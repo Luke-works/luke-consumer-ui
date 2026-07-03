@@ -119,35 +119,34 @@ test.describe("form inbox — complete task (split view)", () => {
   });
 });
 
-test.describe("form inbox — by form definition (three-pane split)", () => {
-  test("the Forms column filters the task list by form", async ({ page }) => {
+test.describe("form inbox — by form definition (unified master pane)", () => {
+  test("lists every form (incl. ones with no tasks) and expands/collapses its tasks", async ({ page }) => {
     const TASKS = [
       { taskId: "t1", name: "Alice submission", created: 1717200000000, assignee: null, instanceId: "i1", definitionCode: "CONTACT" },
       { taskId: "t2", name: "Bob submission", created: 1717300000000, assignee: null, instanceId: "i2", definitionCode: "CONTACT" },
-      { taskId: "t3", name: "Carol survey", created: 1717400000000, assignee: null, instanceId: "i3", definitionCode: "SURVEY" },
     ];
+    const form = (code: string, name: string) => ({ id: code, code, name, status: "PUBLISHED", publishedVersion: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" });
     await stubBackend(page, {
       routes: {
-        "/api/form-inbox*": ok({ items: TASKS, total: 3, firstResult: 0, maxResults: 200 }),
-        "/api/form-definitions*": ok([
-          { id: "f1", code: "CONTACT", name: "Contact us", status: "PUBLISHED", publishedVersion: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
-          { id: "f2", code: "SURVEY", name: "Survey", status: "PUBLISHED", publishedVersion: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
-        ]),
+        "/api/form-inbox*": ok({ items: TASKS, total: 2, firstResult: 0, maxResults: 200 }),
+        // SURVEY and NDA have NO open tasks but must still be listed.
+        "/api/form-definitions*": ok([form("CONTACT", "Contact us"), form("SURVEY", "Survey"), form("NDA", "NDA agreement")]),
       },
     });
     await page.addInitScript(() => localStorage.setItem("lk.inbox.view", "split"));
-    await page.setViewportSize({ width: 1280, height: 900 }); // Forms rail shows at lg
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/forms/inbox");
 
-    // Forms column lists both forms; all tasks visible by default.
+    // Every form definition is listed by name + code — including the task-less ones.
     await expect(page.getByRole("button", { name: /Contact us/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Survey/ })).toBeVisible();
-    await expect(page.getByText("Carol survey")).toBeVisible();
+    await expect(page.getByText("SURVEY", { exact: true })).toBeVisible(); // the code, task-less form
+    await expect(page.getByText("NDA agreement", { exact: true })).toBeVisible();
 
-    // Pick "Contact us" → only its tasks remain; the survey task is filtered out.
+    // The form with tasks is expanded by default → its task shows in the list;
+    // collapsing the form hides its tasks (the reading-pane heading is a separate <h2>).
+    await expect(page.getByRole("button", { name: /Alice submission/ })).toBeVisible();
     await page.getByRole("button", { name: /Contact us/ }).click();
-    await expect(page.getByText("Alice submission").first()).toBeVisible();
-    await expect(page.getByText("Carol survey")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Alice submission/ })).toHaveCount(0);
     await expectNoOverflow(page);
   });
 });
