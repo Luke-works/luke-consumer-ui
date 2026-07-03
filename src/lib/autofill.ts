@@ -195,7 +195,11 @@ export function autofillSchema(schemaJson: string): Record<string, unknown> {
         const rowCount = Math.max(1, num(e.attributes.minRows) ?? 1);
         out[keyOf(id, e)] = Array.from({ length: rowCount }, () => {
           const row: Record<string, unknown> = {};
-          for (const cid of cellIds) row[keyOf(cid, entities[cid])] = fieldValue(entities[cid]);
+          for (const cid of cellIds) {
+            const cell = entities[cid];
+            if (!cell) continue; // cellIds are pre-filtered by `fillable` to existing entities
+            row[keyOf(cid, cell)] = fieldValue(cell);
+          }
           return row;
         });
         continue;

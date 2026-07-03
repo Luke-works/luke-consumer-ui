@@ -32,7 +32,9 @@ export default function SignaturePad({
 
   const point = (e: React.MouseEvent | React.TouchEvent) => {
     const r = ref.current!.getBoundingClientRect();
-    const t = "touches" in e ? e.touches[0] : (e as React.MouseEvent);
+    // On touch start/move at least one active touch is present; fall back to the
+    // mouse-event shape only for safety so clientX/clientY are always defined.
+    const t = "touches" in e ? (e.touches[0] ?? (e as unknown as React.MouseEvent)) : (e as React.MouseEvent);
     // Map CSS coords to the canvas's intrinsic pixel grid.
     const scaleX = ref.current!.width / r.width;
     const scaleY = ref.current!.height / r.height;

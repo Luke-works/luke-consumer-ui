@@ -61,7 +61,7 @@ export function sanitizeKey(raw: unknown): string {
   const words = text.replace(/[^A-Za-z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
   if (!words.length) return "field";
   let k = words
-    .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+    .map((w, i) => (i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
     .join("");
   if (/^[0-9]/.test(k)) k = `f${k}`; // identifiers can't start with a digit
   if (RESERVED_KEYS.has(k)) k = `${k}Field`;
@@ -141,7 +141,7 @@ export function collectKeys(schema: FormSchema): Array<{ id: string; key: string
   const out: Array<{ id: string; key: string }> = [];
   for (const id of orderedIds(schema)) {
     const e = schema.entities[id];
-    if (isKeyed(e)) out.push({ id, key: keyOf(id, e) });
+    if (e && isKeyed(e)) out.push({ id, key: keyOf(id, e) });
   }
   return out;
 }
@@ -170,7 +170,7 @@ export function normalizeKeys(schema: FormSchema): FormSchema {
   const taken = new Set<string>();
   for (const id of orderedIds(out)) {
     const e = out.entities[id];
-    if (!isKeyed(e)) continue;
+    if (!e || !isKeyed(e)) continue;
     const cur = e.attributes.key;
     const base = sanitizeKey(typeof cur === "string" && cur ? cur : (e.attributes.label ?? e.type));
     const key = uniqueKey(base, taken);
@@ -196,7 +196,7 @@ export function camelCaseKeys(schema: FormSchema): FormSchema {
   const remap = new Map<string, string>(); // oldKey → newKey
   for (const id of orderedIds(out)) {
     const e = out.entities[id];
-    if (!isKeyed(e)) continue;
+    if (!e || !isKeyed(e)) continue;
     const oldKey = typeof e.attributes.key === "string" ? e.attributes.key : "";
     const base = toCamelKey(typeof e.attributes.label === "string" && e.attributes.label ? e.attributes.label : oldKey || e.type);
     const newKey = uniqueKey(base, taken);
@@ -214,7 +214,9 @@ export function camelCaseKeys(schema: FormSchema): FormSchema {
 
   const EXPR = ["calculateValue", "customConditional", "customValidation", "customDefaultValue"];
   for (const id of Object.keys(entities)) {
-    const a = entities[id].attributes;
+    const entity = entities[id];
+    if (!entity) continue; // id came from Object.keys(entities), always present
+    const a = entity.attributes;
     for (const attr of EXPR) if (typeof a[attr] === "string") a[attr] = rewrite(a[attr]);
     const cond = a.conditional as { when?: string } | undefined;
     if (cond && typeof cond.when === "string" && remap.has(cond.when)) {
@@ -290,7 +292,9 @@ export function validateSchema(schema: FormSchema | null | undefined): SchemaPro
   }
   // Key uniqueness.
   for (const id of duplicateKeyIds(schema)) {
-    problems.push({ code: "duplicate-key", severity: "error", entityId: id, message: `Key "${keyOf(id, entities[id])}" is used by more than one field — their answers would collide.` });
+    const dup = entities[id];
+    if (!dup) continue; // ids come from collectKeys → always existing entities
+    problems.push({ code: "duplicate-key", severity: "error", entityId: id, message: `Key "${keyOf(id, dup)}" is used by more than one field — their answers would collide.` });
   }
 
   return problems;
@@ -372,8 +376,9 @@ export function repairSchema(schema: FormSchema): { schema: FormSchema; removed:
       // Already placed (cycle back-edge or a child claimed by two parents):
       // sever this edge so the tree stays acyclic and single-parent.
       if (parentId) {
-        const pc = entities[parentId].children;
-        if (pc) entities[parentId].children = pc.filter((c) => c !== id);
+        const parent = entities[parentId];
+        const pc = parent?.children;
+        if (parent && pc) parent.children = pc.filter((c) => c !== id);
       }
       return;
     }

@@ -55,7 +55,7 @@ export default function ConnectionsPage() {
   const [error, setError] = useState<string | null>(null);
   // The dropdown selection (a provider key or the OTHER sentinel) and, when OTHER,
   // the free-text provider key. `provider` is the effective key passed to Connect.
-  const [selection, setSelection] = useState<string>(COMMON_PROVIDERS[0].key);
+  const [selection, setSelection] = useState<string>(COMMON_PROVIDERS[0]!.key); // non-empty constant list
   const [otherProvider, setOtherProvider] = useState("");
   const provider = selection === OTHER ? otherProvider.trim() : selection;
 

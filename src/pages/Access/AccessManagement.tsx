@@ -253,7 +253,7 @@ function ManageMyAccessSection({
       if (code) setCode("");
       return;
     }
-    if (!requestable.some((s) => s.code === code)) setCode(requestable[0].code);
+    if (!requestable.some((s) => s.code === code)) setCode(requestable[0]!.code); // length === 0 returned above
   }, [requestable, code]);
 
   const selectedPending = code ? hasPending(code) : false;

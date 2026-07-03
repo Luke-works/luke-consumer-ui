@@ -141,7 +141,7 @@ export default function FormInbox() {
   useEffect(() => {
     if (mode !== "split") return;
     if (selected && tasks.some((t) => t.taskId === selected.taskId)) return;
-    if (tasks.length > 0) void openTask(tasks[0]);
+    if (tasks.length > 0) void openTask(tasks[0]!); // length > 0 checked
     else { setSelected(null); setView(null); }
     // openTask is stable enough here; selecting sets `selected` so this won't loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,7 +163,7 @@ export default function FormInbox() {
       if (mode === "split" && remaining.length > 0) {
         // Advance to the next task (Outlook-style) rather than clearing the pane.
         const pos = Math.max(0, tasks.findIndex((t) => t.taskId === completedId));
-        void openTask(remaining[Math.min(pos, remaining.length - 1)]);
+        void openTask(remaining[Math.min(pos, remaining.length - 1)]!); // remaining.length > 0, index clamped in-bounds
       } else {
         setSelected(null);
         setView(null);

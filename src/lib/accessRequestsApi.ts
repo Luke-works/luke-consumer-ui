@@ -45,7 +45,8 @@ const ms = (v: unknown): number | undefined => {
     return Number.isNaN(t) ? undefined : t;
   }
   if (Array.isArray(v) && v.length >= 3) {
-    const [Y, Mo, D, h = 0, mi = 0, s = 0] = v as number[];
+    // length >= 3 guarantees Y/Mo/D; the rest default to 0.
+    const [Y = 0, Mo = 0, D = 0, h = 0, mi = 0, s = 0] = v as number[];
     return new Date(Y, Mo - 1, D, h, mi, s).getTime();
   }
   return undefined;

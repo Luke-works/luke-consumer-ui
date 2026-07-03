@@ -38,8 +38,9 @@ export function useDialog<T extends HTMLElement>(isOpen: boolean, onClose: () =>
           event.preventDefault();
           return;
         }
-        const first = items[0];
-        const last = items[items.length - 1];
+        // length === 0 handled above, so both ends are defined.
+        const first = items[0]!;
+        const last = items[items.length - 1]!;
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last.focus();

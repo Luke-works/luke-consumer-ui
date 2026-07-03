@@ -192,14 +192,14 @@ export default function FormTestPanel({
       if (mode === "valid") {
         setPosAiSets(datasets);
         setPosSel(0);
-        setPosInitial(datasets[0].values);
+        setPosInitial(datasets[0]!.values); // empty datasets returned above
         setTestTab("positive");
         setPosResult(null);
         setPosPlay((p) => p + 1); // replay with the first dataset, then re-validate
       } else {
         setNegAiSets(datasets);
         setNegSel(0);
-        setNegInitial(datasets[0].values);
+        setNegInitial(datasets[0]!.values); // empty datasets returned above
         setNegExpected([]); // AI invalid data has no per-field expectation
         setTestTab("negative");
         setNegResult(null);
@@ -348,7 +348,7 @@ export default function FormTestPanel({
                 key={String(sel)}
                 type="button"
                 onClick={() => selectPositive(sel)}
-                title={typeof sel === "number" ? posAiSets[sel].notes : "Heuristic auto-fill"}
+                title={typeof sel === "number" ? posAiSets[sel]!.notes : "Heuristic auto-fill"}
                 className={`rounded-full border px-2.5 py-0.5 transition ${posSel === sel ? "border-brand-400 bg-brand-50 text-brand-600 dark:bg-brand-500/10" : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5"}`}
               >
                 {sel === "local" ? "Local" : `AI ${sel + 1}`}
@@ -366,7 +366,7 @@ export default function FormTestPanel({
                 key={String(sel)}
                 type="button"
                 onClick={() => selectNegative(sel)}
-                title={typeof sel === "number" ? negAiSets[sel].notes : "Heuristic invalid-data fill (rule-aware)"}
+                title={typeof sel === "number" ? negAiSets[sel]!.notes : "Heuristic invalid-data fill (rule-aware)"}
                 className={`rounded-full border px-2.5 py-0.5 transition ${negSel === sel ? "border-brand-400 bg-brand-50 text-brand-600 dark:bg-brand-500/10" : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5"}`}
               >
                 {sel === "local" ? "Local" : `AI ${sel + 1}`}

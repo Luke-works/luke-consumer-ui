@@ -100,7 +100,7 @@ export function extractVariables(doc: EmailDoc | null | undefined): string[] {
   const seen = new Set<string>();
   const scan = (s: unknown) => {
     if (typeof s !== "string") return;
-    for (const m of s.matchAll(VAR_RE)) seen.add(m[1]);
+    for (const m of s.matchAll(VAR_RE)) if (m[1]) seen.add(m[1]);
   };
   scan(doc.subject);
   scan(doc.preheader);

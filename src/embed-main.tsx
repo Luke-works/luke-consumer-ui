@@ -14,7 +14,7 @@ function resolveToken(): string | undefined {
   const injected = (window as unknown as { __LUKE_EMBED_TOKEN__?: string }).__LUKE_EMBED_TOKEN__;
   if (injected && injected !== "__EMBED_TOKEN__") return injected;
   const m = window.location.pathname.match(/\/embed\/([^/?#]+)/);
-  if (m) return decodeURIComponent(m[1]);
+  if (m?.[1]) return decodeURIComponent(m[1]);
   return new URLSearchParams(window.location.search).get("token") ?? undefined;
 }
 
