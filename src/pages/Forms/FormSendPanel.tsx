@@ -118,7 +118,7 @@ export default function FormSendPanel({
               <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <Label>First name</Label>
                 <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jordan" />

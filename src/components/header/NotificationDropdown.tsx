@@ -52,7 +52,7 @@ export default function NotificationDropdown({
       <Dropdown
         isOpen={isOpen}
         onClose={closeDropdown}
-        className={`absolute flex h-[480px] max-h-[70vh] w-[350px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[361px] ${
+        className={`absolute flex h-[480px] max-h-[70vh] w-[350px] max-w-[calc(100vw-1.5rem)] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[361px] ${
           placement === "top"
             ? "bottom-full left-0 right-auto mt-0 mb-2"
             : "-right-[240px] mt-[17px] lg:right-0"

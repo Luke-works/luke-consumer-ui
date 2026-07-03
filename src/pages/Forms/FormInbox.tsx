@@ -166,7 +166,7 @@ export default function FormInbox() {
     <>
       <PageMeta title="Form Inbox | Lukeflow" description="Tasks waiting on you." />
 
-      <div className="mb-6 flex items-start justify-between gap-3">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Form Inbox</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Tasks from form submissions that are waiting to be reviewed.</p>

@@ -90,7 +90,7 @@ export default function SignaturesList() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Signatures</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -267,7 +267,7 @@ function CampaignModal({ tenant, def, onClose }: { tenant: string; def: StoredSi
               {schema.signers.map((s) => (
                 <div key={s.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
                   <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">{s.label} <span className="text-xs text-gray-400">· order {s.order}</span></div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <input placeholder="Full name" value={recipients[s.id]?.name ?? ""} onChange={(e) => setRecipients((r) => ({ ...r, [s.id]: { ...r[s.id]!, name: e.target.value } }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5" />
                     <input type="email" placeholder="email@example.com" value={recipients[s.id]?.email ?? ""} onChange={(e) => setRecipients((r) => ({ ...r, [s.id]: { ...r[s.id]!, email: e.target.value } }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5" />
                   </div>

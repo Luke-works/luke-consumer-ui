@@ -301,7 +301,7 @@ export default function FormsList() {
         description="Build and manage your forms with the Lukeflow form builder."
       />
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-800 dark:text-white/90">
             Forms

@@ -79,7 +79,7 @@ export default function WorkflowsList() {
   return (
     <>
       <PageMeta title="Workflows" description="Design and run automated workflows" />
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Workflows</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
