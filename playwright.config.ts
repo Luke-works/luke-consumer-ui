@@ -23,6 +23,8 @@ export default defineConfig({
     url: `http://localhost:${PORT}/signin`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    env: { VITE_AUTH_API_URL: "http://localhost:9999" },
+    // Reveal the Workflow capability so its screens are reachable in the E2E suite
+    // (it's hidden by default in prod until launch).
+    env: { VITE_AUTH_API_URL: "http://localhost:9999", VITE_WORKFLOW_ENABLED: "true" },
   },
 });
