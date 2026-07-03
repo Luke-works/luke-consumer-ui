@@ -47,6 +47,25 @@ describe("evaluate* sanity (unchanged behavior)", () => {
   });
 });
 
+describe("prototype-pollution hardening", () => {
+  it("rejects expressions naming proto-chain identifiers (analyze)", () => {
+    expect(analyzeExpression("constructor", known)).toMatch(/disallowed/i);
+    expect(analyzeExpression("value.__proto__", known)).toMatch(/disallowed/i);
+    expect(analyzeExpression("prototype", known)).toMatch(/disallowed/i);
+  });
+  it("never evaluates proto-chain access (returns undefined / fail-open)", () => {
+    expect(evaluateExpression("__proto__", {})).toBeUndefined();
+    expect(evaluateCondition("constructor", {})).toBe(true); // fail-open show
+    expect(evaluateValidation("value.constructor", { value: 1 })).toBe(true);
+    // A crafted pollution attempt must not touch Object.prototype.
+    evaluateExpression("constructor", {});
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+  it("still allows ordinary field expressions", () => {
+    expect(evaluateExpression("price * quantity", { price: 2, quantity: 5 })).toBe(10);
+  });
+});
+
 describe("custom-validation fail-open + reporting (#36)", () => {
   beforeEach(() => vi.clearAllMocks());
 

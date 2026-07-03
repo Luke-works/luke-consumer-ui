@@ -3,7 +3,17 @@ import { reportError } from "./reportError";
 
 // A safe expression engine (no raw JS eval). Expressions reference form field
 // values by their property key, e.g. `price * quantity` or `age >= 18`.
-const parser = new Parser();
+//
+// Hardened against expr-eval's prototype-pollution advisory: form expressions only
+// need arithmetic / comparison / logical / conditional operators over flat field
+// keys, so we disable assignment (no scope mutation)…
+const parser = new Parser({ operators: { assignment: false } });
+
+// …and — the definitive guard — reject any expression that even mentions a
+// prototype-chain identifier. The pollution path requires naming one of these, and
+// none has a legitimate use in a form field-value expression, so blocking them
+// closes the vector outright without affecting authored rules.
+const DANGEROUS_IDENTIFIER = /\b(?:__proto__|prototype|constructor)\b/;
 
 export type Scope = Record<string, unknown>;
 
@@ -22,6 +32,7 @@ const reportedErrors = new Set<string>();
 export function evaluateExpression(expr: string, scope: Scope, label?: string): unknown {
   const code = expr?.trim();
   if (!code) return undefined;
+  if (DANGEROUS_IDENTIFIER.test(code)) return undefined; // never evaluate proto-chain access
   try {
     return parser.evaluate(code, scope as Record<string, number>);
   } catch (e) {
@@ -62,6 +73,9 @@ export function analyzeExpression(
 ): string | null {
   const code = expr?.trim();
   if (!code) return null;
+  if (DANGEROUS_IDENTIFIER.test(code)) {
+    return "Disallowed identifier (__proto__ / prototype / constructor).";
+  }
   let parsed: ReturnType<Parser["parse"]>;
   try {
     parsed = parser.parse(code);
