@@ -152,10 +152,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
               >
                 {minionClient ? (
                   <MinionProvider client={minionClient}>
-                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
                   </MinionProvider>
                 ) : (
-                  <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} />
+                  <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
                 )}
               </ErrorBoundary>
             </div>

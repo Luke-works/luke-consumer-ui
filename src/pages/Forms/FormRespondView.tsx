@@ -139,7 +139,8 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
                 <p className="py-8 text-center text-sm text-error-500">This form couldn't be displayed. {e.message}</p>
               )}
             >
-              <FormRenderer schema={form.schema} initialValues={initialValues} onSubmit={onSubmit} submitting={busy} />
+              {/* Public per-recipient fill (token+OTP auth): author is untrusted vs the filler → no author JS. */}
+              <FormRenderer schema={form.schema} initialValues={initialValues} onSubmit={onSubmit} submitting={busy} allowJs={false} />
             </ErrorBoundary>
           </>
         ) : null}

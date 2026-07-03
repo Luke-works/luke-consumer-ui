@@ -43,7 +43,9 @@ const mount = document.getElementById("root");
 
 if (payload && mount) {
   const schema = typeof payload.schema === "string" ? payload.schema : JSON.stringify(payload.schema);
-  const form = <LukeFormRenderer schema={schema} initialValues={payload.data} readOnly />;
+  // allowJs=false: this harness renders untrusted author schemas in headless Chromium; submitted
+  // values are already computed, so no author JS needs to run to produce the PDF.
+  const form = <LukeFormRenderer schema={schema} initialValues={payload.data} readOnly allowJs={false} />;
   createRoot(mount).render(payload.theme ? <FormThemeProvider theme={payload.theme}>{form}</FormThemeProvider> : form);
   markReady();
 } else {

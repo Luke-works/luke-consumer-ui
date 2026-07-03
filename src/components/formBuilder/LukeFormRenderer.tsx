@@ -31,6 +31,7 @@ export default function LukeFormRenderer({
   playback,
   readOnly = false,
   submitting = false,
+  allowJs = true,
 }: {
   schema: string;
   initialValues?: Record<string, unknown>;
@@ -41,6 +42,15 @@ export default function LukeFormRenderer({
   playback?: { steps: { key: string; value: unknown }[]; signal: number; speed?: number };
   readOnly?: boolean;
   submitting?: boolean;
+  /**
+   * Whether the engine may execute author-authored JS field logic (customConditionalJs,
+   * calculateValueJs, …) via `new Function`. Defaults to `true` for authenticated in-app
+   * surfaces (the author is trusted within their own tenant). **Public / anonymous fill
+   * surfaces MUST pass `allowJs={false}`** — there the author is untrusted relative to the
+   * filler and their JS would otherwise run in every (anonymous) filler's browser. The safe
+   * expression engine (non-JS formulas) is unaffected either way.
+   */
+  allowJs?: boolean;
 }) {
   void submitting; // the package manages submit state internally; accepted for prop-compat
   return (
@@ -53,6 +63,7 @@ export default function LukeFormRenderer({
       autoSubmitSignal={autoSubmitSignal}
       playback={playback}
       readOnly={readOnly}
+      allowJs={allowJs}
     />
   );
 }
