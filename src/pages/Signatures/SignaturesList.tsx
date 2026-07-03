@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Copy, Download, Plus, Send, Trash2, Users, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useDialog } from "../../hooks/useDialog";
 import { SIGNATURES, canWrite } from "../../lib/capabilities";
 import {
   ApiError,
@@ -346,15 +347,16 @@ function InstancesDrawer({ tenant, def, onClose }: { tenant: string; def: Stored
     }
   };
 
+  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   return (
     <div className="fixed inset-0 z-[60] flex justify-end bg-black/40" onClick={onClose}>
-      <div className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Campaigns" tabIndex={-1} className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-xl outline-none dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Campaigns</h2>
             <p className="text-xs text-gray-400">{def.name}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"><X className="size-5" /></button>
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"><X className="size-5" /></button>
         </div>
         {err && <p className="text-sm text-error-500">{err}</p>}
         {!rows && !err && <p className="text-sm text-gray-400">Loading…</p>}
@@ -369,9 +371,9 @@ function InstancesDrawer({ tenant, def, onClose }: { tenant: string; def: Stored
                 </div>
                 <div className="flex items-center gap-2">
                   {inst.state === "COMPLETED" && inst.sealStatus === "SEALED" && (
-                    <span onClick={(e) => { e.stopPropagation(); void download(inst); }} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-brand-500 dark:hover:bg-white/10" title="Download signed PDF">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); void download(inst); }} aria-label="Download signed PDF" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-brand-500 dark:hover:bg-white/10" title="Download signed PDF">
                       <Download className="size-4" />
-                    </span>
+                    </button>
                   )}
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${INSTANCE_BADGE[inst.state] ?? ""}`}>{inst.state}</span>
                 </div>
@@ -398,12 +400,13 @@ function InstancesDrawer({ tenant, def, onClose }: { tenant: string; def: Stored
 
 // ── shared modal ───────────────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className={`max-h-[92vh] w-full overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900 ${wide ? "max-w-2xl" : "max-w-md"}`} onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} className={`max-h-[92vh] w-full overflow-y-auto rounded-xl bg-white p-6 shadow-xl outline-none dark:bg-gray-900 ${wide ? "max-w-2xl" : "max-w-md"}`} onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"><X className="size-5" /></button>
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"><X className="size-5" /></button>
         </div>
         {children}
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, KeyRound, Phone as PhoneIcon, X } from "lucide-react";
+import { useDialog } from "../../hooks/useDialog";
 import {
   connectApiKey,
   disconnectApiKey,
@@ -50,15 +51,16 @@ export default function PhoneSettingsDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant]);
 
+  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   return (
     <div className="fixed inset-0 z-[60] flex justify-end bg-black/40" onClick={onClose}>
-      <div className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Phone settings" tabIndex={-1} className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-xl outline-none dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
         <div className="mb-5 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Phone settings</h2>
             <p className="text-xs text-gray-400">Your workspace number, the default assistant, and Vapi connection.</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10">
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10">
             <X className="size-5" />
           </button>
         </div>

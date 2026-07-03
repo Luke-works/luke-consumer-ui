@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { PhoneOutgoing, PhoneIncoming, Plus, Settings as SettingsIcon } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import { useAuth } from "../../context/AuthContext";
+import { useDialog } from "../../hooks/useDialog";
 import { PHONE, canWrite } from "../../lib/capabilities";
 import {
   isCallActive,
@@ -201,9 +202,10 @@ function PlaceCallModal({ tenant, onClose, onPlaced }: { tenant: string; onClose
     }
   };
 
+  const dialogRef = useDialog<HTMLDivElement>(true, onClose);
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Place a call" tabIndex={-1} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl outline-none dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
         <h2 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Place a call</h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           The call is placed from your default number with your default assistant (set these in Settings).
