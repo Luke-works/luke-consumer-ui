@@ -1,6 +1,7 @@
 import "@xyflow/react/dist/style.css";
 import { validateWorkflow, type WorkflowDoc } from "@lukeflow/workflow-core";
 import { WorkflowBuilder } from "@lukeflow/workflow-builder";
+import BuilderMobileNotice from "../../components/common/BuilderMobileNotice";
 import { ArrowLeft, CheckCircle2, PlayCircle, Rocket, Save, Stamp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -244,7 +245,8 @@ export default function WorkflowBuilderPage() {
         </div>
       ) : null}
 
-      <div className="flex h-[72vh] flex-col gap-4 lg:flex-row">
+      <BuilderMobileNotice label="workflow builder" />
+      <div className="hidden h-[72vh] flex-col gap-4 sm:flex lg:flex-row">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
           <WorkflowBuilder value={doc} stepTypes={stepTypes} connections={connections} forms={forms} theme={theme} highlight={highlight} onChange={canEdit ? setDoc : undefined} />
         </div>

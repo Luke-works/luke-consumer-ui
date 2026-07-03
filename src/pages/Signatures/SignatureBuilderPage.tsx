@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Pencil, Rocket, RotateCcw, Save, ShieldCheck } from "lucide-react";
 import { SignatureBuilder, type SignatureBuilderHandle } from "@lukeflow/sign-react";
+import BuilderMobileNotice from "../../components/common/BuilderMobileNotice";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, SIGNATURES } from "../../lib/capabilities";
 import {
@@ -226,6 +227,8 @@ export default function SignatureBuilderPage() {
         </div>
       )}
 
+      <BuilderMobileNotice label="signature designer" />
+      <div className="hidden sm:block">
       <SignatureBuilder
         ref={builderRef}
         initialSchema={initialSchema}
@@ -234,6 +237,7 @@ export default function SignatureBuilderPage() {
         onChange={onChange}
         onUploadDocument={onUploadDocument}
       />
+      </div>
     </div>
   );
 }

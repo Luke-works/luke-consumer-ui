@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { FormBuilder, type FormBuilderHandle } from "@lukeflow/form-builder";
+import BuilderMobileNotice from "../../components/common/BuilderMobileNotice";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
@@ -683,8 +684,12 @@ export default function FormBuilderPage() {
         </div>
       )}
 
+      <BuilderMobileNotice label="form builder" />
       {/* The builder is non-interactive (inert) until checked out — true view-only, not just visual. */}
-      <div inert={!editable || undefined} className={editable ? "" : "opacity-75 transition-opacity"}>
+      <div
+        inert={!editable || undefined}
+        className={editable ? "hidden sm:block" : "hidden opacity-75 transition-opacity sm:block"}
+      >
         <FormBuilder
           key={`${form.id}-${reloadKey}`}
           ref={builderRef}
