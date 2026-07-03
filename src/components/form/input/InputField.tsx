@@ -49,6 +49,10 @@ const Input: FC<InputProps> = ({
     inputClasses += ` bg-transparent text-gray-800 border-gray-300 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white/90  dark:focus:border-brand-800`;
   }
 
+  // Link the hint to the input so screen readers announce it (esp. error text), and
+  // expose invalid state programmatically — not just via border colour.
+  const hintId = hint && id ? `${id}-hint` : undefined;
+
   return (
     <div className="relative">
       <input
@@ -63,11 +67,14 @@ const Input: FC<InputProps> = ({
         step={step}
         disabled={disabled}
         autoFocus={autoFocus}
+        aria-invalid={error || undefined}
+        aria-describedby={hintId}
         className={inputClasses}
       />
 
       {hint && (
         <p
+          id={hintId}
           className={`mt-1.5 text-xs ${
             error
               ? "text-error-500"
