@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
-import { ChevronDown, Columns2, FileText, Inbox as InboxIcon, LayoutList } from "lucide-react";
+import { Columns2, Inbox as InboxIcon, LayoutList } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import DataTable, { type ManualTable } from "../../components/tables/DataTable";
@@ -360,83 +360,95 @@ function SplitInbox({
     return list;
   }, [tasks, formNames]);
 
-  // Which form groups are expanded. Default: a group with tasks is open, empty ones closed;
-  // `override` records the user's explicit toggles.
-  const [override, setOverride] = useState<Record<string, boolean>>({});
-  const isOpen = (code: string, hasTasks: boolean) => override[code] ?? hasTasks;
-  const toggle = (code: string, hasTasks: boolean) =>
-    setOverride((o) => ({ ...o, [code]: !(o[code] ?? hasTasks) }));
+  // The form whose tasks fill the lower section: the user's pick, else the selected task's
+  // form, else the first form that has any tasks.
+  const [activeForm, setActiveForm] = useState<string | null>(null);
+  const firstWithTasks = groups.find((g) => g.tasks.length > 0);
+  const activeCode = activeForm ?? selected?.definitionCode ?? firstWithTasks?.code ?? groups[0]?.code ?? null;
+  const activeGroup = groups.find((g) => g.code === (activeCode ?? " ")) ?? null;
+  const activeTasks = activeGroup?.tasks ?? [];
 
   const truncated = total > tasks.length; // more open tasks than we loaded for grouping
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(300px,360px)_1fr]">
-      {/* Master pane — every form definition (name + code) with its open tasks nested. */}
-      <div className="flex max-h-[72vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="border-b border-gray-100 p-3 dark:border-gray-800">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Search tasks…"
-            className="h-9 w-full rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:placeholder:text-white/30"
-          />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {groups.length === 0 ? (
-            <p className="py-10 text-center text-sm text-gray-400">{search ? "No matches." : "No forms yet."}</p>
-          ) : (
-            groups.map((g) => {
-              const open = isOpen(g.code, g.tasks.length > 0);
-              return (
-                <div key={g.code || "ungrouped"} className="border-b border-gray-100 last:border-0 dark:border-gray-800">
+    <div className="grid gap-4 lg:grid-cols-[minmax(420px,520px)_1fr]">
+      {/* Left pane — two side-by-side sections: forms (left) + the picked form's tasks (right). */}
+      <div className="flex max-h-[72vh] min-h-[60vh] overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        {/* Section 1 — form definitions (name + id). Click one to load its tasks on the right. */}
+        <div className="flex w-[150px] shrink-0 flex-col border-r border-gray-200 dark:border-gray-800">
+          <div className="border-b border-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">Forms</div>
+          <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
+            {groups.length === 0 ? (
+              <p className="py-8 text-center text-sm text-gray-400">No forms yet.</p>
+            ) : (
+              groups.map((g) => {
+                const on = g.code === activeCode;
+                return (
                   <button
+                    key={g.code || "ungrouped"}
                     type="button"
-                    onClick={() => toggle(g.code, g.tasks.length > 0)}
-                    aria-expanded={open}
-                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                    onClick={() => setActiveForm(g.code)}
+                    aria-pressed={on}
+                    className={`flex w-full items-center gap-1.5 px-2.5 py-2 text-left transition ${
+                      on ? "bg-brand-50 dark:bg-brand-500/10" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                    }`}
                   >
-                    <ChevronDown className={`size-4 shrink-0 text-gray-400 transition-transform ${open ? "" : "-rotate-90"}`} />
-                    <FileText className="size-4 shrink-0 text-gray-400" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-gray-800 dark:text-gray-200">{g.name}</span>
+                      <span className={`block truncate text-sm font-medium ${on ? "text-brand-700 dark:text-brand-300" : "text-gray-800 dark:text-gray-200"}`}>{g.name}</span>
                       <span className="block truncate font-mono text-[11px] text-gray-400">{g.code || "—"}</span>
                     </span>
                     <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs ${
                       g.tasks.length ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300" : "bg-gray-100 text-gray-400 dark:bg-white/10"
                     }`}>{g.tasks.length}</span>
                   </button>
-                  {open && (g.tasks.length === 0 ? (
-                    <p className="px-9 pb-2.5 text-xs text-gray-400">No open tasks.</p>
-                  ) : (
-                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {g.tasks.map((t) => {
-                        const active = selected?.taskId === t.taskId;
-                        return (
-                          <button
-                            key={t.taskId}
-                            type="button"
-                            onClick={() => onSelect(t)}
-                            className={`flex w-full flex-col items-start gap-0.5 py-2.5 pl-9 pr-4 text-left transition ${
-                              active ? "bg-brand-50 dark:bg-brand-500/10" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"
-                            }`}
-                          >
-                            <span className={`text-sm ${active ? "font-medium text-brand-700 dark:text-brand-300" : "text-gray-700 dark:text-gray-300"}`}>{t.name ?? "Task"}</span>
-                            <span className="text-xs text-gray-400">{fmt(t.created)} · {who(t.assignee) ?? "Unassigned"}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              );
-            })
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Section 2 — tasks for the picked form. */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center gap-1.5 border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Tasks</span>
+            {activeGroup && <span className="min-w-0 flex-1 truncate text-xs text-gray-400">· {activeGroup.name}</span>}
+          </div>
+          <div className="border-b border-gray-100 p-2.5 dark:border-gray-800">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Search tasks…"
+              className="h-9 w-full rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+          </div>
+          <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
+            {activeTasks.length === 0 ? (
+              <p className="py-8 text-center text-sm text-gray-400">{search ? "No matches." : "No open tasks for this form."}</p>
+            ) : (
+              activeTasks.map((t) => {
+                const active = selected?.taskId === t.taskId;
+                return (
+                  <button
+                    key={t.taskId}
+                    type="button"
+                    onClick={() => onSelect(t)}
+                    className={`flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition ${
+                      active ? "bg-brand-50 dark:bg-brand-500/10" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                    }`}
+                  >
+                    <span className={`text-sm font-medium ${active ? "text-brand-700 dark:text-brand-300" : "text-gray-800 dark:text-gray-200"}`}>{t.name ?? "Task"}</span>
+                    <span className="text-xs text-gray-400">{fmt(t.created)} · {who(t.assignee) ?? "Unassigned"}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          {truncated && (
+            <div className="border-t border-gray-100 px-3 py-2 text-center text-xs text-gray-400 dark:border-gray-800">
+              Showing the first {tasks.length} of {total} open tasks.
+            </div>
           )}
         </div>
-        {truncated && (
-          <div className="border-t border-gray-100 px-3 py-2 text-center text-xs text-gray-400 dark:border-gray-800">
-            Showing the first {tasks.length} of {total} open tasks.
-          </div>
-        )}
       </div>
 
       {/* Reading pane — bounded to the same height as the list so its (potentially tall)

@@ -119,8 +119,8 @@ test.describe("form inbox — complete task (split view)", () => {
   });
 });
 
-test.describe("form inbox — by form definition (unified master pane)", () => {
-  test("lists every form (incl. ones with no tasks) and expands/collapses its tasks", async ({ page }) => {
+test.describe("form inbox — by form definition (two-section left pane)", () => {
+  test("lists every form (incl. task-less) and picking one shows its tasks", async ({ page }) => {
     const TASKS = [
       { taskId: "t1", name: "Alice submission", created: 1717200000000, assignee: null, instanceId: "i1", definitionCode: "CONTACT" },
       { taskId: "t2", name: "Bob submission", created: 1717300000000, assignee: null, instanceId: "i2", definitionCode: "CONTACT" },
@@ -142,10 +142,11 @@ test.describe("form inbox — by form definition (unified master pane)", () => {
     await expect(page.getByText("SURVEY", { exact: true })).toBeVisible(); // the code, task-less form
     await expect(page.getByText("NDA agreement", { exact: true })).toBeVisible();
 
-    // The form with tasks is expanded by default → its task shows in the list;
-    // collapsing the form hides its tasks (the reading-pane heading is a separate <h2>).
+    // The first form with tasks (Contact us) is active by default → its tasks show on the right.
     await expect(page.getByRole("button", { name: /Alice submission/ })).toBeVisible();
-    await page.getByRole("button", { name: /Contact us/ }).click();
+    // Pick the task-less "Survey" form → its (empty) task section shows; Alice's task is gone.
+    await page.getByRole("button", { name: /Survey/ }).click();
+    await expect(page.getByText("No open tasks for this form")).toBeVisible();
     await expect(page.getByRole("button", { name: /Alice submission/ })).toHaveCount(0);
     await expectNoOverflow(page);
   });
