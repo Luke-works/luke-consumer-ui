@@ -189,7 +189,10 @@ export default function WorkflowBuilderPage() {
   }
 
   return (
-    <>
+    // overflow-x-clip contains transient horizontal overflow (react-flow internals +
+    // TailAdmin top-bar tooltips positioned absolute/left-1/2) so the page can't scroll
+    // sideways — same containment the form builder uses.
+    <div className="overflow-x-clip">
       <PageMeta title={`${doc.name ?? "Workflow"} · Builder`} description="Design a workflow" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -279,6 +282,6 @@ export default function WorkflowBuilderPage() {
           onWatch={(instanceId) => setWatchRunId(instanceId)}
         />
       ) : null}
-    </>
+    </div>
   );
 }
