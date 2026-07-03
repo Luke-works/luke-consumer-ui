@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -54,5 +54,59 @@ describe("DataTable manual (server-driven) mode (#26)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("DataTable card mode (small screens)", () => {
+  const cols: ColumnDef<{ name: string; email: string }, unknown>[] = [
+    { id: "name", header: "Name", accessorKey: "name" },
+    { id: "email", header: "Email", accessorKey: "email" },
+  ];
+
+  // Pretend the viewport matches `(max-width: 639px)` so useMediaQuery returns true.
+  function stubNarrow(matches: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }));
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("renders expandable cards (no table) and reveals detail columns on expand", async () => {
+    stubNarrow(true);
+    render(
+      <DataTable
+        columns={cols}
+        data={[{ name: "Ada", email: "ada@x.com" }]}
+        enableSearch={false}
+      />,
+    );
+    // Card view, not a <table>.
+    expect(screen.queryByRole("table")).toBeNull();
+    // Primary column shows; secondary column is collapsed until expanded.
+    expect(screen.getByText("Ada")).toBeInTheDocument();
+    expect(screen.queryByText("ada@x.com")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Show details/ }));
+    expect(screen.getByText("ada@x.com")).toBeInTheDocument();
+  });
+
+  it("keeps the plain table when mobileCards is disabled, even on narrow screens", () => {
+    stubNarrow(true);
+    render(
+      <DataTable
+        columns={cols}
+        data={[{ name: "Ada", email: "ada@x.com" }]}
+        enableSearch={false}
+        mobileCards={false}
+      />,
+    );
+    expect(screen.getByRole("table")).toBeInTheDocument();
   });
 });

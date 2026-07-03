@@ -18,6 +18,7 @@ import {
   ChevronUp,
   Search,
 } from "lucide-react";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 
 // Per-column display hints, read in the header/cell renderers below.
 declare module "@tanstack/react-table" {
@@ -26,6 +27,12 @@ declare module "@tanstack/react-table" {
     align?: "left" | "right" | "center";
     headerClassName?: string;
     cellClassName?: string;
+    /** In the small-screen card view, use this column as the always-visible card
+     *  title. Defaults to the first column when no column opts in. */
+    mobilePrimary?: boolean;
+    /** Hide this column from the expanded detail list in the card view (e.g. a
+     *  redundant/action column already surfaced elsewhere). */
+    mobileHidden?: boolean;
   }
 }
 
@@ -63,6 +70,11 @@ type DataTableProps<T> = {
   toolbar?: React.ReactNode;
   /** Opt in to server-side pagination/sort/search. See {@link ManualTable}. */
   manual?: ManualTable;
+  /** On narrow screens (< Tailwind `sm`), collapse each row into an expandable
+   *  card (primary column + chevron; tap to reveal the rest as label/value
+   *  rows) instead of a horizontally-scrolling table. On by default; pass
+   *  `false` to keep the plain scrolling table everywhere. */
+  mobileCards?: boolean;
 };
 
 const alignClass = (a?: string) =>
@@ -84,8 +96,18 @@ export default function DataTable<T>({
   minWidth = "min-w-[640px]",
   toolbar,
   manual,
+  mobileCards = true,
 }: DataTableProps<T>) {
   const isManual = !!manual;
+
+  // Below Tailwind `sm` we swap the scrolling table for expandable cards. Only
+  // one of the two ever renders (not CSS-hidden), so there's no duplicate DOM.
+  // Under jsdom/SSR this is always false → the table renders, as before.
+  const isNarrow = useMediaQuery("(max-width: 639px)");
+  const cardMode = mobileCards && isNarrow;
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
   // Client-mode state (ignored in manual mode).
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -138,6 +160,9 @@ export default function DataTable<T>({
   });
 
   const rows = table.getRowModel().rows;
+  // Look up a column's header (for its label) when rendering the card detail list.
+  const headerFor = (columnId: string) =>
+    table.getFlatHeaders().find((h) => h.column.id === columnId);
   const currentPageSize = isManual ? manual.pageSize : pageSize;
   const totalRows = isManual ? manual.rowCount : table.getFilteredRowModel().rows.length;
   const pageIndex = isManual ? manual.pageIndex : table.getState().pagination.pageIndex;
@@ -169,6 +194,7 @@ export default function DataTable<T>({
         </div>
       )}
 
+      {!cardMode && (
       <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <table className={`w-full ${minWidth} text-left text-sm`}>
           <thead>
@@ -250,6 +276,87 @@ export default function DataTable<T>({
           </tbody>
         </table>
       </div>
+      )}
+
+      {cardMode && (
+        <div className="space-y-2">
+          {rows.length === 0 ? (
+            <div className="rounded-2xl border border-gray-200 bg-white px-5 py-10 text-center text-sm text-gray-400 dark:border-gray-800 dark:bg-white/[0.03]">
+              {emptyMessage}
+            </div>
+          ) : (
+            rows.map((row) => {
+              const cells = row.getVisibleCells();
+              // The always-visible card title: the column that opts in via
+              // meta.mobilePrimary, else the first column.
+              const primaryIdx = Math.max(
+                0,
+                cells.findIndex((c) => c.column.columnDef.meta?.mobilePrimary),
+              );
+              const primary = cells[primaryIdx];
+              const details = cells.filter(
+                (c, i) => i !== primaryIdx && !c.column.columnDef.meta?.mobileHidden,
+              );
+              const isOpen = !!expanded[row.id];
+              return (
+                <div
+                  key={row.id}
+                  className={`overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] ${rowClassName?.(row.original) ?? ""}`}
+                >
+                  <div className="flex items-center gap-2 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onRowClick ? onRowClick(row.original) : toggleExpanded(row.id)
+                      }
+                      className="min-w-0 flex-1 text-left text-sm text-gray-800 dark:text-white/90"
+                    >
+                      {primary
+                        ? flexRender(primary.column.columnDef.cell, primary.getContext())
+                        : null}
+                    </button>
+                    {details.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(row.id)}
+                        aria-expanded={isOpen}
+                        aria-label={isOpen ? "Hide details" : "Show details"}
+                        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-400 dark:hover:bg-white/5"
+                      >
+                        <ChevronDown
+                          className={`size-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                    )}
+                  </div>
+                  {isOpen && details.length > 0 && (
+                    <dl className="space-y-2 border-t border-gray-100 px-4 py-3 dark:border-gray-800">
+                      {details.map((cell) => {
+                        const header = headerFor(cell.column.id);
+                        return (
+                          <div
+                            key={cell.id}
+                            className="flex items-start justify-between gap-3 text-sm"
+                          >
+                            <dt className="shrink-0 text-gray-400">
+                              {header && !header.isPlaceholder
+                                ? flexRender(header.column.columnDef.header, header.getContext())
+                                : null}
+                            </dt>
+                            <dd className="min-w-0 break-words text-right text-gray-700 dark:text-gray-300">
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {pageCount > 1 && (
         <div className="mt-4 flex items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
