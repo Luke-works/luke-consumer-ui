@@ -48,6 +48,9 @@ export default function FormInbox() {
   const [view, setView] = useState<InstanceView | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
+  // Task ids we've completed but the server list may still return for a beat
+  // (completion can lag). We suppress these from refetches until the server drops them.
+  const completedRef = useRef<Set<string>>(new Set());
 
   const sortCol = sorting[0];
   const sortField = sortCol ? SORT_FIELD[sortCol.id] : undefined;
@@ -72,7 +75,16 @@ export default function FormInbox() {
       sort: sortField,
       order: sortOrder,
     }, ctl.signal)
-      .then((p) => { setTasks(p.items); setTotal(p.total); setLoading(false); })
+      .then((p) => {
+        // Drop just-completed tasks the server hasn't dropped yet; prune ids it
+        // already has (so the suppression set self-heals and can't grow stale).
+        const done = completedRef.current;
+        done.forEach((id) => { if (!p.items.some((t) => t.taskId === id)) done.delete(id); });
+        const items = p.items.filter((t) => !done.has(t.taskId));
+        setTasks(items);
+        setTotal(Math.max(0, p.total - (p.items.length - items.length)));
+        setLoading(false);
+      })
       .catch((e: unknown) => {
         if (isAbortError(e)) return; // superseded poll/filter — not a real error
         setError((e as { message?: string })?.message ?? "Couldn’t load the inbox.");
@@ -106,12 +118,26 @@ export default function FormInbox() {
 
   const complete = async () => {
     if (!tenant || !selected) return;
+    const completedId = selected.taskId;
     setCompleting(true);
     try {
-      await completeTask(tenant, selected.taskId);
-      setSelected(null);
-      setView(null);
-      setReloadKey((k) => k + 1); // refetch the current page
+      await completeTask(tenant, completedId);
+      // Optimistically remove the completed task so it leaves the list AND the
+      // reading pane at once — don't wait on (and don't get re-added by) the
+      // server list, which can still return it for a beat.
+      completedRef.current.add(completedId);
+      const remaining = tasks.filter((t) => t.taskId !== completedId);
+      setTasks(remaining);
+      setTotal((n) => Math.max(0, n - 1));
+      if (mode === "split" && remaining.length > 0) {
+        // Advance to the next task (Outlook-style) rather than clearing the pane.
+        const pos = Math.max(0, tasks.findIndex((t) => t.taskId === completedId));
+        void openTask(remaining[Math.min(pos, remaining.length - 1)]);
+      } else {
+        setSelected(null);
+        setView(null);
+      }
+      setReloadKey((k) => k + 1); // reconcile with the server
     } catch (e) {
       setError((e as { message?: string })?.message ?? "Couldn’t complete the task.");
     } finally {

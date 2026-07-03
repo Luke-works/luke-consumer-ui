@@ -90,6 +90,35 @@ test.describe("mobile navigation drawer", () => {
   });
 });
 
+test.describe("form inbox — complete task (split view)", () => {
+  test("completing removes the task and advances, even if the server list lags", async ({ page }) => {
+    const TASKS = [
+      { taskId: "task-1", name: "Review Alice", created: 1717200000000, assignee: null, instanceId: null },
+      { taskId: "task-2", name: "Review Bob", created: 1717300000000, assignee: null, instanceId: null },
+    ];
+    // getInbox keeps returning BOTH tasks (simulating server-side completion lag);
+    // the UI must still drop the completed one and not let the refetch re-add it.
+    await stubBackend(page, {
+      routes: {
+        "/api/form-inbox*": ok({ items: TASKS, total: 2, firstResult: 0, maxResults: 50 }),
+        "/api/form-inbox/*/complete": (route) =>
+          route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, taskId: "task-1" }) }),
+      },
+    });
+    await page.addInitScript(() => localStorage.setItem("lk.inbox.view", "split"));
+    await page.goto("/forms/inbox");
+
+    // Split view auto-opens the first task in the reading pane (its name as a heading).
+    await expect(page.getByRole("heading", { name: "Review Alice" })).toBeVisible();
+
+    await page.getByRole("button", { name: /complete task/i }).click();
+
+    // Alice leaves the list AND the reading pane; the view advances to Bob.
+    await expect(page.getByText("Review Alice")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Review Bob" })).toBeVisible();
+  });
+});
+
 test.describe("form builder responsive shell", () => {
   test("phone shows the desktop-recommended notice, not the DnD canvas", async ({ page }) => {
     await stubBackend(page, { routes: builderRoutes });
