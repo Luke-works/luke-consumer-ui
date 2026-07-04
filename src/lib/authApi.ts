@@ -367,6 +367,52 @@ export function removeUserFromGroup(tenantId: string, userId: string, groupId: s
   );
 }
 
+/** Rename a candidate group's display name (owner-only; the id is immutable). */
+export function renameGroup(tenantId: string, groupId: string, name: string): Promise<OrgGroup> {
+  return authed(
+    `/api/org/candidate-groups/${seg(groupId)}`,
+    tenantInit(tenantId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+  );
+}
+
+/** Delete a candidate group and its delegated-owners group (owner-only; idempotent). */
+export function deleteGroup(tenantId: string, groupId: string): Promise<void> {
+  return authed(
+    `/api/org/candidate-groups/${seg(groupId)}`,
+    tenantInit(tenantId, { method: "DELETE" }),
+  );
+}
+
+/** A delegated owner (manager) of a candidate group — someone who may edit its membership. */
+export type OrgGroupManager = { id: string; firstName: string | null; lastName: string | null };
+
+/** List the owners (delegated managers) of a candidate group. */
+export async function listGroupOwners(tenantId: string, groupId: string): Promise<OrgGroupManager[]> {
+  return asArray<OrgGroupManager>(
+    await authed(`/api/org/candidate-groups/${seg(groupId)}/managers`, tenantInit(tenantId)),
+  );
+}
+
+/** Appoint a member as an owner of a candidate group (owner-only; idempotent). */
+export function addGroupOwner(tenantId: string, groupId: string, userId: string): Promise<void> {
+  return authed(
+    `/api/org/candidate-groups/${seg(groupId)}/managers/${seg(userId)}`,
+    tenantInit(tenantId, { method: "PUT" }),
+  );
+}
+
+/** Remove a member as an owner of a candidate group (owner-only; idempotent). */
+export function removeGroupOwner(tenantId: string, groupId: string, userId: string): Promise<void> {
+  return authed(
+    `/api/org/candidate-groups/${seg(groupId)}/managers/${seg(userId)}`,
+    tenantInit(tenantId, { method: "DELETE" }),
+  );
+}
+
 export async function listCapabilities(tenantId: string): Promise<CapabilityCatalogItem[]> {
   const all = asArray<CapabilityCatalogItem>(await authed("/api/org/capabilities", tenantInit(tenantId)));
   // Drop force-hidden capabilities (e.g. WORKFLOW until launch) so they never appear in the
