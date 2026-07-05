@@ -66,6 +66,19 @@ declare const MAX_BLOCKS = 50;
 declare const MIN_CONTENT_WIDTH = 480;
 declare const MAX_CONTENT_WIDTH = 700;
 declare const ALLOWED_BLOCK_TYPES: Set<"heading" | "text" | "button" | "image" | "divider" | "spacer" | "footer">;
+declare const MAX_SUBJECT_LEN = 256;
+declare const MAX_PREHEADER_LEN = 256;
+/** heading / text / footer body. */
+declare const MAX_RICH_TEXT_LEN = 5000;
+/** button label, image alt. */
+declare const MAX_SHORT_TEXT_LEN = 256;
+/** href / src / unsubscribeUrl. */
+declare const MAX_URL_LEN = 2048;
+declare const MAX_SPACER_SIZE = 200;
+/** True when a string is a safe CSS color (hex, rgb/rgba/hsl/hsla, or a named color). */
+declare function isValidColor(value: unknown): value is string;
+/** Return the value if it's a safe color, else the fallback. */
+declare function coerceColor(value: unknown, fallback: string): string;
 declare const DEFAULT_THEME: Theme;
 /** A fresh, valid, empty document the builder can start from. */
 declare function emptyEmailDoc(): EmailDoc;
@@ -157,4 +170,4 @@ declare function buildTemplateModel(template: EmailTemplate | null | undefined, 
  */
 declare function previewValues(template: EmailTemplate | null | undefined): Record<string, string>;
 
-export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_THEME, type DividerBlock, EMAIL_VAR_TYPES, type EmailBlock, type EmailDoc, type EmailTemplate, type EmailVarType, type EmailVariable, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, buildTemplateModel, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
+export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_THEME, type DividerBlock, EMAIL_VAR_TYPES, type EmailBlock, type EmailDoc, type EmailTemplate, type EmailVarType, type EmailVariable, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };

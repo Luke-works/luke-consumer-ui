@@ -13,6 +13,25 @@ var ALLOWED_BLOCK_TYPES = /* @__PURE__ */ new Set([
 ]);
 var ALLOWED_ALIGN = /* @__PURE__ */ new Set(["left", "center", "right"]);
 var ALLOWED_FONTS = /* @__PURE__ */ new Set(["sans", "serif", "mono"]);
+var MAX_SUBJECT_LEN = 256;
+var MAX_PREHEADER_LEN = 256;
+var MAX_RICH_TEXT_LEN = 5e3;
+var MAX_SHORT_TEXT_LEN = 256;
+var MAX_URL_LEN = 2048;
+var MAX_SPACER_SIZE = 200;
+var HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+var FUNC_COLOR = /^(?:rgb|rgba|hsl|hsla)\(\s*[0-9.,%\s/]+\)$/i;
+var NAMED_COLORS = new Set(
+  "aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato transparent turquoise violet wheat white whitesmoke yellow yellowgreen currentcolor".split(" ")
+);
+function isValidColor(value) {
+  if (typeof value !== "string") return false;
+  const v = value.trim();
+  return HEX_COLOR.test(v) || FUNC_COLOR.test(v) || /^[a-z]+$/i.test(v) && NAMED_COLORS.has(v.toLowerCase());
+}
+function coerceColor(value, fallback) {
+  return isValidColor(value) ? value.trim() : fallback;
+}
 var DEFAULT_THEME = {
   brandColor: "#2563eb",
   fontFamily: "sans",
@@ -67,8 +86,24 @@ function validateEmailDoc(doc) {
     problems.push({ code: "malformed-doc", severity: "error", message: "Email document is missing its blocks." });
     return problems;
   }
+  const overLen = (v, n) => typeof v === "string" && v.length > n;
+  const colorBad = (v) => typeof v === "string" && v.trim() !== "" && !isValidColor(v);
   if (!nonEmpty(doc.subject)) {
     problems.push({ code: "no-subject", severity: "warning", message: "This email has no subject line." });
+  }
+  if (overLen(doc.subject, MAX_SUBJECT_LEN)) {
+    problems.push({ code: "field-truncated", severity: "warning", message: `Subject is longer than ${MAX_SUBJECT_LEN} characters and will be truncated.` });
+  }
+  if (overLen(doc.preheader, MAX_PREHEADER_LEN)) {
+    problems.push({ code: "field-truncated", severity: "warning", message: `Preheader is longer than ${MAX_PREHEADER_LEN} characters and will be truncated.` });
+  }
+  const theme = doc.theme;
+  if (theme) {
+    for (const [key, label] of [["brandColor", "Brand color"], ["backgroundColor", "Background color"], ["contentBackground", "Card background"]]) {
+      if (colorBad(theme[key])) {
+        problems.push({ code: "insecure-color", severity: "warning", message: `${label} isn't a valid CSS color and will be reset to the default.` });
+      }
+    }
   }
   if (doc.blocks.length === 0) {
     problems.push({ code: "empty-blocks", severity: "error", message: "Add at least one block \u2014 the email is empty." });
@@ -82,6 +117,12 @@ function validateEmailDoc(doc) {
     if (!type || !ALLOWED_BLOCK_TYPES.has(type)) {
       problems.push({ code: "invalid-type", severity: "error", blockIndex: i, message: `Block ${i + 1} has an unknown type "${String(type)}".` });
       return;
+    }
+    for (const [prop, cap] of [["text", MAX_RICH_TEXT_LEN], ["label", MAX_SHORT_TEXT_LEN], ["alt", MAX_SHORT_TEXT_LEN], ["href", MAX_URL_LEN], ["src", MAX_URL_LEN], ["unsubscribeUrl", MAX_URL_LEN]]) {
+      if (overLen(b[prop], cap)) problems.push({ code: "field-truncated", severity: "warning", blockIndex: i, message: `Block ${i + 1} ${prop} is longer than ${cap} characters and will be truncated.` });
+    }
+    if (colorBad(b.bgColor) || colorBad(b.textColor)) {
+      problems.push({ code: "insecure-color", severity: "warning", blockIndex: i, message: `Block ${i + 1} has a color that isn't valid CSS and will be dropped.` });
     }
     switch (type) {
       case "heading":
@@ -128,50 +169,55 @@ function repairTheme(raw) {
   const t = raw && typeof raw === "object" ? raw : {};
   const widthNum = typeof t.contentWidth === "number" ? t.contentWidth : Number(t.contentWidth);
   return {
-    brandColor: typeof t.brandColor === "string" && t.brandColor ? t.brandColor : DEFAULT_THEME.brandColor,
+    brandColor: coerceColor(t.brandColor, DEFAULT_THEME.brandColor),
     fontFamily: typeof t.fontFamily === "string" && ALLOWED_FONTS.has(t.fontFamily) ? t.fontFamily : DEFAULT_THEME.fontFamily,
     contentWidth: Number.isFinite(widthNum) ? clamp(Math.round(widthNum), MIN_CONTENT_WIDTH, MAX_CONTENT_WIDTH) : DEFAULT_THEME.contentWidth,
-    backgroundColor: typeof t.backgroundColor === "string" && t.backgroundColor ? t.backgroundColor : DEFAULT_THEME.backgroundColor,
-    contentBackground: typeof t.contentBackground === "string" && t.contentBackground ? t.contentBackground : DEFAULT_THEME.contentBackground
+    backgroundColor: coerceColor(t.backgroundColor, DEFAULT_THEME.backgroundColor),
+    contentBackground: coerceColor(t.contentBackground, DEFAULT_THEME.contentBackground)
   };
 }
 var str = (v) => typeof v === "string" ? v : "";
+var clip = (v, n) => str(v).slice(0, n);
+var optColor = (v) => coerceColor(v, "");
 function repairBlock(raw) {
   if (!raw || typeof raw !== "object") return null;
   const b = raw;
   const align = coerceAlign(b.align);
   switch (b.type) {
     case "heading":
-      return { type: "heading", text: str(b.text), level: coerceLevel(b.level), ...align ? { align } : {} };
+      return { type: "heading", text: clip(b.text, MAX_RICH_TEXT_LEN), level: coerceLevel(b.level), ...align ? { align } : {} };
     case "text":
-      return { type: "text", text: str(b.text), ...align ? { align } : {} };
-    case "button":
+      return { type: "text", text: clip(b.text, MAX_RICH_TEXT_LEN), ...align ? { align } : {} };
+    case "button": {
+      const bg = optColor(b.bgColor);
+      const fg = optColor(b.textColor);
       return {
         type: "button",
-        label: str(b.label),
-        href: str(b.href),
+        label: clip(b.label, MAX_SHORT_TEXT_LEN),
+        href: clip(b.href, MAX_URL_LEN),
         ...align ? { align } : {},
-        ...typeof b.bgColor === "string" && b.bgColor ? { bgColor: b.bgColor } : {},
-        ...typeof b.textColor === "string" && b.textColor ? { textColor: b.textColor } : {}
+        ...bg ? { bgColor: bg } : {},
+        ...fg ? { textColor: fg } : {}
       };
+    }
     case "image":
       return {
         type: "image",
-        src: str(b.src),
-        alt: str(b.alt),
-        ...typeof b.width === "number" || b.width && Number.isFinite(Number(b.width)) ? { width: Math.round(Number(b.width)) } : {},
-        ...typeof b.href === "string" && b.href ? { href: b.href } : {},
+        src: clip(b.src, MAX_URL_LEN),
+        alt: clip(b.alt, MAX_SHORT_TEXT_LEN),
+        ...typeof b.width === "number" || b.width && Number.isFinite(Number(b.width)) ? { width: clamp(Math.round(Number(b.width)), 1, MAX_CONTENT_WIDTH) } : {},
+        ...typeof b.href === "string" && b.href ? { href: clip(b.href, MAX_URL_LEN) } : {},
         ...align ? { align } : {}
       };
     case "divider":
       return { type: "divider" };
     case "spacer":
-      return { type: "spacer", size: typeof b.size === "number" || Number.isFinite(Number(b.size)) ? Math.max(1, Math.round(Number(b.size) || 24)) : 24 };
+      return { type: "spacer", size: typeof b.size === "number" || Number.isFinite(Number(b.size)) ? clamp(Math.round(Number(b.size) || 24), 1, MAX_SPACER_SIZE) : 24 };
     case "footer":
       return {
         type: "footer",
-        text: str(b.text),
-        ...typeof b.unsubscribeUrl === "string" && b.unsubscribeUrl ? { unsubscribeUrl: b.unsubscribeUrl } : {}
+        text: clip(b.text, MAX_RICH_TEXT_LEN),
+        ...typeof b.unsubscribeUrl === "string" && b.unsubscribeUrl ? { unsubscribeUrl: clip(b.unsubscribeUrl, MAX_URL_LEN) } : {}
       };
     default:
       return null;
@@ -193,8 +239,8 @@ function repairEmailDoc(doc) {
   }
   return {
     doc: {
-      subject: str(src.subject),
-      ...typeof src.preheader === "string" ? { preheader: src.preheader } : {},
+      subject: clip(src.subject, MAX_SUBJECT_LEN),
+      ...typeof src.preheader === "string" ? { preheader: clip(src.preheader, MAX_PREHEADER_LEN) } : {},
       theme: repairTheme(src.theme),
       blocks
     },
@@ -325,6 +371,6 @@ function previewValues(template) {
   return out;
 }
 
-export { ALLOWED_BLOCK_TYPES, DEFAULT_THEME, EMAIL_VAR_TYPES, MAX_BLOCKS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
+export { ALLOWED_BLOCK_TYPES, DEFAULT_THEME, EMAIL_VAR_TYPES, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
