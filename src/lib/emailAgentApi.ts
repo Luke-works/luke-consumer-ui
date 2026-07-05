@@ -9,7 +9,7 @@
 // (#32): a missing env fails the AI feature with a clear error instead of silently
 // shipping authored content to a public host. Calls are tenant-scoped (X-Tenant-Id)
 // and carry no client user id.
-import type { EmailDoc } from "./emailDoc";
+import type { EmailDoc } from "@lukeflow/email-core";
 
 /** Resolve the agents base URL, or throw if it isn't configured (no public fallback). */
 function agentBase(): string {

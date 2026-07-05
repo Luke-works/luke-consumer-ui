@@ -1,0 +1,30 @@
+{
+  "name": "@lukeflow/email-react",
+  "version": "0.1.0-alpha.0",
+  "description": "React renderer for @lukeflow/email-core — EmailDoc → react-email live preview + Postmark-ready inlined HTML/text.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "dependencies": {
+    "@lukeflow/email-core": "0.1.0-alpha.0",
+    "@react-email/components": "^1.0.11",
+    "@react-email/render": "^2.0.9"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}
