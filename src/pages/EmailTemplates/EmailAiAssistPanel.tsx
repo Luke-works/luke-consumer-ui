@@ -4,7 +4,7 @@ import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { saveDraft } from "../../lib/emailTemplatesApi";
 import { generateEmail, AgentCancelledError } from "../../lib/emailAgentApi";
-import { repairEmailDoc, type EmailDoc } from "../../lib/emailDoc";
+import { repairEmailDoc, type EmailDoc } from "@lukeflow/email-core";
 
 type Msg = { role: "you" | "ai"; text: string; error?: boolean; suggestions?: string[] };
 

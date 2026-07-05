@@ -14,7 +14,7 @@ import { ChevronLeftIcon, CheckLineIcon, PaperPlaneIcon, PencilIcon } from "../.
 import { FlaskConical, BadgeCheck } from "lucide-react";
 // Lazy-load the react-email renderer (~510 KB gz) so it's not in this route's initial
 // chunk — it loads when the preview mounts, and the compiler loads on check-in.
-const EmailRenderer = lazy(() => import("../../components/emailBuilder/EmailRenderer"));
+const EmailRenderer = lazy(() => import("@lukeflow/email-react").then((m) => ({ default: m.EmailRenderer })));
 import EmailAiAssistPanel from "./EmailAiAssistPanel";
 import {
   checkIn,
@@ -37,7 +37,7 @@ import {
   validateEmailDoc,
   type EmailDoc,
   type Problem,
-} from "../../lib/emailDoc";
+} from "@lukeflow/email-core";
 
 const STATUS_BADGE: Record<TemplateStatus, string> = {
   draft: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
@@ -192,7 +192,7 @@ function Builder({ tenant, templateId, template }: {
     try {
       await persistDraft();
       const current = { ...docRef.current, subject: subjectRef.current };
-      const { compileEmail } = await import("../../components/emailBuilder/EmailRenderer");
+      const { compileEmail } = await import("@lukeflow/email-react");
       const { html, text } = await compileEmail(current);
       const ver = await checkIn(tenant, templateId, {
         doc: JSON.stringify(current),
