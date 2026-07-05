@@ -130,7 +130,8 @@ function renderBlock(block, brand, i) {
       return null;
   }
 }
-function Email({ doc }) {
+function Email({ doc: input }) {
+  const { doc } = (0, import_email_core.repairEmailDoc)(input);
   const theme = doc.theme ?? import_email_core.DEFAULT_THEME;
   const brand = theme.brandColor || import_email_core.DEFAULT_THEME.brandColor;
   const fontFamily = FONT_STACK[theme.fontFamily] ?? FONT_STACK.sans;
@@ -147,12 +148,29 @@ function Email({ doc }) {
     ) }) })
   ] });
 }
-async function compileEmail(doc) {
+function asTemplate(input) {
+  return input && typeof input === "object" && "doc" in input && input.doc ? input : { doc: input, variables: [] };
+}
+async function compileEmail(input) {
+  const tpl = asTemplate(input);
+  const { doc } = (0, import_email_core.repairEmailDoc)(tpl.doc);
   const [html, text] = await Promise.all([
     (0, import_render.render)(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Email, { doc })),
-    (0, import_render.render)(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Email, { doc }), { plainText: true })
+    // html-to-text uppercases headings by default, which would mangle {{Var}} casing
+    // in the text channel and break Postmark's case-sensitive merge. Keep headings
+    // as-authored so every {{var}} survives identically in html AND text.
+    (0, import_render.render)(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Email, { doc }), {
+      plainText: true,
+      htmlToTextOptions: {
+        selectors: [
+          { selector: "h1", options: { uppercase: false } },
+          { selector: "h2", options: { uppercase: false } },
+          { selector: "h3", options: { uppercase: false } }
+        ]
+      }
+    })
   ]);
-  return { html, text };
+  return { subject: doc.subject, html, text, variables: (0, import_email_core.reconcileVariables)(doc, tpl.variables) };
 }
 function EmailRenderer({
   doc,
