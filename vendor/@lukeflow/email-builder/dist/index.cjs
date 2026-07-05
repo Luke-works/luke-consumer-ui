@@ -376,7 +376,7 @@ function Canvas({
       }
     );
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "eb-canvas", role: "list", "aria-label": "Email blocks", onDragLeave: (e) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "eb-canvas", role: "listbox", "aria-label": "Email blocks", "aria-orientation": "vertical", tabIndex: 0, onDragLeave: (e) => {
     if (e.currentTarget === e.target) setOverIndex(null);
   }, children: [
     overIndex === 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "eb-drop-line", "aria-hidden": "true" }),
@@ -384,7 +384,7 @@ function Canvas({
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
         "div",
         {
-          role: "listitem",
+          role: "option",
           className: `eb-row${selectedIndex === i ? " eb-row-selected" : ""}`,
           tabIndex: disabled ? -1 : 0,
           "aria-selected": selectedIndex === i,
@@ -740,27 +740,31 @@ function Modal({ title, onClose, children, wide = false }) {
       firstItem.focus();
     }
   }, [onClose]);
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "eb-modal-backdrop", onMouseDown: (e) => {
-    if (e.target === e.currentTarget) onClose();
-  }, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
-    "div",
-    {
-      ref: dialogRef,
-      className: `eb-modal${wide ? " eb-modal-wide" : ""}`,
-      role: "dialog",
-      "aria-modal": "true",
-      "aria-label": title,
-      tabIndex: -1,
-      onKeyDown,
-      children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "eb-modal-head", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "eb-modal-title", children: title }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "eb-icon-btn", "aria-label": "Close", onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M6 6l12 12M18 6 6 18" }) }) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "eb-modal-body", children })
-      ]
-    }
-  ) });
+  return (
+    // Presentational overlay; click outside the dialog closes it (Escape also works).
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "eb-modal-backdrop", onMouseDown: (e) => {
+      if (e.target === e.currentTarget) onClose();
+    }, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      "div",
+      {
+        ref: dialogRef,
+        className: `eb-modal${wide ? " eb-modal-wide" : ""}`,
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": title,
+        tabIndex: -1,
+        onKeyDown,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "eb-modal-head", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "eb-modal-title", children: title }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "eb-icon-btn", "aria-label": "Close", onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M6 6l12 12M18 6 6 18" }) }) })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "eb-modal-body", children })
+        ]
+      }
+    ) })
+  );
 }
 
 // src/PreviewModal.tsx
@@ -851,67 +855,72 @@ var EmailBuilder = (0, import_react6.forwardRef)(function EmailBuilder2({ initia
       disabled
     }
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-toolbar", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-toolbar-group", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canUndo, onClick: b.undo, title: "Undo (\u2318Z)", "aria-label": "Undo", children: IconUndo }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canRedo, onClick: b.redo, title: "Redo (\u21E7\u2318Z)", "aria-label": "Redo", children: IconRedo })
+  return (
+    // Root captures keyboard shortcuts (undo/redo, delete, reorder) for its children;
+    // it's a container, not itself an interactive control.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-toolbar", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-toolbar-group", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canUndo, onClick: b.undo, title: "Undo (\u2318Z)", "aria-label": "Undo", children: IconUndo }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canRedo, onClick: b.redo, title: "Redo (\u21E7\u2318Z)", "aria-label": "Redo", children: IconRedo })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-toolbar-spacer" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          "button",
+          {
+            type: "button",
+            className: `eb-chip${errorCount ? " eb-chip-error" : warnCount ? " eb-chip-warn" : ""}`,
+            "aria-pressed": showProblems,
+            onClick: () => setShowProblems((v) => !v),
+            children: errorCount ? `${errorCount} error${errorCount === 1 ? "" : "s"}` : warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "No problems"
+          }
+        ),
+        renderPreview && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
+          IconEye,
+          " Preview"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "eb-block-count", children: [
+          b.doc.blocks.length,
+          " block",
+          b.doc.blocks.length === 1 ? "" : "s"
+        ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-toolbar-spacer" }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        "button",
-        {
-          type: "button",
-          className: `eb-chip${errorCount ? " eb-chip-error" : warnCount ? " eb-chip-warn" : ""}`,
-          "aria-pressed": showProblems,
-          onClick: () => setShowProblems((v) => !v),
-          children: errorCount ? `${errorCount} error${errorCount === 1 ? "" : "s"}` : warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "No problems"
-        }
-      ),
-      renderPreview && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
-        IconEye,
-        " Preview"
+      showProblems && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-problems-panel", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Problems, { problems: b.problems, onSelectBlock: selectBlock }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-header", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "eb-field", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-field-label", children: "Subject" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("input", { className: "eb-input", value: b.doc.subject, disabled, placeholder: "Welcome, {{firstName}}!", onChange: (e) => b.setSubject(e.target.value) })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "eb-field", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-field-label", children: "Preheader" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("input", { className: "eb-input", value: b.doc.preheader ?? "", disabled, placeholder: "Inbox preview text (optional)", onChange: (e) => b.setPreheader(e.target.value) })
+        ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "eb-block-count", children: [
-        b.doc.blocks.length,
-        " block",
-        b.doc.blocks.length === 1 ? "" : "s"
-      ] })
-    ] }),
-    showProblems && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-problems-panel", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Problems, { problems: b.problems, onSelectBlock: selectBlock }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-header", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "eb-field", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-field-label", children: "Subject" }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("input", { className: "eb-input", value: b.doc.subject, disabled, placeholder: "Welcome, {{firstName}}!", onChange: (e) => b.setSubject(e.target.value) })
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-col eb-col-palette", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col-title", children: "Blocks" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Palette, { onAdd: (type) => b.addBlock(type, b.selectedIndex === null ? void 0 : b.selectedIndex + 1), disabled })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col eb-col-canvas", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          Canvas,
+          {
+            blocks: b.doc.blocks,
+            selectedIndex: b.selectedIndex,
+            onSelect: (i) => i === null ? b.select(null) : selectBlock(i),
+            onAdd: b.addBlock,
+            onMove: b.moveBlock,
+            onRemove: b.removeBlock,
+            onDuplicate: b.duplicateBlock,
+            disabled
+          }
+        ) }),
+        settings === "panel" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col eb-col-settings", children: settingsPanel }) : aside && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col eb-col-aside", children: aside })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "eb-field", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-field-label", children: "Preheader" }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("input", { className: "eb-input", value: b.doc.preheader ?? "", disabled, placeholder: "Inbox preview text (optional)", onChange: (e) => b.setPreheader(e.target.value) })
-      ] })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-col eb-col-palette", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col-title", children: "Blocks" }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Palette, { onAdd: (type) => b.addBlock(type, b.selectedIndex === null ? void 0 : b.selectedIndex + 1), disabled })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col eb-col-canvas", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        Canvas,
-        {
-          blocks: b.doc.blocks,
-          selectedIndex: b.selectedIndex,
-          onSelect: (i) => i === null ? b.select(null) : selectBlock(i),
-          onAdd: b.addBlock,
-          onMove: b.moveBlock,
-          onRemove: b.removeBlock,
-          onDuplicate: b.duplicateBlock,
-          disabled
-        }
-      ) }),
-      settings === "panel" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col eb-col-settings", children: settingsPanel }) : aside && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-col eb-col-aside", children: aside })
-    ] }),
-    settings === "modal" && settingsModalOpen && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Modal, { title: "Block settings", onClose: () => setSettingsModalOpen(false), children: settingsPanel }),
-    showPreview && renderPreview && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PreviewModal, { onClose: () => setShowPreview(false), children: renderPreview(b.doc) })
-  ] });
+      settings === "modal" && settingsModalOpen && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Modal, { title: "Block settings", onClose: () => setSettingsModalOpen(false), children: settingsPanel }),
+      showPreview && renderPreview && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(PreviewModal, { onClose: () => setShowPreview(false), children: renderPreview(b.doc) })
+    ] })
+  );
 });
 
 // src/index.ts
