@@ -210,6 +210,121 @@ function parseEmailDoc(raw) {
   }
 }
 
-export { ALLOWED_BLOCK_TYPES, DEFAULT_THEME, MAX_BLOCKS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH, VAR_RE, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isVarOnly, parseEmailDoc, repairEmailDoc, validateEmailDoc };
+// src/variables.ts
+var EMAIL_VAR_TYPES = ["string", "number", "url", "date", "boolean"];
+var VAR_TYPE_SET = new Set(EMAIL_VAR_TYPES);
+var VAR_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function isValidVarName(name) {
+  return typeof name === "string" && VAR_NAME_RE.test(name);
+}
+var isPrimitive = (v) => typeof v === "string" || typeof v === "number" || typeof v === "boolean";
+function normalizeVar(raw) {
+  const v = {
+    name: raw.name,
+    type: typeof raw.type === "string" && VAR_TYPE_SET.has(raw.type) ? raw.type : "string",
+    required: typeof raw.required === "boolean" ? raw.required : true
+  };
+  if (raw.default !== void 0 && isPrimitive(raw.default)) v.default = raw.default;
+  if (typeof raw.label === "string" && raw.label) v.label = raw.label;
+  return v;
+}
+function reconcileVariables(doc, declared = []) {
+  const declaredByName = /* @__PURE__ */ new Map();
+  for (const d of Array.isArray(declared) ? declared : []) {
+    if (d && isValidVarName(d.name) && !declaredByName.has(d.name)) {
+      declaredByName.set(d.name, normalizeVar(d));
+    }
+  }
+  const out = [];
+  const emitted = /* @__PURE__ */ new Set();
+  for (const name of extractVariables(doc)) {
+    if (emitted.has(name)) continue;
+    emitted.add(name);
+    out.push(declaredByName.get(name) ?? { name, type: "string", required: true });
+  }
+  for (const [name, v] of declaredByName) {
+    if (emitted.has(name)) continue;
+    emitted.add(name);
+    out.push(v);
+  }
+  return out;
+}
+function defaultMatchesType(value, type) {
+  switch (type) {
+    case "string":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "url":
+      return typeof value === "string" && /^https?:\/\/\S+/i.test(value.trim());
+    case "date":
+      return typeof value === "string" && !Number.isNaN(Date.parse(value));
+  }
+}
+function validateVariables(template) {
+  const problems = [];
+  const doc = template?.doc;
+  const declared = Array.isArray(template?.variables) ? template.variables : [];
+  const used = new Set(extractVariables(doc));
+  const seen = /* @__PURE__ */ new Set();
+  for (const v of declared) {
+    const name = v?.name;
+    if (!isValidVarName(name)) {
+      problems.push({ code: "invalid-variable-name", severity: "error", message: `Variable name "${String(name)}" is not a valid {{identifier}}.` });
+      continue;
+    }
+    if (seen.has(name)) {
+      problems.push({ code: "duplicate-variable", severity: "error", message: `Variable "${name}" is declared more than once.` });
+      continue;
+    }
+    seen.add(name);
+    if (v.type !== void 0 && !VAR_TYPE_SET.has(v.type)) {
+      problems.push({ code: "invalid-variable-type", severity: "error", message: `Variable "${name}" has an unknown type "${String(v.type)}".` });
+    }
+    if (v.default !== void 0) {
+      if (!isPrimitive(v.default) || !defaultMatchesType(v.default, VAR_TYPE_SET.has(v.type) ? v.type : "string")) {
+        problems.push({ code: "default-type-mismatch", severity: "warning", message: `Variable "${name}" has a default that doesn't match its ${v.type ?? "string"} type.` });
+      }
+    }
+    if (!used.has(name)) {
+      problems.push({ code: "unused-variable", severity: "warning", message: `Variable "${name}" is declared but never used in the email.` });
+    }
+  }
+  for (const name of used) {
+    if (!seen.has(name)) {
+      problems.push({ code: "undeclared-variable", severity: "warning", message: `Variable "${name}" is used but not declared in the contract.` });
+    }
+  }
+  return problems;
+}
+function typeZero(type) {
+  return type === "number" ? 0 : type === "boolean" ? false : "";
+}
+function buildTemplateModel(template, values = {}) {
+  const vals = values && typeof values === "object" ? values : {};
+  const model = {};
+  for (const v of reconcileVariables(template?.doc, template?.variables)) {
+    model[v.name] = v.name in vals && isPrimitive(vals[v.name]) ? vals[v.name] : v.default !== void 0 ? v.default : typeZero(v.type);
+  }
+  return model;
+}
+var SAMPLE = {
+  string: "Sample text",
+  number: "123",
+  url: "https://example.com",
+  date: "2025-01-01",
+  boolean: "true"
+};
+function previewValues(template) {
+  const out = {};
+  for (const v of reconcileVariables(template?.doc, template?.variables)) {
+    out[v.name] = v.default !== void 0 ? String(v.default) : SAMPLE[v.type];
+  }
+  return out;
+}
+
+export { ALLOWED_BLOCK_TYPES, DEFAULT_THEME, EMAIL_VAR_TYPES, MAX_BLOCKS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

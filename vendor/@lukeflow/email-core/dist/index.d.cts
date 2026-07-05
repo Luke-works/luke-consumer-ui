@@ -110,4 +110,51 @@ declare function repairEmailDoc(doc: EmailDoc | null | undefined): {
 /** Parse an EmailDoc JSON string into a repaired doc (empty doc on failure). */
 declare function parseEmailDoc(raw: string | null | undefined): EmailDoc;
 
-export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_THEME, type DividerBlock, type EmailBlock, type EmailDoc, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isVarOnly, parseEmailDoc, repairEmailDoc, validateEmailDoc };
+type EmailVarType = "string" | "number" | "url" | "date" | "boolean";
+type EmailVariable = {
+    /** The {{name}} identifier (VAR_RE grammar). */
+    name: string;
+    /** Declared type; drives TemplateModel seeding + validation. Default "string". */
+    type: EmailVarType;
+    /** Whether the send-time TemplateModel must supply it. Default true. */
+    required: boolean;
+    /** Optional default — seeds the TemplateModel and the preview. */
+    default?: string | number | boolean;
+    /** Optional human label for the builder UI. */
+    label?: string;
+};
+/** A template = the doc plus its declared variable contract. */
+type EmailTemplate = {
+    doc: EmailDoc;
+    variables: EmailVariable[];
+};
+declare const EMAIL_VAR_TYPES: readonly EmailVarType[];
+declare function isValidVarName(name: unknown): name is string;
+/**
+ * The canonical variable contract for a doc: every {{var}} actually used, enriched
+ * with any matching declaration, in a stable order (doc first-seen order, then
+ * declared-but-unused appended). A used var is never dropped — undeclared ones
+ * default to `{ type: "string", required: true }`. Pure & deterministic.
+ */
+declare function reconcileVariables(doc: EmailDoc | null | undefined, declared?: EmailVariable[] | null | undefined): EmailVariable[];
+/**
+ * Check a template's declared variable contract against its doc. Flags invalid
+ * names/types, duplicates, defaults that don't match their type, declared-but-unused
+ * and used-but-undeclared vars. Tolerant of malformed input — never throws.
+ */
+declare function validateVariables(template: EmailTemplate | null | undefined): Problem[];
+/**
+ * Build the Postmark TemplateModel skeleton: one key per reconciled variable,
+ * seeded from `values` → the variable's `default` → the type's zero value. This is
+ * what the Camunda outbound task fills with real values before Postmark merges.
+ */
+declare function buildTemplateModel(template: EmailTemplate | null | undefined, values?: Record<string, string | number | boolean> | null | undefined): Record<string, string | number | boolean>;
+/**
+ * Realistic string values for the LIVE preview so the operator sees rendered
+ * content instead of raw {{vars}}. Uses each variable's `default` when set, else a
+ * type-based sample. The PUBLISHED html/text still keep {{vars}} literal — this is
+ * preview-only. Deterministic.
+ */
+declare function previewValues(template: EmailTemplate | null | undefined): Record<string, string>;
+
+export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_THEME, type DividerBlock, EMAIL_VAR_TYPES, type EmailBlock, type EmailDoc, type EmailTemplate, type EmailVarType, type EmailVariable, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, buildTemplateModel, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
