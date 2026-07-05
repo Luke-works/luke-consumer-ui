@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // `vendor/` holds built third-party dist (the @lukeflow/* packages) — never lint it;
+  // its bundled code can carry eslint-disable directives for plugins we don't load.
+  { ignores: ['dist', 'vendor'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
