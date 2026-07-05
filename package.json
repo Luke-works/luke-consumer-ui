@@ -24,6 +24,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@lukeflow/email-builder": "file:./vendor/@lukeflow/email-builder",
     "@lukeflow/email-core": "file:./vendor/@lukeflow/email-core",
     "@lukeflow/email-react": "file:./vendor/@lukeflow/email-react",
     "@lukeflow/form-builder": "file:./vendor/@lukeflow/form-builder",

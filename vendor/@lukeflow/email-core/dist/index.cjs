@@ -180,6 +180,19 @@ function repairTheme(raw) {
 }
 var str = (v) => typeof v === "string" ? v : "";
 var clip = (v, n) => str(v).slice(0, n);
+function sanitizeVars(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const v of raw) {
+    const name = v?.name;
+    if (v && typeof v === "object" && typeof name === "string" && name && !seen.has(name)) {
+      seen.add(name);
+      out.push(v);
+    }
+  }
+  return out;
+}
 var optColor = (v) => coerceColor(v, "");
 function repairBlock(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -244,7 +257,8 @@ function repairEmailDoc(doc) {
       subject: clip(src.subject, MAX_SUBJECT_LEN),
       ...typeof src.preheader === "string" ? { preheader: clip(src.preheader, MAX_PREHEADER_LEN) } : {},
       theme: repairTheme(src.theme),
-      blocks
+      blocks,
+      ...Array.isArray(src.variables) ? { variables: sanitizeVars(src.variables) } : {}
     },
     removed
   };
@@ -276,7 +290,7 @@ function normalizeVar(raw) {
   if (typeof raw.label === "string" && raw.label) v.label = raw.label;
   return v;
 }
-function reconcileVariables(doc, declared = []) {
+function reconcileVariables(doc, declared = doc?.variables ?? []) {
   const declaredByName = /* @__PURE__ */ new Map();
   for (const d of Array.isArray(declared) ? declared : []) {
     if (d && isValidVarName(d.name) && !declaredByName.has(d.name)) {

@@ -12,8 +12,10 @@ import { useAuth } from "../../context/AuthContext";
 import { canWrite, EMAIL } from "../../lib/capabilities";
 import { ChevronLeftIcon, CheckLineIcon, PaperPlaneIcon, PencilIcon } from "../../icons";
 import { FlaskConical, BadgeCheck } from "lucide-react";
-// Lazy-load the react-email renderer (~510 KB gz) so it's not in this route's initial
-// chunk — it loads when the preview mounts, and the compiler loads on check-in.
+import { EmailBuilder, type EmailBuilderHandle } from "@lukeflow/email-builder";
+import "@lukeflow/email-builder/styles.css";
+// Lazy-load the react-email renderer (~510 KB gz) so it only loads when the Preview
+// modal opens — the builder itself stays decoupled from it via `renderPreview`.
 const EmailRenderer = lazy(() => import("@lukeflow/email-react").then((m) => ({ default: m.EmailRenderer })));
 import EmailAiAssistPanel from "./EmailAiAssistPanel";
 import {
@@ -32,9 +34,10 @@ import {
 import { generateTestData } from "../../lib/emailAgentApi";
 import {
   emptyEmailDoc,
-  extractVariables,
   parseEmailDoc,
+  reconcileVariables,
   validateEmailDoc,
+  validateVariables,
   type EmailDoc,
   type Problem,
 } from "@lukeflow/email-core";
@@ -66,7 +69,6 @@ function Builder({ tenant, templateId, template }: {
   const [saved, setSaved] = useState(true);
   const [saveError, setSaveError] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [problemsOpen, setProblemsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [formDesc, setFormDesc] = useState(template.description ?? "");
@@ -90,11 +92,29 @@ function Builder({ tenant, templateId, template }: {
 
   const { locked: mutating, runExclusive } = useMutationLock();
 
-  // Live problem report. `blocking` gates check-in / publish (mirror Problems panel).
-  const problems = useMemo<Problem[]>(() => validateEmailDoc({ ...doc, subject }), [doc, subject]);
+  // The reconciled typed contract → variable names for the test-send model. The
+  // visual builder owns editing the contract (Variables tab); this is read-only here.
+  const contract = useMemo(() => reconcileVariables({ ...doc, subject }), [doc, subject]);
+  const variables = useMemo(() => contract.map((v) => v.name), [contract]);
+
+  // `blocking` gates check-in / publish. The builder shows the full Problems list;
+  // here we only need the blocking set (validation folds in the variable contract).
+  const problems = useMemo<Problem[]>(() => {
+    const d = { ...doc, subject };
+    return [...validateEmailDoc(d), ...validateVariables({ doc: d, variables: contract })];
+  }, [doc, subject, contract]);
   const blocking = useMemo(() => problems.filter((p) => p.severity === "error"), [problems]);
-  const warnCount = problems.filter((p) => p.severity === "warning").length;
-  const variables = useMemo(() => extractVariables({ ...doc, subject }), [doc, subject]);
+
+  // The visual builder is the editing surface; keep the doc mirror + refs in sync
+  // for autosave, check-in, and test-send. builderRef lets AI-apply/check-in drive it.
+  const builderRef = useRef<EmailBuilderHandle>(null);
+  const onBuilderChange = (next: EmailDoc) => {
+    setDoc(next);
+    docRef.current = next;
+    setSubject(next.subject);
+    subjectRef.current = next.subject;
+    scheduleSave();
+  };
 
   // Load the activity feed when the settings modal opens.
   useEffect(() => {
@@ -133,23 +153,19 @@ function Builder({ tenant, templateId, template }: {
     saveTimer.current = window.setTimeout(() => { void persistDraft(); }, 600);
   };
 
-  const onSubjectChange = (v: string) => {
-    setSubject(v);
-    subjectRef.current = v;
-    setDoc((d) => ({ ...d, subject: v }));
-    scheduleSave();
-  };
-
-  // Apply an AI-produced doc: the panel already saved the draft, so just swap it
-  // into local state and re-render the preview. No refetch, no loading.
+  // Apply an AI-produced doc: push it into the visual builder (authoritative), which
+  // fires onBuilderChange to sync the mirror + autosave. Falls back to the mirror if
+  // the builder handle isn't mounted yet.
   const applyAiDoc = (next: EmailDoc) => {
-    setDoc(next);
+    if (builderRef.current) {
+      builderRef.current.setDoc(next);
+    } else {
+      setDoc(next);
+      docRef.current = next;
+      subjectRef.current = next.subject;
+    }
     setSubject(next.subject);
-    subjectRef.current = next.subject;
-    docRef.current = next;
     setDirty(true);
-    setSaved(true);
-    setSaveError(false);
   };
 
   // Flush a pending autosave on unmount (route change), so the last edits aren't lost.
@@ -187,7 +203,7 @@ function Builder({ tenant, templateId, template }: {
   // Check-in: compile html/text in the browser, store the version (doc+subject),
   // and publish to Postmark. First check-in auto-publishes. Gated on zero errors.
   const handleCheckIn = () => runExclusive(async () => {
-    if (blocking.length) { setProblemsOpen(true); return; } // never check in a broken email
+    if (blocking.length) return; // never check in a broken email (button is also disabled)
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     try {
       await persistDraft();
@@ -215,7 +231,7 @@ function Builder({ tenant, templateId, template }: {
   });
 
   const handlePublish = () => runExclusive(async () => {
-    if (blocking.length) { setProblemsOpen(true); return; }
+    if (blocking.length) return;
     try {
       await publishVersion(tenant, templateId, version);
       setPublishedVersion(version);
@@ -239,10 +255,11 @@ function Builder({ tenant, templateId, template }: {
     setTestOpen(true);
     setTestError(null);
     setTestSent(false);
-    // Seed empty values for every variable so the form renders even if AI fails.
+    // Seed from the declared defaults (falling back to empty) so the form renders
+    // even if AI fails — declared defaults beat blank placeholders.
     setTestModel((prev) => {
       const seeded: Record<string, string> = {};
-      for (const v of variables) seeded[v] = prev[v] ?? "";
+      for (const v of contract) seeded[v.name] = prev[v.name] ?? (v.default !== undefined ? String(v.default) : "");
       return seeded;
     });
     if (variables.length === 0) return;
@@ -312,22 +329,6 @@ function Builder({ tenant, templateId, template }: {
           ) : (
             <>
               <span className={`mr-1 hidden text-xs sm:inline ${saveError ? "text-error-500" : "text-gray-400"}`}>{saveError ? "Save failed — retry" : saved ? "Draft saved" : "Saving…"}</span>
-              {problems.length > 0 && (
-                <Tooltip content={blocking.length ? `${blocking.length} problem(s) block check-in & publish` : `${warnCount} warning(s)`}>
-                  <button
-                    type="button"
-                    onClick={() => setProblemsOpen(true)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-                      blocking.length
-                        ? "bg-error-50 text-error-600 hover:bg-error-100 dark:bg-error-500/10 dark:text-error-400"
-                        : "bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400"
-                    }`}
-                  >
-                    <span aria-hidden>{blocking.length ? "⊘" : "⚠"}</span>
-                    {blocking.length ? `${blocking.length} error${blocking.length > 1 ? "s" : ""}` : `${warnCount} warning${warnCount > 1 ? "s" : ""}`}
-                  </button>
-                </Tooltip>
-              )}
               <Tooltip content="Send yourself a test email with sample values for each variable."><Button size="sm" variant="outline" className={eq} onClick={openTest} disabled={!publishedVersion} startIcon={<FlaskConical className="size-4" />}>Send test</Button></Tooltip>
               <Tooltip content="Save your progress as a draft."><Button size="sm" variant="outline" className={eq} onClick={flushSave} startIcon={<CheckLineIcon className="size-4" />}>Save</Button></Tooltip>
               <Tooltip content={blocking.length ? "Fix the blocking problems before checking in." : "Compile the email and publish it to Postmark as a new version."}><Button size="sm" variant="outline" className={eq} onClick={handleCheckIn} disabled={blocking.length > 0 || mutating} startIcon={<PaperPlaneIcon className="size-4" />}>Check in</Button></Tooltip>
@@ -339,78 +340,30 @@ function Builder({ tenant, templateId, template }: {
         </div>
       </div>
 
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1 space-y-4">
-          {/* Subject line — the only inline field (everything else via AI chat). */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
-            <Label>Subject line</Label>
-            <Input
-              value={subject}
-              onChange={(e) => onSubjectChange(e.target.value)}
-              placeholder="Welcome, {{firstName}}!"
-              disabled={!canEdit}
-            />
-            {variables.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] uppercase tracking-wide text-gray-400">Variables</span>
-                {variables.map((v) => (
-                  <span key={v} className="rounded-full bg-brand-50 px-2 py-0.5 font-mono text-[11px] text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">{`{{${v}}}`}</span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Center: live preview. */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-white/[0.03]">
-            <Suspense fallback={<div className="flex h-[680px] items-center justify-center text-sm text-gray-400">Loading preview…</div>}>
-              <EmailRenderer doc={doc} height={680} />
-            </Suspense>
-          </div>
-        </div>
-
-        {/* Permanent LukeBuilds rail — sticky and viewport-tall. */}
-        {canEdit && (
-          <aside className="sticky top-24 hidden h-[calc(100vh-9rem)] w-[360px] shrink-0 lg:block">
-            <EmailAiAssistPanel
-              tenant={tenant}
-              templateId={templateId}
-              templateName={name}
-              doc={doc}
-              subject={subject}
-              onApplied={applyAiDoc}
-            />
-          </aside>
+      {/* The visual email builder — palette · canvas · settings (block/theme/variables),
+          live preview + Problems in its toolbar. The AI-assist panel rides as the aside. */}
+      <EmailBuilder
+        ref={builderRef}
+        initialDoc={doc}
+        disabled={!canEdit}
+        settings="modal"
+        onChange={onBuilderChange}
+        renderPreview={(d) => (
+          <Suspense fallback={<div className="flex h-[640px] items-center justify-center text-sm text-gray-400">Loading preview…</div>}>
+            <EmailRenderer doc={d} height={640} />
+          </Suspense>
         )}
-      </div>
-
-      {/* Problems */}
-      <Modal isOpen={problemsOpen} onClose={() => setProblemsOpen(false)} className="mx-4 max-h-[80vh] w-full max-w-[520px] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Problems</h2>
-          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-            {blocking.length
-              ? `${blocking.length} blocking issue${blocking.length > 1 ? "s" : ""} must be fixed before you can check in or publish.`
-              : "No blocking issues. The items below are advisory."}
-          </p>
-          {problems.length === 0 ? (
-            <p className="rounded-lg bg-success-50 px-4 py-3 text-sm text-success-600 dark:bg-success-500/10">Everything looks good — no problems found.</p>
-          ) : (
-            <ul className="space-y-2">
-              {problems.map((p, i) => (
-                <li key={i}>
-                  <div className={`flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left text-sm ${p.severity === "error" ? "border-error-200 dark:border-error-500/30" : "border-amber-200 dark:border-amber-500/30"}`}>
-                    <span aria-hidden className={p.severity === "error" ? "text-error-500" : "text-amber-500"}>{p.severity === "error" ? "⊘" : "⚠"}</span>
-                    <span className="min-w-0">
-                      <span className="font-medium text-gray-800 dark:text-gray-200">{p.blockIndex != null ? `Block ${p.blockIndex + 1}` : "Email"}</span>
-                      <span className="block text-gray-500 dark:text-gray-400">{p.message}</span>
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </Modal>
+        aside={canEdit ? (
+          <EmailAiAssistPanel
+            tenant={tenant}
+            templateId={templateId}
+            templateName={name}
+            doc={doc}
+            subject={subject}
+            onApplied={applyAiDoc}
+          />
+        ) : undefined}
+      />
 
       {/* Template settings */}
       <Modal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} className="mx-4 w-full max-w-[480px]">
