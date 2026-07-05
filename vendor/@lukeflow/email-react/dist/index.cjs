@@ -149,7 +149,7 @@ function Email({ doc: input }) {
   ] });
 }
 function asTemplate(input) {
-  return input && typeof input === "object" && "doc" in input && input.doc ? input : { doc: input, variables: [] };
+  return input && typeof input === "object" && "doc" in input && input.doc ? input : { doc: input, variables: input?.variables ?? [] };
 }
 async function compileEmail(input) {
   const tpl = asTemplate(input);

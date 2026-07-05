@@ -34,10 +34,14 @@ import {
   emptyEmailDoc,
   extractVariables,
   parseEmailDoc,
+  reconcileVariables,
   validateEmailDoc,
+  validateVariables,
   type EmailDoc,
+  type EmailVariable,
   type Problem,
 } from "@lukeflow/email-core";
+import EmailVariablesPanel from "./EmailVariablesPanel";
 
 const STATUS_BADGE: Record<TemplateStatus, string> = {
   draft: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
@@ -90,11 +94,28 @@ function Builder({ tenant, templateId, template }: {
 
   const { locked: mutating, runExclusive } = useMutationLock();
 
+  // The typed merge contract (used ∪ declared), reconciled from the doc's own
+  // {{vars}} + any stored declarations. `variables` (names) is kept for the
+  // test-send model + wherever a flat list is handier.
+  const contract = useMemo<EmailVariable[]>(() => reconcileVariables({ ...doc, subject }), [doc, subject]);
+  const usedNames = useMemo(() => new Set(extractVariables({ ...doc, subject })), [doc, subject]);
+  const variables = useMemo(() => contract.map((v) => v.name), [contract]);
+
   // Live problem report. `blocking` gates check-in / publish (mirror Problems panel).
-  const problems = useMemo<Problem[]>(() => validateEmailDoc({ ...doc, subject }), [doc, subject]);
+  // Variable-contract problems (e.g. a default that doesn't match its type) fold in.
+  const problems = useMemo<Problem[]>(() => {
+    const d = { ...doc, subject };
+    return [...validateEmailDoc(d), ...validateVariables({ doc: d, variables: contract })];
+  }, [doc, subject, contract]);
   const blocking = useMemo(() => problems.filter((p) => p.severity === "error"), [problems]);
   const warnCount = problems.filter((p) => p.severity === "warning").length;
-  const variables = useMemo(() => extractVariables({ ...doc, subject }), [doc, subject]);
+
+  // Persist an edited contract onto doc.variables (rides the existing draft JSON).
+  const updateVariables = (next: EmailVariable[]) => {
+    setDoc((d) => ({ ...d, variables: next }));
+    docRef.current = { ...docRef.current, variables: next };
+    scheduleSave();
+  };
 
   // Load the activity feed when the settings modal opens.
   useEffect(() => {
@@ -239,10 +260,11 @@ function Builder({ tenant, templateId, template }: {
     setTestOpen(true);
     setTestError(null);
     setTestSent(false);
-    // Seed empty values for every variable so the form renders even if AI fails.
+    // Seed from the declared defaults (falling back to empty) so the form renders
+    // even if AI fails — declared defaults beat blank placeholders.
     setTestModel((prev) => {
       const seeded: Record<string, string> = {};
-      for (const v of variables) seeded[v] = prev[v] ?? "";
+      for (const v of contract) seeded[v.name] = prev[v.name] ?? (v.default !== undefined ? String(v.default) : "");
       return seeded;
     });
     if (variables.length === 0) return;
@@ -350,15 +372,10 @@ function Builder({ tenant, templateId, template }: {
               placeholder="Welcome, {{firstName}}!"
               disabled={!canEdit}
             />
-            {variables.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] uppercase tracking-wide text-gray-400">Variables</span>
-                {variables.map((v) => (
-                  <span key={v} className="rounded-full bg-brand-50 px-2 py-0.5 font-mono text-[11px] text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">{`{{${v}}}`}</span>
-                ))}
-              </div>
-            )}
           </div>
+
+          {/* Typed variable / merge contract — declarations persist on doc.variables. */}
+          <EmailVariablesPanel contract={contract} usedNames={usedNames} onChange={updateVariables} disabled={!canEdit} />
 
           {/* Center: live preview. */}
           <div className="rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-white/[0.03]">
