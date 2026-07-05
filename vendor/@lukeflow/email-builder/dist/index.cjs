@@ -476,12 +476,16 @@ function SelectField({ label, value, options, onChange, disabled }) {
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("select", { id, className: "eb-select", value, disabled, onChange: (e) => onChange(e.target.value), children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: o.value, children: o.label }, o.value)) }) });
 }
 function ColorField({ label, value, onChange, disabled }) {
+  const captionId = (0, import_react3.useId)();
   const swatch = /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : "#000000";
   const bad = value.trim() !== "" && !(0, import_email_core2.isValidColor)(value);
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "eb-color", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { id, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
-  ] }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "eb-field", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "eb-field-label", id: captionId, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "eb-color", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("input", { "aria-labelledby": captionId, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
+    ] })
+  ] });
 }
 var ALIGNS = [
   { value: "left", label: "Left" },
@@ -827,6 +831,10 @@ var EmailBuilder = (0, import_react6.forwardRef)(function EmailBuilder2({ initia
     } else if ((e.key === "Delete" || e.key === "Backspace") && b.selectedIndex !== null && !isEditingTarget(e.target)) {
       e.preventDefault();
       b.removeBlock(b.selectedIndex);
+    } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && b.selectedIndex !== null && !isEditingTarget(e.target)) {
+      e.preventDefault();
+      const to = b.selectedIndex + (e.key === "ArrowUp" ? -1 : 1);
+      if (to >= 0 && to < b.doc.blocks.length) b.moveBlock(b.selectedIndex, to);
     }
   };
   const settingsPanel = /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(

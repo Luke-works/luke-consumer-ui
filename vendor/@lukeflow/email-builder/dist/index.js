@@ -442,12 +442,16 @@ function SelectField({ label, value, options, onChange, disabled }) {
   return /* @__PURE__ */ jsx4(Labeled, { label, children: (id) => /* @__PURE__ */ jsx4("select", { id, className: "eb-select", value, disabled, onChange: (e) => onChange(e.target.value), children: options.map((o) => /* @__PURE__ */ jsx4("option", { value: o.value, children: o.label }, o.value)) }) });
 }
 function ColorField({ label, value, onChange, disabled }) {
+  const captionId = useId();
   const swatch = /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : "#000000";
   const bad = value.trim() !== "" && !isValidColor(value);
-  return /* @__PURE__ */ jsx4(Labeled, { label, children: (id) => /* @__PURE__ */ jsxs4("span", { className: "eb-color", children: [
-    /* @__PURE__ */ jsx4("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
-    /* @__PURE__ */ jsx4("input", { id, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
-  ] }) });
+  return /* @__PURE__ */ jsxs4("div", { className: "eb-field", children: [
+    /* @__PURE__ */ jsx4("span", { className: "eb-field-label", id: captionId, children: label }),
+    /* @__PURE__ */ jsxs4("span", { className: "eb-color", children: [
+      /* @__PURE__ */ jsx4("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
+      /* @__PURE__ */ jsx4("input", { "aria-labelledby": captionId, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
+    ] })
+  ] });
 }
 var ALIGNS = [
   { value: "left", label: "Left" },
@@ -793,6 +797,10 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
     } else if ((e.key === "Delete" || e.key === "Backspace") && b.selectedIndex !== null && !isEditingTarget(e.target)) {
       e.preventDefault();
       b.removeBlock(b.selectedIndex);
+    } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && b.selectedIndex !== null && !isEditingTarget(e.target)) {
+      e.preventDefault();
+      const to = b.selectedIndex + (e.key === "ArrowUp" ? -1 : 1);
+      if (to >= 0 && to < b.doc.blocks.length) b.moveBlock(b.selectedIndex, to);
     }
   };
   const settingsPanel = /* @__PURE__ */ jsx12(
