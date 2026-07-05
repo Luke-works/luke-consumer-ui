@@ -376,7 +376,7 @@ function Canvas({
       }
     );
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "eb-canvas", role: "listbox", "aria-label": "Email blocks", "aria-orientation": "vertical", tabIndex: 0, onDragLeave: (e) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "eb-canvas", role: "list", "aria-label": "Email blocks", onDragLeave: (e) => {
     if (e.currentTarget === e.target) setOverIndex(null);
   }, children: [
     overIndex === 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "eb-drop-line", "aria-hidden": "true" }),
@@ -384,10 +384,10 @@ function Canvas({
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
         "div",
         {
-          role: "option",
+          role: "listitem",
           className: `eb-row${selectedIndex === i ? " eb-row-selected" : ""}`,
           tabIndex: disabled ? -1 : 0,
-          "aria-selected": selectedIndex === i,
+          "aria-current": selectedIndex === i ? "true" : void 0,
           "aria-label": `${block.type}: ${blockSummary(block)}`,
           draggable: !disabled,
           onDragStart: (e) => {
