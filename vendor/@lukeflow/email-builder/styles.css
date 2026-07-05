@@ -1,0 +1,176 @@
+/**
+ * @lukeflow/email-builder optional stylesheet — purely presentational. The builder
+ * is fully functional unstyled; this makes the toolbar, palette, canvas, drop zones,
+ * settings, and preview usable out of the box. Override any --eb-* token or .eb-*
+ * class to theme it. Colors inherit currentColor where possible.
+ */
+.eb-builder {
+  --eb-space: 12px;
+  --eb-radius: 12px;
+  --eb-border: #e5e7eb;
+  --eb-bg: #ffffff;
+  --eb-surface: #f9fafb;
+  --eb-text: #111827;
+  --eb-muted: #565e6b;
+  --eb-brand: #2563eb;
+  --eb-tint: rgba(37, 99, 235, 0.08);
+  --eb-danger: #dc2626;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--eb-space);
+  font-family: var(--eb-font, inherit);
+  color: var(--eb-text);
+  /* Contain residual overflow so native drag auto-scroll can't slide the page (see form-builder). */
+  overflow-x: clip;
+}
+.eb-disabled { opacity: 0.75; }
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+.eb-toolbar { display: flex; align-items: center; gap: 8px; }
+.eb-toolbar-group { display: inline-flex; gap: 4px; }
+.eb-toolbar-spacer { flex: 1; }
+.eb-block-count { font-size: 12px; color: var(--eb-muted); }
+
+/* ── Header (subject / preheader) ─────────────────────────────────────────── */
+.eb-header { display: grid; grid-template-columns: 1fr 1fr; gap: var(--eb-space); }
+@media (max-width: 720px) { .eb-header { grid-template-columns: 1fr; } }
+.eb-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.eb-field-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--eb-muted); }
+.eb-input, .eb-select, .eb-textarea {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px;
+  padding: 7px 10px; border: 1px solid var(--eb-border); border-radius: 8px;
+  background: var(--eb-bg); color: var(--eb-text);
+}
+.eb-textarea { resize: vertical; min-height: 64px; }
+.eb-input:focus, .eb-select:focus, .eb-textarea:focus { outline: 2px solid var(--eb-brand); outline-offset: -1px; border-color: var(--eb-brand); }
+
+/* ── Grid layout ──────────────────────────────────────────────────────────── */
+.eb-grid { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: var(--eb-space); align-items: start; }
+.eb-grid-aside { grid-template-columns: minmax(0, 180px) minmax(0, 1.4fr) minmax(0, 1fr); }
+@media (max-width: 900px) { .eb-grid, .eb-grid-aside { grid-template-columns: 1fr; } }
+.eb-col { min-width: 0; }
+.eb-col-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--eb-muted); margin-bottom: 8px; }
+
+/* ── Palette ──────────────────────────────────────────────────────────────── */
+.eb-palette { display: flex; flex-direction: column; gap: 6px; }
+.eb-palette-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 1px solid var(--eb-border); border-radius: 8px;
+  background: var(--eb-bg); color: var(--eb-text); cursor: grab; font: inherit; font-size: 13px;
+}
+.eb-palette-item:hover:not(:disabled) { border-color: var(--eb-brand); background: var(--eb-tint); }
+.eb-palette-item:disabled { opacity: 0.5; cursor: not-allowed; }
+.eb-palette-icon { display: inline-flex; color: var(--eb-muted); }
+.eb-palette-label { font-weight: 500; }
+
+/* ── Canvas ───────────────────────────────────────────────────────────────── */
+.eb-canvas { display: flex; flex-direction: column; gap: 2px; min-height: 120px; }
+.eb-canvas-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 40px 16px; border: 1.5px dashed var(--eb-border); border-radius: var(--eb-radius);
+  background: var(--eb-surface); text-align: center;
+}
+.eb-canvas-empty.eb-drop-active { border-color: var(--eb-brand); background: var(--eb-tint); }
+.eb-empty-title { margin: 0; font-weight: 600; font-size: 14px; }
+.eb-empty-hint { margin: 0; font-size: 12px; color: var(--eb-muted); }
+
+.eb-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1px solid var(--eb-border); border-radius: 8px; background: var(--eb-bg); cursor: pointer;
+}
+.eb-row:hover { border-color: var(--eb-brand); }
+.eb-row:focus-visible { outline: 2px solid var(--eb-brand); outline-offset: 1px; }
+.eb-row-selected, .eb-row-selected:hover { border-color: var(--eb-brand); background: var(--eb-tint); box-shadow: inset 2px 0 0 var(--eb-brand); }
+.eb-grip { display: inline-flex; color: var(--eb-muted); cursor: grab; }
+.eb-row-icon { display: inline-flex; color: var(--eb-muted); }
+.eb-row-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.eb-row-type { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--eb-muted); }
+.eb-row-summary { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eb-row-actions { display: inline-flex; gap: 2px; opacity: 0; transition: opacity 0.1s; }
+.eb-row:hover .eb-row-actions, .eb-row:focus-within .eb-row-actions, .eb-row-selected .eb-row-actions { opacity: 1; }
+
+.eb-drop-line { height: 2px; margin: 1px 0; background: var(--eb-brand); border-radius: 2px; }
+
+/* ── Icon buttons ─────────────────────────────────────────────────────────── */
+.eb-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; padding: 5px;
+  border: 1px solid transparent; border-radius: 6px; background: transparent;
+  color: var(--eb-muted); cursor: pointer;
+}
+.eb-icon-btn:hover:not(:disabled) { background: var(--eb-surface); color: var(--eb-text); border-color: var(--eb-border); }
+.eb-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.eb-icon-btn.eb-danger:hover:not(:disabled) { color: var(--eb-danger); border-color: var(--eb-danger); }
+
+/* ── Settings panel (EB-3) ────────────────────────────────────────────────── */
+.eb-grid-3 { grid-template-columns: minmax(0, 180px) minmax(0, 1.3fr) minmax(0, 300px); }
+@media (max-width: 1024px) { .eb-grid-3 { grid-template-columns: 1fr; } }
+.eb-settings { border: 1px solid var(--eb-border); border-radius: var(--eb-radius); background: var(--eb-bg); overflow: hidden; }
+.eb-tabs { display: flex; border-bottom: 1px solid var(--eb-border); background: var(--eb-surface); }
+.eb-tab { flex: 1; padding: 9px 8px; border: none; background: transparent; font: inherit; font-size: 12px; font-weight: 600; color: var(--eb-muted); cursor: pointer; border-bottom: 2px solid transparent; }
+.eb-tab:hover { color: var(--eb-text); }
+.eb-tab-on { color: var(--eb-brand); border-bottom-color: var(--eb-brand); background: var(--eb-bg); }
+.eb-settings-body { padding: 12px; }
+.eb-settings-hint { margin: 4px 0; font-size: 12px; color: var(--eb-muted); }
+.eb-editor { display: flex; flex-direction: column; gap: 10px; }
+
+/* segmented align control */
+.eb-segmented { display: inline-flex; border: 1px solid var(--eb-border); border-radius: 8px; overflow: hidden; }
+.eb-segment { padding: 6px 10px; border: none; border-right: 1px solid var(--eb-border); background: var(--eb-bg); font: inherit; font-size: 12px; color: var(--eb-muted); cursor: pointer; }
+.eb-segment:last-child { border-right: none; }
+.eb-segment-on { background: var(--eb-tint); color: var(--eb-brand); font-weight: 600; }
+
+/* color field */
+.eb-color { display: flex; align-items: center; gap: 6px; }
+.eb-color-swatch { width: 34px; height: 32px; padding: 0; border: 1px solid var(--eb-border); border-radius: 8px; background: none; cursor: pointer; flex: none; }
+.eb-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.eb-invalid { border-color: var(--eb-danger); }
+.eb-invalid:focus { outline-color: var(--eb-danger); }
+
+/* variables editor */
+.eb-vars { display: flex; flex-direction: column; gap: 8px; }
+.eb-var-row { display: grid; grid-template-columns: minmax(0, 1.3fr) auto auto minmax(0, 1.4fr); align-items: center; gap: 6px; }
+.eb-var-name { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.eb-var-name .eb-mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--eb-brand); font-size: 12px; }
+.eb-badge { flex: none; padding: 0 4px; border-radius: 4px; font-size: 10px; background: #fef3c7; color: #b45309; }
+.eb-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--eb-muted); white-space: nowrap; }
+
+/* inline aside (AI panel) under the canvas until modal mode lands */
+.eb-aside-inline { margin-top: var(--eb-space); }
+
+/* ── Toolbar chips + Problems (EB-4) ──────────────────────────────────────── */
+.eb-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
+  border: 1px solid var(--eb-border); border-radius: 999px; background: var(--eb-bg);
+  font: inherit; font-size: 12px; font-weight: 500; color: var(--eb-muted); cursor: pointer;
+}
+.eb-chip:hover { border-color: var(--eb-brand); color: var(--eb-text); }
+.eb-chip[aria-pressed="true"] { background: var(--eb-tint); border-color: var(--eb-brand); color: var(--eb-brand); }
+.eb-chip-error { border-color: var(--eb-danger); color: var(--eb-danger); }
+.eb-chip-warn { border-color: #d97706; color: #b45309; }
+
+.eb-problems-panel { border: 1px solid var(--eb-border); border-radius: var(--eb-radius); background: var(--eb-surface); padding: 10px 12px; }
+.eb-problems-ok { margin: 0; font-size: 12px; color: var(--eb-muted); }
+.eb-problems { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.eb-problem { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; }
+.eb-problem-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex: none; }
+.eb-dot-error { background: var(--eb-danger); }
+.eb-dot-warning { background: #d97706; }
+.eb-problem-link { padding: 0; border: none; background: none; font: inherit; font-size: 12px; text-align: left; color: var(--eb-text); cursor: pointer; }
+.eb-problem-link:hover { color: var(--eb-brand); }
+.eb-problem-loc { font-weight: 600; color: var(--eb-brand); }
+
+/* ── Modal (EB-4) ─────────────────────────────────────────────────────────── */
+.eb-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(15, 23, 42, 0.45);
+}
+.eb-modal {
+  width: 100%; max-width: 460px; max-height: 90vh; display: flex; flex-direction: column;
+  background: var(--eb-bg); color: var(--eb-text); border-radius: var(--eb-radius);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); overflow: hidden;
+}
+.eb-modal-wide { max-width: 720px; }
+.eb-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--eb-border); }
+.eb-modal-title { font-weight: 600; font-size: 14px; }
+.eb-modal-body { padding: 16px; overflow: auto; }
