@@ -4,7 +4,12 @@
 // gated action via OrgDomainMatcher). The authoritative list is served at
 // /api/public/meta/free-email-domains (#38) and loaded by loadFreeEmailDomains();
 // the list below is a bundled fallback so the hint works before that resolves.
-import { authed } from "./authApi";
+
+// The gateway forwards /api/public/** with an any-origin, NO-credentials CORS policy
+// (the embed/public surface). So this must be a plain, credential-less fetch — using
+// the authed() client (which sends credentials:"include" + a bearer) trips the browser's
+// CORS check ("Access-Control-Allow-Credentials must be 'true'") and the request fails.
+const PUBLIC_BASE = (import.meta.env.VITE_AUTH_API_URL || "").replace(/\/$/, "");
 
 const FALLBACK_DOMAINS: readonly string[] = [
   "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.uk", "yahoo.in",
@@ -24,7 +29,11 @@ export async function loadFreeEmailDomains(): Promise<void> {
   if (loaded) return;
   loaded = true;
   try {
-    const { providers } = await authed<{ providers: string[] }>("/api/public/meta/free-email-domains");
+    const res = await fetch(`${PUBLIC_BASE}/api/public/meta/free-email-domains`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { providers } = (await res.json()) as { providers: string[] };
     if (Array.isArray(providers) && providers.length) {
       personalDomains = new Set(providers.map((d) => d.trim().toLowerCase()));
     }

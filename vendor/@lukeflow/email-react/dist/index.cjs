@@ -178,15 +178,46 @@ function EmailRenderer({
   height = 640
 }) {
   const [html, setHtml] = (0, import_react.useState)("");
+  const [error, setError] = (0, import_react.useState)(null);
   const json = typeof doc === "string" ? doc : JSON.stringify(doc);
   (0, import_react.useEffect)(() => {
     let active = true;
-    const parsed = typeof doc === "string" ? (0, import_email_core.parseEmailDoc)(doc) : doc;
-    (0, import_render.render)(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Email, { doc: parsed })).then((out) => active && setHtml(out)).catch(() => active && setHtml(""));
+    setError(null);
+    let out;
+    try {
+      const parsed = typeof doc === "string" ? (0, import_email_core.parseEmailDoc)(doc) : doc;
+      out = (0, import_render.render)(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Email, { doc: parsed }));
+    } catch (e) {
+      out = Promise.reject(e);
+    }
+    out.then((rendered) => {
+      if (active) setHtml(rendered);
+    }).catch((e) => {
+      if (!active) return;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("EmailRenderer: failed to render the email preview.", e);
+      setHtml("");
+      setError(msg || "The preview failed to render.");
+    });
     return () => {
       active = false;
     };
   }, [json]);
+  if (error) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      "div",
+      {
+        role: "alert",
+        className: `flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-500/30 dark:bg-amber-500/10 ${className}`,
+        style: { height },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-medium text-amber-700 dark:text-amber-400", children: "Preview couldn\u2019t be rendered" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "max-w-md text-xs text-amber-600/80 dark:text-amber-400/70", children: error }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-[11px] text-amber-600/60 dark:text-amber-400/50", children: "Your template is safe \u2014 this only affects the on-screen preview. Try reloading the page." })
+        ]
+      }
+    );
+  }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
     "iframe",
     {

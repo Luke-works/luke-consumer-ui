@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { useMutationLock } from "../../hooks/useMutationLock";
 import { guardedLeave } from "../../lib/leaveGuard";
 import PageMeta from "../../components/common/PageMeta";
+import ErrorBoundary from "../../components/common/ErrorBoundary";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import { Modal } from "../../components/ui/modal";
@@ -349,9 +350,23 @@ function Builder({ tenant, templateId, template }: {
         settings="modal"
         onChange={onBuilderChange}
         renderPreview={(d) => (
-          <Suspense fallback={<div className="flex h-[640px] items-center justify-center text-sm text-gray-400">Loading preview…</div>}>
-            <EmailRenderer doc={d} height={640} />
-          </Suspense>
+          // The renderer lazy-loads react-email (~510 KB); if that chunk fails to load
+          // (e.g. a stale/partial deploy), the boundary shows a message instead of a
+          // blank modal, and EmailRenderer itself surfaces any render error inline.
+          <ErrorBoundary
+            label="email-preview"
+            fallback={(err, reset) => (
+              <div role="alert" className="flex h-[640px] flex-col items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-500/30 dark:bg-amber-500/10">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Preview couldn’t be loaded</p>
+                <p className="max-w-md text-xs text-amber-600/80 dark:text-amber-400/70">{err.message || "The preview module failed to load."}</p>
+                <button type="button" onClick={reset} className="mt-1 rounded-md bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600">Retry</button>
+              </div>
+            )}
+          >
+            <Suspense fallback={<div className="flex h-[640px] items-center justify-center text-sm text-gray-400">Loading preview…</div>}>
+              <EmailRenderer doc={d} height={640} />
+            </Suspense>
+          </ErrorBoundary>
         )}
         aside={canEdit ? (
           <EmailAiAssistPanel
