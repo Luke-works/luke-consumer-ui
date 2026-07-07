@@ -38,11 +38,6 @@ function safeUrl(value) {
   return (0, import_email_core.isHttpUrl)(value) || (0, import_email_core.isVarOnly)(value) ? value : void 0;
 }
 var RENDER_TIMEOUT_MS = 2e4;
-var FONT_STACK = {
-  sans: "Helvetica, Arial, sans-serif",
-  serif: "Georgia, 'Times New Roman', serif",
-  mono: "'Courier New', Courier, monospace"
-};
 var ALIGN_CLASS = {
   left: "text-left",
   center: "text-center",
@@ -76,7 +71,7 @@ function renderMarkdownLite(text) {
   if (last < text.length) out.push(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_react.Fragment, { children: text.slice(last) }, key++));
   return out;
 }
-function renderBlock(block, brand, i) {
+function renderBlock(block, brand, fontFamily, i) {
   const align = "align" in block && block.align || "left";
   switch (block.type) {
     case "heading":
@@ -85,19 +80,20 @@ function renderBlock(block, brand, i) {
         {
           as: `h${block.level ?? 1}`,
           className: `m-0 mb-[12px] font-bold text-gray-900 ${HEADING_SIZE[block.level ?? 1]} ${ALIGN_CLASS[align]}`,
+          style: { fontFamily },
           children: block.text
         },
         i
       );
     case "text":
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Text, { className: `m-0 mb-[12px] text-[14px] leading-[24px] text-gray-700 ${ALIGN_CLASS[align]}`, children: renderMarkdownLite(block.text) }, i);
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Text, { className: `m-0 mb-[12px] text-[14px] leading-[24px] text-gray-700 ${ALIGN_CLASS[align]}`, style: { fontFamily }, children: renderMarkdownLite(block.text) }, i);
     case "button":
       return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Section, { className: `mb-[16px] ${ALIGN_CLASS[align]}`, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         import_components.Button,
         {
           href: safeUrl(block.href),
           className: "inline-block rounded px-[20px] py-[12px] text-[14px] font-semibold no-underline",
-          style: { backgroundColor: block.bgColor || brand, color: block.textColor || "#ffffff" },
+          style: { backgroundColor: block.bgColor || brand, color: block.textColor || "#ffffff", fontFamily },
           children: block.label
         }
       ) }, i);
@@ -123,8 +119,8 @@ function renderBlock(block, brand, i) {
       const unsubscribeUrl = safeUrl(block.unsubscribeUrl);
       return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_components.Section, { className: "mt-[24px]", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Hr, { className: "mb-[12px] border-gray-200" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Text, { className: "m-0 text-[12px] leading-[20px] text-gray-500", children: renderMarkdownLite(block.text) }),
-        unsubscribeUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Text, { className: "m-0 mt-[6px] text-[12px] text-gray-500", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Link, { href: unsubscribeUrl, className: "text-gray-500 underline", children: "Unsubscribe" }) }) : null
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Text, { className: "m-0 text-[12px] leading-[20px] text-gray-500", style: { fontFamily }, children: renderMarkdownLite(block.text) }),
+        unsubscribeUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Text, { className: "m-0 mt-[6px] text-[12px] text-gray-500", style: { fontFamily }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Link, { href: unsubscribeUrl, className: "text-gray-500 underline", children: "Unsubscribe" }) }) : null
       ] }, i);
     }
     default:
@@ -135,16 +131,17 @@ function Email({ doc: input }) {
   const { doc } = (0, import_email_core.repairEmailDoc)(input);
   const theme = doc.theme ?? import_email_core.DEFAULT_THEME;
   const brand = theme.brandColor || import_email_core.DEFAULT_THEME.brandColor;
-  const fontFamily = FONT_STACK[theme.fontFamily] ?? FONT_STACK.sans;
+  const font = (0, import_email_core.fontById)(theme.fontFamily);
+  const fontFamily = font.stack;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_components.Html, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Head, {}),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Head, { children: font.webHref ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("link", { rel: "stylesheet", href: font.webHref }) : null }),
     doc.preheader ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Preview, { children: doc.preheader }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Tailwind, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_components.Body, { style: { backgroundColor: theme.backgroundColor || import_email_core.DEFAULT_THEME.backgroundColor, fontFamily, margin: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       import_components.Container,
       {
         className: "mx-auto my-[40px] rounded-lg p-[32px]",
-        style: { maxWidth: theme.contentWidth, backgroundColor: theme.contentBackground || import_email_core.DEFAULT_THEME.contentBackground },
-        children: doc.blocks.map((b, i) => renderBlock(b, brand, i))
+        style: { maxWidth: theme.contentWidth, backgroundColor: theme.contentBackground || import_email_core.DEFAULT_THEME.contentBackground, fontFamily },
+        children: doc.blocks.map((b, i) => renderBlock(b, brand, fontFamily, i))
       }
     ) }) })
   ] });

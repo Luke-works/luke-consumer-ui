@@ -566,15 +566,16 @@ function BlockEditor({ block, onUpdate, disabled = false }) {
 // src/ThemeEditor.tsx
 var import_email_core3 = require("@lukeflow/email-core");
 var import_jsx_runtime6 = require("react/jsx-runtime");
+var FONT_OPTIONS = import_email_core3.FONTS.map((f) => ({ value: f.id, label: f.label }));
 function ThemeEditor({ theme, onChange, disabled = false }) {
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-editor", children: [
     /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ColorField, { label: "Brand color", value: theme.brandColor, disabled, onChange: (brandColor) => onChange({ brandColor }) }),
     /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       SelectField,
       {
-        label: "Font",
+        label: "Font (applies to the whole email)",
         value: theme.fontFamily,
-        options: [{ value: "sans", label: "Sans-serif" }, { value: "serif", label: "Serif" }, { value: "mono", label: "Monospace" }],
+        options: FONT_OPTIONS,
         disabled,
         onChange: (fontFamily) => onChange({ fontFamily })
       }

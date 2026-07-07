@@ -57,10 +57,13 @@ declare function previewValues(template: EmailTemplate | null | undefined): Reco
  */
 declare function mergePreview(html: string, values: Record<string, string | number | boolean> | null | undefined): string;
 
-type FontFamily = "sans" | "serif" | "mono";
+/** A font id from the shared library (see fonts.ts). The whole email uses ONE font
+ *  — this is the single, template-wide choice; blocks never carry their own. */
+type FontFamily = string;
 type Theme = {
     /** Hex; used for buttons/accents. */
     brandColor: string;
+    /** A font id from the shared FONTS library — applied globally to every block. */
     fontFamily: FontFamily;
     /** px, clamped to 480..700. */
     contentWidth: number;
@@ -185,4 +188,30 @@ declare function repairEmailDoc(doc: EmailDoc | null | undefined): {
 /** Parse an EmailDoc JSON string into a repaired doc (empty doc on failure). */
 declare function parseEmailDoc(raw: string | null | undefined): EmailDoc;
 
-export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_THEME, type DividerBlock, EMAIL_VAR_TYPES, type EmailBlock, type EmailDoc, type EmailTemplate, type EmailVarType, type EmailVariable, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
+type FontCategory = "sans" | "serif" | "mono";
+type FontDef = {
+    /** Stable id persisted in `theme.fontFamily`. */
+    id: string;
+    /** Human label for the picker. */
+    label: string;
+    category: FontCategory;
+    /** Full CSS `font-family` value: the (optional) web font first, then real
+     *  fallbacks ending in a generic family so it renders everywhere. */
+    stack: string;
+    /** Google Fonts stylesheet to load in <Head> for clients that support web fonts.
+     *  Omitted for web-safe fonts (which need no download). */
+    webHref?: string;
+};
+declare const FONTS: readonly FontDef[];
+/** All valid font ids (what may be stored in `theme.fontFamily`). */
+declare const FONT_IDS: readonly string[];
+/** The default font id (first in the list). */
+declare const DEFAULT_FONT_ID: string;
+/** True when `id` names a font in the library. */
+declare function isFontId(id: unknown): id is string;
+/** Resolve a font id to its definition, falling back to the default for unknown ids. */
+declare function fontById(id: string | null | undefined): FontDef;
+/** The CSS `font-family` stack for a font id (default's stack for unknown ids). */
+declare function fontStack(id: string | null | undefined): string;
+
+export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_FONT_ID, DEFAULT_THEME, type DividerBlock, EMAIL_VAR_TYPES, type EmailBlock, type EmailDoc, type EmailTemplate, type EmailVarType, type EmailVariable, FONTS, FONT_IDS, type FontCategory, type FontDef, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, fontById, fontStack, hasBlockingProblems, isFontId, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };

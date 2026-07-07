@@ -530,17 +530,18 @@ function BlockEditor({ block, onUpdate, disabled = false }) {
 }
 
 // src/ThemeEditor.tsx
-import { MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH } from "@lukeflow/email-core";
+import { FONTS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH } from "@lukeflow/email-core";
 import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
+var FONT_OPTIONS = FONTS.map((f) => ({ value: f.id, label: f.label }));
 function ThemeEditor({ theme, onChange, disabled = false }) {
   return /* @__PURE__ */ jsxs6("div", { className: "eb-editor", children: [
     /* @__PURE__ */ jsx6(ColorField, { label: "Brand color", value: theme.brandColor, disabled, onChange: (brandColor) => onChange({ brandColor }) }),
     /* @__PURE__ */ jsx6(
       SelectField,
       {
-        label: "Font",
+        label: "Font (applies to the whole email)",
         value: theme.fontFamily,
-        options: [{ value: "sans", label: "Sans-serif" }, { value: "serif", label: "Serif" }, { value: "mono", label: "Monospace" }],
+        options: FONT_OPTIONS,
         disabled,
         onChange: (fontFamily) => onChange({ fontFamily })
       }

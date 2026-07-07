@@ -1,3 +1,47 @@
+// src/fonts.ts
+var google = (family, axis) => `https://fonts.googleapis.com/css2?family=${family}:wght@${axis}&display=swap`;
+var FONTS = [
+  // ── Web-safe (no download; render in every client) ──
+  { id: "sans", label: "System sans-serif", category: "sans", stack: "Helvetica, Arial, sans-serif" },
+  { id: "serif", label: "System serif", category: "serif", stack: "Georgia, 'Times New Roman', serif" },
+  { id: "mono", label: "Monospace", category: "mono", stack: "'Courier New', Courier, monospace" },
+  { id: "arial", label: "Arial", category: "sans", stack: "Arial, Helvetica, sans-serif" },
+  { id: "verdana", label: "Verdana", category: "sans", stack: "Verdana, Geneva, sans-serif" },
+  { id: "tahoma", label: "Tahoma", category: "sans", stack: "Tahoma, Verdana, sans-serif" },
+  { id: "trebuchet", label: "Trebuchet MS", category: "sans", stack: "'Trebuchet MS', Helvetica, sans-serif" },
+  { id: "georgia", label: "Georgia", category: "serif", stack: "Georgia, 'Times New Roman', serif" },
+  { id: "times", label: "Times New Roman", category: "serif", stack: "'Times New Roman', Times, serif" },
+  { id: "courier", label: "Courier New", category: "mono", stack: "'Courier New', Courier, monospace" },
+  // ── Google web fonts — sans ──
+  { id: "inter", label: "Inter", category: "sans", stack: "'Inter', Helvetica, Arial, sans-serif", webHref: google("Inter", "400;500;600;700") },
+  { id: "roboto", label: "Roboto", category: "sans", stack: "'Roboto', Helvetica, Arial, sans-serif", webHref: google("Roboto", "400;500;700") },
+  { id: "open-sans", label: "Open Sans", category: "sans", stack: "'Open Sans', Helvetica, Arial, sans-serif", webHref: google("Open+Sans", "400;600;700") },
+  { id: "lato", label: "Lato", category: "sans", stack: "'Lato', Helvetica, Arial, sans-serif", webHref: google("Lato", "400;700") },
+  { id: "montserrat", label: "Montserrat", category: "sans", stack: "'Montserrat', Helvetica, Arial, sans-serif", webHref: google("Montserrat", "400;600;700") },
+  { id: "poppins", label: "Poppins", category: "sans", stack: "'Poppins', Helvetica, Arial, sans-serif", webHref: google("Poppins", "400;500;600") },
+  { id: "raleway", label: "Raleway", category: "sans", stack: "'Raleway', Helvetica, Arial, sans-serif", webHref: google("Raleway", "400;600;700") },
+  { id: "nunito", label: "Nunito", category: "sans", stack: "'Nunito', Helvetica, Arial, sans-serif", webHref: google("Nunito", "400;600;700") },
+  // ── Google web fonts — serif ──
+  { id: "merriweather", label: "Merriweather", category: "serif", stack: "'Merriweather', Georgia, 'Times New Roman', serif", webHref: google("Merriweather", "400;700") },
+  { id: "playfair", label: "Playfair Display", category: "serif", stack: "'Playfair Display', Georgia, 'Times New Roman', serif", webHref: google("Playfair+Display", "400;600;700") },
+  { id: "lora", label: "Lora", category: "serif", stack: "'Lora', Georgia, 'Times New Roman', serif", webHref: google("Lora", "400;600;700") },
+  // ── Google web fonts — monospace ──
+  { id: "roboto-mono", label: "Roboto Mono", category: "mono", stack: "'Roboto Mono', 'Courier New', monospace", webHref: google("Roboto+Mono", "400;500") },
+  { id: "jetbrains-mono", label: "JetBrains Mono", category: "mono", stack: "'JetBrains Mono', 'Courier New', monospace", webHref: google("JetBrains+Mono", "400;500") }
+];
+var FONT_MAP = new Map(FONTS.map((f) => [f.id, f]));
+var FONT_IDS = FONTS.map((f) => f.id);
+var DEFAULT_FONT_ID = FONTS[0].id;
+function isFontId(id) {
+  return typeof id === "string" && FONT_MAP.has(id);
+}
+function fontById(id) {
+  return id != null && FONT_MAP.get(id) || FONTS[0];
+}
+function fontStack(id) {
+  return fontById(id).stack;
+}
+
 // src/emailDoc.ts
 var MAX_BLOCKS = 50;
 var MIN_CONTENT_WIDTH = 480;
@@ -12,7 +56,6 @@ var ALLOWED_BLOCK_TYPES = /* @__PURE__ */ new Set([
   "footer"
 ]);
 var ALLOWED_ALIGN = /* @__PURE__ */ new Set(["left", "center", "right"]);
-var ALLOWED_FONTS = /* @__PURE__ */ new Set(["sans", "serif", "mono"]);
 var MAX_SUBJECT_LEN = 256;
 var MAX_PREHEADER_LEN = 256;
 var MAX_RICH_TEXT_LEN = 5e3;
@@ -34,7 +77,7 @@ function coerceColor(value, fallback) {
 }
 var DEFAULT_THEME = {
   brandColor: "#2563eb",
-  fontFamily: "sans",
+  fontFamily: DEFAULT_FONT_ID,
   contentWidth: 600,
   backgroundColor: "#f3f4f6",
   contentBackground: "#ffffff"
@@ -165,7 +208,7 @@ function repairTheme(raw) {
   const widthNum = typeof t.contentWidth === "number" ? t.contentWidth : Number(t.contentWidth);
   return {
     brandColor: coerceColor(t.brandColor, DEFAULT_THEME.brandColor),
-    fontFamily: typeof t.fontFamily === "string" && ALLOWED_FONTS.has(t.fontFamily) ? t.fontFamily : DEFAULT_THEME.fontFamily,
+    fontFamily: isFontId(t.fontFamily) ? t.fontFamily : DEFAULT_THEME.fontFamily,
     contentWidth: Number.isFinite(widthNum) ? clamp(Math.round(widthNum), MIN_CONTENT_WIDTH, MAX_CONTENT_WIDTH) : DEFAULT_THEME.contentWidth,
     backgroundColor: coerceColor(t.backgroundColor, DEFAULT_THEME.backgroundColor),
     contentBackground: coerceColor(t.contentBackground, DEFAULT_THEME.contentBackground)
@@ -396,6 +439,6 @@ function mergePreview(html, values) {
   );
 }
 
-export { ALLOWED_BLOCK_TYPES, DEFAULT_THEME, EMAIL_VAR_TYPES, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
+export { ALLOWED_BLOCK_TYPES, DEFAULT_FONT_ID, DEFAULT_THEME, EMAIL_VAR_TYPES, FONTS, FONT_IDS, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, fontById, fontStack, hasBlockingProblems, isFontId, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
