@@ -44,6 +44,18 @@ declare function buildTemplateModel(template: EmailTemplate | null | undefined, 
  * preview-only. Deterministic.
  */
 declare function previewValues(template: EmailTemplate | null | undefined): Record<string, string>;
+/**
+ * Merge concrete values into a compiled email's HTML, exactly as Postmark's
+ * Mustachio does for a `{{var}}` reference: substitute each `{{name}}` with its
+ * value, HTML-escaped (so a value can't inject markup into the message). This
+ * yields the ACTUAL email a recipient sees, for the LIVE PREVIEW only — the
+ * PUBLISHED artifact keeps `{{vars}}` literal (Postmark merges at send time).
+ *
+ * A variable with no supplied value is left as its literal `{{name}}`, so gaps in
+ * the model stay visible in the preview instead of silently rendering blank. Pure
+ * and deterministic; operates on the rendered HTML string (no DOM).
+ */
+declare function mergePreview(html: string, values: Record<string, string | number | boolean> | null | undefined): string;
 
 type FontFamily = "sans" | "serif" | "mono";
 type Theme = {
@@ -173,4 +185,4 @@ declare function repairEmailDoc(doc: EmailDoc | null | undefined): {
 /** Parse an EmailDoc JSON string into a repaired doc (empty doc on failure). */
 declare function parseEmailDoc(raw: string | null | undefined): EmailDoc;
 
-export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_THEME, type DividerBlock, EMAIL_VAR_TYPES, type EmailBlock, type EmailDoc, type EmailTemplate, type EmailVarType, type EmailVariable, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
+export { ALLOWED_BLOCK_TYPES, type Align, type BlockType, type ButtonBlock, DEFAULT_THEME, type DividerBlock, EMAIL_VAR_TYPES, type EmailBlock, type EmailDoc, type EmailTemplate, type EmailVarType, type EmailVariable, type FontFamily, type FooterBlock, type HeadingBlock, type HeadingLevel, type ImageBlock, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, type Problem, type ProblemSeverity, type SpacerBlock, type TextBlock, type Theme, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };

@@ -1,5 +1,5 @@
 // src/EmailRenderer.tsx
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { render } from "@react-email/render";
 import {
   Body,
@@ -20,6 +20,7 @@ import {
   DEFAULT_THEME,
   isHttpUrl,
   isVarOnly,
+  mergePreview,
   parseEmailDoc,
   reconcileVariables,
   repairEmailDoc
@@ -166,6 +167,7 @@ async function compileEmail(input) {
 }
 function EmailRenderer({
   doc,
+  values,
   className = "",
   height = 640
 }) {
@@ -195,6 +197,12 @@ function EmailRenderer({
       active = false;
     };
   }, [json]);
+  const valuesKey = values ? JSON.stringify(values) : "";
+  const srcDoc = useMemo(
+    () => values ? mergePreview(html, values) : html,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [html, valuesKey]
+  );
   if (error) {
     return /* @__PURE__ */ jsxs(
       "div",
@@ -214,7 +222,7 @@ function EmailRenderer({
     "iframe",
     {
       title: "Email preview",
-      srcDoc: html,
+      srcDoc,
       className: `w-full rounded-lg border border-gray-200 bg-white dark:border-gray-800 ${className}`,
       style: { height },
       sandbox: ""

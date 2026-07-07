@@ -384,7 +384,23 @@ function previewValues(template) {
   }
   return out;
 }
+var HTML_ESCAPE = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+};
+var escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => HTML_ESCAPE[c]);
+function mergePreview(html, values) {
+  if (typeof html !== "string") return "";
+  const vals = values && typeof values === "object" ? values : {};
+  return html.replace(
+    VAR_RE,
+    (whole, name) => Object.prototype.hasOwnProperty.call(vals, name) && vals[name] != null ? escapeHtml(String(vals[name])) : whole
+  );
+}
 
-export { ALLOWED_BLOCK_TYPES, DEFAULT_THEME, EMAIL_VAR_TYPES, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
+export { ALLOWED_BLOCK_TYPES, DEFAULT_THEME, EMAIL_VAR_TYPES, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, hasBlockingProblems, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

@@ -349,10 +349,11 @@ function Builder({ tenant, templateId, template }: {
         disabled={!canEdit}
         settings="modal"
         onChange={onBuilderChange}
-        renderPreview={(d) => (
+        renderPreview={(d, values) => (
           // The renderer lazy-loads react-email (~510 KB); if that chunk fails to load
           // (e.g. a stale/partial deploy), the boundary shows a message instead of a
           // blank modal, and EmailRenderer itself surfaces any render error inline.
+          // `values` (when the operator merges sample data) yields the actual recipient email.
           <ErrorBoundary
             label="email-preview"
             fallback={(err, reset) => (
@@ -364,10 +365,20 @@ function Builder({ tenant, templateId, template }: {
             )}
           >
             <Suspense fallback={<div className="flex h-[640px] items-center justify-center text-sm text-gray-400">Loading preview…</div>}>
-              <EmailRenderer doc={d} height={640} />
+              <EmailRenderer doc={d} values={values} height={640} />
             </Suspense>
           </ErrorBoundary>
         )}
+        // Reuse the email agent's test-data sampler so the preview can be filled with
+        // realistic, AI-generated values (same source as the Send-test modal). Coerce
+        // to strings for the variable inputs; on failure the panel surfaces the message.
+        onGenerateTestData={async (d) => {
+          const { samples } = await generateTestData(d, 1, session?.tenant ?? undefined);
+          const raw = samples[0]?.values ?? {};
+          const out: Record<string, string> = {};
+          for (const [k, v] of Object.entries(raw)) if (v != null) out[k] = String(v);
+          return out;
+        }}
         aside={canEdit ? (
           <EmailAiAssistPanel
             tenant={tenant}

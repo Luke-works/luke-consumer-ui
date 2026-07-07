@@ -386,6 +386,22 @@ function previewValues(template) {
   }
   return out;
 }
+var HTML_ESCAPE = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+};
+var escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => HTML_ESCAPE[c]);
+function mergePreview(html, values) {
+  if (typeof html !== "string") return "";
+  const vals = values && typeof values === "object" ? values : {};
+  return html.replace(
+    VAR_RE,
+    (whole, name) => Object.prototype.hasOwnProperty.call(vals, name) && vals[name] != null ? escapeHtml(String(vals[name])) : whole
+  );
+}
 
 exports.ALLOWED_BLOCK_TYPES = ALLOWED_BLOCK_TYPES;
 exports.DEFAULT_THEME = DEFAULT_THEME;
@@ -410,6 +426,7 @@ exports.isHttpsUrl = isHttpsUrl;
 exports.isValidColor = isValidColor;
 exports.isValidVarName = isValidVarName;
 exports.isVarOnly = isVarOnly;
+exports.mergePreview = mergePreview;
 exports.parseEmailDoc = parseEmailDoc;
 exports.previewValues = previewValues;
 exports.reconcileVariables = reconcileVariables;

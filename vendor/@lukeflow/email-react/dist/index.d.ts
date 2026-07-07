@@ -30,8 +30,12 @@ declare function compileEmail(input: EmailDoc | EmailTemplate): Promise<Compiled
  * exactly as Postmark will deliver it, and its styles can't leak into (or inherit
  * from) the host stylesheet.
  */
-declare function EmailRenderer({ doc, className, height, }: {
+declare function EmailRenderer({ doc, values, className, height, }: {
     doc: EmailDoc | string;
+    /** When provided, {{vars}} in the rendered HTML are merged with these values —
+     *  the ACTUAL email a recipient receives (preview-only; the published artifact
+     *  keeps {{vars}} literal). Absent/omitted keeps the placeholders visible. */
+    values?: Record<string, string | number | boolean>;
     className?: string;
     height?: number;
 }): react.JSX.Element;

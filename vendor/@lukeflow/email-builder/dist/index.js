@@ -171,7 +171,7 @@ function useEmailBuilder(initialDoc = emptyEmailDoc()) {
 }
 
 // src/EmailBuilder.tsx
-import { forwardRef, useEffect as useEffect3, useImperativeHandle, useMemo as useMemo2, useRef as useRef3, useState as useState4 } from "react";
+import { forwardRef, useEffect as useEffect4, useImperativeHandle, useMemo as useMemo3, useRef as useRef3, useState as useState5 } from "react";
 import { extractVariables } from "@lukeflow/email-core";
 
 // src/blocks.tsx
@@ -667,6 +667,10 @@ function Problems({ problems, onSelectBlock }) {
   }) });
 }
 
+// src/PreviewModal.tsx
+import { useEffect as useEffect3, useMemo as useMemo2, useState as useState4 } from "react";
+import { previewValues, reconcileVariables as reconcileVariables2, VAR_RE } from "@lukeflow/email-core";
+
 // src/Modal.tsx
 import { useCallback as useCallback2, useEffect as useEffect2, useRef as useRef2 } from "react";
 import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
@@ -734,22 +738,118 @@ function Modal({ title, onClose, children, wide = false }) {
 }
 
 // src/PreviewModal.tsx
-import { jsx as jsx11 } from "react/jsx-runtime";
-function PreviewModal({ onClose, children }) {
-  return /* @__PURE__ */ jsx11(Modal, { title: "Email preview", onClose, wide: true, children });
+import { jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
+function mergeText(text, values) {
+  return text.replace(
+    VAR_RE,
+    (whole, name) => Object.prototype.hasOwnProperty.call(values, name) && values[name] !== "" ? values[name] : whole
+  );
+}
+function PreviewModal({
+  doc,
+  renderPreview,
+  onGenerateTestData,
+  onClose
+}) {
+  const contract = useMemo2(() => reconcileVariables2(doc), [doc]);
+  const hasVars = contract.length > 0;
+  const [merge, setMerge] = useState4(true);
+  const [values, setValues] = useState4(
+    () => previewValues({ doc, variables: doc.variables ?? [] })
+  );
+  const [generating, setGenerating] = useState4(false);
+  const [genError, setGenError] = useState4(null);
+  const namesKey = contract.map((v) => v.name).join("\0");
+  useEffect3(() => {
+    const seed = previewValues({ doc, variables: doc.variables ?? [] });
+    setValues((prev) => {
+      const next = {};
+      for (const v of contract) next[v.name] = prev[v.name] ?? seed[v.name] ?? "";
+      return next;
+    });
+  }, [namesKey]);
+  const generate = async () => {
+    if (!onGenerateTestData) return;
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const generated = await onGenerateTestData(doc);
+      setValues((prev) => {
+        const next = { ...prev };
+        for (const name of Object.keys(next)) {
+          const g = generated?.[name];
+          if (g != null && g !== "") next[name] = String(g);
+        }
+        return next;
+      });
+      setMerge(true);
+    } catch (e) {
+      setGenError(e?.message || "Couldn\u2019t generate sample values.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+  const effectiveValues = merge ? values : void 0;
+  const subject = doc.subject ? merge ? mergeText(doc.subject, values) : doc.subject : "";
+  return /* @__PURE__ */ jsx11(Modal, { title: "Email preview", onClose, wide: true, children: /* @__PURE__ */ jsxs11("div", { className: `eb-preview${hasVars ? "" : " eb-preview-novars"}`, children: [
+    /* @__PURE__ */ jsxs11("div", { className: "eb-preview-canvas", children: [
+      subject ? /* @__PURE__ */ jsxs11("div", { className: "eb-preview-subject", children: [
+        /* @__PURE__ */ jsx11("span", { className: "eb-preview-subject-label", children: "Subject" }),
+        /* @__PURE__ */ jsx11("span", { className: "eb-preview-subject-text", children: subject })
+      ] }) : null,
+      /* @__PURE__ */ jsx11("div", { className: "eb-preview-frame", children: renderPreview(doc, effectiveValues) })
+    ] }),
+    hasVars && /* @__PURE__ */ jsxs11("aside", { className: "eb-preview-side", "aria-label": "Sample data", children: [
+      /* @__PURE__ */ jsxs11("div", { className: "eb-preview-side-head", children: [
+        /* @__PURE__ */ jsx11("span", { className: "eb-preview-side-title", children: "Sample data" }),
+        /* @__PURE__ */ jsxs11("label", { className: "eb-preview-toggle", title: "Merge these values into the preview", children: [
+          /* @__PURE__ */ jsx11("input", { type: "checkbox", checked: merge, onChange: (e) => setMerge(e.target.checked) }),
+          /* @__PURE__ */ jsx11("span", { children: "Merge values" })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx11("p", { className: "eb-preview-hint", children: "See the actual email a recipient receives. Edit a value, or generate a realistic set." }),
+      onGenerateTestData && /* @__PURE__ */ jsx11(
+        "button",
+        {
+          type: "button",
+          className: "eb-preview-gen",
+          disabled: generating,
+          onClick: () => void generate(),
+          children: generating ? "Generating\u2026" : "Generate sample values"
+        }
+      ),
+      genError && /* @__PURE__ */ jsx11("p", { className: "eb-preview-error", role: "alert", children: genError }),
+      /* @__PURE__ */ jsx11("div", { className: "eb-preview-vars", children: contract.map((v) => /* @__PURE__ */ jsxs11("label", { className: "eb-preview-var", children: [
+        /* @__PURE__ */ jsxs11("span", { className: "eb-preview-var-name", children: [
+          `{{${v.name}}}`,
+          v.required ? /* @__PURE__ */ jsx11("span", { className: "eb-preview-req", title: "required", children: " *" }) : null
+        ] }),
+        /* @__PURE__ */ jsx11(
+          "input",
+          {
+            className: "eb-input",
+            value: values[v.name] ?? "",
+            disabled: !merge,
+            placeholder: v.type,
+            onChange: (e) => setValues((prev) => ({ ...prev, [v.name]: e.target.value }))
+          }
+        )
+      ] }, v.name)) })
+    ] })
+  ] }) });
 }
 
 // src/EmailBuilder.tsx
-import { jsx as jsx12, jsxs as jsxs11 } from "react/jsx-runtime";
-var IconUndo = /* @__PURE__ */ jsxs11("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
+var IconUndo = /* @__PURE__ */ jsxs12("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
   /* @__PURE__ */ jsx12("path", { d: "M9 7 4 12l5 5" }),
   /* @__PURE__ */ jsx12("path", { d: "M4 12h11a5 5 0 0 1 0 10h-1" })
 ] });
-var IconRedo = /* @__PURE__ */ jsxs11("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+var IconRedo = /* @__PURE__ */ jsxs12("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
   /* @__PURE__ */ jsx12("path", { d: "m15 7 5 5-5 5" }),
   /* @__PURE__ */ jsx12("path", { d: "M20 12H9a5 5 0 0 0 0 10h1" })
 ] });
-var IconEye = /* @__PURE__ */ jsxs11("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
+var IconEye = /* @__PURE__ */ jsxs12("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
   /* @__PURE__ */ jsx12("path", { d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" }),
   /* @__PURE__ */ jsx12("circle", { cx: "12", cy: "12", r: "3" })
 ] });
@@ -759,15 +859,15 @@ function isEditingTarget(t) {
   const tag = el.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
 }
-var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, disabled = false, className = "", settings = "panel", aside, renderPreview }, ref) {
+var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, disabled = false, className = "", settings = "panel", aside, renderPreview, onGenerateTestData }, ref) {
   const b = useEmailBuilder(initialDoc);
-  const [showPreview, setShowPreview] = useState4(false);
-  const [showProblems, setShowProblems] = useState4(false);
-  const [settingsModalOpen, setSettingsModalOpen] = useState4(false);
+  const [showPreview, setShowPreview] = useState5(false);
+  const [showProblems, setShowProblems] = useState5(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState5(false);
   const onChangeRef = useRef3(onChange);
   onChangeRef.current = onChange;
   const mounted = useRef3(false);
-  useEffect3(() => {
+  useEffect4(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
@@ -781,7 +881,7 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
     redo: b.redo,
     getProblems: () => b.problems
   }), [b.doc, b.setDoc, b.undo, b.redo, b.problems]);
-  const usedNames = useMemo2(() => new Set(extractVariables(b.doc)), [b.doc]);
+  const usedNames = useMemo3(() => new Set(extractVariables(b.doc)), [b.doc]);
   const errorCount = b.problems.filter((p) => p.severity === "error").length;
   const warnCount = b.problems.length - errorCount;
   const selectBlock = (index) => {
@@ -825,9 +925,9 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
     // Root captures keyboard shortcuts (undo/redo, delete, reorder) for its children;
     // it's a container, not itself an interactive control.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    /* @__PURE__ */ jsxs11("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
-      /* @__PURE__ */ jsxs11("div", { className: "eb-toolbar", children: [
-        /* @__PURE__ */ jsxs11("div", { className: "eb-toolbar-group", children: [
+    /* @__PURE__ */ jsxs12("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
+      /* @__PURE__ */ jsxs12("div", { className: "eb-toolbar", children: [
+        /* @__PURE__ */ jsxs12("div", { className: "eb-toolbar-group", children: [
           /* @__PURE__ */ jsx12("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canUndo, onClick: b.undo, title: "Undo (\u2318Z)", "aria-label": "Undo", children: IconUndo }),
           /* @__PURE__ */ jsx12("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canRedo, onClick: b.redo, title: "Redo (\u21E7\u2318Z)", "aria-label": "Redo", children: IconRedo })
         ] }),
@@ -842,29 +942,29 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
             children: errorCount ? `${errorCount} error${errorCount === 1 ? "" : "s"}` : warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "No problems"
           }
         ),
-        renderPreview && /* @__PURE__ */ jsxs11("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
+        renderPreview && /* @__PURE__ */ jsxs12("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
           IconEye,
           " Preview"
         ] }),
-        /* @__PURE__ */ jsxs11("span", { className: "eb-block-count", children: [
+        /* @__PURE__ */ jsxs12("span", { className: "eb-block-count", children: [
           b.doc.blocks.length,
           " block",
           b.doc.blocks.length === 1 ? "" : "s"
         ] })
       ] }),
       showProblems && /* @__PURE__ */ jsx12("div", { className: "eb-problems-panel", children: /* @__PURE__ */ jsx12(Problems, { problems: b.problems, onSelectBlock: selectBlock }) }),
-      /* @__PURE__ */ jsxs11("div", { className: "eb-header", children: [
-        /* @__PURE__ */ jsxs11("label", { className: "eb-field", children: [
+      /* @__PURE__ */ jsxs12("div", { className: "eb-header", children: [
+        /* @__PURE__ */ jsxs12("label", { className: "eb-field", children: [
           /* @__PURE__ */ jsx12("span", { className: "eb-field-label", children: "Subject" }),
           /* @__PURE__ */ jsx12("input", { className: "eb-input", value: b.doc.subject, disabled, placeholder: "Welcome, {{firstName}}!", onChange: (e) => b.setSubject(e.target.value) })
         ] }),
-        /* @__PURE__ */ jsxs11("label", { className: "eb-field", children: [
+        /* @__PURE__ */ jsxs12("label", { className: "eb-field", children: [
           /* @__PURE__ */ jsx12("span", { className: "eb-field-label", children: "Preheader" }),
           /* @__PURE__ */ jsx12("input", { className: "eb-input", value: b.doc.preheader ?? "", disabled, placeholder: "Inbox preview text (optional)", onChange: (e) => b.setPreheader(e.target.value) })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs11("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
-        /* @__PURE__ */ jsxs11("div", { className: "eb-col eb-col-palette", children: [
+      /* @__PURE__ */ jsxs12("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
+        /* @__PURE__ */ jsxs12("div", { className: "eb-col eb-col-palette", children: [
           /* @__PURE__ */ jsx12("div", { className: "eb-col-title", children: "Blocks" }),
           /* @__PURE__ */ jsx12(Palette, { onAdd: (type) => b.addBlock(type, b.selectedIndex === null ? void 0 : b.selectedIndex + 1), disabled })
         ] }),
@@ -884,7 +984,15 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
         settings === "panel" ? /* @__PURE__ */ jsx12("div", { className: "eb-col eb-col-settings", children: settingsPanel }) : aside && /* @__PURE__ */ jsx12("div", { className: "eb-col eb-col-aside", children: aside })
       ] }),
       settings === "modal" && settingsModalOpen && /* @__PURE__ */ jsx12(Modal, { title: "Block settings", onClose: () => setSettingsModalOpen(false), children: settingsPanel }),
-      showPreview && renderPreview && /* @__PURE__ */ jsx12(PreviewModal, { onClose: () => setShowPreview(false), children: renderPreview(b.doc) })
+      showPreview && renderPreview && /* @__PURE__ */ jsx12(
+        PreviewModal,
+        {
+          doc: b.doc,
+          renderPreview,
+          onGenerateTestData,
+          onClose: () => setShowPreview(false)
+        }
+      )
     ] })
   );
 });

@@ -70,8 +70,15 @@ interface EmailBuilderProps {
     /** An aside column (e.g. AI-assist), shown as the third column in "modal" mode. */
     aside?: ReactNode;
     /** Renders the live preview for the current doc (host-provided so the builder stays
-     *  decoupled from react-email — the host can lazy-load it). Omit to hide the Preview button. */
-    renderPreview?: (doc: EmailDoc) => ReactNode;
+     *  decoupled from react-email — the host can lazy-load it). Receives an optional
+     *  `values` map: when present, the renderer should merge {{vars}} with these values
+     *  (the actual recipient email); when absent, {{vars}} stay literal. Omit the whole
+     *  prop to hide the Preview button. */
+    renderPreview?: (doc: EmailDoc, values?: Record<string, string>) => ReactNode;
+    /** Optional test-data generator (e.g. an AI sampler). When provided, the preview
+     *  shows a "Generate sample values" button that fills the variable inputs. Returns a
+     *  name→value map; the builder stays backend-agnostic. */
+    onGenerateTestData?: (doc: EmailDoc) => Promise<Record<string, string>>;
 }
 declare const EmailBuilder: react.ForwardRefExoticComponent<EmailBuilderProps & react.RefAttributes<EmailBuilderHandle>>;
 
@@ -80,9 +87,11 @@ declare function Problems({ problems, onSelectBlock }: {
     onSelectBlock: (index: number) => void;
 }): react.JSX.Element;
 
-declare function PreviewModal({ onClose, children }: {
+declare function PreviewModal({ doc, renderPreview, onGenerateTestData, onClose, }: {
+    doc: EmailDoc;
+    renderPreview: (doc: EmailDoc, values?: Record<string, string>) => ReactNode;
+    onGenerateTestData?: (doc: EmailDoc) => Promise<Record<string, string>>;
     onClose: () => void;
-    children: ReactNode;
 }): react.JSX.Element;
 
 declare function Modal({ title, onClose, children, wide }: {

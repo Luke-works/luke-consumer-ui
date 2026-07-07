@@ -174,6 +174,7 @@ async function compileEmail(input) {
 }
 function EmailRenderer({
   doc,
+  values,
   className = "",
   height = 640
 }) {
@@ -203,6 +204,12 @@ function EmailRenderer({
       active = false;
     };
   }, [json]);
+  const valuesKey = values ? JSON.stringify(values) : "";
+  const srcDoc = (0, import_react.useMemo)(
+    () => values ? (0, import_email_core.mergePreview)(html, values) : html,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [html, valuesKey]
+  );
   if (error) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
       "div",
@@ -222,7 +229,7 @@ function EmailRenderer({
     "iframe",
     {
       title: "Email preview",
-      srcDoc: html,
+      srcDoc,
       className: `w-full rounded-lg border border-gray-200 bg-white dark:border-gray-800 ${className}`,
       style: { height },
       sandbox: ""
