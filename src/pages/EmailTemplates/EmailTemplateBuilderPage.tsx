@@ -35,6 +35,7 @@ import {
 import { generateTestData } from "../../lib/emailAgentApi";
 import {
   emptyEmailDoc,
+  mergePreview,
   parseEmailDoc,
   reconcileVariables,
   validateEmailDoc,
@@ -378,6 +379,14 @@ function Builder({ tenant, templateId, template }: {
           const out: Record<string, string> = {};
           for (const [k, v] of Object.entries(raw)) if (v != null) out[k] = String(v);
           return out;
+        }}
+        // The preview's "HTML" tab: compile the same artifact we publish to Postmark
+        // (lazy react-email), then merge sample values when the operator is merging —
+        // so the code shown is exactly what the recipient's client receives.
+        getPreviewHtml={async (d, values) => {
+          const { compileEmail } = await import("@lukeflow/email-react");
+          const { html } = await compileEmail(d);
+          return values ? mergePreview(html, values) : html;
         }}
         aside={canEdit ? (
           <EmailAiAssistPanel

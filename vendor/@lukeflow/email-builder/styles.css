@@ -179,6 +179,27 @@
 .eb-preview { display: flex; gap: 16px; align-items: flex-start; }
 .eb-preview-novars { display: block; }
 .eb-preview-canvas { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.eb-preview-tabs { display: flex; align-items: center; gap: 4px; }
+.eb-preview-tab {
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 5px 12px; border: 1px solid var(--eb-border); border-radius: 8px;
+  background: var(--eb-bg); color: var(--eb-muted);
+}
+.eb-preview-tab-active { background: var(--eb-tint); border-color: var(--eb-brand); color: var(--eb-brand); }
+.eb-preview-copy {
+  margin-left: auto; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 5px 10px; border: 1px solid var(--eb-border); border-radius: 8px;
+  background: var(--eb-bg); color: var(--eb-muted);
+}
+.eb-preview-copy:hover { color: var(--eb-text); }
+.eb-preview-code {
+  margin: 0; height: 100%; min-height: 320px; max-height: 60vh; overflow: auto;
+  padding: 12px 14px; border: 1px solid var(--eb-border); border-radius: 8px;
+  background: #0f172a; color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5;
+  white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2;
+}
+.eb-preview-code-loading { padding: 24px; text-align: center; font-size: 13px; color: var(--eb-muted); }
 .eb-preview-subject {
   display: flex; gap: 8px; align-items: baseline; min-width: 0;
   padding: 8px 12px; border: 1px solid var(--eb-border); border-radius: 8px; background: var(--eb-surface);

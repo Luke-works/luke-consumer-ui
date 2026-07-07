@@ -749,10 +749,12 @@ function PreviewModal({
   doc,
   renderPreview,
   onGenerateTestData,
+  getPreviewHtml,
   onClose
 }) {
   const contract = useMemo2(() => reconcileVariables2(doc), [doc]);
   const hasVars = contract.length > 0;
+  const [view, setView] = useState4("preview");
   const [merge, setMerge] = useState4(true);
   const [values, setValues] = useState4(
     () => previewValues({ doc, variables: doc.variables ?? [] })
@@ -791,13 +793,70 @@ function PreviewModal({
   };
   const effectiveValues = merge ? values : void 0;
   const subject = doc.subject ? merge ? mergeText(doc.subject, values) : doc.subject : "";
+  const json = JSON.stringify(doc);
+  const [code, setCode] = useState4("");
+  const [codeError, setCodeError] = useState4(null);
+  const [codeLoading, setCodeLoading] = useState4(false);
+  const [copied, setCopied] = useState4(false);
+  const valuesKey = JSON.stringify(effectiveValues ?? null);
+  useEffect3(() => {
+    if (view !== "html" || !getPreviewHtml) return;
+    let active = true;
+    setCodeLoading(true);
+    setCodeError(null);
+    getPreviewHtml(doc, effectiveValues).then((html) => {
+      if (active) setCode(html);
+    }).catch((e) => {
+      if (active) setCodeError(e?.message || "Couldn\u2019t compile the HTML.");
+    }).finally(() => {
+      if (active) setCodeLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [view, json, valuesKey]);
+  const copyCode = () => {
+    void navigator.clipboard?.writeText(code).then(
+      () => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      },
+      () => {
+      }
+    );
+  };
   return /* @__PURE__ */ jsx11(Modal, { title: "Email preview", onClose, wide: true, children: /* @__PURE__ */ jsxs11("div", { className: `eb-preview${hasVars ? "" : " eb-preview-novars"}`, children: [
     /* @__PURE__ */ jsxs11("div", { className: "eb-preview-canvas", children: [
+      getPreviewHtml && /* @__PURE__ */ jsxs11("div", { className: "eb-preview-tabs", role: "tablist", "aria-label": "Preview view", children: [
+        /* @__PURE__ */ jsx11(
+          "button",
+          {
+            type: "button",
+            role: "tab",
+            "aria-selected": view === "preview",
+            className: `eb-preview-tab${view === "preview" ? " eb-preview-tab-active" : ""}`,
+            onClick: () => setView("preview"),
+            children: "Preview"
+          }
+        ),
+        /* @__PURE__ */ jsx11(
+          "button",
+          {
+            type: "button",
+            role: "tab",
+            "aria-selected": view === "html",
+            className: `eb-preview-tab${view === "html" ? " eb-preview-tab-active" : ""}`,
+            onClick: () => setView("html"),
+            children: "HTML"
+          }
+        ),
+        view === "html" && code && !codeError ? /* @__PURE__ */ jsx11("button", { type: "button", className: "eb-preview-copy", onClick: copyCode, children: copied ? "Copied" : "Copy" }) : null
+      ] }),
       subject ? /* @__PURE__ */ jsxs11("div", { className: "eb-preview-subject", children: [
         /* @__PURE__ */ jsx11("span", { className: "eb-preview-subject-label", children: "Subject" }),
         /* @__PURE__ */ jsx11("span", { className: "eb-preview-subject-text", children: subject })
       ] }) : null,
-      /* @__PURE__ */ jsx11("div", { className: "eb-preview-frame", children: renderPreview(doc, effectiveValues) })
+      view === "html" && getPreviewHtml ? /* @__PURE__ */ jsx11("div", { className: "eb-preview-frame", children: codeError ? /* @__PURE__ */ jsx11("p", { className: "eb-preview-error", role: "alert", children: codeError }) : codeLoading && !code ? /* @__PURE__ */ jsx11("div", { className: "eb-preview-code-loading", children: "Compiling HTML\u2026" }) : /* @__PURE__ */ jsx11("pre", { className: "eb-preview-code", "aria-label": "Compiled email HTML", children: /* @__PURE__ */ jsx11("code", { children: code }) }) }) : /* @__PURE__ */ jsx11("div", { className: "eb-preview-frame", children: renderPreview(doc, effectiveValues) })
     ] }),
     hasVars && /* @__PURE__ */ jsxs11("aside", { className: "eb-preview-side", "aria-label": "Sample data", children: [
       /* @__PURE__ */ jsxs11("div", { className: "eb-preview-side-head", children: [
@@ -859,7 +918,7 @@ function isEditingTarget(t) {
   const tag = el.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
 }
-var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, disabled = false, className = "", settings = "panel", aside, renderPreview, onGenerateTestData }, ref) {
+var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, disabled = false, className = "", settings = "panel", aside, renderPreview, onGenerateTestData, getPreviewHtml }, ref) {
   const b = useEmailBuilder(initialDoc);
   const [showPreview, setShowPreview] = useState5(false);
   const [showProblems, setShowProblems] = useState5(false);
@@ -990,6 +1049,7 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
           doc: b.doc,
           renderPreview,
           onGenerateTestData,
+          getPreviewHtml,
           onClose: () => setShowPreview(false)
         }
       )

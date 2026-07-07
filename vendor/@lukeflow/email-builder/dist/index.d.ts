@@ -79,6 +79,11 @@ interface EmailBuilderProps {
      *  shows a "Generate sample values" button that fills the variable inputs. Returns a
      *  name→value map; the builder stays backend-agnostic. */
     onGenerateTestData?: (doc: EmailDoc) => Promise<Record<string, string>>;
+    /** Optional compiler for the preview's HTML source view. When provided, the preview
+     *  gains a "HTML" tab showing the compiled email HTML (with `values` merged when the
+     *  operator is merging sample data). Host-provided so the builder stays decoupled
+     *  from the renderer. Omit to hide the HTML tab. */
+    getPreviewHtml?: (doc: EmailDoc, values?: Record<string, string>) => Promise<string>;
 }
 declare const EmailBuilder: react.ForwardRefExoticComponent<EmailBuilderProps & react.RefAttributes<EmailBuilderHandle>>;
 
@@ -87,10 +92,11 @@ declare function Problems({ problems, onSelectBlock }: {
     onSelectBlock: (index: number) => void;
 }): react.JSX.Element;
 
-declare function PreviewModal({ doc, renderPreview, onGenerateTestData, onClose, }: {
+declare function PreviewModal({ doc, renderPreview, onGenerateTestData, getPreviewHtml, onClose, }: {
     doc: EmailDoc;
     renderPreview: (doc: EmailDoc, values?: Record<string, string>) => ReactNode;
     onGenerateTestData?: (doc: EmailDoc) => Promise<Record<string, string>>;
+    getPreviewHtml?: (doc: EmailDoc, values?: Record<string, string>) => Promise<string>;
     onClose: () => void;
 }): react.JSX.Element;
 

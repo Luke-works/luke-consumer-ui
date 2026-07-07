@@ -78,9 +78,6 @@ function isVarOnly(value) {
   if (typeof value !== "string") return false;
   return /^\s*\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}\s*$/.test(value);
 }
-function hasVar(value) {
-  return typeof value === "string" && /\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}/.test(value);
-}
 var nonEmpty = (v) => typeof v === "string" && v.trim().length > 0;
 function validateEmailDoc(doc) {
   const problems = [];
@@ -138,9 +135,7 @@ function validateEmailDoc(doc) {
         if (!nonEmpty(b.href)) {
           problems.push({ code: "missing-prop", severity: "error", blockIndex: i, message: "Button is missing its link." });
         } else if (!isHttpUrl(b.href) && !isVarOnly(b.href)) {
-          problems.push({ code: "invalid-href", severity: "error", blockIndex: i, message: "Button link must be a URL or a {{variable}}." });
-        } else if (!isHttpUrl(b.href) && hasVar(b.href)) {
-          problems.push({ code: "var-href-no-scheme", severity: "warning", blockIndex: i, message: "Button link uses a variable without an http(s) scheme \u2014 make sure it resolves to a full URL." });
+          problems.push({ code: "invalid-href", severity: "error", blockIndex: i, message: "Button link must be a full http(s) URL or a single {{variable}}." });
         }
         break;
       case "image":
