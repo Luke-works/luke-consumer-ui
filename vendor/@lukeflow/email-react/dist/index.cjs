@@ -37,6 +37,7 @@ function safeUrl(value) {
   if (typeof value !== "string") return void 0;
   return (0, import_email_core.isHttpUrl)(value) || (0, import_email_core.isVarOnly)(value) ? value : void 0;
 }
+var RENDER_TIMEOUT_MS = 2e4;
 var FONT_STACK = {
   sans: "Helvetica, Arial, sans-serif",
   serif: "Georgia, 'Times New Roman', serif",
@@ -180,10 +181,15 @@ function EmailRenderer({
 }) {
   const [html, setHtml] = (0, import_react.useState)("");
   const [error, setError] = (0, import_react.useState)(null);
+  const [ready, setReady] = (0, import_react.useState)(false);
   const json = typeof doc === "string" ? doc : JSON.stringify(doc);
   (0, import_react.useEffect)(() => {
     let active = true;
     setError(null);
+    setReady(false);
+    const timer = setTimeout(() => {
+      if (active) setError("The preview is taking too long to load \u2014 the renderer may not have loaded. Try reloading the page.");
+    }, RENDER_TIMEOUT_MS);
     let out;
     try {
       const parsed = typeof doc === "string" ? (0, import_email_core.parseEmailDoc)(doc) : doc;
@@ -192,9 +198,14 @@ function EmailRenderer({
       out = Promise.reject(e);
     }
     out.then((rendered) => {
-      if (active) setHtml(rendered);
+      if (!active) return;
+      clearTimeout(timer);
+      setHtml(rendered);
+      setError(null);
+      setReady(true);
     }).catch((e) => {
       if (!active) return;
+      clearTimeout(timer);
       const msg = e instanceof Error ? e.message : String(e);
       console.error("EmailRenderer: failed to render the email preview.", e);
       setHtml("");
@@ -202,6 +213,7 @@ function EmailRenderer({
     });
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [json]);
   const valuesKey = values ? JSON.stringify(values) : "";
@@ -222,6 +234,22 @@ function EmailRenderer({
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "max-w-md text-xs text-amber-600/80 dark:text-amber-400/70", children: error }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-[11px] text-amber-600/60 dark:text-amber-400/50", children: "Your template is safe \u2014 this only affects the on-screen preview. Try reloading the page." })
         ]
+      }
+    );
+  }
+  if (!ready) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      "div",
+      {
+        className: `flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white text-sm text-gray-400 dark:border-gray-800 dark:bg-gray-900 ${className}`,
+        style: { height },
+        children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { className: "h-4 w-4 animate-spin", viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" })
+          ] }),
+          "Rendering preview\u2026"
+        ] })
       }
     );
   }
