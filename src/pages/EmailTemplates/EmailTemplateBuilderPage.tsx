@@ -12,7 +12,7 @@ import Input from "../../components/form/input/InputField";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, EMAIL } from "../../lib/capabilities";
 import { ChevronLeftIcon, CheckLineIcon, PaperPlaneIcon, PencilIcon } from "../../icons";
-import { FlaskConical, BadgeCheck } from "lucide-react";
+import { FlaskConical, BadgeCheck, X } from "lucide-react";
 import { EmailBuilder, type EmailBuilderHandle } from "@lukeflow/email-builder";
 import "@lukeflow/email-builder/styles.css";
 // Lazy-load the react-email renderer (~510 KB gz) so it only loads when the Preview
@@ -74,6 +74,12 @@ function Builder({ tenant, templateId, template }: {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [formDesc, setFormDesc] = useState(template.description ?? "");
+  // Settings-modal edits are buffered in drafts (seeded on open) so the toolbar title
+  // doesn't change until Save and an unsaved close can cleanly discard. `settingsDirty`
+  // flips the corner button to a tick and guards an outside-click with a confirm.
+  const [draftName, setDraftName] = useState(template.name);
+  const [draftDesc, setDraftDesc] = useState(template.description ?? "");
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   // Send-test modal state.
   const [testOpen, setTestOpen] = useState(false);
@@ -118,15 +124,25 @@ function Builder({ tenant, templateId, template }: {
     scheduleSave();
   };
 
-  // Load the activity feed when the settings modal opens.
+  // Load the activity feed + seed the edit drafts from the committed values when the
+  // settings modal opens. Seeding only on open (not on every name/desc change) keeps
+  // the dirty comparison meaningful.
   useEffect(() => {
     if (!settingsOpen) return;
+    setDraftName(name);
+    setDraftDesc(formDesc);
+    setDiscardOpen(false);
     let active = true;
     getAudit(tenant, templateId)
       .then((a) => active && setAuditEvents(a))
       .catch(() => active && setAuditEvents([]));
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsOpen, tenant, templateId]);
+
+  // Unsaved edits in the settings modal → corner button becomes a tick, outside-click
+  // is guarded with a discard confirm.
+  const settingsDirty = canEdit && (draftName !== name || draftDesc !== formDesc);
 
   // Persist the working draft (doc JSON + subject), surfacing failures.
   const persistDraft = async (): Promise<boolean> => {
@@ -246,9 +262,22 @@ function Builder({ tenant, templateId, template }: {
   });
 
   const saveSettings = async () => {
-    const next = name.trim() || template.name;
+    const next = draftName.trim() || template.name;
     setName(next);
-    await updateMeta(tenant, templateId, { name: next, description: formDesc });
+    setFormDesc(draftDesc);
+    await updateMeta(tenant, templateId, { name: next, description: draftDesc });
+    setDiscardOpen(false);
+    setSettingsOpen(false);
+  };
+
+  // Requested close (the corner X, backdrop, or Escape): guard unsaved edits with a
+  // discard confirm; a clean modal just closes.
+  const requestCloseSettings = () => {
+    if (settingsDirty) setDiscardOpen(true);
+    else setSettingsOpen(false);
+  };
+  const discardSettings = () => {
+    setDiscardOpen(false);
     setSettingsOpen(false);
   };
 
@@ -401,8 +430,24 @@ function Builder({ tenant, templateId, template }: {
       />
 
       {/* Template settings */}
-      <Modal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} className="mx-4 w-full max-w-[480px]">
+      <Modal isOpen={settingsOpen} onClose={requestCloseSettings} showCloseButton={false} ariaLabel="Template settings" className="mx-4 w-full max-w-[480px]">
         <div className="p-6">
+          {/* Corner action: a tick once there are unsaved edits (saves + closes), else a
+              plain close (X). Outside-click / Escape route through requestCloseSettings. */}
+          <button
+            type="button"
+            onClick={settingsDirty ? () => void saveSettings() : () => setSettingsOpen(false)}
+            disabled={settingsDirty && !draftName.trim()}
+            aria-label={settingsDirty ? "Save changes" : "Close dialog"}
+            title={settingsDirty ? "Save changes" : "Close"}
+            className={`absolute right-3 top-3 z-999 flex size-9.5 items-center justify-center rounded-full transition-colors disabled:opacity-40 sm:right-4 sm:top-4 ${
+              settingsDirty
+                ? "bg-brand-500 text-white hover:bg-brand-600"
+                : "bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            {settingsDirty ? <CheckLineIcon className="size-5" /> : <X className="size-5" />}
+          </button>
           <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Template settings</h2>
           <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">
             <span className="text-xs text-gray-400">Template ID</span>
@@ -410,15 +455,15 @@ function Builder({ tenant, templateId, template }: {
           </div>
           <div className="mb-4">
             <Label>Template name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} />
+            <Input value={draftName} onChange={(e) => setDraftName(e.target.value)} disabled={!canEdit} />
           </div>
           <div className="mb-6">
             <Label>Description</Label>
-            <Input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Optional" disabled={!canEdit} />
+            <Input value={draftDesc} onChange={(e) => setDraftDesc(e.target.value)} placeholder="Optional" disabled={!canEdit} />
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setSettingsOpen(false)}>{canEdit ? "Cancel" : "Close"}</Button>
-            {canEdit && <Button onClick={saveSettings} disabled={!name.trim()}>Save</Button>}
+            <Button variant="outline" onClick={requestCloseSettings}>{canEdit ? "Cancel" : "Close"}</Button>
+            {canEdit && <Button onClick={saveSettings} disabled={!draftName.trim() || !settingsDirty}>Save</Button>}
           </div>
 
           {auditEvents.length > 0 && (
@@ -434,6 +479,20 @@ function Builder({ tenant, templateId, template }: {
               </ul>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Discard-changes confirmation (outside-click / Cancel with unsaved edits) */}
+      <Modal isOpen={discardOpen} onClose={() => setDiscardOpen(false)} showCloseButton={false} ariaLabel="Discard changes" className="mx-4 w-full max-w-[380px]">
+        <div className="p-6">
+          <h2 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">Discard changes?</h2>
+          <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+            Your changes to the template settings haven’t been saved. Discard them?
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setDiscardOpen(false)}>Keep editing</Button>
+            <Button onClick={discardSettings}>Discard</Button>
+          </div>
         </div>
       </Modal>
 
