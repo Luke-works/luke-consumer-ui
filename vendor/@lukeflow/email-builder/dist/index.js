@@ -171,7 +171,7 @@ function useEmailBuilder(initialDoc = emptyEmailDoc()) {
 }
 
 // src/EmailBuilder.tsx
-import { forwardRef, useEffect as useEffect4, useImperativeHandle, useMemo as useMemo3, useRef as useRef3, useState as useState5 } from "react";
+import { forwardRef, useEffect as useEffect5, useImperativeHandle, useMemo as useMemo3, useRef as useRef3, useState as useState5 } from "react";
 import { extractVariables } from "@lukeflow/email-core";
 
 // src/blocks.tsx
@@ -399,28 +399,64 @@ function Canvas({
   ] });
 }
 
+// src/FontSelect.tsx
+import { useEffect } from "react";
+import { FONTS, WEB_FONT_HREFS, fontStack } from "@lukeflow/email-core";
+import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+function ensureFontPreviews() {
+  if (typeof document === "undefined") return;
+  for (const href of WEB_FONT_HREFS) {
+    if (document.head.querySelector(`link[data-eb-font-preview="${href}"]`)) continue;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.setAttribute("data-eb-font-preview", href);
+    document.head.appendChild(link);
+  }
+}
+function FontSelect({ value, onChange, disabled = false }) {
+  useEffect(() => {
+    ensureFontPreviews();
+  }, []);
+  return /* @__PURE__ */ jsxs4("label", { className: "eb-field eb-field-font", children: [
+    /* @__PURE__ */ jsx4("span", { className: "eb-field-label", children: "Font" }),
+    /* @__PURE__ */ jsx4(
+      "select",
+      {
+        className: "eb-input eb-font-select",
+        value,
+        disabled,
+        "aria-label": "Email font (applies to the whole template)",
+        onChange: (e) => onChange(e.target.value),
+        style: { fontFamily: fontStack(value) },
+        children: FONTS.map((f) => /* @__PURE__ */ jsx4("option", { value: f.id, style: { fontFamily: f.stack }, children: f.label }, f.id))
+      }
+    )
+  ] });
+}
+
 // src/SettingsPanel.tsx
-import { useEffect, useState as useState3 } from "react";
+import { useEffect as useEffect2, useState as useState3 } from "react";
 
 // src/fields.tsx
 import { useId } from "react";
 import { isValidColor } from "@lukeflow/email-core";
-import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
 function Labeled({ label, children }) {
   const id = useId();
-  return /* @__PURE__ */ jsxs4("label", { className: "eb-field", htmlFor: id, children: [
-    /* @__PURE__ */ jsx4("span", { className: "eb-field-label", children: label }),
+  return /* @__PURE__ */ jsxs5("label", { className: "eb-field", htmlFor: id, children: [
+    /* @__PURE__ */ jsx5("span", { className: "eb-field-label", children: label }),
     children(id)
   ] });
 }
 function TextField({ label, value, onChange, placeholder, disabled, mono }) {
-  return /* @__PURE__ */ jsx4(Labeled, { label, children: (id) => /* @__PURE__ */ jsx4("input", { id, className: `eb-input${mono ? " eb-mono" : ""}`, value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
+  return /* @__PURE__ */ jsx5(Labeled, { label, children: (id) => /* @__PURE__ */ jsx5("input", { id, className: `eb-input${mono ? " eb-mono" : ""}`, value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
 }
 function TextAreaField({ label, value, onChange, placeholder, disabled }) {
-  return /* @__PURE__ */ jsx4(Labeled, { label, children: (id) => /* @__PURE__ */ jsx4("textarea", { id, className: "eb-textarea", value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
+  return /* @__PURE__ */ jsx5(Labeled, { label, children: (id) => /* @__PURE__ */ jsx5("textarea", { id, className: "eb-textarea", value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
 }
 function NumberField({ label, value, onChange, min, max, disabled, placeholder }) {
-  return /* @__PURE__ */ jsx4(Labeled, { label, children: (id) => /* @__PURE__ */ jsx4(
+  return /* @__PURE__ */ jsx5(Labeled, { label, children: (id) => /* @__PURE__ */ jsx5(
     "input",
     {
       id,
@@ -439,17 +475,17 @@ function NumberField({ label, value, onChange, min, max, disabled, placeholder }
   ) });
 }
 function SelectField({ label, value, options, onChange, disabled }) {
-  return /* @__PURE__ */ jsx4(Labeled, { label, children: (id) => /* @__PURE__ */ jsx4("select", { id, className: "eb-select", value, disabled, onChange: (e) => onChange(e.target.value), children: options.map((o) => /* @__PURE__ */ jsx4("option", { value: o.value, children: o.label }, o.value)) }) });
+  return /* @__PURE__ */ jsx5(Labeled, { label, children: (id) => /* @__PURE__ */ jsx5("select", { id, className: "eb-select", value, disabled, onChange: (e) => onChange(e.target.value), children: options.map((o) => /* @__PURE__ */ jsx5("option", { value: o.value, children: o.label }, o.value)) }) });
 }
 function ColorField({ label, value, onChange, disabled }) {
   const captionId = useId();
   const swatch = /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : "#000000";
   const bad = value.trim() !== "" && !isValidColor(value);
-  return /* @__PURE__ */ jsxs4("div", { className: "eb-field", children: [
-    /* @__PURE__ */ jsx4("span", { className: "eb-field-label", id: captionId, children: label }),
-    /* @__PURE__ */ jsxs4("span", { className: "eb-color", children: [
-      /* @__PURE__ */ jsx4("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
-      /* @__PURE__ */ jsx4("input", { "aria-labelledby": captionId, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
+  return /* @__PURE__ */ jsxs5("div", { className: "eb-field", children: [
+    /* @__PURE__ */ jsx5("span", { className: "eb-field-label", id: captionId, children: label }),
+    /* @__PURE__ */ jsxs5("span", { className: "eb-color", children: [
+      /* @__PURE__ */ jsx5("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
+      /* @__PURE__ */ jsx5("input", { "aria-labelledby": captionId, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
     ] })
   ] });
 }
@@ -459,9 +495,9 @@ var ALIGNS = [
   { value: "right", label: "Right" }
 ];
 function AlignField({ value, onChange, disabled }) {
-  return /* @__PURE__ */ jsxs4("div", { className: "eb-field", children: [
-    /* @__PURE__ */ jsx4("span", { className: "eb-field-label", children: "Align" }),
-    /* @__PURE__ */ jsx4("div", { className: "eb-segmented", role: "group", "aria-label": "Align", children: ALIGNS.map((a) => /* @__PURE__ */ jsx4(
+  return /* @__PURE__ */ jsxs5("div", { className: "eb-field", children: [
+    /* @__PURE__ */ jsx5("span", { className: "eb-field-label", children: "Align" }),
+    /* @__PURE__ */ jsx5("div", { className: "eb-segmented", role: "group", "aria-label": "Align", children: ALIGNS.map((a) => /* @__PURE__ */ jsx5(
       "button",
       {
         type: "button",
@@ -477,14 +513,14 @@ function AlignField({ value, onChange, disabled }) {
 }
 
 // src/BlockEditor.tsx
-import { jsx as jsx5, jsxs as jsxs5 } from "react/jsx-runtime";
+import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
 function BlockEditor({ block, onUpdate, disabled = false }) {
   const align = "align" in block && block.align ? block.align : "left";
   switch (block.type) {
     case "heading":
-      return /* @__PURE__ */ jsxs5("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ jsx5(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Heading text \u2014 {{vars}} allowed" }),
-        /* @__PURE__ */ jsx5(
+      return /* @__PURE__ */ jsxs6("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ jsx6(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Heading text \u2014 {{vars}} allowed" }),
+        /* @__PURE__ */ jsx6(
           SelectField,
           {
             label: "Level",
@@ -494,67 +530,56 @@ function BlockEditor({ block, onUpdate, disabled = false }) {
             onChange: (v) => onUpdate({ level: Number(v) })
           }
         ),
-        /* @__PURE__ */ jsx5(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
+        /* @__PURE__ */ jsx6(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
       ] });
     case "text":
-      return /* @__PURE__ */ jsxs5("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ jsx5(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Supports **bold**, *italic*, [links](https://\u2026), and {{vars}}" }),
-        /* @__PURE__ */ jsx5(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
+      return /* @__PURE__ */ jsxs6("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ jsx6(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Supports **bold**, *italic*, [links](https://\u2026), and {{vars}}" }),
+        /* @__PURE__ */ jsx6(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
       ] });
     case "button":
-      return /* @__PURE__ */ jsxs5("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ jsx5(TextField, { label: "Label", value: block.label, disabled, onChange: (label) => onUpdate({ label }), placeholder: "Click here" }),
-        /* @__PURE__ */ jsx5(TextField, { label: "Link (href)", value: block.href, disabled, onChange: (href) => onUpdate({ href }), placeholder: "https://\u2026 or {{ctaUrl}}", mono: true }),
-        /* @__PURE__ */ jsx5(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) }),
-        /* @__PURE__ */ jsx5(ColorField, { label: "Background", value: block.bgColor ?? "", disabled, onChange: (bgColor) => onUpdate({ bgColor }) }),
-        /* @__PURE__ */ jsx5(ColorField, { label: "Text color", value: block.textColor ?? "", disabled, onChange: (textColor) => onUpdate({ textColor }) })
+      return /* @__PURE__ */ jsxs6("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ jsx6(TextField, { label: "Label", value: block.label, disabled, onChange: (label) => onUpdate({ label }), placeholder: "Click here" }),
+        /* @__PURE__ */ jsx6(TextField, { label: "Link (href)", value: block.href, disabled, onChange: (href) => onUpdate({ href }), placeholder: "https://\u2026 or {{ctaUrl}}", mono: true }),
+        /* @__PURE__ */ jsx6(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) }),
+        /* @__PURE__ */ jsx6(ColorField, { label: "Background", value: block.bgColor ?? "", disabled, onChange: (bgColor) => onUpdate({ bgColor }) }),
+        /* @__PURE__ */ jsx6(ColorField, { label: "Text color", value: block.textColor ?? "", disabled, onChange: (textColor) => onUpdate({ textColor }) })
       ] });
     case "image":
-      return /* @__PURE__ */ jsxs5("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ jsx5(TextField, { label: "Source (https)", value: block.src, disabled, onChange: (src) => onUpdate({ src }), placeholder: "https://\u2026/image.png or {{logoUrl}}", mono: true }),
-        /* @__PURE__ */ jsx5(TextField, { label: "Alt text", value: block.alt, disabled, onChange: (alt) => onUpdate({ alt }), placeholder: "Describe the image (accessibility)" }),
-        /* @__PURE__ */ jsx5(NumberField, { label: "Width (px)", value: block.width, min: 1, max: 700, disabled, onChange: (width) => onUpdate({ width }), placeholder: "auto" }),
-        /* @__PURE__ */ jsx5(TextField, { label: "Link (optional)", value: block.href ?? "", disabled, onChange: (href) => onUpdate({ href: href || void 0 }), placeholder: "https://\u2026", mono: true }),
-        /* @__PURE__ */ jsx5(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
+      return /* @__PURE__ */ jsxs6("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ jsx6(TextField, { label: "Source (https)", value: block.src, disabled, onChange: (src) => onUpdate({ src }), placeholder: "https://\u2026/image.png or {{logoUrl}}", mono: true }),
+        /* @__PURE__ */ jsx6(TextField, { label: "Alt text", value: block.alt, disabled, onChange: (alt) => onUpdate({ alt }), placeholder: "Describe the image (accessibility)" }),
+        /* @__PURE__ */ jsx6(NumberField, { label: "Width (px)", value: block.width, min: 1, max: 700, disabled, onChange: (width) => onUpdate({ width }), placeholder: "auto" }),
+        /* @__PURE__ */ jsx6(TextField, { label: "Link (optional)", value: block.href ?? "", disabled, onChange: (href) => onUpdate({ href: href || void 0 }), placeholder: "https://\u2026", mono: true }),
+        /* @__PURE__ */ jsx6(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
       ] });
     case "spacer":
-      return /* @__PURE__ */ jsx5("div", { className: "eb-editor", children: /* @__PURE__ */ jsx5(NumberField, { label: "Height (px)", value: block.size ?? 24, min: 1, max: 200, disabled, onChange: (size) => onUpdate({ size: size ?? 24 }) }) });
+      return /* @__PURE__ */ jsx6("div", { className: "eb-editor", children: /* @__PURE__ */ jsx6(NumberField, { label: "Height (px)", value: block.size ?? 24, min: 1, max: 200, disabled, onChange: (size) => onUpdate({ size: size ?? 24 }) }) });
     case "footer":
-      return /* @__PURE__ */ jsxs5("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ jsx5(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "\xA9 Your Company \xB7 123 St \xB7 {{city}}" }),
-        /* @__PURE__ */ jsx5(TextField, { label: "Unsubscribe URL", value: block.unsubscribeUrl ?? "", disabled, onChange: (unsubscribeUrl) => onUpdate({ unsubscribeUrl: unsubscribeUrl || void 0 }), placeholder: "https://\u2026 or {{unsubscribeUrl}}", mono: true })
+      return /* @__PURE__ */ jsxs6("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ jsx6(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "\xA9 Your Company \xB7 123 St \xB7 {{city}}" }),
+        /* @__PURE__ */ jsx6(TextField, { label: "Unsubscribe URL", value: block.unsubscribeUrl ?? "", disabled, onChange: (unsubscribeUrl) => onUpdate({ unsubscribeUrl: unsubscribeUrl || void 0 }), placeholder: "https://\u2026 or {{unsubscribeUrl}}", mono: true })
       ] });
     case "divider":
-      return /* @__PURE__ */ jsx5("p", { className: "eb-settings-hint", children: "A divider has no settings. Use a Spacer to control the gap around it." });
+      return /* @__PURE__ */ jsx6("p", { className: "eb-settings-hint", children: "A divider has no settings. Use a Spacer to control the gap around it." });
   }
 }
 
 // src/ThemeEditor.tsx
-import { FONTS, MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH } from "@lukeflow/email-core";
-import { jsx as jsx6, jsxs as jsxs6 } from "react/jsx-runtime";
-var FONT_OPTIONS = FONTS.map((f) => ({ value: f.id, label: f.label }));
+import { MAX_CONTENT_WIDTH, MIN_CONTENT_WIDTH } from "@lukeflow/email-core";
+import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 function ThemeEditor({ theme, onChange, disabled = false }) {
-  return /* @__PURE__ */ jsxs6("div", { className: "eb-editor", children: [
-    /* @__PURE__ */ jsx6(ColorField, { label: "Brand color", value: theme.brandColor, disabled, onChange: (brandColor) => onChange({ brandColor }) }),
-    /* @__PURE__ */ jsx6(
-      SelectField,
-      {
-        label: "Font (applies to the whole email)",
-        value: theme.fontFamily,
-        options: FONT_OPTIONS,
-        disabled,
-        onChange: (fontFamily) => onChange({ fontFamily })
-      }
-    ),
-    /* @__PURE__ */ jsx6(NumberField, { label: "Content width (px)", value: theme.contentWidth, min: MIN_CONTENT_WIDTH, max: MAX_CONTENT_WIDTH, disabled, onChange: (w) => onChange({ contentWidth: w ?? theme.contentWidth }) }),
-    /* @__PURE__ */ jsx6(ColorField, { label: "Page background", value: theme.backgroundColor, disabled, onChange: (backgroundColor) => onChange({ backgroundColor }) }),
-    /* @__PURE__ */ jsx6(ColorField, { label: "Card background", value: theme.contentBackground, disabled, onChange: (contentBackground) => onChange({ contentBackground }) })
+  return /* @__PURE__ */ jsxs7("div", { className: "eb-editor", children: [
+    /* @__PURE__ */ jsx7(ColorField, { label: "Brand color", value: theme.brandColor, disabled, onChange: (brandColor) => onChange({ brandColor }) }),
+    /* @__PURE__ */ jsx7(NumberField, { label: "Content width (px)", value: theme.contentWidth, min: MIN_CONTENT_WIDTH, max: MAX_CONTENT_WIDTH, disabled, onChange: (w) => onChange({ contentWidth: w ?? theme.contentWidth }) }),
+    /* @__PURE__ */ jsx7(ColorField, { label: "Page background", value: theme.backgroundColor, disabled, onChange: (backgroundColor) => onChange({ backgroundColor }) }),
+    /* @__PURE__ */ jsx7(ColorField, { label: "Card background", value: theme.contentBackground, disabled, onChange: (contentBackground) => onChange({ contentBackground }) })
   ] });
 }
 
 // src/VariablesEditor.tsx
 import { EMAIL_VAR_TYPES } from "@lukeflow/email-core";
-import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
+import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
 function coerceDefault(raw, type) {
   if (raw === "") return void 0;
   if (type === "number") {
@@ -566,28 +591,28 @@ function coerceDefault(raw, type) {
 }
 function VariablesEditor({ contract, usedNames, onChange, disabled = false }) {
   if (contract.length === 0) {
-    return /* @__PURE__ */ jsxs7("p", { className: "eb-settings-hint", children: [
+    return /* @__PURE__ */ jsxs8("p", { className: "eb-settings-hint", children: [
       "No variables yet. Add ",
-      /* @__PURE__ */ jsx7("span", { className: "eb-mono", children: "{{name}}" }),
+      /* @__PURE__ */ jsx8("span", { className: "eb-mono", children: "{{name}}" }),
       " to the subject or any block and it appears here."
     ] });
   }
   const patch = (name, changes) => onChange(contract.map((v) => v.name === name ? { ...v, ...changes } : v));
-  return /* @__PURE__ */ jsxs7("div", { className: "eb-vars", children: [
-    /* @__PURE__ */ jsx7("p", { className: "eb-settings-hint", children: "Declared types are validated before the email is sent. Values are supplied at send time." }),
+  return /* @__PURE__ */ jsxs8("div", { className: "eb-vars", children: [
+    /* @__PURE__ */ jsx8("p", { className: "eb-settings-hint", children: "Declared types are validated before the email is sent. Values are supplied at send time." }),
     contract.map((v) => {
       const unused = !usedNames.has(v.name);
-      return /* @__PURE__ */ jsxs7("div", { className: "eb-var-row", children: [
-        /* @__PURE__ */ jsxs7("div", { className: "eb-var-name", children: [
-          /* @__PURE__ */ jsx7("span", { className: "eb-mono", children: `{{${v.name}}}` }),
-          unused && /* @__PURE__ */ jsx7("span", { className: "eb-badge", title: "Declared but not used", children: "unused" })
+      return /* @__PURE__ */ jsxs8("div", { className: "eb-var-row", children: [
+        /* @__PURE__ */ jsxs8("div", { className: "eb-var-name", children: [
+          /* @__PURE__ */ jsx8("span", { className: "eb-mono", children: `{{${v.name}}}` }),
+          unused && /* @__PURE__ */ jsx8("span", { className: "eb-badge", title: "Declared but not used", children: "unused" })
         ] }),
-        /* @__PURE__ */ jsx7("select", { "aria-label": `Type for ${v.name}`, className: "eb-select", value: v.type, disabled, onChange: (e) => patch(v.name, { type: e.target.value }), children: EMAIL_VAR_TYPES.map((t) => /* @__PURE__ */ jsx7("option", { value: t, children: t }, t)) }),
-        /* @__PURE__ */ jsxs7("label", { className: "eb-check", children: [
-          /* @__PURE__ */ jsx7("input", { type: "checkbox", checked: v.required, disabled, onChange: (e) => patch(v.name, { required: e.target.checked }) }),
+        /* @__PURE__ */ jsx8("select", { "aria-label": `Type for ${v.name}`, className: "eb-select", value: v.type, disabled, onChange: (e) => patch(v.name, { type: e.target.value }), children: EMAIL_VAR_TYPES.map((t) => /* @__PURE__ */ jsx8("option", { value: t, children: t }, t)) }),
+        /* @__PURE__ */ jsxs8("label", { className: "eb-check", children: [
+          /* @__PURE__ */ jsx8("input", { type: "checkbox", checked: v.required, disabled, onChange: (e) => patch(v.name, { required: e.target.checked }) }),
           "required"
         ] }),
-        /* @__PURE__ */ jsx7(
+        /* @__PURE__ */ jsx8(
           "input",
           {
             "aria-label": `Default for ${v.name}`,
@@ -604,7 +629,7 @@ function VariablesEditor({ contract, usedNames, onChange, disabled = false }) {
 }
 
 // src/SettingsPanel.tsx
-import { jsx as jsx8, jsxs as jsxs8 } from "react/jsx-runtime";
+import { jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
 var TABS = [
   { id: "block", label: "Block" },
   { id: "theme", label: "Theme" },
@@ -622,11 +647,11 @@ function SettingsPanel({
   disabled = false
 }) {
   const [tab, setTab] = useState3("theme");
-  useEffect(() => {
+  useEffect2(() => {
     if (selectedIndex !== null) setTab("block");
   }, [selectedIndex]);
-  return /* @__PURE__ */ jsxs8("div", { className: "eb-settings", children: [
-    /* @__PURE__ */ jsx8("div", { className: "eb-tabs", role: "tablist", "aria-label": "Settings", children: TABS.map((t) => /* @__PURE__ */ jsx8(
+  return /* @__PURE__ */ jsxs9("div", { className: "eb-settings", children: [
+    /* @__PURE__ */ jsx9("div", { className: "eb-tabs", role: "tablist", "aria-label": "Settings", children: TABS.map((t) => /* @__PURE__ */ jsx9(
       "button",
       {
         type: "button",
@@ -638,48 +663,48 @@ function SettingsPanel({
       },
       t.id
     )) }),
-    /* @__PURE__ */ jsxs8("div", { className: "eb-settings-body", role: "tabpanel", children: [
-      tab === "block" && (selectedBlock ? /* @__PURE__ */ jsx8(BlockEditor, { block: selectedBlock, onUpdate: onUpdateBlock, disabled }) : /* @__PURE__ */ jsx8("p", { className: "eb-settings-hint", children: "Select a block in the canvas to edit it." })),
-      tab === "theme" && /* @__PURE__ */ jsx8(ThemeEditor, { theme, onChange: onUpdateTheme, disabled }),
-      tab === "variables" && /* @__PURE__ */ jsx8(VariablesEditor, { contract, usedNames, onChange: onUpdateVariables, disabled })
+    /* @__PURE__ */ jsxs9("div", { className: "eb-settings-body", role: "tabpanel", children: [
+      tab === "block" && (selectedBlock ? /* @__PURE__ */ jsx9(BlockEditor, { block: selectedBlock, onUpdate: onUpdateBlock, disabled }) : /* @__PURE__ */ jsx9("p", { className: "eb-settings-hint", children: "Select a block in the canvas to edit it." })),
+      tab === "theme" && /* @__PURE__ */ jsx9(ThemeEditor, { theme, onChange: onUpdateTheme, disabled }),
+      tab === "variables" && /* @__PURE__ */ jsx9(VariablesEditor, { contract, usedNames, onChange: onUpdateVariables, disabled })
     ] })
   ] });
 }
 
 // src/Problems.tsx
-import { jsx as jsx9, jsxs as jsxs9 } from "react/jsx-runtime";
+import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
 function Problems({ problems, onSelectBlock }) {
   if (problems.length === 0) {
-    return /* @__PURE__ */ jsx9("p", { className: "eb-problems-ok", children: "No problems \u2014 the email looks good." });
+    return /* @__PURE__ */ jsx10("p", { className: "eb-problems-ok", children: "No problems \u2014 the email looks good." });
   }
-  return /* @__PURE__ */ jsx9("ul", { className: "eb-problems", "aria-label": "Problems", children: problems.map((p, i) => {
+  return /* @__PURE__ */ jsx10("ul", { className: "eb-problems", "aria-label": "Problems", children: problems.map((p, i) => {
     const clickable = p.blockIndex !== void 0;
-    return /* @__PURE__ */ jsxs9("li", { className: `eb-problem eb-problem-${p.severity}`, children: [
-      /* @__PURE__ */ jsx9("span", { className: `eb-problem-dot eb-dot-${p.severity}`, "aria-hidden": "true" }),
-      clickable ? /* @__PURE__ */ jsxs9("button", { type: "button", className: "eb-problem-link", onClick: () => onSelectBlock(p.blockIndex), children: [
-        /* @__PURE__ */ jsxs9("span", { className: "eb-problem-loc", children: [
+    return /* @__PURE__ */ jsxs10("li", { className: `eb-problem eb-problem-${p.severity}`, children: [
+      /* @__PURE__ */ jsx10("span", { className: `eb-problem-dot eb-dot-${p.severity}`, "aria-hidden": "true" }),
+      clickable ? /* @__PURE__ */ jsxs10("button", { type: "button", className: "eb-problem-link", onClick: () => onSelectBlock(p.blockIndex), children: [
+        /* @__PURE__ */ jsxs10("span", { className: "eb-problem-loc", children: [
           "Block ",
           p.blockIndex + 1
         ] }),
         " ",
         p.message
-      ] }) : /* @__PURE__ */ jsx9("span", { children: p.message })
+      ] }) : /* @__PURE__ */ jsx10("span", { children: p.message })
     ] }, i);
   }) });
 }
 
 // src/PreviewModal.tsx
-import { useEffect as useEffect3, useMemo as useMemo2, useState as useState4 } from "react";
+import { useEffect as useEffect4, useMemo as useMemo2, useState as useState4 } from "react";
 import { previewValues, reconcileVariables as reconcileVariables2, VAR_RE } from "@lukeflow/email-core";
 
 // src/Modal.tsx
-import { useCallback as useCallback2, useEffect as useEffect2, useRef as useRef2 } from "react";
-import { jsx as jsx10, jsxs as jsxs10 } from "react/jsx-runtime";
+import { useCallback as useCallback2, useEffect as useEffect3, useRef as useRef2 } from "react";
+import { jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
 var FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 function Modal({ title, onClose, children, wide = false }) {
   const dialogRef = useRef2(null);
   const restoreRef = useRef2(null);
-  useEffect2(() => {
+  useEffect3(() => {
     restoreRef.current = document.activeElement ?? null;
     const dialog = dialogRef.current;
     const first = dialog?.querySelector(FOCUSABLE);
@@ -714,9 +739,9 @@ function Modal({ title, onClose, children, wide = false }) {
   return (
     // Presentational overlay; click outside the dialog closes it (Escape also works).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    /* @__PURE__ */ jsx10("div", { className: "eb-modal-backdrop", onMouseDown: (e) => {
+    /* @__PURE__ */ jsx11("div", { className: "eb-modal-backdrop", onMouseDown: (e) => {
       if (e.target === e.currentTarget) onClose();
-    }, children: /* @__PURE__ */ jsxs10(
+    }, children: /* @__PURE__ */ jsxs11(
       "div",
       {
         ref: dialogRef,
@@ -727,11 +752,11 @@ function Modal({ title, onClose, children, wide = false }) {
         tabIndex: -1,
         onKeyDown,
         children: [
-          /* @__PURE__ */ jsxs10("div", { className: "eb-modal-head", children: [
-            /* @__PURE__ */ jsx10("span", { className: "eb-modal-title", children: title }),
-            /* @__PURE__ */ jsx10("button", { type: "button", className: "eb-icon-btn", "aria-label": "Close", onClick: onClose, children: /* @__PURE__ */ jsx10("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ jsx10("path", { d: "M6 6l12 12M18 6 6 18" }) }) })
+          /* @__PURE__ */ jsxs11("div", { className: "eb-modal-head", children: [
+            /* @__PURE__ */ jsx11("span", { className: "eb-modal-title", children: title }),
+            /* @__PURE__ */ jsx11("button", { type: "button", className: "eb-icon-btn", "aria-label": "Close", onClick: onClose, children: /* @__PURE__ */ jsx11("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ jsx11("path", { d: "M6 6l12 12M18 6 6 18" }) }) })
           ] }),
-          /* @__PURE__ */ jsx10("div", { className: "eb-modal-body", children })
+          /* @__PURE__ */ jsx11("div", { className: "eb-modal-body", children })
         ]
       }
     ) })
@@ -739,7 +764,7 @@ function Modal({ title, onClose, children, wide = false }) {
 }
 
 // src/PreviewModal.tsx
-import { jsx as jsx11, jsxs as jsxs11 } from "react/jsx-runtime";
+import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
 function mergeText(text, values) {
   return text.replace(
     VAR_RE,
@@ -763,7 +788,7 @@ function PreviewModal({
   const [generating, setGenerating] = useState4(false);
   const [genError, setGenError] = useState4(null);
   const namesKey = contract.map((v) => v.name).join("\0");
-  useEffect3(() => {
+  useEffect4(() => {
     const seed = previewValues({ doc, variables: doc.variables ?? [] });
     setValues((prev) => {
       const next = {};
@@ -800,7 +825,7 @@ function PreviewModal({
   const [codeLoading, setCodeLoading] = useState4(false);
   const [copied, setCopied] = useState4(false);
   const valuesKey = JSON.stringify(effectiveValues ?? null);
-  useEffect3(() => {
+  useEffect4(() => {
     if (view !== "html" || !getPreviewHtml) return;
     let active = true;
     setCodeLoading(true);
@@ -826,10 +851,10 @@ function PreviewModal({
       }
     );
   };
-  return /* @__PURE__ */ jsx11(Modal, { title: "Email preview", onClose, wide: true, children: /* @__PURE__ */ jsxs11("div", { className: `eb-preview${hasVars ? "" : " eb-preview-novars"}`, children: [
-    /* @__PURE__ */ jsxs11("div", { className: "eb-preview-canvas", children: [
-      getPreviewHtml && /* @__PURE__ */ jsxs11("div", { className: "eb-preview-tabs", role: "tablist", "aria-label": "Preview view", children: [
-        /* @__PURE__ */ jsx11(
+  return /* @__PURE__ */ jsx12(Modal, { title: "Email preview", onClose, wide: true, children: /* @__PURE__ */ jsxs12("div", { className: `eb-preview${hasVars ? "" : " eb-preview-novars"}`, children: [
+    /* @__PURE__ */ jsxs12("div", { className: "eb-preview-canvas", children: [
+      getPreviewHtml && /* @__PURE__ */ jsxs12("div", { className: "eb-preview-tabs", role: "tablist", "aria-label": "Preview view", children: [
+        /* @__PURE__ */ jsx12(
           "button",
           {
             type: "button",
@@ -840,7 +865,7 @@ function PreviewModal({
             children: "Preview"
           }
         ),
-        /* @__PURE__ */ jsx11(
+        /* @__PURE__ */ jsx12(
           "button",
           {
             type: "button",
@@ -851,24 +876,24 @@ function PreviewModal({
             children: "HTML"
           }
         ),
-        view === "html" && code && !codeError ? /* @__PURE__ */ jsx11("button", { type: "button", className: "eb-preview-copy", onClick: copyCode, children: copied ? "Copied" : "Copy" }) : null
+        view === "html" && code && !codeError ? /* @__PURE__ */ jsx12("button", { type: "button", className: "eb-preview-copy", onClick: copyCode, children: copied ? "Copied" : "Copy" }) : null
       ] }),
-      subject ? /* @__PURE__ */ jsxs11("div", { className: "eb-preview-subject", children: [
-        /* @__PURE__ */ jsx11("span", { className: "eb-preview-subject-label", children: "Subject" }),
-        /* @__PURE__ */ jsx11("span", { className: "eb-preview-subject-text", children: subject })
+      subject ? /* @__PURE__ */ jsxs12("div", { className: "eb-preview-subject", children: [
+        /* @__PURE__ */ jsx12("span", { className: "eb-preview-subject-label", children: "Subject" }),
+        /* @__PURE__ */ jsx12("span", { className: "eb-preview-subject-text", children: subject })
       ] }) : null,
-      view === "html" && getPreviewHtml ? /* @__PURE__ */ jsx11("div", { className: "eb-preview-frame", children: codeError ? /* @__PURE__ */ jsx11("p", { className: "eb-preview-error", role: "alert", children: codeError }) : codeLoading && !code ? /* @__PURE__ */ jsx11("div", { className: "eb-preview-code-loading", children: "Compiling HTML\u2026" }) : /* @__PURE__ */ jsx11("pre", { className: "eb-preview-code", "aria-label": "Compiled email HTML", children: /* @__PURE__ */ jsx11("code", { children: code }) }) }) : /* @__PURE__ */ jsx11("div", { className: "eb-preview-frame", children: renderPreview(doc, effectiveValues) })
+      view === "html" && getPreviewHtml ? /* @__PURE__ */ jsx12("div", { className: "eb-preview-frame", children: codeError ? /* @__PURE__ */ jsx12("p", { className: "eb-preview-error", role: "alert", children: codeError }) : codeLoading && !code ? /* @__PURE__ */ jsx12("div", { className: "eb-preview-code-loading", children: "Compiling HTML\u2026" }) : /* @__PURE__ */ jsx12("pre", { className: "eb-preview-code", "aria-label": "Compiled email HTML", children: /* @__PURE__ */ jsx12("code", { children: code }) }) }) : /* @__PURE__ */ jsx12("div", { className: "eb-preview-frame", children: renderPreview(doc, effectiveValues) })
     ] }),
-    hasVars && /* @__PURE__ */ jsxs11("aside", { className: "eb-preview-side", "aria-label": "Sample data", children: [
-      /* @__PURE__ */ jsxs11("div", { className: "eb-preview-side-head", children: [
-        /* @__PURE__ */ jsx11("span", { className: "eb-preview-side-title", children: "Sample data" }),
-        /* @__PURE__ */ jsxs11("label", { className: "eb-preview-toggle", title: "Merge these values into the preview", children: [
-          /* @__PURE__ */ jsx11("input", { type: "checkbox", checked: merge, onChange: (e) => setMerge(e.target.checked) }),
-          /* @__PURE__ */ jsx11("span", { children: "Merge values" })
+    hasVars && /* @__PURE__ */ jsxs12("aside", { className: "eb-preview-side", "aria-label": "Sample data", children: [
+      /* @__PURE__ */ jsxs12("div", { className: "eb-preview-side-head", children: [
+        /* @__PURE__ */ jsx12("span", { className: "eb-preview-side-title", children: "Sample data" }),
+        /* @__PURE__ */ jsxs12("label", { className: "eb-preview-toggle", title: "Merge these values into the preview", children: [
+          /* @__PURE__ */ jsx12("input", { type: "checkbox", checked: merge, onChange: (e) => setMerge(e.target.checked) }),
+          /* @__PURE__ */ jsx12("span", { children: "Merge values" })
         ] })
       ] }),
-      /* @__PURE__ */ jsx11("p", { className: "eb-preview-hint", children: "See the actual email a recipient receives. Edit a value, or generate a realistic set." }),
-      onGenerateTestData && /* @__PURE__ */ jsx11(
+      /* @__PURE__ */ jsx12("p", { className: "eb-preview-hint", children: "See the actual email a recipient receives. Edit a value, or generate a realistic set." }),
+      onGenerateTestData && /* @__PURE__ */ jsx12(
         "button",
         {
           type: "button",
@@ -878,13 +903,13 @@ function PreviewModal({
           children: generating ? "Generating\u2026" : "Generate sample values"
         }
       ),
-      genError && /* @__PURE__ */ jsx11("p", { className: "eb-preview-error", role: "alert", children: genError }),
-      /* @__PURE__ */ jsx11("div", { className: "eb-preview-vars", children: contract.map((v) => /* @__PURE__ */ jsxs11("label", { className: "eb-preview-var", children: [
-        /* @__PURE__ */ jsxs11("span", { className: "eb-preview-var-name", children: [
+      genError && /* @__PURE__ */ jsx12("p", { className: "eb-preview-error", role: "alert", children: genError }),
+      /* @__PURE__ */ jsx12("div", { className: "eb-preview-vars", children: contract.map((v) => /* @__PURE__ */ jsxs12("label", { className: "eb-preview-var", children: [
+        /* @__PURE__ */ jsxs12("span", { className: "eb-preview-var-name", children: [
           `{{${v.name}}}`,
-          v.required ? /* @__PURE__ */ jsx11("span", { className: "eb-preview-req", title: "required", children: " *" }) : null
+          v.required ? /* @__PURE__ */ jsx12("span", { className: "eb-preview-req", title: "required", children: " *" }) : null
         ] }),
-        /* @__PURE__ */ jsx11(
+        /* @__PURE__ */ jsx12(
           "input",
           {
             className: "eb-input",
@@ -900,18 +925,18 @@ function PreviewModal({
 }
 
 // src/EmailBuilder.tsx
-import { jsx as jsx12, jsxs as jsxs12 } from "react/jsx-runtime";
-var IconUndo = /* @__PURE__ */ jsxs12("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-  /* @__PURE__ */ jsx12("path", { d: "M9 7 4 12l5 5" }),
-  /* @__PURE__ */ jsx12("path", { d: "M4 12h11a5 5 0 0 1 0 10h-1" })
+import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
+var IconUndo = /* @__PURE__ */ jsxs13("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+  /* @__PURE__ */ jsx13("path", { d: "M9 7 4 12l5 5" }),
+  /* @__PURE__ */ jsx13("path", { d: "M4 12h11a5 5 0 0 1 0 10h-1" })
 ] });
-var IconRedo = /* @__PURE__ */ jsxs12("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-  /* @__PURE__ */ jsx12("path", { d: "m15 7 5 5-5 5" }),
-  /* @__PURE__ */ jsx12("path", { d: "M20 12H9a5 5 0 0 0 0 10h1" })
+var IconRedo = /* @__PURE__ */ jsxs13("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+  /* @__PURE__ */ jsx13("path", { d: "m15 7 5 5-5 5" }),
+  /* @__PURE__ */ jsx13("path", { d: "M20 12H9a5 5 0 0 0 0 10h1" })
 ] });
-var IconEye = /* @__PURE__ */ jsxs12("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
-  /* @__PURE__ */ jsx12("path", { d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" }),
-  /* @__PURE__ */ jsx12("circle", { cx: "12", cy: "12", r: "3" })
+var IconEye = /* @__PURE__ */ jsxs13("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
+  /* @__PURE__ */ jsx13("path", { d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" }),
+  /* @__PURE__ */ jsx13("circle", { cx: "12", cy: "12", r: "3" })
 ] });
 function isEditingTarget(t) {
   const el = t;
@@ -927,7 +952,7 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
   const onChangeRef = useRef3(onChange);
   onChangeRef.current = onChange;
   const mounted = useRef3(false);
-  useEffect4(() => {
+  useEffect5(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
@@ -967,7 +992,7 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
       if (to >= 0 && to < b.doc.blocks.length) b.moveBlock(b.selectedIndex, to);
     }
   };
-  const settingsPanel = /* @__PURE__ */ jsx12(
+  const settingsPanel = /* @__PURE__ */ jsx13(
     SettingsPanel,
     {
       selectedBlock: b.selectedBlock,
@@ -985,14 +1010,14 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
     // Root captures keyboard shortcuts (undo/redo, delete, reorder) for its children;
     // it's a container, not itself an interactive control.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    /* @__PURE__ */ jsxs12("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
-      /* @__PURE__ */ jsxs12("div", { className: "eb-toolbar", children: [
-        /* @__PURE__ */ jsxs12("div", { className: "eb-toolbar-group", children: [
-          /* @__PURE__ */ jsx12("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canUndo, onClick: b.undo, title: "Undo (\u2318Z)", "aria-label": "Undo", children: IconUndo }),
-          /* @__PURE__ */ jsx12("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canRedo, onClick: b.redo, title: "Redo (\u21E7\u2318Z)", "aria-label": "Redo", children: IconRedo })
+    /* @__PURE__ */ jsxs13("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
+      /* @__PURE__ */ jsxs13("div", { className: "eb-toolbar", children: [
+        /* @__PURE__ */ jsxs13("div", { className: "eb-toolbar-group", children: [
+          /* @__PURE__ */ jsx13("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canUndo, onClick: b.undo, title: "Undo (\u2318Z)", "aria-label": "Undo", children: IconUndo }),
+          /* @__PURE__ */ jsx13("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canRedo, onClick: b.redo, title: "Redo (\u21E7\u2318Z)", "aria-label": "Redo", children: IconRedo })
         ] }),
-        /* @__PURE__ */ jsx12("span", { className: "eb-toolbar-spacer" }),
-        /* @__PURE__ */ jsx12(
+        /* @__PURE__ */ jsx13("span", { className: "eb-toolbar-spacer" }),
+        /* @__PURE__ */ jsx13(
           "button",
           {
             type: "button",
@@ -1002,33 +1027,36 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
             children: errorCount ? `${errorCount} error${errorCount === 1 ? "" : "s"}` : warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "No problems"
           }
         ),
-        renderPreview && /* @__PURE__ */ jsxs12("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
+        renderPreview && /* @__PURE__ */ jsxs13("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
           IconEye,
           " Preview"
         ] }),
-        /* @__PURE__ */ jsxs12("span", { className: "eb-block-count", children: [
+        /* @__PURE__ */ jsxs13("span", { className: "eb-block-count", children: [
           b.doc.blocks.length,
           " block",
           b.doc.blocks.length === 1 ? "" : "s"
         ] })
       ] }),
-      showProblems && /* @__PURE__ */ jsx12("div", { className: "eb-problems-panel", children: /* @__PURE__ */ jsx12(Problems, { problems: b.problems, onSelectBlock: selectBlock }) }),
-      /* @__PURE__ */ jsxs12("div", { className: "eb-header", children: [
-        /* @__PURE__ */ jsxs12("label", { className: "eb-field", children: [
-          /* @__PURE__ */ jsx12("span", { className: "eb-field-label", children: "Subject" }),
-          /* @__PURE__ */ jsx12("input", { className: "eb-input", value: b.doc.subject, disabled, placeholder: "Welcome, {{firstName}}!", onChange: (e) => b.setSubject(e.target.value) })
+      showProblems && /* @__PURE__ */ jsx13("div", { className: "eb-problems-panel", children: /* @__PURE__ */ jsx13(Problems, { problems: b.problems, onSelectBlock: selectBlock }) }),
+      /* @__PURE__ */ jsxs13("div", { className: "eb-header", children: [
+        /* @__PURE__ */ jsxs13("div", { className: "eb-header-main", children: [
+          /* @__PURE__ */ jsxs13("label", { className: "eb-field eb-field-grow", children: [
+            /* @__PURE__ */ jsx13("span", { className: "eb-field-label", children: "Subject" }),
+            /* @__PURE__ */ jsx13("input", { className: "eb-input", value: b.doc.subject, disabled, placeholder: "Welcome, {{firstName}}!", onChange: (e) => b.setSubject(e.target.value) })
+          ] }),
+          /* @__PURE__ */ jsx13(FontSelect, { value: b.doc.theme.fontFamily, disabled, onChange: (fontFamily) => b.setTheme({ fontFamily }) })
         ] }),
-        /* @__PURE__ */ jsxs12("label", { className: "eb-field", children: [
-          /* @__PURE__ */ jsx12("span", { className: "eb-field-label", children: "Preheader" }),
-          /* @__PURE__ */ jsx12("input", { className: "eb-input", value: b.doc.preheader ?? "", disabled, placeholder: "Inbox preview text (optional)", onChange: (e) => b.setPreheader(e.target.value) })
+        /* @__PURE__ */ jsxs13("label", { className: "eb-field", children: [
+          /* @__PURE__ */ jsx13("span", { className: "eb-field-label", children: "Preheader" }),
+          /* @__PURE__ */ jsx13("input", { className: "eb-input", value: b.doc.preheader ?? "", disabled, placeholder: "Inbox preview text (optional)", onChange: (e) => b.setPreheader(e.target.value) })
         ] })
       ] }),
-      /* @__PURE__ */ jsxs12("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
-        /* @__PURE__ */ jsxs12("div", { className: "eb-col eb-col-palette", children: [
-          /* @__PURE__ */ jsx12("div", { className: "eb-col-title", children: "Blocks" }),
-          /* @__PURE__ */ jsx12(Palette, { onAdd: (type) => b.addBlock(type, b.selectedIndex === null ? void 0 : b.selectedIndex + 1), disabled })
+      /* @__PURE__ */ jsxs13("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
+        /* @__PURE__ */ jsxs13("div", { className: "eb-col eb-col-palette", children: [
+          /* @__PURE__ */ jsx13("div", { className: "eb-col-title", children: "Blocks" }),
+          /* @__PURE__ */ jsx13(Palette, { onAdd: (type) => b.addBlock(type, b.selectedIndex === null ? void 0 : b.selectedIndex + 1), disabled })
         ] }),
-        /* @__PURE__ */ jsx12("div", { className: "eb-col eb-col-canvas", children: /* @__PURE__ */ jsx12(
+        /* @__PURE__ */ jsx13("div", { className: "eb-col eb-col-canvas", children: /* @__PURE__ */ jsx13(
           Canvas,
           {
             blocks: b.doc.blocks,
@@ -1041,10 +1069,10 @@ var EmailBuilder = forwardRef(function EmailBuilder2({ initialDoc, onChange, dis
             disabled
           }
         ) }),
-        settings === "panel" ? /* @__PURE__ */ jsx12("div", { className: "eb-col eb-col-settings", children: settingsPanel }) : aside && /* @__PURE__ */ jsx12("div", { className: "eb-col eb-col-aside", children: aside })
+        settings === "panel" ? /* @__PURE__ */ jsx13("div", { className: "eb-col eb-col-settings", children: settingsPanel }) : aside && /* @__PURE__ */ jsx13("div", { className: "eb-col eb-col-aside", children: aside })
       ] }),
-      settings === "modal" && settingsModalOpen && /* @__PURE__ */ jsx12(Modal, { title: "Block settings", onClose: () => setSettingsModalOpen(false), children: settingsPanel }),
-      showPreview && renderPreview && /* @__PURE__ */ jsx12(
+      settings === "modal" && settingsModalOpen && /* @__PURE__ */ jsx13(Modal, { title: "Block settings", onClose: () => setSettingsModalOpen(false), children: settingsPanel }),
+      showPreview && renderPreview && /* @__PURE__ */ jsx13(
         PreviewModal,
         {
           doc: b.doc,

@@ -31,6 +31,7 @@ var FONTS = [
 ];
 var FONT_MAP = new Map(FONTS.map((f) => [f.id, f]));
 var FONT_IDS = FONTS.map((f) => f.id);
+var WEB_FONT_HREFS = FONTS.map((f) => f.webHref).filter((h) => typeof h === "string");
 var DEFAULT_FONT_ID = FONTS[0].id;
 function isFontId(id) {
   return typeof id === "string" && FONT_MAP.has(id);
@@ -439,6 +440,6 @@ function mergePreview(html, values) {
   );
 }
 
-export { ALLOWED_BLOCK_TYPES, DEFAULT_FONT_ID, DEFAULT_THEME, EMAIL_VAR_TYPES, FONTS, FONT_IDS, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, VAR_RE, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, fontById, fontStack, hasBlockingProblems, isFontId, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
+export { ALLOWED_BLOCK_TYPES, DEFAULT_FONT_ID, DEFAULT_THEME, EMAIL_VAR_TYPES, FONTS, FONT_IDS, MAX_BLOCKS, MAX_CONTENT_WIDTH, MAX_PREHEADER_LEN, MAX_RICH_TEXT_LEN, MAX_SHORT_TEXT_LEN, MAX_SPACER_SIZE, MAX_SUBJECT_LEN, MAX_URL_LEN, MIN_CONTENT_WIDTH, VAR_RE, WEB_FONT_HREFS, buildTemplateModel, coerceColor, emptyEmailDoc, extractVariables, fontById, fontStack, hasBlockingProblems, isFontId, isHttpUrl, isHttpsUrl, isValidColor, isValidVarName, isVarOnly, mergePreview, parseEmailDoc, previewValues, reconcileVariables, repairEmailDoc, validateEmailDoc, validateVariables };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

@@ -33,6 +33,7 @@ var FONTS = [
 ];
 var FONT_MAP = new Map(FONTS.map((f) => [f.id, f]));
 var FONT_IDS = FONTS.map((f) => f.id);
+var WEB_FONT_HREFS = FONTS.map((f) => f.webHref).filter((h) => typeof h === "string");
 var DEFAULT_FONT_ID = FONTS[0].id;
 function isFontId(id) {
   return typeof id === "string" && FONT_MAP.has(id);
@@ -457,6 +458,7 @@ exports.MAX_SUBJECT_LEN = MAX_SUBJECT_LEN;
 exports.MAX_URL_LEN = MAX_URL_LEN;
 exports.MIN_CONTENT_WIDTH = MIN_CONTENT_WIDTH;
 exports.VAR_RE = VAR_RE;
+exports.WEB_FONT_HREFS = WEB_FONT_HREFS;
 exports.buildTemplateModel = buildTemplateModel;
 exports.coerceColor = coerceColor;
 exports.emptyEmailDoc = emptyEmailDoc;
