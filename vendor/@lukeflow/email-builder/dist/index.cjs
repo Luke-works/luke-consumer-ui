@@ -205,8 +205,8 @@ function useEmailBuilder(initialDoc = (0, import_email_core.emptyEmailDoc)()) {
 }
 
 // src/EmailBuilder.tsx
-var import_react8 = require("react");
-var import_email_core7 = require("@lukeflow/email-core");
+var import_react9 = require("react");
+var import_email_core9 = require("@lukeflow/email-core");
 
 // src/blocks.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -301,25 +301,96 @@ function Palette({
 }
 
 // src/Canvas.tsx
+var import_react3 = require("react");
+var import_email_core3 = require("@lukeflow/email-core");
+
+// src/BlockView.tsx
 var import_react2 = require("react");
+var import_email_core2 = require("@lukeflow/email-core");
 var import_jsx_runtime3 = require("react/jsx-runtime");
-var IconDup = /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("rect", { x: "9", y: "9", width: "11", height: "11", rx: "2" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M5 15V5a2 2 0 0 1 2-2h10" })
+var HEADING_SIZE = { 1: "24px", 2: "20px", 3: "16px" };
+var MD_RE = /(\*\*([^*]+)\*\*|\*([^*]+)\*|\[([^\]]+)\]\(([^)]+)\))/g;
+function markdownLite(text) {
+  const out = [];
+  let last = 0;
+  let key = 0;
+  for (const m of text.matchAll(MD_RE)) {
+    const idx = m.index ?? 0;
+    if (idx > last) out.push(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react2.Fragment, { children: text.slice(last, idx) }, key++));
+    if (m[2] !== void 0) out.push(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { children: m[2] }, key++));
+    else if (m[3] !== void 0) out.push(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)("em", { children: m[3] }, key++));
+    else if (m[4] !== void 0) out.push(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { textDecoration: "underline" }, children: m[4] }, key++));
+    last = idx + m[0].length;
+  }
+  if (last < text.length) out.push(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_react2.Fragment, { children: text.slice(last) }, key++));
+  return out;
+}
+var alignStyle = (block) => {
+  const align = "align" in block && block.align || "left";
+  return { textAlign: align };
+};
+var isRenderableImg = (src) => /^https?:\/\/\S+/i.test(src);
+function BlockView({ block, theme }) {
+  const font = (0, import_email_core2.fontStack)(theme.fontFamily);
+  const brand = theme.brandColor || "#2563eb";
+  switch (block.type) {
+    case "heading": {
+      const level = block.level ?? 1;
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+        "div",
+        {
+          role: "heading",
+          "aria-level": level,
+          style: { ...alignStyle(block), margin: "0 0 12px", fontFamily: font, fontWeight: 700, fontSize: HEADING_SIZE[level] ?? HEADING_SIZE[1], lineHeight: 1.25, color: "#111827" },
+          children: block.text || /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { color: "#9ca3af" }, children: "Heading" })
+        }
+      );
+    }
+    case "text":
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { style: { ...alignStyle(block), margin: "0 0 12px", fontFamily: font, fontSize: "14px", lineHeight: "24px", color: "#374151" }, children: block.text ? markdownLite(block.text) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { color: "#9ca3af" }, children: "Empty text" }) });
+    case "button":
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { ...alignStyle(block), margin: "0 0 16px" }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { display: "inline-block", padding: "12px 20px", borderRadius: "4px", fontFamily: font, fontSize: "14px", fontWeight: 600, background: block.bgColor || brand, color: block.textColor || "#ffffff" }, children: block.label || "Button" }) });
+    case "image": {
+      const style = { ...alignStyle(block), margin: "0 0 16px" };
+      if (isRenderableImg(block.src)) {
+        return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("img", { src: block.src, alt: block.alt || "", style: { display: "inline-block", maxWidth: "100%", height: "auto", width: block.width ? `${block.width}px` : void 0 } }) });
+      }
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: block.width ? `${Math.min(block.width, 480)}px` : "100%", maxWidth: "100%", height: "120px", background: "#f3f4f6", border: "1px dashed #d1d5db", borderRadius: "6px", color: "#9ca3af", fontFamily: font, fontSize: "12px" }, children: block.alt || "Image" }) });
+    }
+    case "divider":
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("hr", { style: { border: "none", borderTop: "1px solid #e5e7eb", margin: "20px 0" } });
+    case "spacer":
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { height: `${block.size ?? 24}px` }, "aria-hidden": "true" });
+    case "footer":
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { style: { marginTop: "24px", fontFamily: font }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("hr", { style: { border: "none", borderTop: "1px solid #e5e7eb", margin: "0 0 12px" } }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { style: { margin: 0, fontSize: "12px", lineHeight: "20px", color: "#6b7280" }, children: block.text ? markdownLite(block.text) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { style: { color: "#9ca3af" }, children: "Footer" }) }),
+        block.unsubscribeUrl ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { style: { margin: "6px 0 0", fontSize: "12px", color: "#6b7280", textDecoration: "underline" }, children: "Unsubscribe" }) : null
+      ] });
+    default:
+      return null;
+  }
+}
+
+// src/Canvas.tsx
+var import_jsx_runtime4 = require("react/jsx-runtime");
+var IconDup = /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("rect", { x: "9", y: "9", width: "11", height: "11", rx: "2" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M5 15V5a2 2 0 0 1 2-2h10" })
 ] });
-var IconTrash = /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: [
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M4 7h16" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M10 11v6M14 11v6" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { d: "M9 7V4h6v3" })
+var IconTrash = /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: [
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M4 7h16" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M10 11v6M14 11v6" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { d: "M9 7V4h6v3" })
 ] });
-var IconGrip = /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "currentColor", "aria-hidden": "true", children: [
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "9", cy: "6", r: "1.4" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "15", cy: "6", r: "1.4" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "9", cy: "12", r: "1.4" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "15", cy: "12", r: "1.4" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "9", cy: "18", r: "1.4" }),
-  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "15", cy: "18", r: "1.4" })
+var IconGrip = /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: "currentColor", "aria-hidden": "true", children: [
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "9", cy: "6", r: "1.4" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "15", cy: "6", r: "1.4" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "9", cy: "12", r: "1.4" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "15", cy: "12", r: "1.4" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "9", cy: "18", r: "1.4" }),
+  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("circle", { cx: "15", cy: "18", r: "1.4" })
 ] });
 function parsePayload(e) {
   const raw = e.dataTransfer.getData("text/plain");
@@ -329,6 +400,7 @@ function parsePayload(e) {
 }
 function Canvas({
   blocks,
+  theme,
   selectedIndex,
   onSelect,
   onAdd,
@@ -337,7 +409,7 @@ function Canvas({
   onDuplicate,
   disabled = false
 }) {
-  const [overIndex, setOverIndex] = (0, import_react2.useState)(null);
+  const [overIndex, setOverIndex] = (0, import_react3.useState)(null);
   const insertionFor = (e, index) => {
     const rect = e.currentTarget.getBoundingClientRect();
     return e.clientY - rect.top > rect.height / 2 ? index + 1 : index;
@@ -356,11 +428,18 @@ function Canvas({
       if (to !== from) onMove(from, Math.max(0, to));
     }
   };
+  const pageStyle = { background: theme.backgroundColor || "#f3f4f6" };
+  const cardStyle = {
+    background: theme.contentBackground || "#ffffff",
+    maxWidth: theme.contentWidth ? `${theme.contentWidth}px` : "600px",
+    fontFamily: (0, import_email_core3.fontStack)(theme.fontFamily)
+  };
   if (blocks.length === 0) {
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "eb-canvas-page", style: pageStyle, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
       "div",
       {
-        className: `eb-canvas eb-canvas-empty${overIndex !== null ? " eb-drop-active" : ""}`,
+        className: `eb-canvas-card eb-canvas-empty${overIndex !== null ? " eb-drop-active" : ""}`,
+        style: cardStyle,
         onDragOver: (e) => {
           if (parsePayload(e) || e.dataTransfer.types.includes("text/plain")) {
             e.preventDefault();
@@ -370,76 +449,90 @@ function Canvas({
         onDragLeave: () => setOverIndex(null),
         onDrop: (e) => commitDrop(e, 0),
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "eb-empty-title", children: "Your email is empty" }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "eb-empty-hint", children: "Add a block from the palette, or drag one here." })
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "eb-empty-title", children: "Your email is empty" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "eb-empty-hint", children: "Add a block from the palette, or drag one here." })
         ]
       }
-    );
+    ) });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "eb-canvas", role: "list", "aria-label": "Email blocks", onDragLeave: (e) => {
-    if (e.currentTarget === e.target) setOverIndex(null);
-  }, children: [
-    overIndex === 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "eb-drop-line", "aria-hidden": "true" }),
-    blocks.map((block, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
-        "div",
-        {
-          role: "listitem",
-          className: `eb-row${selectedIndex === i ? " eb-row-selected" : ""}`,
-          tabIndex: disabled ? -1 : 0,
-          "aria-current": selectedIndex === i ? "true" : void 0,
-          "aria-label": `${block.type}: ${blockSummary(block)}`,
-          draggable: !disabled,
-          onDragStart: (e) => {
-            e.dataTransfer.setData("text/plain", `move:${i}`);
-            e.dataTransfer.effectAllowed = "move";
-          },
-          onDragOver: (e) => {
-            if (e.dataTransfer.types.includes("text/plain")) {
-              e.preventDefault();
-              setOverIndex(insertionFor(e, i));
-            }
-          },
-          onDrop: (e) => commitDrop(e, insertionFor(e, i)),
-          onClick: () => onSelect(i),
-          onKeyDown: (e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onSelect(i);
-            }
-          },
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "eb-grip", "aria-hidden": "true", children: IconGrip }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "eb-row-icon", "aria-hidden": "true", children: BLOCK_ICONS[block.type] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: "eb-row-body", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "eb-row-type", children: block.type }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "eb-row-summary", children: blockSummary(block) })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: "eb-row-actions", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", className: "eb-icon-btn", disabled, title: "Duplicate", "aria-label": "Duplicate block", onClick: (e) => {
-                e.stopPropagation();
-                onDuplicate(i);
-              }, children: IconDup }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", className: "eb-icon-btn eb-danger", disabled, title: "Delete", "aria-label": "Delete block", onClick: (e) => {
-                e.stopPropagation();
-                onRemove(i);
-              }, children: IconTrash })
-            ] })
-          ]
-        }
-      ),
-      overIndex === i + 1 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "eb-drop-line", "aria-hidden": "true" })
-    ] }, i))
-  ] });
+  return (
+    // Clicking the bare page background (not a block) deselects — a mouse convenience;
+    // deselect is also reachable via Escape/blur, so no keyboard handler is needed here.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "eb-canvas-page", style: pageStyle, onClick: (e) => {
+      if (e.target === e.currentTarget) onSelect(null);
+    }, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+      "div",
+      {
+        className: "eb-canvas-card",
+        style: cardStyle,
+        role: "list",
+        "aria-label": "Email blocks",
+        onDragLeave: (e) => {
+          if (e.currentTarget === e.target) setOverIndex(null);
+        },
+        children: [
+          overIndex === 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "eb-drop-line", "aria-hidden": "true" }),
+          blocks.map((block, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+              "div",
+              {
+                role: "listitem",
+                className: `eb-wrow${selectedIndex === i ? " eb-wrow-selected" : ""}`,
+                tabIndex: disabled ? -1 : 0,
+                "aria-current": selectedIndex === i ? "true" : void 0,
+                "aria-label": `${block.type}: ${blockSummary(block)}`,
+                draggable: !disabled,
+                onDragStart: (e) => {
+                  e.dataTransfer.setData("text/plain", `move:${i}`);
+                  e.dataTransfer.effectAllowed = "move";
+                },
+                onDragOver: (e) => {
+                  if (e.dataTransfer.types.includes("text/plain")) {
+                    e.preventDefault();
+                    setOverIndex(insertionFor(e, i));
+                  }
+                },
+                onDrop: (e) => commitDrop(e, insertionFor(e, i)),
+                onClick: () => onSelect(i),
+                onKeyDown: (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelect(i);
+                  }
+                },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "eb-wrow-chrome", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "eb-wrow-grip", "aria-hidden": "true", children: IconGrip }),
+                    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "eb-wrow-type", children: block.type }),
+                    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", className: "eb-icon-btn", disabled, title: "Duplicate", "aria-label": "Duplicate block", onClick: (e) => {
+                      e.stopPropagation();
+                      onDuplicate(i);
+                    }, children: IconDup }),
+                    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("button", { type: "button", className: "eb-icon-btn eb-danger", disabled, title: "Delete", "aria-label": "Delete block", onClick: (e) => {
+                      e.stopPropagation();
+                      onRemove(i);
+                    }, children: IconTrash })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "eb-wrow-view", "aria-hidden": "true", inert: true, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(BlockView, { block, theme }) })
+                ]
+              }
+            ),
+            overIndex === i + 1 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "eb-drop-line", "aria-hidden": "true" })
+          ] }, i))
+        ]
+      }
+    ) })
+  );
 }
 
 // src/FontSelect.tsx
-var import_react3 = require("react");
-var import_email_core2 = require("@lukeflow/email-core");
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_react4 = require("react");
+var import_email_core4 = require("@lukeflow/email-core");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 function ensureFontPreviews() {
   if (typeof document === "undefined") return;
-  for (const href of import_email_core2.WEB_FONT_HREFS) {
+  for (const href of import_email_core4.WEB_FONT_HREFS) {
     if (document.head.querySelector(`link[data-eb-font-preview="${href}"]`)) continue;
     const link = document.createElement("link");
     link.rel = "stylesheet";
@@ -449,12 +542,12 @@ function ensureFontPreviews() {
   }
 }
 function FontSelect({ value, onChange, disabled = false }) {
-  (0, import_react3.useEffect)(() => {
+  (0, import_react4.useEffect)(() => {
     ensureFontPreviews();
   }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("label", { className: "eb-field eb-field-font", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "eb-field-label", children: "Font" }),
-    /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { className: "eb-field eb-field-font", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "eb-field-label", children: "Font" }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "select",
       {
         className: "eb-input eb-font-select",
@@ -462,35 +555,35 @@ function FontSelect({ value, onChange, disabled = false }) {
         disabled,
         "aria-label": "Email font (applies to the whole template)",
         onChange: (e) => onChange(e.target.value),
-        style: { fontFamily: (0, import_email_core2.fontStack)(value) },
-        children: import_email_core2.FONTS.map((f) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("option", { value: f.id, style: { fontFamily: f.stack }, children: f.label }, f.id))
+        style: { fontFamily: (0, import_email_core4.fontStack)(value) },
+        children: import_email_core4.FONTS.map((f) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: f.id, style: { fontFamily: f.stack }, children: f.label }, f.id))
       }
     )
   ] });
 }
 
 // src/SettingsPanel.tsx
-var import_react5 = require("react");
+var import_react6 = require("react");
 
 // src/fields.tsx
-var import_react4 = require("react");
-var import_email_core3 = require("@lukeflow/email-core");
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_react5 = require("react");
+var import_email_core5 = require("@lukeflow/email-core");
+var import_jsx_runtime6 = require("react/jsx-runtime");
 function Labeled({ label, children }) {
-  const id = (0, import_react4.useId)();
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("label", { className: "eb-field", htmlFor: id, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "eb-field-label", children: label }),
+  const id = (0, import_react5.useId)();
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("label", { className: "eb-field", htmlFor: id, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "eb-field-label", children: label }),
     children(id)
   ] });
 }
 function TextField({ label, value, onChange, placeholder, disabled, mono }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("input", { id, className: `eb-input${mono ? " eb-mono" : ""}`, value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { id, className: `eb-input${mono ? " eb-mono" : ""}`, value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
 }
 function TextAreaField({ label, value, onChange, placeholder, disabled }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("textarea", { id, className: "eb-textarea", value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("textarea", { id, className: "eb-textarea", value, placeholder, disabled, onChange: (e) => onChange(e.target.value) }) });
 }
 function NumberField({ label, value, onChange, min, max, disabled, placeholder }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
     "input",
     {
       id,
@@ -509,17 +602,17 @@ function NumberField({ label, value, onChange, min, max, disabled, placeholder }
   ) });
 }
 function SelectField({ label, value, options, onChange, disabled }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("select", { id, className: "eb-select", value, disabled, onChange: (e) => onChange(e.target.value), children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: o.value, children: o.label }, o.value)) }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Labeled, { label, children: (id) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("select", { id, className: "eb-select", value, disabled, onChange: (e) => onChange(e.target.value), children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("option", { value: o.value, children: o.label }, o.value)) }) });
 }
 function ColorField({ label, value, onChange, disabled }) {
-  const captionId = (0, import_react4.useId)();
+  const captionId = (0, import_react5.useId)();
   const swatch = /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : "#000000";
-  const bad = value.trim() !== "" && !(0, import_email_core3.isValidColor)(value);
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "eb-field", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "eb-field-label", id: captionId, children: label }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "eb-color", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("input", { "aria-labelledby": captionId, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
+  const bad = value.trim() !== "" && !(0, import_email_core5.isValidColor)(value);
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-field", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "eb-field-label", id: captionId, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "eb-color", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { "aria-label": `${label} swatch`, type: "color", className: "eb-color-swatch", value: swatch, disabled, onChange: (e) => onChange(e.target.value) }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("input", { "aria-labelledby": captionId, className: `eb-input eb-mono${bad ? " eb-invalid" : ""}`, value, placeholder: "#2563eb", disabled, onChange: (e) => onChange(e.target.value), "aria-invalid": bad })
     ] })
   ] });
 }
@@ -529,9 +622,9 @@ var ALIGNS = [
   { value: "right", label: "Right" }
 ];
 function AlignField({ value, onChange, disabled }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "eb-field", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "eb-field-label", children: "Align" }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "eb-segmented", role: "group", "aria-label": "Align", children: ALIGNS.map((a) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-field", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "eb-field-label", children: "Align" }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "eb-segmented", role: "group", "aria-label": "Align", children: ALIGNS.map((a) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       "button",
       {
         type: "button",
@@ -547,14 +640,14 @@ function AlignField({ value, onChange, disabled }) {
 }
 
 // src/BlockEditor.tsx
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 function BlockEditor({ block, onUpdate, disabled = false }) {
   const align = "align" in block && block.align ? block.align : "left";
   switch (block.type) {
     case "heading":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Heading text \u2014 {{vars}} allowed" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Heading text \u2014 {{vars}} allowed" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           SelectField,
           {
             label: "Level",
@@ -564,56 +657,56 @@ function BlockEditor({ block, onUpdate, disabled = false }) {
             onChange: (v) => onUpdate({ level: Number(v) })
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
       ] });
     case "text":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Supports **bold**, *italic*, [links](https://\u2026), and {{vars}}" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "Supports **bold**, *italic*, [links](https://\u2026), and {{vars}}" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
       ] });
     case "button":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextField, { label: "Label", value: block.label, disabled, onChange: (label) => onUpdate({ label }), placeholder: "Click here" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextField, { label: "Link (href)", value: block.href, disabled, onChange: (href) => onUpdate({ href }), placeholder: "https://\u2026 or {{ctaUrl}}", mono: true }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ColorField, { label: "Background", value: block.bgColor ?? "", disabled, onChange: (bgColor) => onUpdate({ bgColor }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ColorField, { label: "Text color", value: block.textColor ?? "", disabled, onChange: (textColor) => onUpdate({ textColor }) })
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextField, { label: "Label", value: block.label, disabled, onChange: (label) => onUpdate({ label }), placeholder: "Click here" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextField, { label: "Link (href)", value: block.href, disabled, onChange: (href) => onUpdate({ href }), placeholder: "https://\u2026 or {{ctaUrl}}", mono: true }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ColorField, { label: "Background", value: block.bgColor ?? "", disabled, onChange: (bgColor) => onUpdate({ bgColor }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ColorField, { label: "Text color", value: block.textColor ?? "", disabled, onChange: (textColor) => onUpdate({ textColor }) })
       ] });
     case "image":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextField, { label: "Source (https)", value: block.src, disabled, onChange: (src) => onUpdate({ src }), placeholder: "https://\u2026/image.png or {{logoUrl}}", mono: true }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextField, { label: "Alt text", value: block.alt, disabled, onChange: (alt) => onUpdate({ alt }), placeholder: "Describe the image (accessibility)" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(NumberField, { label: "Width (px)", value: block.width, min: 1, max: 700, disabled, onChange: (width) => onUpdate({ width }), placeholder: "auto" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextField, { label: "Link (optional)", value: block.href ?? "", disabled, onChange: (href) => onUpdate({ href: href || void 0 }), placeholder: "https://\u2026", mono: true }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextField, { label: "Source (https)", value: block.src, disabled, onChange: (src) => onUpdate({ src }), placeholder: "https://\u2026/image.png or {{logoUrl}}", mono: true }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextField, { label: "Alt text", value: block.alt, disabled, onChange: (alt) => onUpdate({ alt }), placeholder: "Describe the image (accessibility)" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(NumberField, { label: "Width (px)", value: block.width, min: 1, max: 700, disabled, onChange: (width) => onUpdate({ width }), placeholder: "auto" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextField, { label: "Link (optional)", value: block.href ?? "", disabled, onChange: (href) => onUpdate({ href: href || void 0 }), placeholder: "https://\u2026", mono: true }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(AlignField, { value: align, disabled, onChange: (a) => onUpdate({ align: a }) })
       ] });
     case "spacer":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "eb-editor", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(NumberField, { label: "Height (px)", value: block.size ?? 24, min: 1, max: 200, disabled, onChange: (size) => onUpdate({ size: size ?? 24 }) }) });
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "eb-editor", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(NumberField, { label: "Height (px)", value: block.size ?? 24, min: 1, max: 200, disabled, onChange: (size) => onUpdate({ size: size ?? 24 }) }) });
     case "footer":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "eb-editor", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "\xA9 Your Company \xB7 123 St \xB7 {{city}}" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TextField, { label: "Unsubscribe URL", value: block.unsubscribeUrl ?? "", disabled, onChange: (unsubscribeUrl) => onUpdate({ unsubscribeUrl: unsubscribeUrl || void 0 }), placeholder: "https://\u2026 or {{unsubscribeUrl}}", mono: true })
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "eb-editor", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextAreaField, { label: "Text", value: block.text, disabled, onChange: (text) => onUpdate({ text }), placeholder: "\xA9 Your Company \xB7 123 St \xB7 {{city}}" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(TextField, { label: "Unsubscribe URL", value: block.unsubscribeUrl ?? "", disabled, onChange: (unsubscribeUrl) => onUpdate({ unsubscribeUrl: unsubscribeUrl || void 0 }), placeholder: "https://\u2026 or {{unsubscribeUrl}}", mono: true })
       ] });
     case "divider":
-      return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "eb-settings-hint", children: "A divider has no settings. Use a Spacer to control the gap around it." });
+      return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "eb-settings-hint", children: "A divider has no settings. Use a Spacer to control the gap around it." });
   }
 }
 
 // src/ThemeEditor.tsx
-var import_email_core4 = require("@lukeflow/email-core");
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_email_core6 = require("@lukeflow/email-core");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function ThemeEditor({ theme, onChange, disabled = false }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "eb-editor", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ColorField, { label: "Brand color", value: theme.brandColor, disabled, onChange: (brandColor) => onChange({ brandColor }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(NumberField, { label: "Content width (px)", value: theme.contentWidth, min: import_email_core4.MIN_CONTENT_WIDTH, max: import_email_core4.MAX_CONTENT_WIDTH, disabled, onChange: (w) => onChange({ contentWidth: w ?? theme.contentWidth }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ColorField, { label: "Page background", value: theme.backgroundColor, disabled, onChange: (backgroundColor) => onChange({ backgroundColor }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ColorField, { label: "Card background", value: theme.contentBackground, disabled, onChange: (contentBackground) => onChange({ contentBackground }) })
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "eb-editor", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ColorField, { label: "Brand color", value: theme.brandColor, disabled, onChange: (brandColor) => onChange({ brandColor }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(NumberField, { label: "Content width (px)", value: theme.contentWidth, min: import_email_core6.MIN_CONTENT_WIDTH, max: import_email_core6.MAX_CONTENT_WIDTH, disabled, onChange: (w) => onChange({ contentWidth: w ?? theme.contentWidth }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ColorField, { label: "Page background", value: theme.backgroundColor, disabled, onChange: (backgroundColor) => onChange({ backgroundColor }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ColorField, { label: "Card background", value: theme.contentBackground, disabled, onChange: (contentBackground) => onChange({ contentBackground }) })
   ] });
 }
 
 // src/VariablesEditor.tsx
-var import_email_core5 = require("@lukeflow/email-core");
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_email_core7 = require("@lukeflow/email-core");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function coerceDefault(raw, type) {
   if (raw === "") return void 0;
   if (type === "number") {
@@ -625,28 +718,28 @@ function coerceDefault(raw, type) {
 }
 function VariablesEditor({ contract, usedNames, onChange, disabled = false }) {
   if (contract.length === 0) {
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("p", { className: "eb-settings-hint", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("p", { className: "eb-settings-hint", children: [
       "No variables yet. Add ",
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "eb-mono", children: "{{name}}" }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "eb-mono", children: "{{name}}" }),
       " to the subject or any block and it appears here."
     ] });
   }
   const patch = (name, changes) => onChange(contract.map((v) => v.name === name ? { ...v, ...changes } : v));
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "eb-vars", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "eb-settings-hint", children: "Declared types are validated before the email is sent. Values are supplied at send time." }),
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "eb-vars", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "eb-settings-hint", children: "Declared types are validated before the email is sent. Values are supplied at send time." }),
     contract.map((v) => {
       const unused = !usedNames.has(v.name);
-      return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "eb-var-row", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "eb-var-name", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "eb-mono", children: `{{${v.name}}}` }),
-          unused && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "eb-badge", title: "Declared but not used", children: "unused" })
+      return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "eb-var-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "eb-var-name", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "eb-mono", children: `{{${v.name}}}` }),
+          unused && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "eb-badge", title: "Declared but not used", children: "unused" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("select", { "aria-label": `Type for ${v.name}`, className: "eb-select", value: v.type, disabled, onChange: (e) => patch(v.name, { type: e.target.value }), children: import_email_core5.EMAIL_VAR_TYPES.map((t) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: t, children: t }, t)) }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("label", { className: "eb-check", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("input", { type: "checkbox", checked: v.required, disabled, onChange: (e) => patch(v.name, { required: e.target.checked }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("select", { "aria-label": `Type for ${v.name}`, className: "eb-select", value: v.type, disabled, onChange: (e) => patch(v.name, { type: e.target.value }), children: import_email_core7.EMAIL_VAR_TYPES.map((t) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("option", { value: t, children: t }, t)) }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("label", { className: "eb-check", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("input", { type: "checkbox", checked: v.required, disabled, onChange: (e) => patch(v.name, { required: e.target.checked }) }),
           "required"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "input",
           {
             "aria-label": `Default for ${v.name}`,
@@ -663,7 +756,7 @@ function VariablesEditor({ contract, usedNames, onChange, disabled = false }) {
 }
 
 // src/SettingsPanel.tsx
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_jsx_runtime10 = require("react/jsx-runtime");
 var TABS = [
   { id: "block", label: "Block" },
   { id: "theme", label: "Theme" },
@@ -680,12 +773,12 @@ function SettingsPanel({
   onUpdateVariables,
   disabled = false
 }) {
-  const [tab, setTab] = (0, import_react5.useState)("theme");
-  (0, import_react5.useEffect)(() => {
+  const [tab, setTab] = (0, import_react6.useState)("theme");
+  (0, import_react6.useEffect)(() => {
     if (selectedIndex !== null) setTab("block");
   }, [selectedIndex]);
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "eb-settings", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "eb-tabs", role: "tablist", "aria-label": "Settings", children: TABS.map((t) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "eb-settings", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "eb-tabs", role: "tablist", "aria-label": "Settings", children: TABS.map((t) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       "button",
       {
         type: "button",
@@ -697,55 +790,55 @@ function SettingsPanel({
       },
       t.id
     )) }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "eb-settings-body", role: "tabpanel", children: [
-      tab === "block" && (selectedBlock ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(BlockEditor, { block: selectedBlock, onUpdate: onUpdateBlock, disabled }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "eb-settings-hint", children: "Select a block in the canvas to edit it." })),
-      tab === "theme" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ThemeEditor, { theme, onChange: onUpdateTheme, disabled }),
-      tab === "variables" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(VariablesEditor, { contract, usedNames, onChange: onUpdateVariables, disabled })
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "eb-settings-body", role: "tabpanel", children: [
+      tab === "block" && (selectedBlock ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(BlockEditor, { block: selectedBlock, onUpdate: onUpdateBlock, disabled }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "eb-settings-hint", children: "Select a block in the canvas to edit it." })),
+      tab === "theme" && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ThemeEditor, { theme, onChange: onUpdateTheme, disabled }),
+      tab === "variables" && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(VariablesEditor, { contract, usedNames, onChange: onUpdateVariables, disabled })
     ] })
   ] });
 }
 
 // src/Problems.tsx
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function Problems({ problems, onSelectBlock }) {
   if (problems.length === 0) {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "eb-problems-ok", children: "No problems \u2014 the email looks good." });
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "eb-problems-ok", children: "No problems \u2014 the email looks good." });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: "eb-problems", "aria-label": "Problems", children: problems.map((p, i) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ul", { className: "eb-problems", "aria-label": "Problems", children: problems.map((p, i) => {
     const clickable = p.blockIndex !== void 0;
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("li", { className: `eb-problem eb-problem-${p.severity}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: `eb-problem-dot eb-dot-${p.severity}`, "aria-hidden": "true" }),
-      clickable ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("button", { type: "button", className: "eb-problem-link", onClick: () => onSelectBlock(p.blockIndex), children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "eb-problem-loc", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("li", { className: `eb-problem eb-problem-${p.severity}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: `eb-problem-dot eb-dot-${p.severity}`, "aria-hidden": "true" }),
+      clickable ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("button", { type: "button", className: "eb-problem-link", onClick: () => onSelectBlock(p.blockIndex), children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "eb-problem-loc", children: [
           "Block ",
           p.blockIndex + 1
         ] }),
         " ",
         p.message
-      ] }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: p.message })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: p.message })
     ] }, i);
   }) });
 }
 
 // src/PreviewModal.tsx
-var import_react7 = require("react");
-var import_email_core6 = require("@lukeflow/email-core");
+var import_react8 = require("react");
+var import_email_core8 = require("@lukeflow/email-core");
 
 // src/Modal.tsx
-var import_react6 = require("react");
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_react7 = require("react");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 var FOCUSABLE = 'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 function Modal({ title, onClose, children, wide = false }) {
-  const dialogRef = (0, import_react6.useRef)(null);
-  const restoreRef = (0, import_react6.useRef)(null);
-  (0, import_react6.useEffect)(() => {
+  const dialogRef = (0, import_react7.useRef)(null);
+  const restoreRef = (0, import_react7.useRef)(null);
+  (0, import_react7.useEffect)(() => {
     restoreRef.current = document.activeElement ?? null;
     const dialog = dialogRef.current;
     const first = dialog?.querySelector(FOCUSABLE);
     (first ?? dialog)?.focus();
     return () => restoreRef.current?.focus?.();
   }, []);
-  const onKeyDown = (0, import_react6.useCallback)((e) => {
+  const onKeyDown = (0, import_react7.useCallback)((e) => {
     if (e.key === "Escape") {
       e.stopPropagation();
       onClose();
@@ -773,9 +866,9 @@ function Modal({ title, onClose, children, wide = false }) {
   return (
     // Presentational overlay; click outside the dialog closes it (Escape also works).
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "eb-modal-backdrop", onMouseDown: (e) => {
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-modal-backdrop", onMouseDown: (e) => {
       if (e.target === e.currentTarget) onClose();
-    }, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
       "div",
       {
         ref: dialogRef,
@@ -786,11 +879,11 @@ function Modal({ title, onClose, children, wide = false }) {
         tabIndex: -1,
         onKeyDown,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "eb-modal-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "eb-modal-title", children: title }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "eb-icon-btn", "aria-label": "Close", onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M6 6l12 12M18 6 6 18" }) }) })
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-modal-head", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-modal-title", children: title }),
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "eb-icon-btn", "aria-label": "Close", onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M6 6l12 12M18 6 6 18" }) }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "eb-modal-body", children })
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-modal-body", children })
         ]
       }
     ) })
@@ -798,10 +891,10 @@ function Modal({ title, onClose, children, wide = false }) {
 }
 
 // src/PreviewModal.tsx
-var import_jsx_runtime12 = require("react/jsx-runtime");
+var import_jsx_runtime13 = require("react/jsx-runtime");
 function mergeText(text, values) {
   return text.replace(
-    import_email_core6.VAR_RE,
+    import_email_core8.VAR_RE,
     (whole, name) => Object.prototype.hasOwnProperty.call(values, name) && values[name] !== "" ? values[name] : whole
   );
 }
@@ -812,18 +905,18 @@ function PreviewModal({
   getPreviewHtml,
   onClose
 }) {
-  const contract = (0, import_react7.useMemo)(() => (0, import_email_core6.reconcileVariables)(doc), [doc]);
+  const contract = (0, import_react8.useMemo)(() => (0, import_email_core8.reconcileVariables)(doc), [doc]);
   const hasVars = contract.length > 0;
-  const [view, setView] = (0, import_react7.useState)("preview");
-  const [merge, setMerge] = (0, import_react7.useState)(true);
-  const [values, setValues] = (0, import_react7.useState)(
-    () => (0, import_email_core6.previewValues)({ doc, variables: doc.variables ?? [] })
+  const [view, setView] = (0, import_react8.useState)("preview");
+  const [merge, setMerge] = (0, import_react8.useState)(true);
+  const [values, setValues] = (0, import_react8.useState)(
+    () => (0, import_email_core8.previewValues)({ doc, variables: doc.variables ?? [] })
   );
-  const [generating, setGenerating] = (0, import_react7.useState)(false);
-  const [genError, setGenError] = (0, import_react7.useState)(null);
+  const [generating, setGenerating] = (0, import_react8.useState)(false);
+  const [genError, setGenError] = (0, import_react8.useState)(null);
   const namesKey = contract.map((v) => v.name).join("\0");
-  (0, import_react7.useEffect)(() => {
-    const seed = (0, import_email_core6.previewValues)({ doc, variables: doc.variables ?? [] });
+  (0, import_react8.useEffect)(() => {
+    const seed = (0, import_email_core8.previewValues)({ doc, variables: doc.variables ?? [] });
     setValues((prev) => {
       const next = {};
       for (const v of contract) next[v.name] = prev[v.name] ?? seed[v.name] ?? "";
@@ -854,12 +947,12 @@ function PreviewModal({
   const effectiveValues = merge ? values : void 0;
   const subject = doc.subject ? merge ? mergeText(doc.subject, values) : doc.subject : "";
   const json = JSON.stringify(doc);
-  const [code, setCode] = (0, import_react7.useState)("");
-  const [codeError, setCodeError] = (0, import_react7.useState)(null);
-  const [codeLoading, setCodeLoading] = (0, import_react7.useState)(false);
-  const [copied, setCopied] = (0, import_react7.useState)(false);
+  const [code, setCode] = (0, import_react8.useState)("");
+  const [codeError, setCodeError] = (0, import_react8.useState)(null);
+  const [codeLoading, setCodeLoading] = (0, import_react8.useState)(false);
+  const [copied, setCopied] = (0, import_react8.useState)(false);
   const valuesKey = JSON.stringify(effectiveValues ?? null);
-  (0, import_react7.useEffect)(() => {
+  (0, import_react8.useEffect)(() => {
     if (view !== "html" || !getPreviewHtml) return;
     let active = true;
     setCodeLoading(true);
@@ -885,10 +978,10 @@ function PreviewModal({
       }
     );
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Modal, { title: "Email preview", onClose, wide: true, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: `eb-preview${hasVars ? "" : " eb-preview-novars"}`, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-preview-canvas", children: [
-      getPreviewHtml && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-preview-tabs", role: "tablist", "aria-label": "Preview view", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Modal, { title: "Email preview", onClose, wide: true, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `eb-preview${hasVars ? "" : " eb-preview-novars"}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-preview-canvas", children: [
+      getPreviewHtml && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-preview-tabs", role: "tablist", "aria-label": "Preview view", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
           "button",
           {
             type: "button",
@@ -899,7 +992,7 @@ function PreviewModal({
             children: "Preview"
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
           "button",
           {
             type: "button",
@@ -910,24 +1003,24 @@ function PreviewModal({
             children: "HTML"
           }
         ),
-        view === "html" && code && !codeError ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "eb-preview-copy", onClick: copyCode, children: copied ? "Copied" : "Copy" }) : null
+        view === "html" && code && !codeError ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "eb-preview-copy", onClick: copyCode, children: copied ? "Copied" : "Copy" }) : null
       ] }),
-      subject ? /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-preview-subject", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-preview-subject-label", children: "Subject" }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-preview-subject-text", children: subject })
+      subject ? /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-preview-subject", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "eb-preview-subject-label", children: "Subject" }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "eb-preview-subject-text", children: subject })
       ] }) : null,
-      view === "html" && getPreviewHtml ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-preview-frame", children: codeError ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "eb-preview-error", role: "alert", children: codeError }) : codeLoading && !code ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-preview-code-loading", children: "Compiling HTML\u2026" }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("pre", { className: "eb-preview-code", "aria-label": "Compiled email HTML", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("code", { children: code }) }) }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-preview-frame", children: renderPreview(doc, effectiveValues) })
+      view === "html" && getPreviewHtml ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-preview-frame", children: codeError ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "eb-preview-error", role: "alert", children: codeError }) : codeLoading && !code ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-preview-code-loading", children: "Compiling HTML\u2026" }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("pre", { className: "eb-preview-code", "aria-label": "Compiled email HTML", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { children: code }) }) }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-preview-frame", children: renderPreview(doc, effectiveValues) })
     ] }),
-    hasVars && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("aside", { className: "eb-preview-side", "aria-label": "Sample data", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "eb-preview-side-head", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-preview-side-title", children: "Sample data" }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "eb-preview-toggle", title: "Merge these values into the preview", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("input", { type: "checkbox", checked: merge, onChange: (e) => setMerge(e.target.checked) }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "Merge values" })
+    hasVars && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("aside", { className: "eb-preview-side", "aria-label": "Sample data", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-preview-side-head", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "eb-preview-side-title", children: "Sample data" }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "eb-preview-toggle", title: "Merge these values into the preview", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("input", { type: "checkbox", checked: merge, onChange: (e) => setMerge(e.target.checked) }),
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: "Merge values" })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "eb-preview-hint", children: "See the actual email a recipient receives. Edit a value, or generate a realistic set." }),
-      onGenerateTestData && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "eb-preview-hint", children: "See the actual email a recipient receives. Edit a value, or generate a realistic set." }),
+      onGenerateTestData && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
         "button",
         {
           type: "button",
@@ -937,13 +1030,13 @@ function PreviewModal({
           children: generating ? "Generating\u2026" : "Generate sample values"
         }
       ),
-      genError && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "eb-preview-error", role: "alert", children: genError }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "eb-preview-vars", children: contract.map((v) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "eb-preview-var", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "eb-preview-var-name", children: [
+      genError && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "eb-preview-error", role: "alert", children: genError }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-preview-vars", children: contract.map((v) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "eb-preview-var", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "eb-preview-var-name", children: [
           `{{${v.name}}}`,
-          v.required ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "eb-preview-req", title: "required", children: " *" }) : null
+          v.required ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "eb-preview-req", title: "required", children: " *" }) : null
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
           "input",
           {
             className: "eb-input",
@@ -959,18 +1052,18 @@ function PreviewModal({
 }
 
 // src/EmailBuilder.tsx
-var import_jsx_runtime13 = require("react/jsx-runtime");
-var IconUndo = /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M9 7 4 12l5 5" }),
-  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M4 12h11a5 5 0 0 1 0 10h-1" })
+var import_jsx_runtime14 = require("react/jsx-runtime");
+var IconUndo = /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("path", { d: "M9 7 4 12l5 5" }),
+  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("path", { d: "M4 12h11a5 5 0 0 1 0 10h-1" })
 ] });
-var IconRedo = /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "m15 7 5 5-5 5" }),
-  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M20 12H9a5 5 0 0 0 0 10h1" })
+var IconRedo = /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("svg", { viewBox: "0 0 24 24", width: "16", height: "16", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("path", { d: "m15 7 5 5-5 5" }),
+  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("path", { d: "M20 12H9a5 5 0 0 0 0 10h1" })
 ] });
-var IconEye = /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
-  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" }),
-  /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("circle", { cx: "12", cy: "12", r: "3" })
+var IconEye = /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("svg", { viewBox: "0 0 24 24", width: "15", height: "15", fill: "none", stroke: "currentColor", strokeWidth: "1.8", "aria-hidden": "true", children: [
+  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("path", { d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" }),
+  /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("circle", { cx: "12", cy: "12", r: "3" })
 ] });
 function isEditingTarget(t) {
   const el = t;
@@ -978,29 +1071,29 @@ function isEditingTarget(t) {
   const tag = el.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
 }
-var EmailBuilder = (0, import_react8.forwardRef)(function EmailBuilder2({ initialDoc, onChange, disabled = false, className = "", settings = "panel", aside, renderPreview, onGenerateTestData, getPreviewHtml }, ref) {
+var EmailBuilder = (0, import_react9.forwardRef)(function EmailBuilder2({ initialDoc, onChange, disabled = false, className = "", settings = "panel", aside, renderPreview, onGenerateTestData, getPreviewHtml }, ref) {
   const b = useEmailBuilder(initialDoc);
-  const [showPreview, setShowPreview] = (0, import_react8.useState)(false);
-  const [showProblems, setShowProblems] = (0, import_react8.useState)(false);
-  const [settingsModalOpen, setSettingsModalOpen] = (0, import_react8.useState)(false);
-  const onChangeRef = (0, import_react8.useRef)(onChange);
+  const [showPreview, setShowPreview] = (0, import_react9.useState)(false);
+  const [showProblems, setShowProblems] = (0, import_react9.useState)(false);
+  const [settingsModalOpen, setSettingsModalOpen] = (0, import_react9.useState)(false);
+  const onChangeRef = (0, import_react9.useRef)(onChange);
   onChangeRef.current = onChange;
-  const mounted = (0, import_react8.useRef)(false);
-  (0, import_react8.useEffect)(() => {
+  const mounted = (0, import_react9.useRef)(false);
+  (0, import_react9.useEffect)(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
     }
     onChangeRef.current?.(b.doc);
   }, [b.doc]);
-  (0, import_react8.useImperativeHandle)(ref, () => ({
+  (0, import_react9.useImperativeHandle)(ref, () => ({
     getDoc: () => b.doc,
     setDoc: b.setDoc,
     undo: b.undo,
     redo: b.redo,
     getProblems: () => b.problems
   }), [b.doc, b.setDoc, b.undo, b.redo, b.problems]);
-  const usedNames = (0, import_react8.useMemo)(() => new Set((0, import_email_core7.extractVariables)(b.doc)), [b.doc]);
+  const usedNames = (0, import_react9.useMemo)(() => new Set((0, import_email_core9.extractVariables)(b.doc)), [b.doc]);
   const errorCount = b.problems.filter((p) => p.severity === "error").length;
   const warnCount = b.problems.length - errorCount;
   const selectBlock = (index) => {
@@ -1026,7 +1119,7 @@ var EmailBuilder = (0, import_react8.forwardRef)(function EmailBuilder2({ initia
       if (to >= 0 && to < b.doc.blocks.length) b.moveBlock(b.selectedIndex, to);
     }
   };
-  const settingsPanel = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+  const settingsPanel = /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
     SettingsPanel,
     {
       selectedBlock: b.selectedBlock,
@@ -1044,14 +1137,14 @@ var EmailBuilder = (0, import_react8.forwardRef)(function EmailBuilder2({ initia
     // Root captures keyboard shortcuts (undo/redo, delete, reorder) for its children;
     // it's a container, not itself an interactive control.
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-toolbar", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-toolbar-group", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canUndo, onClick: b.undo, title: "Undo (\u2318Z)", "aria-label": "Undo", children: IconUndo }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canRedo, onClick: b.redo, title: "Redo (\u21E7\u2318Z)", "aria-label": "Redo", children: IconRedo })
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: `eb-builder${disabled ? " eb-disabled" : ""} ${className}`.trim(), onKeyDown, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "eb-toolbar", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "eb-toolbar-group", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canUndo, onClick: b.undo, title: "Undo (\u2318Z)", "aria-label": "Undo", children: IconUndo }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "eb-icon-btn", disabled: disabled || !b.canRedo, onClick: b.redo, title: "Redo (\u21E7\u2318Z)", "aria-label": "Redo", children: IconRedo })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "eb-toolbar-spacer" }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "eb-toolbar-spacer" }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
           "button",
           {
             type: "button",
@@ -1061,39 +1154,40 @@ var EmailBuilder = (0, import_react8.forwardRef)(function EmailBuilder2({ initia
             children: errorCount ? `${errorCount} error${errorCount === 1 ? "" : "s"}` : warnCount ? `${warnCount} warning${warnCount === 1 ? "" : "s"}` : "No problems"
           }
         ),
-        renderPreview && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
+        renderPreview && /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("button", { type: "button", className: "eb-chip", onClick: () => setShowPreview(true), children: [
           IconEye,
           " Preview"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "eb-block-count", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("span", { className: "eb-block-count", children: [
           b.doc.blocks.length,
           " block",
           b.doc.blocks.length === 1 ? "" : "s"
         ] })
       ] }),
-      showProblems && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-problems-panel", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Problems, { problems: b.problems, onSelectBlock: selectBlock }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-header", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-header-main", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "eb-field eb-field-grow", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "eb-field-label", children: "Subject" }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("input", { className: "eb-input", value: b.doc.subject, disabled, placeholder: "Welcome, {{firstName}}!", onChange: (e) => b.setSubject(e.target.value) })
+      showProblems && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "eb-problems-panel", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Problems, { problems: b.problems, onSelectBlock: selectBlock }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "eb-header", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "eb-header-main", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("label", { className: "eb-field eb-field-grow", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "eb-field-label", children: "Subject" }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("input", { className: "eb-input", value: b.doc.subject, disabled, placeholder: "Welcome, {{firstName}}!", onChange: (e) => b.setSubject(e.target.value) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FontSelect, { value: b.doc.theme.fontFamily, disabled, onChange: (fontFamily) => b.setTheme({ fontFamily }) })
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(FontSelect, { value: b.doc.theme.fontFamily, disabled, onChange: (fontFamily) => b.setTheme({ fontFamily }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "eb-field", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "eb-field-label", children: "Preheader" }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("input", { className: "eb-input", value: b.doc.preheader ?? "", disabled, placeholder: "Inbox preview text (optional)", onChange: (e) => b.setPreheader(e.target.value) })
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("label", { className: "eb-field", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "eb-field-label", children: "Preheader" }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("input", { className: "eb-input", value: b.doc.preheader ?? "", disabled, placeholder: "Inbox preview text (optional)", onChange: (e) => b.setPreheader(e.target.value) })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "eb-col eb-col-palette", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-col-title", children: "Blocks" }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Palette, { onAdd: (type) => b.addBlock(type, b.selectedIndex === null ? void 0 : b.selectedIndex + 1), disabled })
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: `eb-grid eb-grid-3${aside && settings === "modal" ? " eb-has-aside" : ""}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "eb-col eb-col-palette", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "eb-col-title", children: "Blocks" }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Palette, { onAdd: (type) => b.addBlock(type, b.selectedIndex === null ? void 0 : b.selectedIndex + 1), disabled })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-col eb-col-canvas", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "eb-col eb-col-canvas", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
           Canvas,
           {
             blocks: b.doc.blocks,
+            theme: b.doc.theme,
             selectedIndex: b.selectedIndex,
             onSelect: (i) => i === null ? b.select(null) : selectBlock(i),
             onAdd: b.addBlock,
@@ -1103,10 +1197,10 @@ var EmailBuilder = (0, import_react8.forwardRef)(function EmailBuilder2({ initia
             disabled
           }
         ) }),
-        settings === "panel" ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-col eb-col-settings", children: settingsPanel }) : aside && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "eb-col eb-col-aside", children: aside })
+        settings === "panel" ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "eb-col eb-col-settings", children: settingsPanel }) : aside && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "eb-col eb-col-aside", children: aside })
       ] }),
-      settings === "modal" && settingsModalOpen && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Modal, { title: "Block settings", onClose: () => setSettingsModalOpen(false), children: settingsPanel }),
-      showPreview && renderPreview && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+      settings === "modal" && settingsModalOpen && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Modal, { title: "Block settings", onClose: () => setSettingsModalOpen(false), children: settingsPanel }),
+      showPreview && renderPreview && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
         PreviewModal,
         {
           doc: b.doc,
