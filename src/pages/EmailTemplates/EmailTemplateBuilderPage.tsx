@@ -33,6 +33,7 @@ import {
   type TemplateStatus,
 } from "../../lib/emailTemplatesApi";
 import { generateTestData } from "../../lib/emailAgentApi";
+import { uploadEmailAsset } from "../../lib/emailAssetsApi";
 import {
   emptyEmailDoc,
   mergePreview,
@@ -409,6 +410,12 @@ function Builder({ tenant, templateId, template }: {
           for (const [k, v] of Object.entries(raw)) if (v != null) out[k] = String(v);
           return out;
         }}
+        // Upload an image block's file to the public email-asset store (tenant + this
+        // template) and return its DURABLE public URL — loadable in a sent email.
+        onUploadImage={canEdit ? async (file) => {
+          const { url } = await uploadEmailAsset(tenant, templateId, file);
+          return url;
+        } : undefined}
         // The preview's "HTML" tab: compile the same artifact we publish to Postmark
         // (lazy react-email), then merge sample values when the operator is merging —
         // so the code shown is exactly what the recipient's client receives.
