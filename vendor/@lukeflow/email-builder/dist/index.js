@@ -607,6 +607,7 @@ function AlignField({ value, onChange, disabled }) {
 
 // src/ImageField.tsx
 import { useId as useId2, useRef as useRef2, useState as useState3 } from "react";
+import { isHttpUrl } from "@lukeflow/email-core";
 import { jsx as jsx7, jsxs as jsxs7 } from "react/jsx-runtime";
 var MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 function ImageField({ label, value, onChange, onUpload, disabled = false, placeholder }) {
@@ -653,9 +654,12 @@ function ImageField({ label, value, onChange, onUpload, disabled = false, placeh
           onChange: (e) => onChange(e.target.value)
         }
       ),
-      onUpload && /* @__PURE__ */ jsx7("button", { type: "button", className: "eb-upload-btn", disabled: disabled || uploading, onClick: () => fileRef.current?.click(), children: uploading ? "Uploading\u2026" : "Upload" })
+      onUpload && /* @__PURE__ */ jsx7("button", { type: "button", className: "eb-upload-btn", disabled: disabled || uploading, onClick: () => fileRef.current?.click(), children: uploading ? "Uploading\u2026" : isHttpUrl(value) ? "Replace" : "Upload" })
     ] }),
     onUpload && /* @__PURE__ */ jsx7("input", { ref: fileRef, type: "file", accept: "image/*", className: "eb-file-hidden", tabIndex: -1, "aria-hidden": "true", onChange: onFile }),
+    isHttpUrl(value) && /* @__PURE__ */ jsx7("img", { src: value, alt: "", className: "eb-image-thumb", onError: (e) => {
+      e.currentTarget.style.display = "none";
+    } }),
     error && /* @__PURE__ */ jsx7("span", { className: "eb-field-error", role: "alert", children: error })
   ] });
 }

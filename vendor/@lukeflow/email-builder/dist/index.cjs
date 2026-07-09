@@ -206,7 +206,7 @@ function useEmailBuilder(initialDoc = (0, import_email_core.emptyEmailDoc)()) {
 
 // src/EmailBuilder.tsx
 var import_react10 = require("react");
-var import_email_core9 = require("@lukeflow/email-core");
+var import_email_core10 = require("@lukeflow/email-core");
 
 // src/blocks.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -641,6 +641,7 @@ function AlignField({ value, onChange, disabled }) {
 
 // src/ImageField.tsx
 var import_react6 = require("react");
+var import_email_core6 = require("@lukeflow/email-core");
 var import_jsx_runtime7 = require("react/jsx-runtime");
 var MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 function ImageField({ label, value, onChange, onUpload, disabled = false, placeholder }) {
@@ -687,9 +688,12 @@ function ImageField({ label, value, onChange, onUpload, disabled = false, placeh
           onChange: (e) => onChange(e.target.value)
         }
       ),
-      onUpload && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: "eb-upload-btn", disabled: disabled || uploading, onClick: () => fileRef.current?.click(), children: uploading ? "Uploading\u2026" : "Upload" })
+      onUpload && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: "eb-upload-btn", disabled: disabled || uploading, onClick: () => fileRef.current?.click(), children: uploading ? "Uploading\u2026" : (0, import_email_core6.isHttpUrl)(value) ? "Replace" : "Upload" })
     ] }),
     onUpload && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { ref: fileRef, type: "file", accept: "image/*", className: "eb-file-hidden", tabIndex: -1, "aria-hidden": "true", onChange: onFile }),
+    (0, import_email_core6.isHttpUrl)(value) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("img", { src: value, alt: "", className: "eb-image-thumb", onError: (e) => {
+      e.currentTarget.style.display = "none";
+    } }),
     error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "eb-field-error", role: "alert", children: error })
   ] });
 }
@@ -748,19 +752,19 @@ function BlockEditor({ block, onUpdate, onUploadImage, disabled = false }) {
 }
 
 // src/ThemeEditor.tsx
-var import_email_core6 = require("@lukeflow/email-core");
+var import_email_core7 = require("@lukeflow/email-core");
 var import_jsx_runtime9 = require("react/jsx-runtime");
 function ThemeEditor({ theme, onChange, disabled = false }) {
   return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "eb-editor", children: [
     /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ColorField, { label: "Brand color", value: theme.brandColor, disabled, onChange: (brandColor) => onChange({ brandColor }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(NumberField, { label: "Content width (px)", value: theme.contentWidth, min: import_email_core6.MIN_CONTENT_WIDTH, max: import_email_core6.MAX_CONTENT_WIDTH, disabled, onChange: (w) => onChange({ contentWidth: w ?? theme.contentWidth }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(NumberField, { label: "Content width (px)", value: theme.contentWidth, min: import_email_core7.MIN_CONTENT_WIDTH, max: import_email_core7.MAX_CONTENT_WIDTH, disabled, onChange: (w) => onChange({ contentWidth: w ?? theme.contentWidth }) }),
     /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ColorField, { label: "Page background", value: theme.backgroundColor, disabled, onChange: (backgroundColor) => onChange({ backgroundColor }) }),
     /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ColorField, { label: "Card background", value: theme.contentBackground, disabled, onChange: (contentBackground) => onChange({ contentBackground }) })
   ] });
 }
 
 // src/VariablesEditor.tsx
-var import_email_core7 = require("@lukeflow/email-core");
+var import_email_core8 = require("@lukeflow/email-core");
 var import_jsx_runtime10 = require("react/jsx-runtime");
 function coerceDefault(raw, type) {
   if (raw === "") return void 0;
@@ -789,7 +793,7 @@ function VariablesEditor({ contract, usedNames, onChange, disabled = false }) {
           /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "eb-mono", children: `{{${v.name}}}` }),
           unused && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "eb-badge", title: "Declared but not used", children: "unused" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("select", { "aria-label": `Type for ${v.name}`, className: "eb-select", value: v.type, disabled, onChange: (e) => patch(v.name, { type: e.target.value }), children: import_email_core7.EMAIL_VAR_TYPES.map((t) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: t, children: t }, t)) }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("select", { "aria-label": `Type for ${v.name}`, className: "eb-select", value: v.type, disabled, onChange: (e) => patch(v.name, { type: e.target.value }), children: import_email_core8.EMAIL_VAR_TYPES.map((t) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: t, children: t }, t)) }),
         /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "eb-check", children: [
           /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "checkbox", checked: v.required, disabled, onChange: (e) => patch(v.name, { required: e.target.checked }) }),
           "required"
@@ -878,7 +882,7 @@ function Problems({ problems, onSelectBlock }) {
 
 // src/PreviewModal.tsx
 var import_react9 = require("react");
-var import_email_core8 = require("@lukeflow/email-core");
+var import_email_core9 = require("@lukeflow/email-core");
 
 // src/Modal.tsx
 var import_react8 = require("react");
@@ -950,7 +954,7 @@ function Modal({ title, onClose, children, wide = false }) {
 var import_jsx_runtime14 = require("react/jsx-runtime");
 function mergeText(text, values) {
   return text.replace(
-    import_email_core8.VAR_RE,
+    import_email_core9.VAR_RE,
     (whole, name) => Object.prototype.hasOwnProperty.call(values, name) && values[name] !== "" ? values[name] : whole
   );
 }
@@ -961,18 +965,18 @@ function PreviewModal({
   getPreviewHtml,
   onClose
 }) {
-  const contract = (0, import_react9.useMemo)(() => (0, import_email_core8.reconcileVariables)(doc), [doc]);
+  const contract = (0, import_react9.useMemo)(() => (0, import_email_core9.reconcileVariables)(doc), [doc]);
   const hasVars = contract.length > 0;
   const [view, setView] = (0, import_react9.useState)("preview");
   const [merge, setMerge] = (0, import_react9.useState)(true);
   const [values, setValues] = (0, import_react9.useState)(
-    () => (0, import_email_core8.previewValues)({ doc, variables: doc.variables ?? [] })
+    () => (0, import_email_core9.previewValues)({ doc, variables: doc.variables ?? [] })
   );
   const [generating, setGenerating] = (0, import_react9.useState)(false);
   const [genError, setGenError] = (0, import_react9.useState)(null);
   const namesKey = contract.map((v) => v.name).join("\0");
   (0, import_react9.useEffect)(() => {
-    const seed = (0, import_email_core8.previewValues)({ doc, variables: doc.variables ?? [] });
+    const seed = (0, import_email_core9.previewValues)({ doc, variables: doc.variables ?? [] });
     setValues((prev) => {
       const next = {};
       for (const v of contract) next[v.name] = prev[v.name] ?? seed[v.name] ?? "";
@@ -1149,7 +1153,7 @@ var EmailBuilder = (0, import_react10.forwardRef)(function EmailBuilder2({ initi
     redo: b.redo,
     getProblems: () => b.problems
   }), [b.doc, b.setDoc, b.undo, b.redo, b.problems]);
-  const usedNames = (0, import_react10.useMemo)(() => new Set((0, import_email_core9.extractVariables)(b.doc)), [b.doc]);
+  const usedNames = (0, import_react10.useMemo)(() => new Set((0, import_email_core10.extractVariables)(b.doc)), [b.doc]);
   const errorCount = b.problems.filter((p) => p.severity === "error").length;
   const warnCount = b.problems.length - errorCount;
   const selectBlock = (index) => {
