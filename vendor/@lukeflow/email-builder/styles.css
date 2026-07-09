@@ -83,23 +83,30 @@
 .eb-empty-hint { margin: 0; font-size: 12px; color: var(--eb-muted); }
 
 /* A block row: the rendered content, framed by a hover/selection outline with a
-   floating chrome (grip + type + actions). The rendered view is inert (clicks pass
-   to the row); the outline sits in the block's own margin so nothing shifts. */
-.eb-wrow { position: relative; border-radius: 4px; cursor: pointer; outline: 1px solid transparent; outline-offset: 3px; transition: outline-color 0.1s; }
-.eb-wrow:hover { outline-color: var(--eb-brand); }
+   floating chrome (grip + type + move/duplicate/delete). The rendered view is inert
+   (clicks pass to the row). A min-height + hover tint make every block — even a thin
+   divider/spacer — a clearly visible, grabbable band. */
+.eb-wrow {
+  position: relative; box-sizing: border-box; min-height: 36px; padding: 2px 0;
+  border-radius: 4px; cursor: pointer; outline: 1px solid transparent; outline-offset: 2px;
+  transition: outline-color 0.1s, background-color 0.1s;
+}
+.eb-wrow:hover { outline-color: var(--eb-brand); background: var(--eb-tint); }
 .eb-wrow:focus-visible { outline: 2px solid var(--eb-brand); }
-.eb-wrow-selected, .eb-wrow-selected:hover { outline: 2px solid var(--eb-brand); }
+.eb-wrow-selected, .eb-wrow-selected:hover { outline: 2px solid var(--eb-brand); background: var(--eb-tint); }
 .eb-wrow-view { pointer-events: none; }
+/* A persistent grab strip down the left edge (visible on hover/selection) so tall or
+   thin blocks are easy to grab + reorder without hunting for the handle. */
 .eb-wrow-chrome {
   position: absolute; top: -13px; right: 4px; z-index: 2;
-  display: none; align-items: center; gap: 3px; padding: 2px 4px;
-  background: var(--eb-bg); border: 1px solid var(--eb-border); border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  display: none; align-items: center; gap: 3px; padding: 3px 5px;
+  background: var(--eb-bg); border: 1px solid var(--eb-border); border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
 }
 .eb-wrow:hover .eb-wrow-chrome, .eb-wrow:focus-within .eb-wrow-chrome, .eb-wrow-selected .eb-wrow-chrome { display: flex; }
 .eb-wrow-grip { display: inline-flex; color: var(--eb-muted); cursor: grab; }
 .eb-wrow-type { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--eb-muted); padding: 0 2px; }
 
-.eb-drop-line { height: 2px; margin: 3px 0; background: var(--eb-brand); border-radius: 2px; }
+.eb-drop-line { height: 3px; margin: 4px 0; background: var(--eb-brand); border-radius: 2px; box-shadow: 0 0 0 1px var(--eb-bg); }
 
 /* ── Icon buttons ─────────────────────────────────────────────────────────── */
 .eb-icon-btn {

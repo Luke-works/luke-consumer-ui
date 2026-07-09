@@ -325,8 +325,14 @@ function BlockView({ block, theme }) {
     }
     case "divider":
       return /* @__PURE__ */ jsx3("hr", { style: { border: "none", borderTop: "1px solid #e5e7eb", margin: "20px 0" } });
-    case "spacer":
-      return /* @__PURE__ */ jsx3("div", { style: { height: `${block.size ?? 24}px` }, "aria-hidden": "true" });
+    case "spacer": {
+      const size = block.size ?? 24;
+      return /* @__PURE__ */ jsxs3("div", { style: { height: `${size}px`, minHeight: "20px", display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed #d1d5db", borderRadius: "4px", background: "#fafafa", color: "#9ca3af", fontFamily: font, fontSize: "11px" }, children: [
+        "Spacer \xB7 ",
+        size,
+        "px"
+      ] });
+    }
     case "footer":
       return /* @__PURE__ */ jsxs3("div", { style: { marginTop: "24px", fontFamily: font }, children: [
         /* @__PURE__ */ jsx3("hr", { style: { border: "none", borderTop: "1px solid #e5e7eb", margin: "0 0 12px" } }),
@@ -358,6 +364,8 @@ var IconGrip = /* @__PURE__ */ jsxs4("svg", { viewBox: "0 0 24 24", width: "14",
   /* @__PURE__ */ jsx4("circle", { cx: "9", cy: "18", r: "1.4" }),
   /* @__PURE__ */ jsx4("circle", { cx: "15", cy: "18", r: "1.4" })
 ] });
+var IconUp = /* @__PURE__ */ jsx4("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ jsx4("path", { d: "m6 15 6-6 6 6" }) });
+var IconDown = /* @__PURE__ */ jsx4("svg", { viewBox: "0 0 24 24", width: "14", height: "14", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ jsx4("path", { d: "m6 9 6 6 6-6" }) });
 function parsePayload(e) {
   const raw = e.dataTransfer.getData("text/plain");
   if (raw.startsWith("new:")) return { kind: "new", type: raw.slice(4) };
@@ -469,8 +477,16 @@ function Canvas({
                 },
                 children: [
                   /* @__PURE__ */ jsxs4("div", { className: "eb-wrow-chrome", children: [
-                    /* @__PURE__ */ jsx4("span", { className: "eb-wrow-grip", "aria-hidden": "true", children: IconGrip }),
+                    /* @__PURE__ */ jsx4("span", { className: "eb-wrow-grip", title: "Drag to move", "aria-hidden": "true", children: IconGrip }),
                     /* @__PURE__ */ jsx4("span", { className: "eb-wrow-type", children: block.type }),
+                    /* @__PURE__ */ jsx4("button", { type: "button", className: "eb-icon-btn", disabled: disabled || i === 0, title: "Move up", "aria-label": "Move block up", onClick: (e) => {
+                      e.stopPropagation();
+                      onMove(i, i - 1);
+                    }, children: IconUp }),
+                    /* @__PURE__ */ jsx4("button", { type: "button", className: "eb-icon-btn", disabled: disabled || i === blocks.length - 1, title: "Move down", "aria-label": "Move block down", onClick: (e) => {
+                      e.stopPropagation();
+                      onMove(i, i + 1);
+                    }, children: IconDown }),
                     /* @__PURE__ */ jsx4("button", { type: "button", className: "eb-icon-btn", disabled, title: "Duplicate", "aria-label": "Duplicate block", onClick: (e) => {
                       e.stopPropagation();
                       onDuplicate(i);
