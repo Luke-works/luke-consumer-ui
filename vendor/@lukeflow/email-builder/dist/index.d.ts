@@ -84,6 +84,11 @@ interface EmailBuilderProps {
      *  operator is merging sample data). Host-provided so the builder stays decoupled
      *  from the renderer. Omit to hide the HTML tab. */
     getPreviewHtml?: (doc: EmailDoc, values?: Record<string, string>) => Promise<string>;
+    /** Optional image uploader. When provided, an image block's Source field gains an
+     *  "Upload" button; the host stores the file (e.g. S3) and returns a DURABLE, PUBLIC
+     *  https URL (a mail client loads it with a bare <img src>, no auth). Builder stays
+     *  backend-agnostic. */
+    onUploadImage?: (file: File) => Promise<string>;
 }
 declare const EmailBuilder: react.ForwardRefExoticComponent<EmailBuilderProps & react.RefAttributes<EmailBuilderHandle>>;
 
@@ -116,13 +121,16 @@ interface SettingsPanelProps {
     onUpdateBlock: (patch: Record<string, unknown>) => void;
     onUpdateTheme: (patch: Partial<Theme>) => void;
     onUpdateVariables: (next: EmailVariable[]) => void;
+    onUploadImage?: (file: File) => Promise<string>;
     disabled?: boolean;
 }
-declare function SettingsPanel({ selectedBlock, selectedIndex, theme, contract, usedNames, onUpdateBlock, onUpdateTheme, onUpdateVariables, disabled, }: SettingsPanelProps): react.JSX.Element;
+declare function SettingsPanel({ selectedBlock, selectedIndex, theme, contract, usedNames, onUpdateBlock, onUpdateTheme, onUpdateVariables, onUploadImage, disabled, }: SettingsPanelProps): react.JSX.Element;
 
-declare function BlockEditor({ block, onUpdate, disabled }: {
+declare function BlockEditor({ block, onUpdate, onUploadImage, disabled }: {
     block: EmailBlock;
     onUpdate: (patch: Record<string, unknown>) => void;
+    /** Optional host uploader; when set, the image block gains an Upload button. */
+    onUploadImage?: (file: File) => Promise<string>;
     disabled?: boolean;
 }): react.JSX.Element;
 
