@@ -15,6 +15,8 @@ import { canRead, EMAIL } from "../../lib/capabilities";
 import { ApiError } from "../../lib/authApi";
 import * as emailApi from "../../lib/emailApi";
 import type { EmailServer, Verification } from "../../lib/emailApi";
+import * as boxesApi from "../../lib/emailBoxesApi";
+import type { EmailBox, EmailBoxDirection } from "../../lib/emailBoxesApi";
 
 type Phase = "loading" | "form" | "code" | "done" | "error";
 
@@ -193,7 +195,10 @@ export default function Email() {
       ) : phase === "error" ? (
         <LoadError message={error} onRetry={() => void load()} />
       ) : phase === "done" && server ? (
-        <Connected server={server} />
+        <div className="mx-auto max-w-xl space-y-6">
+          <Connected server={server} />
+          <EmailBoxes tenant={tenant} senderDomain={server.senderDomain} />
+        </div>
       ) : (
         <div className="mx-auto max-w-xl">
           <Stepper phase={phase} />
@@ -394,6 +399,214 @@ function Connected({ server }: { server: EmailServer }) {
             }
           />
         </dl>
+      </div>
+    </div>
+  );
+}
+
+/* ── email boxes (inbound / outbound addresses) ─────────────────────────── */
+
+function EmailBoxes({ tenant, senderDomain }: { tenant: string; senderDomain: string }) {
+  const [boxes, setBoxes] = useState<EmailBox[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [direction, setDirection] = useState<EmailBoxDirection>("OUTBOUND");
+  const [localPart, setLocalPart] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [streamType, setStreamType] = useState("Transactional");
+  const [workflowTrigger, setWorkflowTrigger] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    boxesApi
+      .listBoxes(tenant)
+      .then((b) => active && setBoxes(b))
+      .catch((e) => active && setError(messageOf(e)))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [tenant]);
+
+  async function register() {
+    if (!localPart.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await boxesApi.registerBox(tenant, {
+        direction,
+        localPart: localPart.trim(),
+        displayName: displayName.trim() || undefined,
+        streamType: direction === "OUTBOUND" ? streamType : undefined,
+        workflowTrigger: direction === "INBOUND" ? workflowTrigger : undefined,
+      });
+      setBoxes((prev) => [...prev, res.box]);
+      setLocalPart("");
+      setDisplayName("");
+      if (res.warning) setNotice(res.warning);
+      else if (res.inboundWebhookUrl)
+        setNotice(
+          `Inbound is wired. Point MX for ${senderDomain} at Postmark to receive at this address` +
+            (res.postmarkInboundAddress ? `, or forward to ${res.postmarkInboundAddress}.` : "."),
+        );
+    } catch (e) {
+      setError(messageOf(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string) {
+    const prev = boxes;
+    setBoxes((b) => b.filter((x) => x.id !== id));
+    try {
+      await boxesApi.deleteBox(tenant, id);
+    } catch (e) {
+      setBoxes(prev); // rollback
+      setError(messageOf(e));
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] sm:p-8">
+      <div className="flex items-start gap-4">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/10">
+          <MailIcon className="size-5" />
+        </span>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Email boxes</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Register addresses on <span className="font-mono">{senderDomain}</span> to send from
+            (outbound) or receive at (inbound). Inbound mail can trigger a workflow.
+          </p>
+        </div>
+      </div>
+
+      {/* Register */}
+      <div className="mt-6 space-y-4 rounded-xl border border-gray-100 p-4 dark:border-gray-800">
+        <div className="inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700">
+          {(["OUTBOUND", "INBOUND"] as EmailBoxDirection[]).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDirection(d)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                direction === d
+                  ? "bg-brand-500 text-white"
+                  : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+              }`}
+            >
+              {d === "OUTBOUND" ? "Outbound (send)" : "Inbound (receive)"}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="sm:flex-1">
+            <Label htmlFor="box-localpart">Address</Label>
+            <div className="flex items-center">
+              <Input
+                id="box-localpart"
+                value={localPart}
+                onChange={(e) => setLocalPart(e.target.value.replace(/@.*/, ""))}
+                placeholder={direction === "INBOUND" ? "support" : "sales"}
+              />
+              <span className="ml-2 whitespace-nowrap font-mono text-sm text-gray-400">
+                @{senderDomain}
+              </span>
+            </div>
+          </div>
+          <div className="sm:flex-1">
+            <Label htmlFor="box-name">Display name (optional)</Label>
+            <Input
+              id="box-name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={direction === "INBOUND" ? "Support inbox" : "Sales"}
+            />
+          </div>
+        </div>
+
+        {direction === "OUTBOUND" ? (
+          <div>
+            <Label htmlFor="box-stream">Stream type</Label>
+            <select
+              id="box-stream"
+              value={streamType}
+              onChange={(e) => setStreamType(e.target.value)}
+              className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 sm:w-56"
+            >
+              <option value="Transactional">Transactional</option>
+              <option value="Broadcasts">Broadcasts</option>
+            </select>
+          </div>
+        ) : (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={workflowTrigger}
+              onChange={(e) => setWorkflowTrigger(e.target.checked)}
+              className="size-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900"
+            />
+            Trigger a workflow when mail arrives
+          </label>
+        )}
+
+        <Button size="sm" disabled={!localPart.trim() || busy} onClick={register}>
+          {busy ? "Registering…" : `Register ${direction === "INBOUND" ? "inbound" : "outbound"} box`}
+        </Button>
+        {notice && <Banner tone="info">{notice}</Banner>}
+        {error && <Banner tone="error">{error}</Banner>}
+      </div>
+
+      {/* List */}
+      <div className="mt-6">
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading boxes…</p>
+        ) : boxes.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">No boxes yet.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {boxes.map((b) => (
+              <li key={b.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 font-mono text-sm text-gray-800 dark:text-gray-100">
+                    <span className="truncate">{b.address}</span>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        b.direction === "INBOUND"
+                          ? "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400"
+                          : "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                      }`}
+                    >
+                      {b.direction === "INBOUND" ? "Inbound" : "Outbound"}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-400">
+                    {b.direction === "INBOUND"
+                      ? b.workflowTrigger
+                        ? "Fires a workflow on receipt"
+                        : "Stored only (no workflow)"
+                      : b.postmarkStreamId
+                        ? `Stream: ${b.postmarkStreamId}`
+                        : "Outbound"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => remove(b.id)}
+                  className="shrink-0 text-xs text-gray-400 transition hover:text-error-500"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
