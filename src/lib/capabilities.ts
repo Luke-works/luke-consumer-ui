@@ -17,12 +17,21 @@ export const WORKFLOW = "WORKFLOW";
 
 /**
  * Capabilities hidden from the ENTIRE UI until we flip them on — regardless of any grant or
- * subscription. WORKFLOW is off by default; set VITE_WORKFLOW_ENABLED=true to reveal it. Hidden
- * capabilities report level "none" (gating nav + routes) AND are filtered out of the capability
- * catalog / request / my-access lists (see isCapabilityVisible).
+ * subscription. The MVP surface is Forms + Email + Access only; PHONE, SIGNATURES and WORKFLOW are
+ * post-MVP and stay hidden until their env flag is set. Each is revealed by opting in:
+ * VITE_PHONE_ENABLED / VITE_SIGNATURES_ENABLED / VITE_WORKFLOW_ENABLED = true. Hidden capabilities
+ * report level "none" (gating nav + routes) AND are filtered out of the capability catalog /
+ * request / my-access lists (see isCapabilityVisible). (DOCUMENTS has no UI capability, so nothing
+ * to gate there.)
  */
-const workflowEnabled = String(import.meta.env.VITE_WORKFLOW_ENABLED).toLowerCase() === "true";
-export const HIDDEN_CAPABILITIES: ReadonlySet<string> = new Set<string>(workflowEnabled ? [] : [WORKFLOW]);
+const flagOn = (v: unknown) => String(v).toLowerCase() === "true";
+export const HIDDEN_CAPABILITIES: ReadonlySet<string> = new Set<string>(
+  [
+    flagOn(import.meta.env.VITE_PHONE_ENABLED) ? null : PHONE,
+    flagOn(import.meta.env.VITE_SIGNATURES_ENABLED) ? null : SIGNATURES,
+    flagOn(import.meta.env.VITE_WORKFLOW_ENABLED) ? null : WORKFLOW,
+  ].filter((c): c is string => c !== null),
+);
 
 /** False when a capability is force-hidden (not ready) — filter catalog/access lists by this. */
 export function isCapabilityVisible(code: string): boolean {

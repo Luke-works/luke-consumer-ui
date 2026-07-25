@@ -23,8 +23,14 @@ export default defineConfig({
     url: `http://localhost:${PORT}/signin`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    // Reveal the Workflow capability so its screens are reachable in the E2E suite
-    // (it's hidden by default in prod until launch).
-    env: { VITE_AUTH_API_URL: "http://localhost:9999", VITE_WORKFLOW_ENABLED: "true" },
+    // Reveal the post-MVP capabilities so their screens stay reachable in the E2E suite.
+    // They're hidden by default in the shipped UI (MVP = Forms + Email + Access) but the
+    // pages still exist and must keep full route coverage here.
+    env: {
+      VITE_AUTH_API_URL: "http://localhost:9999",
+      VITE_PHONE_ENABLED: "true",
+      VITE_SIGNATURES_ENABLED: "true",
+      VITE_WORKFLOW_ENABLED: "true",
+    },
   },
 });
