@@ -8,21 +8,24 @@ const session = (caps: Record<string, string>) =>
 describe("capabilities gating (#25)", () => {
   it("reads the effective level, defaulting to none", () => {
     expect(capabilityLevel(session({ FORMS: "read-write" }), FORMS)).toBe("read-write");
+    expect(capabilityLevel(session({ FORMS: "contributor" }), FORMS)).toBe("contributor");
     expect(capabilityLevel(session({ FORMS: "read" }), FORMS)).toBe("read");
     expect(capabilityLevel(session({}), FORMS)).toBe("none");
     expect(capabilityLevel(null, FORMS)).toBe("none");
     expect(capabilityLevel(session({ FORMS: "bogus" }), FORMS)).toBe("none");
   });
 
-  it("canRead is true for read or read-write", () => {
+  it("canRead is true for read, contributor, or read-write", () => {
     expect(canRead(session({ FORMS: "read" }), FORMS)).toBe(true);
+    expect(canRead(session({ FORMS: "contributor" }), FORMS)).toBe(true);
     expect(canRead(session({ FORMS: "read-write" }), FORMS)).toBe(true);
     expect(canRead(session({}), FORMS)).toBe(false);
     expect(canRead(null, FORMS)).toBe(false);
   });
 
-  it("canWrite requires read-write (read alone is not enough)", () => {
+  it("canWrite is true for contributor and read-write (read alone is not enough)", () => {
     expect(canWrite(session({ FORMS: "read-write" }), FORMS)).toBe(true);
+    expect(canWrite(session({ FORMS: "contributor" }), FORMS)).toBe(true); // contributor can edit
     expect(canWrite(session({ FORMS: "read" }), FORMS)).toBe(false);
     expect(canWrite(null, FORMS)).toBe(false);
   });

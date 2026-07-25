@@ -214,7 +214,7 @@ export function createOrganization(input: {
 // the caller to be a tenant-admin. Invite/add-member hit luke-auth directly
 // (they touch WorkOS); the rest are proxied through to core-engine's /api/org/*.
 
-export type RoleLevel = "none" | "read" | "read-write";
+export type RoleLevel = "none" | "read" | "contributor" | "read-write";
 
 /** Roles in a member row: tenantAdmin (owner) + the three assignable dimensions. */
 export type MemberRoles = {

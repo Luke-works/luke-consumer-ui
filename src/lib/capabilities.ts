@@ -4,7 +4,9 @@
 // Levels and tiers mirror the capability-engine (read | read-write; FREE/STANDARD/PREMIUM).
 import type { SessionView } from "./authApi";
 
-export type CapabilityLevel = "none" | "read" | "read-write";
+// `contributor` (core-engine #104) sits between read and read-write: create/edit ordinary content,
+// but NOT the privileged actions (publish, sign-off, delete/purge) — the engine enforces that split.
+export type CapabilityLevel = "none" | "read" | "contributor" | "read-write";
 
 /** Well-known capability codes (the map keys the gateway emits, uppercase). */
 export const FORMS = "FORMS";
@@ -34,7 +36,7 @@ export function capabilityLevel(
 ): CapabilityLevel {
   if (HIDDEN_CAPABILITIES.has(code)) return "none"; // gate nav + routes for not-yet-ready features
   const v = session?.capabilities?.[code];
-  return v === "read" || v === "read-write" ? v : "none";
+  return v === "read" || v === "contributor" || v === "read-write" ? v : "none";
 }
 
 /** True when the caller can at least view the capability's resource. */
@@ -42,9 +44,12 @@ export function canRead(session: SessionView | null | undefined, code: string): 
   return capabilityLevel(session, code) !== "none";
 }
 
-/** True when the caller can create/edit within the capability's resource. */
+/** True when the caller can create/edit within the capability's resource. Both `contributor` and
+ *  `read-write` can edit; the privileged actions (publish/delete) are gated server-side, so a
+ *  contributor may see those controls but the engine rejects them (#104). */
 export function canWrite(session: SessionView | null | undefined, code: string): boolean {
-  return capabilityLevel(session, code) === "read-write";
+  const lvl = capabilityLevel(session, code);
+  return lvl === "read-write" || lvl === "contributor";
 }
 
 /** Pricing/availability tiers as surfaced by the capability catalog. */
@@ -65,5 +70,6 @@ export const TIER_BADGE: Record<string, string> = {
 export const LEVEL_LABEL: Record<CapabilityLevel, string> = {
   none: "No access",
   read: "Read-only",
+  contributor: "Contributor",
   "read-write": "Read & write",
 };

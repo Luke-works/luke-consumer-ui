@@ -128,6 +128,7 @@ function LevelSelect({
     >
       <option value="none">None</option>
       <option value="read">Read</option>
+      <option value="contributor">Contributor — edit, no publish/delete</option>
       <option value="read-write">Read &amp; write</option>
     </select>
   );
@@ -154,6 +155,7 @@ function TierBadge({ tier }: { tier?: string }) {
 const LEVEL_BADGE: Record<CapabilityLevel, string> = {
   none: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
   read: "bg-blue-50 text-blue-600 dark:bg-blue-500/15",
+  contributor: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
   "read-write": "bg-success-50 text-success-600 dark:bg-success-500/15",
 };
 
@@ -161,6 +163,7 @@ const LEVEL_BADGE: Record<CapabilityLevel, string> = {
 
 const REQUEST_LEVELS: { value: AccessRequestLevel; label: string }[] = [
   { value: "read", label: "Read-only" },
+  { value: "contributor", label: "Contributor — edit, no publish/delete" },
   { value: "read-write", label: "Read & write" },
 ];
 
@@ -235,7 +238,7 @@ function ManageMyAccessSection({
   // The caller's effective level for a capability ("none" when not granted).
   const myLevel = (c: string): CapabilityLevel => {
     const raw = capabilities[c];
-    return raw === "read" || raw === "read-write" ? raw : "none";
+    return raw === "read" || raw === "contributor" || raw === "read-write" ? raw : "none";
   };
 
   const hasPending = useCallback(

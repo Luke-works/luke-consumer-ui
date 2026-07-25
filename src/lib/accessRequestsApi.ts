@@ -12,7 +12,7 @@ const MINE = "/api/my-access-requests";
 const ORG = "/api/org/access-requests";
 const seg = (s: string) => encodeURIComponent(s);
 
-export type AccessRequestLevel = "read" | "read-write";
+export type AccessRequestLevel = "read" | "contributor" | "read-write";
 export type AccessRequestStatus = "PENDING" | "APPROVED" | "DENIED" | "CANCELLED";
 
 /** A capability access request (requester-submitted, owner-decided). */
