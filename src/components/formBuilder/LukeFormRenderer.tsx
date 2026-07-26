@@ -8,7 +8,7 @@
  * builder cutover.
  */
 import { FormRenderer as LukeRenderer } from "@lukeflow/form-react";
-import type { FormData, FormSchema } from "@lukeflow/form-core";
+import type { FormData, FormSchema, JsEvaluator } from "@lukeflow/form-core";
 import "@lukeflow/form-react/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
 
@@ -32,6 +32,7 @@ export default function LukeFormRenderer({
   readOnly = false,
   submitting = false,
   allowJs = false,
+  jsEvaluator,
 }: {
   schema: string;
   initialValues?: Record<string, unknown>;
@@ -53,6 +54,12 @@ export default function LukeFormRenderer({
    * unaffected either way.
    */
   allowJs?: boolean;
+  /**
+   * A SANDBOXED author-JS evaluator (a QuickJS isolate — see {@link import("../../lib/formJsSandbox")}).
+   * Pass this together with `allowJs` on a filler-facing surface so author JS runs WITHOUT DOM / host
+   * access instead of via the built-in `new Function`. Omit on author-self-trust surfaces.
+   */
+  jsEvaluator?: JsEvaluator;
 }) {
   void submitting; // the package manages submit state internally; accepted for prop-compat
   return (
@@ -66,6 +73,7 @@ export default function LukeFormRenderer({
       playback={playback}
       readOnly={readOnly}
       allowJs={allowJs}
+      jsEvaluator={jsEvaluator}
     />
   );
 }

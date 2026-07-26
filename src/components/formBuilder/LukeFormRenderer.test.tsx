@@ -35,4 +35,10 @@ describe("LukeFormRenderer — author-JS is safe by default", () => {
     render(<LukeFormRenderer schema={SCHEMA} allowJs={false} />);
     expect(captured.allowJs).toBe(false);
   });
+
+  it("forwards a sandboxed jsEvaluator to the underlying renderer", () => {
+    const sandbox = () => ({ value: 1, show: true, valid: true, ok: true });
+    render(<LukeFormRenderer schema={SCHEMA} allowJs jsEvaluator={sandbox as never} />);
+    expect(captured.jsEvaluator).toBe(sandbox);
+  });
 });

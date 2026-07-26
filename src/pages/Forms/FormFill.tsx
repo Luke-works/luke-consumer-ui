@@ -5,6 +5,7 @@ import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { MinionProvider } from "@lukeflow/form-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
+import { useFormJsEvaluator } from "../../lib/formJsSandbox";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { createAuthedMinionClient } from "../../lib/minionsApi";
 import AttachmentsButton from "../../components/documents/AttachmentsButton";
@@ -29,6 +30,9 @@ export default function FormFill() {
   // Secure minion client (authed, tenant-scoped) — powers server-side field features like address
   // autocomplete without exposing any provider key to the browser.
   const minionClient = useMemo(() => (tenant ? createAuthedMinionClient(tenant) : null), [tenant]);
+  // Sandboxed author-JS evaluator (QuickJS isolate). Until it loads, author JS stays OFF (never the
+  // unsandboxed new Function); once ready, calc/conditional/validation JS runs inside the isolate.
+  const jsEvaluator = useFormJsEvaluator();
 
   const [view, setView] = useState<InstanceView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,7 +168,8 @@ export default function FormFill() {
                     onChange={handleChange}
                     onSubmit={handleSubmit}
                     submitting={submitting}
-                    allowJs
+                    allowJs={Boolean(jsEvaluator)}
+                    jsEvaluator={jsEvaluator}
                   />
                 </MinionProvider>
               ) : (
@@ -174,7 +179,8 @@ export default function FormFill() {
                   onChange={handleChange}
                   onSubmit={handleSubmit}
                   submitting={submitting}
-                  allowJs
+                  allowJs={Boolean(jsEvaluator)}
+                  jsEvaluator={jsEvaluator}
                 />
               )}
             </>

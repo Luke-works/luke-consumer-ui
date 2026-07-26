@@ -24,6 +24,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",
     "@lukeflow/email-builder": "file:./vendor/@lukeflow/email-builder",
     "@lukeflow/email-core": "file:./vendor/@lukeflow/email-core",
     "@lukeflow/email-react": "file:./vendor/@lukeflow/email-react",
@@ -45,6 +46,7 @@
     "dompurify": "^3.4.10",
     "lucide-react": "^1.17.0",
     "pdfjs-dist": "^5.4.296",
+    "quickjs-emscripten": "^0.32.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-dropzone": "^14.3.5",

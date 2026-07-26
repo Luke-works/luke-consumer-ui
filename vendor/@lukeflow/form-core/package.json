@@ -16,6 +16,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./quickjs": {
+      "types": "./dist/quickjs.d.ts",
+      "import": "./dist/quickjs.js",
+      "require": "./dist/quickjs.cjs"
     }
   }
 }
