@@ -61,6 +61,37 @@ export function getAccessToken(): string | null {
 
 const url = (path: string) => `${BASE}${path}`;
 
+/** Default network deadline for gateway/core calls. The agent clients already bound their calls;
+ *  the auth/core client had none, so a hung gateway (cold Render dyno, dropped socket) left spinners
+ *  hanging forever. 30s is well above any real gateway round-trip (long AI calls use the agent clients). */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/** fetch() with a default deadline: aborts after `ms`, OR when the caller's own signal aborts
+ *  (whichever first). Mirrors the per-attempt timeout the agent clients use. */
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  ms = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const ctl = new AbortController();
+  const caller = init.signal ?? undefined;
+  const timer = setTimeout(
+    () => ctl.abort(new DOMException("Request timed out", "TimeoutError")),
+    ms,
+  );
+  const onAbort = () => ctl.abort(caller?.reason);
+  if (caller) {
+    if (caller.aborted) ctl.abort(caller.reason);
+    else caller.addEventListener("abort", onAbort, { once: true });
+  }
+  try {
+    return await fetch(input, { ...init, signal: ctl.signal });
+  } finally {
+    clearTimeout(timer);
+    caller?.removeEventListener("abort", onAbort);
+  }
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
@@ -85,7 +116,7 @@ export async function register(input: {
   firstName?: string;
   lastName?: string;
 }): Promise<{ userId: string; user: WorkosUser; verifyRequired: boolean }> {
-  const res = await fetch(url("/auth/register"), {
+  const res = await fetchWithTimeout(url("/auth/register"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -95,7 +126,7 @@ export async function register(input: {
 }
 
 export async function login(email: string, password: string): Promise<AuthResult> {
-  const res = await fetch(url("/auth/login"), {
+  const res = await fetchWithTimeout(url("/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -106,9 +137,23 @@ export async function login(email: string, password: string): Promise<AuthResult
   return data;
 }
 
-/** Restore a session from the refresh cookie. Returns null when signed out. */
+let refreshInFlight: Promise<AuthResult | null> | null = null;
+
+/** Restore a session from the refresh cookie. Returns null when signed out.
+ *
+ *  SINGLE-FLIGHT: data-heavy pages fire many authed() calls at once (users/groups/grants/…), so on
+ *  token expiry each 401 would trigger its own POST /auth/refresh, rotating the refresh cookie N
+ *  times in parallel — a classic refresh race that can invalidate sibling requests. All concurrent
+ *  callers now share ONE in-flight refresh; the promise clears when it settles. */
 export async function refresh(): Promise<AuthResult | null> {
-  const res = await fetch(url("/auth/refresh"), {
+  refreshInFlight ??= doRefresh().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function doRefresh(): Promise<AuthResult | null> {
+  const res = await fetchWithTimeout(url("/auth/refresh"), {
     method: "POST",
     credentials: "include",
   });
@@ -123,7 +168,7 @@ export async function refresh(): Promise<AuthResult | null> {
 
 export async function logout(): Promise<void> {
   try {
-    await fetch(url("/auth/logout"), {
+    await fetchWithTimeout(url("/auth/logout"), {
       method: "POST",
       credentials: "include",
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -142,7 +187,7 @@ export function socialUrl(provider: SocialProvider): string {
 export async function authed<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const headers = new Headers(init.headers);
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-  const res = await fetch(url(path), { ...init, headers, credentials: "include" });
+  const res = await fetchWithTimeout(url(path), { ...init, headers, credentials: "include" });
   if (res.status === 401 && retry) {
     const r = await refresh();
     if (r) return authed<T>(path, init, false);

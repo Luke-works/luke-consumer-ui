@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { authed, tenantInit, setAccessToken } from "./authApi";
+import { authed, tenantInit, setAccessToken, getAccessToken } from "./authApi";
 
 function res(status: number, body?: unknown) {
   return {
@@ -47,6 +47,25 @@ describe("authApi (#25)", () => {
     expect(out).toEqual({ data: "ok" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect((fetchMock.mock.calls[2][1].headers as Headers).get("Authorization")).toBe("Bearer fresh");
+  });
+
+  it("single-flights refresh: many parallel 401s trigger exactly ONE /auth/refresh", async () => {
+    setAccessToken("stale");
+    let refreshCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((input: string) => {
+      if (input.includes("/auth/refresh")) {
+        refreshCalls++;
+        return Promise.resolve(res(200, { accessToken: "fresh", user: {}, session: {} }));
+      }
+      // Data endpoints 401 while the token is stale, 200 once refresh has run.
+      return Promise.resolve(getAccessToken() === "fresh" ? res(200, { ok: true }) : res(401));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // A data-heavy page fires many authed() calls at once; on expiry they must not stampede refresh.
+    await Promise.all([authed("/a"), authed("/b"), authed("/c"), authed("/d")]);
+
+    expect(refreshCalls).toBe(1);
   });
 
   it("does NOT retry forever — a 401 that survives refresh rejects", async () => {
