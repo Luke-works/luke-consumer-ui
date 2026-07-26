@@ -377,10 +377,10 @@ export default function FormTestPanel({
 
         {/* Renderers play the typing animation then validate. Inactive tab is hidden but mounted. */}
         <div className={testTab === "positive" ? "" : "hidden"}>
-          <FormRenderer key={`pos-${testNonce}`} schema={testSchema} playback={{ steps: posSteps, signal: posPlay }} onResult={setPosResult} />
+          <FormRenderer key={`pos-${testNonce}`} schema={testSchema} playback={{ steps: posSteps, signal: posPlay }} onResult={setPosResult} allowJs />
         </div>
         <div className={testTab === "negative" ? "" : "hidden"}>
-          <FormRenderer key={`neg-${testNonce}`} schema={testSchema} playback={{ steps: negSteps, signal: negPlay }} onResult={setNegResult} />
+          <FormRenderer key={`neg-${testNonce}`} schema={testSchema} playback={{ steps: negSteps, signal: negPlay }} onResult={setNegResult} allowJs />
         </div>
 
         {aiTestError && (

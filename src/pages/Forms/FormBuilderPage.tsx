@@ -766,7 +766,7 @@ export default function FormBuilderPage() {
           ) : (
             <>
               <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Fill it out to test conditions, calculated values and validation.</p>
-              <FormRenderer schema={previewSchema} onSubmit={() => setPreviewDone(true)} />
+              <FormRenderer schema={previewSchema} onSubmit={() => setPreviewDone(true)} allowJs />
             </>
           )}
         </div>

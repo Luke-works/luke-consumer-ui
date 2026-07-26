@@ -546,7 +546,7 @@ export default function FormsList() {
           <h2 className="mb-6 text-lg font-semibold text-gray-800 dark:text-white/90">Preview</h2>
           {previewSchema ? (
             <Suspense fallback={<p className="py-6 text-center text-sm text-gray-400">Loading…</p>}>
-              <FormRenderer schema={previewSchema} />
+              <FormRenderer schema={previewSchema} allowJs />
             </Suspense>
           ) : null}
         </div>

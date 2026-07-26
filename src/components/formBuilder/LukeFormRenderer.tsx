@@ -31,7 +31,7 @@ export default function LukeFormRenderer({
   playback,
   readOnly = false,
   submitting = false,
-  allowJs = true,
+  allowJs = false,
 }: {
   schema: string;
   initialValues?: Record<string, unknown>;
@@ -44,11 +44,13 @@ export default function LukeFormRenderer({
   submitting?: boolean;
   /**
    * Whether the engine may execute author-authored JS field logic (customConditionalJs,
-   * calculateValueJs, …) via `new Function`. Defaults to `true` for authenticated in-app
-   * surfaces (the author is trusted within their own tenant). **Public / anonymous fill
-   * surfaces MUST pass `allowJs={false}`** — there the author is untrusted relative to the
-   * filler and their JS would otherwise run in every (anonymous) filler's browser. The safe
-   * expression engine (non-JS formulas) is unaffected either way.
+   * calculateValueJs, …) via `new Function`. **Defaults to `false` — SAFE BY DEFAULT.** Author JS
+   * runs in the viewer's/filler's browser, so a read-only response view (staff/tenant reading a
+   * submission) and any surface where the author is untrusted relative to the viewer must NOT run
+   * it — leaving this unset now closes that hole automatically. Only an interactive FILL surface,
+   * where the author's calc/conditional logic IS the feature, opts in (and ideally via a sandboxed
+   * `jsEvaluator`, not raw `new Function`). The safe expression engine (non-JS formulas) is
+   * unaffected either way.
    */
   allowJs?: boolean;
 }) {

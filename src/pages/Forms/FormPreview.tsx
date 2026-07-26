@@ -75,7 +75,7 @@ export default function FormPreview() {
                   </div>
                 </>
               ) : (
-                <FormRenderer schema={payload.schema} onSubmit={() => setDone(true)} />
+                <FormRenderer schema={payload.schema} onSubmit={() => setDone(true)} allowJs />
               )}
             </>
           )}

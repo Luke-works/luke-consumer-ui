@@ -164,6 +164,7 @@ export default function FormFill() {
                     onChange={handleChange}
                     onSubmit={handleSubmit}
                     submitting={submitting}
+                    allowJs
                   />
                 </MinionProvider>
               ) : (
@@ -173,6 +174,7 @@ export default function FormFill() {
                   onChange={handleChange}
                   onSubmit={handleSubmit}
                   submitting={submitting}
+                  allowJs
                 />
               )}
             </>
