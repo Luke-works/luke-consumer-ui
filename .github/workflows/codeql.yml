@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           # First-party source only — skip the vendored @lukeflow dist and build output.
@@ -33,4 +33,4 @@ jobs:
               - dist-render
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
