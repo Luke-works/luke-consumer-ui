@@ -39,3 +39,11 @@ jobs:
         # Gating, zero-tolerance: `npm run lint` is `eslint . --max-warnings 0`, so any
         # error OR warning fails the build.
         run: npm run lint --if-present
+
+      - name: Accessibility lint (informational)
+        # D14: eslint-plugin-jsx-a11y over the app. NON-gating for now — there's an existing
+        # baseline of ~38 findings (a mix of live MVP pages and post-MVP Phone/Signatures/Workflow
+        # surfaces, some UX-opinionated). Surfaced here so a11y regressions are visible in CI; fold
+        # `eslint.config.a11y.js`'s rules into the gating `lint` once the baseline is cleared.
+        run: npm run lint:a11y --if-present
+        continue-on-error: true
