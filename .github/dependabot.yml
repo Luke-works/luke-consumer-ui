@@ -1,0 +1,32 @@
+# Automated dependency update PRs. Grouped to keep noise down; security updates
+# come through regardless of the schedule.
+#
+# NOTE: Dependabot reads this config from the DEFAULT branch (main), but the app
+# deploys from develop — so every block sets target-branch: develop, or the PRs
+# would open against main and never ship to dev/qa (deploy-branch drift).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # One PR for routine minor/patch bumps across the tree.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # Majors land as individual PRs (they need a migration pass).
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci
