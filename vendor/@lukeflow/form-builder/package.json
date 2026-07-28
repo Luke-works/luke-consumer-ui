@@ -4,18 +4,30 @@
   "description": "Headless-engine-backed React form builder for @lukeflow/form-core.",
   "license": "UNLICENSED",
   "type": "module",
-  "sideEffects": ["*.css"],
-  "files": ["dist", "styles.css"],
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist",
+    "styles.css"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
     "./styles.css": "./styles.css"
   },
   "dependencies": {
     "@lukeflow/form-core": "0.1.0-alpha.0",
     "@lukeflow/form-react": "0.1.0-alpha.0"
   },
-  "peerDependencies": { "react": ">=18", "react-dom": ">=18" }
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
 }

@@ -22,5 +22,8 @@
       "import": "./dist/quickjs.js",
       "require": "./dist/quickjs.cjs"
     }
+  },
+  "peerDependencies": {
+    "quickjs-emscripten": "^0.32.0"
   }
 }

@@ -1,0 +1,49 @@
+{
+  "vendoredAt": "2026-07-28T22:50:34.166Z",
+  "packages": {
+    "form-core": {
+      "version": "0.1.0-alpha.0",
+      "files": {
+        "dist/index.cjs": "6d51d3dcfb62da4a7f0d72ea336f0c8a852912b3fcecfc37a1bfdbb1ead54e55",
+        "dist/index.d.cts": "6e912805797bdbd53e92a66b7349c9263ec02542a02b3906285b8f6e80a0ca94",
+        "dist/index.d.ts": "6e912805797bdbd53e92a66b7349c9263ec02542a02b3906285b8f6e80a0ca94",
+        "dist/index.js": "6bc1a11f4f74eea73e733c61e2c215df1bf64576b67821443b3fc2f0a106b887",
+        "dist/quickjs.cjs": "690881833d0bacccc4f61c68ce34caa19a700264b61e730495dfce1b7b21ac0d",
+        "dist/quickjs.d.cts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
+        "dist/quickjs.d.ts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
+        "dist/quickjs.js": "a2f05f9ff0fab67863aa9ac26aa2edf5eb89dc023a86b718c7508d8fad720091"
+      }
+    },
+    "form-react": {
+      "version": "0.1.0-alpha.0",
+      "files": {
+        "dist/index.cjs": "0069b25d7fb165d1a1b5afcdc51b03b08deaa016ad1024f8238be69f493dcef2",
+        "dist/index.d.cts": "1b3a1eaf1cabc86eb25f6e862eb56537c4c59e120c23864f24980c3bfa7910d7",
+        "dist/index.d.ts": "1b3a1eaf1cabc86eb25f6e862eb56537c4c59e120c23864f24980c3bfa7910d7",
+        "dist/index.js": "b36261dcab3b78dd48d031ce734e2e7e2dfb23a7e1f00d63cd2162d779adb1a9",
+        "styles.css": "8aa9b192fcde447f7b48e3849e00e5b606d4ac05e633a2d48b4597024ffb219d"
+      }
+    },
+    "form-builder": {
+      "version": "0.1.0-alpha.0",
+      "files": {
+        "dist/index.cjs": "96b824b076cb45eb82cb7b9c091b3ee358d2b720affc01fd4770ee6f70b146b9",
+        "dist/index.d.cts": "ce9df5cf8d07746260abdda133bfbdc2daa4e645ff6096fe8bfc899cb5ec8677",
+        "dist/index.d.ts": "ce9df5cf8d07746260abdda133bfbdc2daa4e645ff6096fe8bfc899cb5ec8677",
+        "dist/index.js": "80c78832a810e496e93f5a9835b77f8d2c7b67fb597dca0964971ecd783f1ab2",
+        "styles.css": "dfe3f8939498186b8f854a2d1208cc08fbd918fbec7a0c46c2c4b5da7b1a0769"
+      }
+    },
+    "form-embed": {
+      "version": "0.1.0-alpha.0",
+      "files": {
+        "dist/embed.global.js": "7beb5075fb4bf35d2e1111f62a7650d22cbc5b688e52459fe1d5e64ca396601e",
+        "dist/index.cjs": "0bccf3b5d657d5bb4f90ca3b2efc63ccda407496bced130b3d08202263483a5a",
+        "dist/index.d.cts": "bb168619935fa8ef7d7685f380d53da3e4d4b8e4d55219d08c4422b33411a381",
+        "dist/index.d.ts": "bb168619935fa8ef7d7685f380d53da3e4d4b8e4d55219d08c4422b33411a381",
+        "dist/index.js": "c5daa91ab5295f4e93111734b726f2c6701e33e80453f41ce2d4dcd276c7aeec"
+      }
+    }
+  },
+  "globalBundle": "7beb5075fb4bf35d2e1111f62a7650d22cbc5b688e52459fe1d5e64ca396601e"
+}

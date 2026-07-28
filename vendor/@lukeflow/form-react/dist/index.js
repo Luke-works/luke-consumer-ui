@@ -944,7 +944,7 @@ function FileField({
     /* @__PURE__ */ jsx8("input", { ...a11y, type: "file", multiple, disabled: disabled || uploading, onChange: (e) => handle(e.target.files) }),
     uploading && /* @__PURE__ */ jsx8("span", { className: "lf-file-uploading", children: "Uploading\u2026" }),
     error && /* @__PURE__ */ jsx8("p", { role: "alert", className: "lf-error", children: error }),
-    files.length > 0 && /* @__PURE__ */ jsx8("ul", { className: "lf-file-list", children: files.map((f, i) => /* @__PURE__ */ jsx8("li", { children: f.url ? /* @__PURE__ */ jsx8("a", { href: f.url, target: "_blank", rel: "noreferrer", children: f.name ?? "file" }) : f.name ?? "file" }, i)) })
+    files.length > 0 && /* @__PURE__ */ jsx8("ul", { className: "lf-file-list", children: files.map((f, i) => /* @__PURE__ */ jsx8("li", { children: typeof f.url === "string" && /^(https?:|mailto:)/i.test(f.url.trim()) ? /* @__PURE__ */ jsx8("a", { href: f.url, target: "_blank", rel: "noreferrer", children: f.name ?? "file" }) : f.name ?? "file" }, i)) })
   ] });
 }
 

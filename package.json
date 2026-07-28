@@ -16,6 +16,8 @@
     "build:embed": "vite build --config vite.embed.config.ts",
     "build:respond": "vite build --config vite.respond.config.ts",
     "build:render": "vite build --config vite.render.config.ts",
+    "vendor:forms": "node scripts/vendor-forms.mjs",
+    "vendor:check": "node scripts/vendor-forms.mjs --check",
     "vendor:respond": "npm run build:respond && node scripts/vendor-bundle.mjs respond",
     "vendor:embed": "npm run build:embed && node scripts/vendor-bundle.mjs embed",
     "lint": "eslint . --max-warnings 0",

@@ -26,6 +26,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check vendored @lukeflow/form-* tree
+        # The form packages are built in the luke-forms repo and COPIED in here. This proves the
+        # copy is exactly what the last vendor run produced — catching hand-edits, partial copies,
+        # and a stale package whose upstream fix never made it across.
+        run: npm run vendor:check
+
       - name: Type-check & build
         # 'npm run build' = tsc (type-check) + vite build. Catches type errors and
         # broken imports before they ship.
