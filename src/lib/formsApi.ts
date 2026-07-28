@@ -198,11 +198,18 @@ export async function setOutboundConfig(
 }
 
 /** Outbound send: create a prefilled instance for a recipient and email them the /respond link. */
-export type OutboundSendResult = { instanceId: string; token: string; link: string; emailStatus: string };
+export type OutboundSendResult = {
+  instanceId: string;
+  token: string;
+  link: string;
+  /** Shareable per-tenant recipient portal link ("see all my forms"). */
+  portalLink: string;
+  emailStatus: string;
+};
 export function sendOutbound(
   tenant: string,
   id: string,
-  recipient: { firstName?: string; lastName?: string; email: string },
+  recipient: { firstName?: string; lastName?: string; email: string; phone?: string },
   prefill?: Record<string, unknown>,
   expiresAt?: number,
 ): Promise<OutboundSendResult> {

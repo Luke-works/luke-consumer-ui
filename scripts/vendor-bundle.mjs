@@ -9,6 +9,9 @@ import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// The recipient PORTAL bundle moved to its own repo (luke-portal); it vendors itself into
+// static/portal-assets via its own scripts/vendor-portal.mjs. This script serves the bundles that
+// are still BUILT in consumer-ui.
 const BUNDLES = {
   respond: { dist: "dist-respond", files: ["respond.js", "respond.css"], target: "static/respond-assets" },
   embed: { dist: "dist-embed", files: ["embed.js", "embed.css"], target: "static/embed-assets" },

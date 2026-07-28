@@ -28,21 +28,23 @@ export default function FormSendPanel({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [prefill, setPrefill] = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OutboundSendResult | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"link" | "portal" | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setFirstName("");
     setLastName("");
     setEmail("");
+    setPhone("");
     setPrefill({});
     setResult(null);
     setError(null);
-    setCopied(false);
+    setCopied(null);
     setFields(null);
     let active = true;
     getFields(tenant, code, "latest")
@@ -64,7 +66,12 @@ export default function FormSendPanel({
     try {
       const clean: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(prefill)) if (v !== "") clean[k] = v;
-      const r = await sendOutbound(tenant, formId, { firstName, lastName, email: email.trim() }, clean);
+      const r = await sendOutbound(
+        tenant,
+        formId,
+        { firstName, lastName, email: email.trim(), phone: phone.trim() || undefined },
+        clean,
+      );
       setResult(r);
     } catch (e) {
       setError((e as Error).message);
@@ -73,11 +80,10 @@ export default function FormSendPanel({
     }
   };
 
-  const copyLink = async () => {
-    if (!result) return;
+  const copy = async (which: "link" | "portal", text: string) => {
     try {
-      await navigator.clipboard.writeText(result.link);
-      setCopied(true);
+      await navigator.clipboard.writeText(text);
+      setCopied(which);
     } catch {
       /* ignore */
     }
@@ -101,13 +107,31 @@ export default function FormSendPanel({
                 Email status: {result.emailStatus}. Share the link below manually if needed.
               </p>
             ) : null}
-            <p className="mt-3 text-xs font-medium uppercase text-gray-400">Recipient link</p>
+            <p className="mt-3 text-xs font-medium uppercase text-gray-400">Direct form link</p>
             <div className="mt-1 flex items-center gap-2">
               <code className="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300">
                 {result.link}
               </code>
-              <Button size="sm" variant="outline" onClick={copyLink}>{copied ? "Copied ✓" : "Copy"}</Button>
+              <Button size="sm" variant="outline" onClick={() => copy("link", result.link)}>
+                {copied === "link" ? "Copied ✓" : "Copy"}
+              </Button>
             </div>
+            {result.portalLink ? (
+              <>
+                <p className="mt-3 text-xs font-medium uppercase text-gray-400">Recipient portal (all their forms)</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300">
+                    {result.portalLink}
+                  </code>
+                  <Button size="sm" variant="outline" onClick={() => copy("portal", result.portalLink)}>
+                    {copied === "portal" ? "Copied ✓" : "Copy"}
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">
+                  The recipient verifies their email once here and sees every form you've sent them.
+                </p>
+              </>
+            ) : null}
             <div className="mt-5 flex justify-end">
               <Button variant="outline" onClick={onClose}>Done</Button>
             </div>
@@ -131,6 +155,11 @@ export default function FormSendPanel({
             <div className="mt-3">
               <Label>Email <span className="text-error-500">*</span></Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jordan@acme.com" />
+            </div>
+            <div className="mt-3">
+              <Label>Mobile <span className="text-gray-400">(optional)</span></Label>
+              <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 555 123 4567" />
+              <p className="mt-1 text-xs text-gray-400">For text-message (SMS) verification in the portal, once enabled.</p>
             </div>
 
             {preparerFields.length > 0 ? (
