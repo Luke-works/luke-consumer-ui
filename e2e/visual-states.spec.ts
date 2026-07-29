@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { stubBackend, expectHealthy, forceTheme, ok, type StubOptions } from "./support/harness";
+import { stubBackend, expectHealthy, expectSettled, forceTheme, ok, type StubOptions } from "./support/harness";
 
 /**
  * VISUAL REGRESSION — UI STATES.
@@ -281,6 +281,7 @@ test.describe("visual states", () => {
             await state.setup(page);
             await expectHealthy(page);
             await page.evaluate(() => document.fonts.ready);
+            await expectSettled(page);
 
             await expect(page).toHaveScreenshot(`${state.name}-${vp.name}-${theme}.png`, {
               fullPage: true,

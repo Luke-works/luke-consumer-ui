@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { stubBackend, expectHealthy, expectRendered, forceTheme } from "./support/harness";
+import { stubBackend, expectHealthy, expectRendered, expectSettled, forceTheme } from "./support/harness";
 import { SCREENS } from "./support/screens";
 
 /**
@@ -71,6 +71,7 @@ test.describe("visual", () => {
 
           // Webfonts swapping in after the shot is the classic source of phantom diffs.
           await page.evaluate(() => document.fonts.ready);
+          await expectSettled(page);
 
           await expect(page).toHaveScreenshot(`${screen.name}-${vp.name}-${theme}.png`, {
             fullPage: true, // below-the-fold layout is exactly what the other checks can't see

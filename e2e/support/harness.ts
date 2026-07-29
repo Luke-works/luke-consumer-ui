@@ -141,3 +141,17 @@ export async function forceTheme(page: Page, theme: "light" | "dark"): Promise<v
     }
   }, theme);
 }
+
+/**
+ * Wait until nothing on the page is still announcing that it's loading.
+ *
+ * `expectRendered` only catches a bare "Loading…" — the Suspense fallback. Individual features
+ * lazy-load their own heavy pieces behind their own wording ("Loading designer…"), which shifts
+ * everything below it as it resolves. That is invisible to a functional test and lethal to a pixel
+ * baseline: the shot lands at a different stage each run and the whole page diffs.
+ */
+export async function expectSettled(page: Page): Promise<void> {
+  await expect(page.getByText(/^loading\b/i), "a lazy-loaded region was still resolving").toHaveCount(0, {
+    timeout: 15_000,
+  });
+}
