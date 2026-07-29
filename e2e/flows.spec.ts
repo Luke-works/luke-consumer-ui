@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./support/fixtures";
 import { GATEWAY, stubBackend, makeSession, USER, ok, expectNoOverflow } from "./support/harness";
 
 // Deep per-screen functional flows layered on the screen-matrix backbone: real

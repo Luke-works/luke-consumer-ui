@@ -1,4 +1,5 @@
-import { test, expect, type Route } from "@playwright/test";
+import { test, expect } from "./support/fixtures";
+import type { Route } from "@playwright/test";
 import { stubBackend, expectHealthy, ok } from "./support/harness";
 
 // The OUTBOUND recipient journey, end to end: verify by emailed code → fill → submit.

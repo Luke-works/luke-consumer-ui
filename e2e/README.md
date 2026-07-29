@@ -38,11 +38,22 @@ diff that already ships expected/actual/diff images, costs runtime and explains 
 ### Recording a walkthrough
 
 ```bash
-npm run e2e:record     # RECORD=1 — keeps video for every flow test, pass or fail
+npm run e2e:record                  # human-paced, with a visible cursor
+RECORD_SPEED=800 npm run e2e:record # slower, for a demo
 ```
 
-Writes `.webm` per test under `test-results/`, useful for showing a journey to someone rather than
-describing it.
+Writes a `.webm` per test under `test-results/`. RECORD=1 changes three things, and **only** in
+this mode:
+
+| | |
+| --- | --- |
+| `slowMo` (default 450ms) | Spaces the actions apart. At full speed a test fills three fields and submits in under a second — correct, and unwatchable. |
+| Visible cursor | Playwright drives real mouse events but a browser never paints a pointer into a video, so without one fields fill themselves and buttons depress untouched. Drawn white-on-dark so it reads over a primary button and in dark mode. |
+| 1280×800 video | Legible played back full-size. |
+
+None of it applies to a normal run: no pacing, no overlay, no listeners. Half a second between
+actions across 305 tests would add minutes of CI wall-clock to make output nobody watches slower —
+and a test that asserted on the cursor would be testing the harness, so nothing does.
 
 ## Visual regression
 
