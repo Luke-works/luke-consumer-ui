@@ -40,6 +40,12 @@ const VISUAL_VIEWPORTS = [
   { name: "laptop", width: 1280, height: 800 },
 ] as const;
 
+// No video here. A visual failure is explained by the three images the report already gives you —
+// expected, actual, and a highlighted diff — so a recording adds nothing but time, and these two
+// files are 168 of the suite's 305 tests. Video stays on for the FUNCTIONAL specs, where the
+// question is "what did it do" rather than "what does it look like".
+test.use({ video: "off" });
+
 test.describe("visual", () => {
   test.skip(
     process.platform !== BASELINE_PLATFORM,

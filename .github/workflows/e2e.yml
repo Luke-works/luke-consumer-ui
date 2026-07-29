@@ -32,12 +32,18 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
 
-      - name: Upload report on failure
+      - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          # The HTML report embeds the trace, video and screenshot for each failure; test-results/
+          # holds the raw files. Both, because the report is the readable one and the raw trace is
+          # the one you can replay with `npx playwright show-trace`.
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
 
   # Regenerate the committed visual baselines. Run manually (Actions → E2E → Run workflow)
   # after an INTENDED visual change, then download the artifact and commit it.
@@ -132,4 +138,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-live-report
-          path: luke-consumer-ui/playwright-report/
+          path: |
+            luke-consumer-ui/playwright-report/
+            luke-consumer-ui/test-results/
+          retention-days: 14

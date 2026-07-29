@@ -12,10 +12,21 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: "line",
+  // Terse terminal output, but ALSO write the HTML report — it is what embeds the trace, video
+  // and screenshot for a failure. Without it `playwright-report/` never exists and the CI
+  // "upload on failure" step silently uploads nothing, which is what it had been doing: a run
+  // with 168 failures produced no diagnostic artifact at all.
+  reporter: [["line"], ["html", { open: "never" }]],
   use: {
     baseURL: `http://localhost:${PORT}`,
-    trace: "on-first-retry",
+    // retain-on-failure, NOT on-first-retry: the latter captures the RETRY, so a failure that
+    // doesn't reproduce leaves nothing, and locally (retries: 0) it never captures at all.
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    // Recorded for every test and discarded unless it fails. Individual specs opt OUT where a
+    // recording explains nothing (the render matrix, the visual suites) — see their headers.
+    // RECORD=1 keeps video for every test, for producing a walkthrough of a flow on demand.
+    video: process.env.RECORD === "1" ? "on" : "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

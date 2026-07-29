@@ -25,7 +25,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:live": "playwright test --config playwright.live.config.ts"
+    "test:e2e:live": "playwright test --config playwright.live.config.ts",
+    "e2e:record": "RECORD=1 playwright test e2e/flows.spec.ts e2e/forms-submit.spec.ts e2e/forms-respond.spec.ts",
+    "e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",

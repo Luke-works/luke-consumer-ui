@@ -9,6 +9,11 @@ import { SCREENS } from "./support/screens";
 //   • no horizontal overflow (the responsive guarantee).
 // The inventory itself lives in support/screens.ts, shared with the visual suite.
 
+// No video: this is a render matrix, not a flow. Each test is one page load, so a recording shows
+// a single frame of nothing happening — the screenshot-on-failure already says everything. It is
+// also 120 of the suite's tests, so recording here is where the runtime cost actually lands.
+test.use({ video: "off" });
+
 for (const s of SCREENS) {
   test.describe(s.name, () => {
     for (const vp of VIEWPORTS) {

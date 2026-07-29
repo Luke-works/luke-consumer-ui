@@ -17,6 +17,33 @@ Hermetic Playwright. Playwright starts the Vite dev server itself and every spec
 The screen inventory lives once in `support/screens.ts`. Add a route there and it is **automatically
 both smoke-checked and pixel-checked** — the two suites can't drift about what "every screen" means.
 
+## When something fails
+
+A failing test keeps four things: a **video** of the run, a **trace** (step-by-step with DOM
+snapshots and network), a **screenshot** at the moment of failure, and an HTML report that embeds
+all three. CI uploads them as the `playwright-report` artifact, kept 14 days.
+
+```bash
+npm run e2e:report                      # open the HTML report
+npx playwright show-trace test-results/<test>/trace.zip   # replay it action by action
+```
+
+Video is deliberately NOT recorded everywhere. It's on for the multi-step **flow** specs, and off
+for the render matrix and the visual suites — a recording of a single page load, or of a pixel
+diff that already ships expected/actual/diff images, costs runtime and explains nothing.
+
+> A video is evidence, not a guarantee. Nothing diffs videos frame-to-frame; what makes a flow
+> *guaranteed* is the assertions inside it. The recording only tells you why one broke.
+
+### Recording a walkthrough
+
+```bash
+npm run e2e:record     # RECORD=1 — keeps video for every flow test, pass or fail
+```
+
+Writes `.webm` per test under `test-results/`, useful for showing a journey to someone rather than
+describing it.
+
 ## Visual regression
 
 The render matrix proves a page mounts and doesn't scroll sideways. All of that can hold while the
