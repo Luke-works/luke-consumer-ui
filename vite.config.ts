@@ -37,8 +37,10 @@ export default defineConfig({
     // (formSchema, expression) run fine under it too.
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
-    // e2e/ holds Playwright specs (run via `npm run test:e2e`), not vitest.
-    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+    // e2e/ and e2e-live/ hold Playwright specs (`npm run test:e2e` / `:live`), not vitest. Both
+    // must be excluded: vitest's default include matches any *.spec.ts anywhere, so a new Playwright
+    // directory is picked up as a unit suite and fails on the first `page` fixture.
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**", "e2e-live/**"],
     // 8 GB machine: vitest otherwise spawns one fork per CPU core (~8) and
     // thrashes swap. Cap the pool so a run can't starve the system.
     maxWorkers: 2,
