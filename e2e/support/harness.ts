@@ -124,3 +124,20 @@ export async function expectNoOverflow(page: Page): Promise<void> {
 
 /** Helper for a JSON 200 route handler. */
 export const ok = (body: unknown) => (route: Route) => route.fulfill(json(body));
+
+/**
+ * Force a theme before the app boots.
+ *
+ * ThemeContext reads `localStorage.theme` on mount and toggles `.dark` on <html>. Setting it via
+ * an init script means the very first paint is already correct — flipping it after load would
+ * screenshot a light-mode frame mid-transition and produce diffs that come and go.
+ */
+export async function forceTheme(page: Page, theme: "light" | "dark"): Promise<void> {
+  await page.addInitScript((t) => {
+    try {
+      window.localStorage.setItem("theme", t as string);
+    } catch {
+      /* storage can be unavailable; the app falls back to its default */
+    }
+  }, theme);
+}

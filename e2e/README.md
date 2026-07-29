@@ -6,7 +6,8 @@ Hermetic Playwright. Playwright starts the Vite dev server itself and every spec
 | Spec | What it covers |
 | --- | --- |
 | `screens.spec.ts` | Render matrix — every route × 4 widths: no crash, not blank, no horizontal overflow |
-| `visual.spec.ts` | Pixel baseline for every route × 2 widths (see below) |
+| `visual.spec.ts` | Pixel baseline for every route × 2 widths × **both themes** |
+| `visual-states.spec.ts` | Pixel baseline for UI **states** — modals, drawers, errors, success, empty |
 | `flows.spec.ts` | List/modal/table interactions |
 | `forms-submit.spec.ts` | Fill → submit, and the anonymous embed submit |
 | `forms-respond.spec.ts` | Outbound recipient journey: verify by code → fill → submit, incl. field ownership |
@@ -40,6 +41,26 @@ re-approve:
 The job deliberately **uploads** rather than pushing. A job that committed its own baselines would
 approve every regression automatically and the suite would only ever confirm the last run — the
 human looking at the diff *is* the test.
+
+### What's covered
+
+| Axis | Why |
+| --- | --- |
+| **Both themes** | Dark mode is a second full rendering built from CSS custom properties, so it fails independently. A token that stops resolving or a hard-coded hex with no dark variant renders fine and passes every structural check — and is obvious in a pixel diff. Highest-yield axis to duplicate. |
+| **UI states** | Most of what a user looks at isn't a resting route: it's a modal, an open drawer, a validation error, a success panel. Those have their own layout and z-index and were entirely uncovered. |
+| **Two widths** | See below. |
+
+`visual-states.spec.ts` drives the app into each state before shooting it. A state must END visible,
+asserted against the same accessible names the functional specs use — so a state that stops being
+reachable fails loudly rather than silently screenshotting the page behind it.
+
+On a non-Linux machine the suite skips. `VERIFY_SETUP=1 npx playwright test e2e/visual-states.spec.ts`
+runs it anyway: the screenshots won't match, but every `setup` executes, which is how you confirm a
+NEW state is reachable before asking CI to bless a baseline for it.
+
+A state that can't be opened **reliably** is left out rather than made flaky — the header
+notification panel is one; it opens or not depending on interaction order, and a visual test that
+diffs at random is worse than no test.
 
 ### Two widths, not four
 

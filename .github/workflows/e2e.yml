@@ -68,13 +68,15 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Regenerate baselines
-        run: npx playwright test e2e/visual.spec.ts --update-snapshots
+        run: npx playwright test e2e/visual.spec.ts e2e/visual-states.spec.ts --update-snapshots
 
       - name: Upload the baselines to commit
         uses: actions/upload-artifact@v4
         with:
           name: visual-baselines
-          path: e2e/visual.spec.ts-snapshots/
+          path: |
+            e2e/visual.spec.ts-snapshots/
+            e2e/visual-states.spec.ts-snapshots/
 
   # LIVE lane — the same browser automation against a REAL core-engine (embedded H2).
   # Separate job because it needs a JVM and takes minutes, not seconds; the hermetic lane stays
