@@ -5,7 +5,6 @@ import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { MinionProvider } from "@lukeflow/form-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
-import { useFormJsEvaluator } from "../../lib/formJsSandbox";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { createAuthedMinionClient } from "../../lib/minionsApi";
 import AttachmentsButton from "../../components/documents/AttachmentsButton";
@@ -30,9 +29,6 @@ export default function FormFill() {
   // Secure minion client (authed, tenant-scoped) — powers server-side field features like address
   // autocomplete without exposing any provider key to the browser.
   const minionClient = useMemo(() => (tenant ? createAuthedMinionClient(tenant) : null), [tenant]);
-  // Sandboxed author-JS evaluator (QuickJS isolate). Until it loads, author JS stays OFF (never the
-  // unsandboxed new Function); once ready, calc/conditional/validation JS runs inside the isolate.
-  const jsEvaluator = useFormJsEvaluator();
 
   const [view, setView] = useState<InstanceView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,16 +47,24 @@ export default function FormFill() {
   const ctxRef = useRef<{ tenant: string | null; instanceId: string | null }>({ tenant: null, instanceId: null });
 
   // Create the instance once on entry.
+  //
+  // Deliberately NO "ignore stale result" cleanup flag here. The obvious pattern —
+  // `let active = true; … return () => { active = false; }` — deadlocks against the
+  // `created.current` guard under StrictMode's mount→cleanup→remount: the first pass
+  // starts the request and the cleanup disowns its result, then the second pass sees
+  // the guard already set and never re-issues it. The response arrives with nothing
+  // left to receive it and the page hangs on "Preparing the form…" forever.
+  //
+  // The guard alone is the correct invariant: exactly one instance is created per
+  // mount (creating two would leave an orphan runtime instance behind), and a real
+  // unmount gets a fresh ref on remount, so navigating away and back re-fetches.
+  // Setting state after unmount is a no-op in React 18+, so nothing needs disowning.
   useEffect(() => {
     if (!tenant || !code || created.current) return;
     created.current = true;
-    let active = true;
     createInstance(tenant, { definitionCode: code })
-      .then((v) => { if (active) { setView(v); setLoading(false); } })
-      .catch((e: unknown) => {
-        if (active) { setError(messageFor(e)); setLoading(false); }
-      });
-    return () => { active = false; };
+      .then((v) => { setView(v); setLoading(false); })
+      .catch((e: unknown) => { setError(messageFor(e)); setLoading(false); });
   }, [tenant, code]);
 
   // On unmount, flush any in-debounce edit so the last keystrokes aren't dropped
@@ -168,8 +172,6 @@ export default function FormFill() {
                     onChange={handleChange}
                     onSubmit={handleSubmit}
                     submitting={submitting}
-                    allowJs={Boolean(jsEvaluator)}
-                    jsEvaluator={jsEvaluator}
                   />
                 </MinionProvider>
               ) : (
@@ -179,8 +181,6 @@ export default function FormFill() {
                   onChange={handleChange}
                   onSubmit={handleSubmit}
                   submitting={submitting}
-                  allowJs={Boolean(jsEvaluator)}
-                  jsEvaluator={jsEvaluator}
                 />
               )}
             </>
