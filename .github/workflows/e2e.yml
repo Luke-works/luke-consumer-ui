@@ -38,3 +38,40 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+
+  # Regenerate the committed visual baselines. Run manually (Actions → E2E → Run workflow)
+  # after an INTENDED visual change, then download the artifact and commit it.
+  #
+  # It lives in CI rather than on a developer's machine because font rasterisation is
+  # platform-specific: a baseline shot on macOS can never match this ubuntu runner, so the
+  # only images worth committing are the ones this job produces. Uploaded as an artifact
+  # rather than pushed, so a human still approves every pixel change — that approval IS the
+  # test, and a job that force-pushed new baselines would quietly approve regressions.
+  visual-baselines:
+    name: Update visual baselines (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Regenerate baselines
+        run: npx playwright test e2e/visual.spec.ts --update-snapshots
+
+      - name: Upload the baselines to commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: e2e/visual.spec.ts-snapshots/
