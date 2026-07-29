@@ -257,6 +257,16 @@ declare function NodePreview({ entity, field, components }: {
     components?: Record<string, FieldComponent>;
 }): react.JSX.Element | null;
 
+interface DataStructureViewProps {
+    /** The schema to describe (the live working schema). */
+    schema: FormSchema;
+    /** Field-type registry (defaults to the standard set) — must match the builder's. */
+    registry?: FieldTypeRegistry;
+    /** Called with an entity id when a field key is clicked (e.g. jump to it on the canvas). */
+    onSelect?: (entityId: string) => void;
+}
+declare function DataStructureView({ schema, registry, onSelect }: DataStructureViewProps): react.JSX.Element;
+
 /**
  * @lukeflow/form-builder — the reference React form builder for @lukeflow/form-core.
  *
@@ -268,4 +278,4 @@ declare function NodePreview({ entity, field, components }: {
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, FormBuilder, type FormBuilderHandle, type FormBuilderProps, NodePreview, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };
+export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, DataStructureView, type DataStructureViewProps, FormBuilder, type FormBuilderHandle, type FormBuilderProps, NodePreview, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };
