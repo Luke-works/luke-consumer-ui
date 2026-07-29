@@ -3,6 +3,7 @@ import ErrorBoundary from "../../components/common/ErrorBoundary";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readSubmitMessage } from "../../lib/formSchema";
+import { schemaForRecipient } from "../../lib/outboundRoles";
 import { getRespondForm, requestOtp, submitRespond, verifyOtp, type RespondForm } from "../../lib/publicInstanceApi";
 
 /**
@@ -24,6 +25,14 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
 
   const initialValues = useMemo(
     () => (form ? { ...(form.prefill ?? {}), ...(form.data ?? {}) } : undefined),
+    [form],
+  );
+
+  // Fields the PREPARER owns are shown to the recipient but not editable by them — the values are
+  // context for the answer they're being asked for, not part of it. (The server enforces this too;
+  // a disabled input is a courtesy to honest users, not the boundary.)
+  const recipientSchema = useMemo(
+    () => (form ? schemaForRecipient(form.schema, form.outboundRoles) : ""),
     [form],
   );
 
@@ -140,7 +149,7 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
               )}
             >
               {/* Public per-recipient fill (token+OTP auth): author is untrusted vs the filler → no author JS. */}
-              <FormRenderer schema={form.schema} initialValues={initialValues} onSubmit={onSubmit} submitting={busy} allowJs={false} />
+              <FormRenderer schema={recipientSchema} initialValues={initialValues} onSubmit={onSubmit} submitting={busy} allowJs={false} />
             </ErrorBoundary>
           </>
         ) : null}

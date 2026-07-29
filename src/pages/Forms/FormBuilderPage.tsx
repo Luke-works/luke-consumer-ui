@@ -43,12 +43,13 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink, Send } from "lucide-react";
+import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink, Send, Users } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
 import FormSendPanel from "./FormSendPanel";
+import FormRolesPanel from "./FormRolesPanel";
 import { guardedLeave } from "../../lib/leaveGuard";
 import { useMutationLock } from "../../hooks/useMutationLock";
 import { PencilIcon } from "../../icons";
@@ -122,6 +123,7 @@ export default function FormBuilderPage() {
   const [latestSignedOff, setLatestSignedOff] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [rolesOpen, setRolesOpen] = useState(false);
   const isOutbound = form?.kind === "OUTBOUND";
   // Advisory edit-lock: who (other than me) currently holds it, for the "being edited" banner.
   const [lockedByOther, setLockedByOther] = useState<string | null>(null);
@@ -653,13 +655,23 @@ export default function FormBuilderPage() {
                 onPublish={onPublish}
               />
               {isOutbound ? (
-                <Tooltip content={publishedVersion != null
-                  ? "Send a prefilled copy to a recipient by email."
-                  : "Publish a version first — you send the published version."}>
-                  <button type="button" onClick={() => setSendOpen(true)} disabled={publishedVersion == null} className={TOOLBAR_BTN_NEUTRAL}>
-                    <Send className="size-4" />Send
-                  </button>
-                </Tooltip>
+                <>
+                  {/* Roles are a design-time decision about the form, so this sits with the other
+                      authoring actions — and unlike Send it needs no published version, since you
+                      decide who fills what while you're still building. */}
+                  <Tooltip content="Choose which fields you fill before sending, and which the recipient fills.">
+                    <button type="button" onClick={() => setRolesOpen(true)} className={TOOLBAR_BTN_NEUTRAL}>
+                      <Users className="size-4" />Who fills
+                    </button>
+                  </Tooltip>
+                  <Tooltip content={publishedVersion != null
+                    ? "Send a prefilled copy to a recipient by email."
+                    : "Publish a version first — you send the published version."}>
+                    <button type="button" onClick={() => setSendOpen(true)} disabled={publishedVersion == null} className={TOOLBAR_BTN_NEUTRAL}>
+                      <Send className="size-4" />Send
+                    </button>
+                  </Tooltip>
+                </>
               ) : (
                 <Tooltip content={publishedVersion != null
                   ? `Embed the published version (v${publishedVersion}) — get an iframe snippet for any website.`
@@ -766,7 +778,7 @@ export default function FormBuilderPage() {
           ) : (
             <>
               <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Fill it out to test conditions, calculated values and validation.</p>
-              <FormRenderer schema={previewSchema} onSubmit={() => setPreviewDone(true)} allowJs />
+              <FormRenderer schema={previewSchema} onSubmit={() => setPreviewDone(true)} />
             </>
           )}
         </div>
@@ -795,13 +807,24 @@ export default function FormBuilderPage() {
         onSubmissionHandled={() => setForm((prev) => (prev ? { ...prev, submissionHandling: "COLLECT" } : prev))}
       />
       {form ? (
-        <FormSendPanel
-          open={sendOpen}
-          onClose={() => setSendOpen(false)}
-          tenant={tenant}
-          formId={id}
-          code={form.code}
-        />
+        <>
+          <FormSendPanel
+            open={sendOpen}
+            onClose={() => setSendOpen(false)}
+            tenant={tenant}
+            formId={id}
+            code={form.code}
+            outboundRoles={form.outboundRoles}
+          />
+          <FormRolesPanel
+            open={rolesOpen}
+            onClose={() => setRolesOpen(false)}
+            tenant={tenant}
+            form={form}
+            schema={JSON.stringify(latestRef.current ?? initialSchema)}
+            onSaved={(roles) => setForm((prev) => (prev ? { ...prev, outboundRoles: roles } : prev))}
+          />
+        </>
       ) : null}
 
       <Modal isOpen={formSettingsOpen} onClose={() => setFormSettingsOpen(false)} className="mx-4 w-full max-w-[480px]">

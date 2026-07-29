@@ -10,6 +10,7 @@ import Button from "../../components/ui/button/Button";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import { getFields, sendOutbound, type FieldContract, type OutboundSendResult } from "../../lib/formsApi";
+import { roleOf, ROLE_LABEL, type FieldRole } from "../../lib/outboundRoles";
 
 export default function FormSendPanel({
   open,
@@ -17,12 +18,15 @@ export default function FormSendPanel({
   tenant,
   formId,
   code,
+  outboundRoles,
 }: {
   open: boolean;
   onClose: () => void;
   tenant: string;
   formId: string;
   code: string;
+  /** Per-field ownership for this form; absent entries fall back to the schema's `disabled`. */
+  outboundRoles?: Record<string, FieldRole>;
 }) {
   const [fields, setFields] = useState<FieldContract[] | null>(null);
   const [firstName, setFirstName] = useState("");
@@ -55,9 +59,13 @@ export default function FormSendPanel({
     };
   }, [open, tenant, code]);
 
-  // Disabled fields are the preparer-provided / display fields (AI sets them read-only for the
-  // recipient) — those are what you prefill here. Editable fields are the recipient's to fill.
-  const preparerFields = (fields ?? []).filter((f) => f.disabled);
+  // What you can pre-answer: the fields you OWN (PREPARER) plus the ones you may seed and the
+  // recipient may still correct (EITHER). Fields with no explicit role fall back to how preparer
+  // fields were expressed before the role map existed — `disabled` in the schema — so forms
+  // authored earlier keep working untouched.
+  const preparerFields = (fields ?? []).filter(
+    (f) => roleOf(f.key, { disabled: f.disabled }, outboundRoles) !== "RECIPIENT",
+  );
 
   const send = async () => {
     if (!email.trim() || sending) return;
@@ -166,15 +174,23 @@ export default function FormSendPanel({
               <div className="mt-5">
                 <p className="mb-2 text-xs font-medium uppercase text-gray-400">Prefill (you fill these)</p>
                 <div className="space-y-3">
-                  {preparerFields.map((f) => (
-                    <div key={f.key}>
-                      <Label>{f.label || f.key}</Label>
-                      <Input
-                        value={prefill[f.key] ?? ""}
-                        onChange={(e) => setPrefill((p) => ({ ...p, [f.key]: e.target.value }))}
-                      />
-                    </div>
-                  ))}
+                  {preparerFields.map((f) => {
+                    const role = roleOf(f.key, { disabled: f.disabled }, outboundRoles);
+                    return (
+                      <div key={f.key}>
+                        <Label>
+                          {f.label || f.key}
+                          {/* EITHER looks identical here but behaves differently on the recipient's
+                              side, so say which one it is rather than letting them find out. */}
+                          <span className="ml-2 text-xs font-normal text-gray-400">{ROLE_LABEL[role]}</span>
+                        </Label>
+                        <Input
+                          value={prefill[f.key] ?? ""}
+                          onChange={(e) => setPrefill((p) => ({ ...p, [f.key]: e.target.value }))}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : fields === null ? (
