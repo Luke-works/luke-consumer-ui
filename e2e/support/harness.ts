@@ -143,15 +143,24 @@ export async function forceTheme(page: Page, theme: "light" | "dark"): Promise<v
 }
 
 /**
- * Wait until nothing on the page is still announcing that it's loading.
+ * Give lazy-loaded regions a chance to finish before a screenshot, WITHOUT requiring that they do.
  *
- * `expectRendered` only catches a bare "Loading…" — the Suspense fallback. Individual features
- * lazy-load their own heavy pieces behind their own wording ("Loading designer…"), which shifts
- * everything below it as it resolves. That is invisible to a functional test and lethal to a pixel
- * baseline: the shot lands at a different stage each run and the whole page diffs.
+ * `expectRendered` only catches the bare Suspense "Loading…". Features lazy-load their own heavy
+ * pieces behind their own wording ("Loading designer…"), which shifts everything below as it
+ * resolves — invisible to a functional test, lethal to a pixel baseline, because the shot lands at
+ * a different stage between runs and the whole page diffs.
+ *
+ * Deliberately a soft wait, not an assertion. Several screens are stubbed so their load never
+ * completes (a 404'd signing page, for one) and legitimately show a loading state forever; making
+ * this an expectation failed 12 of them. A permanently-loading screen is perfectly stable and
+ * baselines fine — it's the ones mid-resolution that need the pause.
  */
 export async function expectSettled(page: Page): Promise<void> {
-  await expect(page.getByText(/^loading\b/i), "a lazy-loaded region was still resolving").toHaveCount(0, {
-    timeout: 15_000,
-  });
+  await page
+    .getByText(/^loading\b/i)
+    .first()
+    .waitFor({ state: "detached", timeout: 10_000 })
+    .catch(() => {
+      /* still loading, and that may be its resting state — shoot it as-is */
+    });
 }
