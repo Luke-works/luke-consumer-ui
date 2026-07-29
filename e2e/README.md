@@ -58,3 +58,36 @@ await expect(page).toHaveScreenshot("name.png", {
   mask: [page.getByTestId("live-timestamp")],
 });
 ```
+
+## The live lane (`e2e-live/`)
+
+`npm run test:e2e:live` runs the same browser automation against a **real core-engine** on embedded
+H2 — no Postgres, no Docker, no secrets. Playwright boots the engine, a gateway stand-in and the dev
+server itself.
+
+It exists for one class of bug the hermetic suite structurally cannot see: **the app and the server
+disagreeing.** If the engine starts rejecting or stripping a field the app still sends, every
+hermetic test stays green while real submissions quietly lose data. Breadth belongs in the hermetic
+suite; this lane stays small and pointed.
+
+### Why there's a gateway stand-in
+
+The first attempt injected `X-User-Id` into the browser's requests and could never have worked —
+core-engine's CORS allows only `Authorization`, `Content-Type`, `Accept` and `X-Tenant-Id`, so the
+preflight strips it. That is deliberate: in deployment luke-auth-engine verifies the session token,
+**discards any client-supplied `X-User-Id`** and injects the verified one server-side, so a browser
+can never assert who it is.
+
+`support/gateway.mjs` reproduces that topology — browser → gateway → engine — doing exactly the two
+things the real gateway does here: serve `/auth/refresh` + `/session`, and proxy everything else
+with identity injected. It asserts an identity rather than verifying one, which is why:
+
+> **The live lane proves the DATA contract, not the AUTH contract.** A regression in who-may-see-what
+> will not surface here. Covering that needs the real gateway and real WorkOS credentials.
+
+### Capability access is real
+
+`permitAll` in Spring Security makes the API look open in dev. It isn't — `CapabilityAccessInterceptor`
+answers 403 first, and a request needs BOTH an active tenant subscription and a user grant. The
+fixture provisions those through the same endpoints an operator would, so the lane can't drift from
+how access actually works.

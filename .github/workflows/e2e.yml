@@ -75,3 +75,59 @@ jobs:
         with:
           name: visual-baselines
           path: e2e/visual.spec.ts-snapshots/
+
+  # LIVE lane — the same browser automation against a REAL core-engine (embedded H2).
+  # Separate job because it needs a JVM and takes minutes, not seconds; the hermetic lane stays
+  # the fast feedback loop. This is the only lane that can catch the app and the server
+  # disagreeing about a request shape — a class of bug that is invisible to stubs and silent in
+  # production. Needs core-engine checked out beside this repo.
+  e2e-live:
+    name: E2E live (real core-engine)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the UI
+        uses: actions/checkout@v4
+        with:
+          path: luke-consumer-ui
+
+      - name: Get core-engine
+        uses: actions/checkout@v4
+        with:
+          repository: Luke-works/luke-core-engine
+          ref: develop
+          token: ${{ secrets.FLEET_REPO_TOKEN || github.token }}
+          path: luke-core-engine
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: luke-consumer-ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: luke-consumer-ui
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: luke-consumer-ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the live E2E lane
+        working-directory: luke-consumer-ui
+        # Playwright boots core-engine, the gateway stand-in and the dev server itself.
+        run: npm run test:e2e:live
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-live-report
+          path: luke-consumer-ui/playwright-report/

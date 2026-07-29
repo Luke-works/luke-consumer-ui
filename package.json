@@ -24,7 +24,8 @@
     "lint:a11y": "eslint . -c eslint.config.a11y.js",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:live": "playwright test --config playwright.live.config.ts"
   },
   "dependencies": {
     "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",
