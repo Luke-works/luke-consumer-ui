@@ -1,4 +1,4 @@
-import { FormSchema, Diagnostic, EntityAttributes, InsertTarget, FormSettings, SchemaEntity, FieldTypeRegistry, FieldState } from '@lukeflow/form-core';
+import { FormSchema, Diagnostic, EntityAttributes, InsertTarget, FormSettings, SchemaEntity, FieldTypeRegistry, FormTemplate, FieldState } from '@lukeflow/form-core';
 export { FieldTypeRegistry } from '@lukeflow/form-core';
 import * as react from 'react';
 import { ReactNode } from 'react';
@@ -229,6 +229,14 @@ interface FormBuilderProps {
      * affordance (e.g. in its own top bar) so the form isn't previewable from two places.
      */
     hidePreview?: boolean;
+    /** Filename stem for the Data view's "Generate template" download (default "form"). */
+    formName?: string;
+    /**
+     * Override the Data view's template download with a custom encoder (e.g. a real
+     * `.xlsx`). Receives the derived {@link FormTemplate} and a sanitized file stem;
+     * when omitted, a CSV is downloaded.
+     */
+    onGenerateTemplate?: (template: FormTemplate, fileStem: string) => void;
     className?: string;
 }
 /** Imperative handle (via `ref`) for replacing the schema without a remount. */
@@ -264,8 +272,16 @@ interface DataStructureViewProps {
     registry?: FieldTypeRegistry;
     /** Called with an entity id when a field key is clicked (e.g. jump to it on the canvas). */
     onSelect?: (entityId: string) => void;
+    /** Filename stem for the downloaded template (default "form"). */
+    formName?: string;
+    /**
+     * Override the "Generate template" download with a custom encoder (e.g. a real
+     * `.xlsx`). Receives the derived {@link FormTemplate} and the sanitized file stem.
+     * When omitted, a CSV is downloaded.
+     */
+    onGenerateTemplate?: (template: FormTemplate, fileStem: string) => void;
 }
-declare function DataStructureView({ schema, registry, onSelect }: DataStructureViewProps): react.JSX.Element;
+declare function DataStructureView({ schema, registry, onSelect, formName, onGenerateTemplate }: DataStructureViewProps): react.JSX.Element;
 
 /**
  * @lukeflow/form-builder — the reference React form builder for @lukeflow/form-core.

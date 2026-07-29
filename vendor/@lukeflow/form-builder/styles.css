@@ -83,48 +83,94 @@
   color: #fff;
 }
 
-/* ── Data-structure view (field tree + example JSON) ───────────────────────── */
-.lf-builder-body--data { display: block; }
+/* ── Data-structure view (field tree + example JSON + template) ─────────────── */
+/* Its OWN full-width shell — deliberately NOT .lf-builder-body, so a host theme's
+   builder-body grid (e.g. consumer-ui's palette|canvas|settings 3-col grid) can't
+   squeeze the view into a narrow column. */
+.lf-ds-shell { width: 100%; }
 .lf-ds {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: var(--lf-space, 12px);
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 1180px;
 }
-.lf-ds-pane {
-  border: 1px solid var(--lf-border, #d9d9d9);
-  border-radius: var(--lf-radius, 6px);
-  background: var(--lf-bg, #fff);
-  min-width: 0;
-}
-.lf-ds-head {
+
+/* Top bar: title + field count + the Generate-template action. */
+.lf-ds-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--lf-border, #d9d9d9);
+  gap: 12px;
+  flex-wrap: wrap;
 }
-.lf-ds-headtitle { font-size: 0.8rem; font-weight: 600; }
+.lf-ds-bar-heading { display: flex; align-items: baseline; gap: 10px; }
+.lf-ds-bar-title { font-size: 1rem; font-weight: 700; color: var(--lf-text, #1a1a1a); }
 .lf-ds-count {
   font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--lf-muted, #565e6b);
 }
-.lf-ds-empty { margin: 0; padding: 16px 12px; color: var(--lf-muted, #565e6b); font-size: 0.85rem; }
-.lf-ds-list { list-style: none; margin: 0; padding: 6px 0; }
-.lf-ds-children { padding: 0 0 0 16px; border-left: 1px dashed var(--lf-border, #d9d9d9); margin-left: 12px; }
+.lf-ds-template-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--lf-primary, #2563eb);
+  border-radius: var(--lf-radius, 8px);
+  background: var(--lf-primary, #2563eb);
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+.lf-ds-template-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.lf-ds-template-btn:disabled { opacity: 0.5; cursor: default; }
+.lf-ds-template-btn svg { width: 15px; height: 15px; }
+
+/* Two cards side by side: field tree | example JSON. */
+.lf-ds-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.lf-ds-pane {
+  min-width: 0;
+  border: 1px solid var(--lf-border, #e5e7eb);
+  border-radius: var(--lf-radius, 10px);
+  background: var(--lf-bg, #fff);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  overflow: hidden;
+}
+.lf-ds-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--lf-border, #e5e7eb);
+  background: var(--lf-subtle, #fafafa);
+}
+.lf-ds-pane-title { font-size: 0.78rem; font-weight: 600; color: var(--lf-text, #1a1a1a); }
+.lf-ds-empty { margin: 0; padding: 22px 16px; color: var(--lf-muted, #565e6b); font-size: 0.85rem; }
+.lf-ds-list { list-style: none; margin: 0; padding: 4px 0; }
+.lf-ds-children { padding: 0 0 2px 14px; border-left: 1px dashed var(--lf-border, #e5e7eb); margin: 0 0 4px 16px; }
 .lf-ds-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
+  gap: 7px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--lf-border-subtle, #f2f4f7);
 }
-.lf-ds-row.is-excluded { opacity: 0.6; }
+.lf-ds-item:last-child > .lf-ds-row { border-bottom: none; }
+.lf-ds-row.is-excluded { opacity: 0.55; }
 .lf-ds-key {
   font-family: var(--lf-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.82rem;
+  font-size: 0.83rem;
   font-weight: 600;
   color: var(--lf-text, #1a1a1a);
 }
@@ -133,33 +179,35 @@
 .lf-ds-type {
   font-family: var(--lf-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.72rem;
-  padding: 1px 6px;
-  border-radius: 4px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 5px;
   background: var(--lf-tint, #eef2ff);
   color: var(--lf-primary, #2563eb);
 }
-.lf-ds-accepts { font-size: 0.78rem; color: var(--lf-muted, #565e6b); }
+.lf-ds-accepts { font-size: 0.78rem; color: var(--lf-muted, #565e6b); margin-right: auto; }
 .lf-ds-chip {
   font-size: 0.68rem;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 999px;
-  background: var(--lf-bg-muted, #f3f4f6);
+  background: var(--lf-bg-muted, #f2f4f7);
   color: var(--lf-muted, #565e6b);
+  white-space: nowrap;
 }
 .lf-ds-chip.is-cond { background: #fff7ed; color: #b45309; }
 .lf-ds-chip.is-excl { background: #fef2f2; color: var(--lf-error, #dc2626); }
 .lf-ds-code {
   margin: 0;
-  padding: 12px;
+  padding: 14px;
   overflow-x: auto;
   font-family: var(--lf-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.78rem;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  line-height: 1.6;
   white-space: pre;
   color: var(--lf-text, #1a1a1a);
 }
-@media (max-width: 720px) {
-  .lf-ds { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 900px) {
+  .lf-ds-panes { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── Three-pane body ───────────────────────────────────────────────────────── */

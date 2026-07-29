@@ -710,6 +710,7 @@ export default function FormBuilderPage() {
           attributeEditors={editors}
           settings="modal"
           hidePreview /* Preview lives in the top bar (works in view-only too) */
+          formName={form.name} /* file stem for the Data view's "Generate template" download */
           aside={
             canEdit ? (
               <AiAssistPanel

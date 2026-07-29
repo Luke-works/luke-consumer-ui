@@ -3008,6 +3008,48 @@ function deriveDataContract(schema, registry) {
   return { fields, example };
 }
 
+// src/formTemplate.ts
+var BOM = "\uFEFF";
+function csvCell(value) {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+function toCsv(headers) {
+  return `${BOM}${headers.map(csvCell).join(",")}\r
+`;
+}
+function buildFormTemplate(schema, registry) {
+  const { fields } = deriveDataContract(schema, registry);
+  const columns = [];
+  const skipped = [];
+  for (const f of fields) {
+    if (f.excluded) continue;
+    if (f.typeLabel === "row[]") {
+      skipped.push(f.key);
+      continue;
+    }
+    if (f.children && f.children.length > 0) {
+      for (const c of f.children) {
+        columns.push({
+          key: `${f.key}.${c.key}`,
+          label: `${f.label} \u2014 ${c.label}`,
+          type: c.typeLabel,
+          required: false,
+          example: c.example
+        });
+      }
+      continue;
+    }
+    columns.push({
+      key: f.key,
+      label: f.label,
+      type: f.typeLabel,
+      required: f.constraints.includes("required"),
+      example: f.example
+    });
+  }
+  return { columns, skipped, csv: toCsv(columns.map((c) => c.key)) };
+}
+
 // src/builder/operations.ts
 var _idCounter = 0;
 function defaultIdGen() {
@@ -3206,6 +3248,7 @@ exports.ValidatorRegistry = ValidatorRegistry;
 exports.buildDependencyGraph = buildDependencyGraph;
 exports.buildEvalModel = buildEvalModel;
 exports.buildFieldValidators = buildFieldValidators;
+exports.buildFormTemplate = buildFormTemplate;
 exports.camelCaseKeys = camelCaseKeys;
 exports.collectKeys = collectKeys;
 exports.createDefaultFieldTypeRegistry = createDefaultFieldTypeRegistry;
