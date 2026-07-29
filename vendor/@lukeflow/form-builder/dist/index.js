@@ -2623,30 +2623,80 @@ function Problems({ builder }) {
 
 // src/builder/DataStructureView.tsx
 import { useMemo as useMemo5 } from "react";
-import { deriveDataContract } from "@lukeflow/form-core";
+import {
+  deriveDataContract,
+  buildFormTemplate
+} from "@lukeflow/form-core";
 import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
-function DataStructureView({ schema, registry, onSelect }) {
+function IconDownload() {
+  return /* @__PURE__ */ jsxs13("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ jsx13("path", { d: "M12 3v12" }),
+    /* @__PURE__ */ jsx13("path", { d: "m7 11 5 5 5-5" }),
+    /* @__PURE__ */ jsx13("path", { d: "M5 21h14" })
+  ] });
+}
+function downloadCsv(csv, filename) {
+  if (typeof document === "undefined") return;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function DataStructureView({ schema, registry, onSelect, formName, onGenerateTemplate }) {
   const contract = useMemo5(() => deriveDataContract(schema, registry), [schema, registry]);
   const json = useMemo5(() => JSON.stringify(contract.example, null, 2), [contract.example]);
   const n = contract.fields.length;
+  const handleGenerateTemplate = () => {
+    const template = buildFormTemplate(schema, registry);
+    const stem = (formName || "form").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "form";
+    if (onGenerateTemplate) {
+      onGenerateTemplate(template, stem);
+      return;
+    }
+    downloadCsv(template.csv, `${stem}-template.csv`);
+  };
   return /* @__PURE__ */ jsxs13("div", { className: "lf-ds", role: "region", "aria-label": "Data structure", children: [
-    /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-tree", children: [
-      /* @__PURE__ */ jsxs13("header", { className: "lf-ds-head", children: [
-        /* @__PURE__ */ jsx13("span", { className: "lf-ds-headtitle", children: "Data structure" }),
+    /* @__PURE__ */ jsxs13("div", { className: "lf-ds-bar", children: [
+      /* @__PURE__ */ jsxs13("div", { className: "lf-ds-bar-heading", children: [
+        /* @__PURE__ */ jsx13("span", { className: "lf-ds-bar-title", children: "Data structure" }),
         /* @__PURE__ */ jsxs13("span", { className: "lf-ds-count", children: [
           n,
           " field",
           n === 1 ? "" : "s"
         ] })
       ] }),
-      n === 0 ? /* @__PURE__ */ jsx13("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ jsx13(FieldRow, { field: f, onSelect }, f.entityId)) })
+      /* @__PURE__ */ jsxs13(
+        "button",
+        {
+          type: "button",
+          className: "lf-ds-template-btn",
+          onClick: handleGenerateTemplate,
+          disabled: n === 0,
+          title: "Download a spreadsheet template \u2014 one column per field \u2014 to prefill and run against this form (e.g. a campaign)",
+          children: [
+            /* @__PURE__ */ jsx13(IconDownload, {}),
+            "Generate template"
+          ]
+        }
+      )
     ] }),
-    /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-json", children: [
-      /* @__PURE__ */ jsxs13("header", { className: "lf-ds-head", children: [
-        /* @__PURE__ */ jsx13("span", { className: "lf-ds-headtitle", children: "Example submission" }),
-        /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: "JSON" })
+    /* @__PURE__ */ jsxs13("div", { className: "lf-ds-panes", children: [
+      /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-tree", children: [
+        /* @__PURE__ */ jsx13("header", { className: "lf-ds-pane-head", children: /* @__PURE__ */ jsx13("span", { className: "lf-ds-pane-title", children: "Fields" }) }),
+        n === 0 ? /* @__PURE__ */ jsx13("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ jsx13(FieldRow, { field: f, onSelect }, f.entityId)) })
       ] }),
-      /* @__PURE__ */ jsx13("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ jsx13("code", { children: json }) })
+      /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-json", children: [
+        /* @__PURE__ */ jsxs13("header", { className: "lf-ds-pane-head", children: [
+          /* @__PURE__ */ jsx13("span", { className: "lf-ds-pane-title", children: "Example submission" }),
+          /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: "JSON" })
+        ] }),
+        /* @__PURE__ */ jsx13("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ jsx13("code", { children: json }) })
+      ] })
     ] })
   ] });
 }
@@ -2668,7 +2718,7 @@ function FieldRow({ field, onSelect }) {
 
 // src/FormBuilder.tsx
 import { jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
-var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, className }, ref) {
+var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, formName, onGenerateTemplate, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = useState10(false);
@@ -2732,10 +2782,19 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
       /* @__PURE__ */ jsx14(ProblemsBadge, { builder: b })
     ] }),
     /* @__PURE__ */ jsxs14(CanvasDndProvider, { builder: b, children: [
-      view === "data" ? /* @__PURE__ */ jsx14("div", { className: "lf-builder-body lf-builder-body--data", children: /* @__PURE__ */ jsx14(DataStructureView, { schema: b.schema, registry, onSelect: (id) => {
-        setView("design");
-        b.select(id);
-      } }) }) : /* @__PURE__ */ jsxs14("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
+      view === "data" ? /* @__PURE__ */ jsx14("div", { className: "lf-ds-shell", children: /* @__PURE__ */ jsx14(
+        DataStructureView,
+        {
+          schema: b.schema,
+          registry,
+          formName,
+          onGenerateTemplate,
+          onSelect: (id) => {
+            setView("design");
+            b.select(id);
+          }
+        }
+      ) }) : /* @__PURE__ */ jsxs14("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
         /* @__PURE__ */ jsx14(Palette, { builder: b, extra: extraFields }),
         /* @__PURE__ */ jsx14(Canvas, { builder: b, components, registry }),
         modal ? aside && /* @__PURE__ */ jsx14("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx14(SettingsPanel, { builder: b, editors })

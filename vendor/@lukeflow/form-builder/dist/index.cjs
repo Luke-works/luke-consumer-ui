@@ -2651,28 +2651,75 @@ function Problems({ builder }) {
 var import_react11 = require("react");
 var import_form_core9 = require("@lukeflow/form-core");
 var import_jsx_runtime13 = require("react/jsx-runtime");
-function DataStructureView({ schema, registry, onSelect }) {
+function IconDownload() {
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M12 3v12" }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "m7 11 5 5 5-5" }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M5 21h14" })
+  ] });
+}
+function downloadCsv(csv, filename) {
+  if (typeof document === "undefined") return;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function DataStructureView({ schema, registry, onSelect, formName, onGenerateTemplate }) {
   const contract = (0, import_react11.useMemo)(() => (0, import_form_core9.deriveDataContract)(schema, registry), [schema, registry]);
   const json = (0, import_react11.useMemo)(() => JSON.stringify(contract.example, null, 2), [contract.example]);
   const n = contract.fields.length;
+  const handleGenerateTemplate = () => {
+    const template = (0, import_form_core9.buildFormTemplate)(schema, registry);
+    const stem = (formName || "form").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "form";
+    if (onGenerateTemplate) {
+      onGenerateTemplate(template, stem);
+      return;
+    }
+    downloadCsv(template.csv, `${stem}-template.csv`);
+  };
   return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds", role: "region", "aria-label": "Data structure", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-tree", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-head", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-headtitle", children: "Data structure" }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-bar", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-bar-heading", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-bar-title", children: "Data structure" }),
         /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "lf-ds-count", children: [
           n,
           " field",
           n === 1 ? "" : "s"
         ] })
       ] }),
-      n === 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FieldRow, { field: f, onSelect }, f.entityId)) })
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+        "button",
+        {
+          type: "button",
+          className: "lf-ds-template-btn",
+          onClick: handleGenerateTemplate,
+          disabled: n === 0,
+          title: "Download a spreadsheet template \u2014 one column per field \u2014 to prefill and run against this form (e.g. a campaign)",
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconDownload, {}),
+            "Generate template"
+          ]
+        }
+      )
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-json", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-head", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-headtitle", children: "Example submission" }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: "JSON" })
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-panes", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-tree", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("header", { className: "lf-ds-pane-head", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-pane-title", children: "Fields" }) }),
+        n === 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FieldRow, { field: f, onSelect }, f.entityId)) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { children: json }) })
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-json", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-pane-head", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-pane-title", children: "Example submission" }),
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: "JSON" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { children: json }) })
+      ] })
     ] })
   ] });
 }
@@ -2694,7 +2741,7 @@ function FieldRow({ field, onSelect }) {
 
 // src/FormBuilder.tsx
 var import_jsx_runtime14 = require("react/jsx-runtime");
-var FormBuilder = (0, import_react12.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, className }, ref) {
+var FormBuilder = (0, import_react12.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, formName, onGenerateTemplate, className }, ref) {
   const b = useFormBuilder(initialSchema);
   (0, import_react12.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = (0, import_react12.useState)(false);
@@ -2758,10 +2805,19 @@ var FormBuilder = (0, import_react12.forwardRef)(function FormBuilder2({ initial
       /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ProblemsBadge, { builder: b })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(CanvasDndProvider, { builder: b, children: [
-      view === "data" ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-builder-body lf-builder-body--data", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(DataStructureView, { schema: b.schema, registry, onSelect: (id) => {
-        setView("design");
-        b.select(id);
-      } }) }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
+      view === "data" ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-ds-shell", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+        DataStructureView,
+        {
+          schema: b.schema,
+          registry,
+          formName,
+          onGenerateTemplate,
+          onSelect: (id) => {
+            setView("design");
+            b.select(id);
+          }
+        }
+      ) }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
         /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Palette, { builder: b, extra: extraFields }),
         /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Canvas, { builder: b, components, registry }),
         modal ? aside && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(SettingsPanel, { builder: b, editors })
