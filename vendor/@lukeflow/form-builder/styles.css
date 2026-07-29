@@ -60,6 +60,108 @@
 .lf-problems-badge.is-warning { background: #fff7ed; color: #b45309; }
 .lf-problems-badge.is-error { background: #fef2f2; color: var(--lf-error, #dc2626); }
 
+/* ── Design / Data view toggle (segmented control) ─────────────────────────── */
+.lf-builder-viewtoggle {
+  display: inline-flex;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  overflow: hidden;
+}
+.lf-builder-viewtoggle button {
+  border: none;
+  border-radius: 0;
+  padding: 4px 12px;
+  background: var(--lf-bg, #fff);
+  color: var(--lf-muted, #565e6b);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.lf-builder-viewtoggle button + button { border-left: 1px solid var(--lf-border, #d9d9d9); }
+.lf-builder-viewtoggle button.is-active {
+  background: var(--lf-primary, #2563eb);
+  color: #fff;
+}
+
+/* ── Data-structure view (field tree + example JSON) ───────────────────────── */
+.lf-builder-body--data { display: block; }
+.lf-ds {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--lf-space, 12px);
+  align-items: start;
+}
+.lf-ds-pane {
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background: var(--lf-bg, #fff);
+  min-width: 0;
+}
+.lf-ds-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--lf-border, #d9d9d9);
+}
+.lf-ds-headtitle { font-size: 0.8rem; font-weight: 600; }
+.lf-ds-count {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lf-muted, #565e6b);
+}
+.lf-ds-empty { margin: 0; padding: 16px 12px; color: var(--lf-muted, #565e6b); font-size: 0.85rem; }
+.lf-ds-list { list-style: none; margin: 0; padding: 6px 0; }
+.lf-ds-children { padding: 0 0 0 16px; border-left: 1px dashed var(--lf-border, #d9d9d9); margin-left: 12px; }
+.lf-ds-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+}
+.lf-ds-row.is-excluded { opacity: 0.6; }
+.lf-ds-key {
+  font-family: var(--lf-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--lf-text, #1a1a1a);
+}
+.lf-ds-key--btn { border: none; background: none; padding: 0; cursor: pointer; }
+.lf-ds-key--btn:hover { color: var(--lf-primary, #2563eb); text-decoration: underline; }
+.lf-ds-type {
+  font-family: var(--lf-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--lf-tint, #eef2ff);
+  color: var(--lf-primary, #2563eb);
+}
+.lf-ds-accepts { font-size: 0.78rem; color: var(--lf-muted, #565e6b); }
+.lf-ds-chip {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lf-bg-muted, #f3f4f6);
+  color: var(--lf-muted, #565e6b);
+}
+.lf-ds-chip.is-cond { background: #fff7ed; color: #b45309; }
+.lf-ds-chip.is-excl { background: #fef2f2; color: var(--lf-error, #dc2626); }
+.lf-ds-code {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: var(--lf-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre;
+  color: var(--lf-text, #1a1a1a);
+}
+@media (max-width: 720px) {
+  .lf-ds { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ── Three-pane body ───────────────────────────────────────────────────────── */
 .lf-builder-body {
   display: grid;

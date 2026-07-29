@@ -2241,6 +2241,77 @@ interface PrintOptions {
 declare function toPrintableHtml(schema: FormSchema, data: FormData, options?: PrintOptions): string;
 
 /**
+ * Derive a form's DATA CONTRACT from its schema — the design-time answer to
+ * "what data does this form produce, and how does each field accept it?".
+ *
+ * For every keyed field it reports: the submission `key`, the value `type`
+ * (string/number/boolean/date/array/object, refined to `string[]` / `row[]` /
+ * `file[]` for display), a human "accepts" description, and the field's
+ * constraints (required, length/range/pattern, selection/row/file counts,
+ * option count) — read exactly as the built-in validators read them. It also
+ * emits an EXAMPLE submission payload, so a viewer can show the literal JSON
+ * shape an integration receives.
+ *
+ * This mirrors the runtime submission shape produced by {@link import("./engine/createFormEngine").createFormEngine}'s
+ * `collect()`: the payload is a FLAT map keyed by field `key`; layout containers
+ * (`panel`/`columns`/…) flatten and contribute no key; grids (`dataGrid`/`editGrid`)
+ * are the only nesting — an array of per-row key→value maps. `persistent: false`
+ * fields are excluded from the payload (and from the example) but still listed
+ * (flagged `excluded`), and conditionally-shown fields are flagged `conditional`.
+ *
+ * Pure, tolerant (never throws on a malformed draft), and DOM/React-free — the
+ * same disciplines as {@link toPrintableHtml}, whose tree-walk this follows.
+ *
+ * @packageDocumentation
+ */
+
+/** The value category of a field, as surfaced in the contract. */
+type DataValueType = FieldType["valueType"];
+/**
+ * One field in the derived data contract. `children` is populated for grids (the
+ * per-row template fields) and for `addressBlock` (its fixed sub-keys); it is
+ * `undefined` for scalar fields.
+ */
+interface DataContractField {
+    /** The submission/scope key — the field's name in the payload. */
+    key: string;
+    /** The entity id (so a viewer can jump to / select the field). */
+    entityId: string;
+    /** The entity `type` discriminator (e.g. `email`, `dataGrid`). */
+    fieldType: string;
+    /** Human-readable label (falls back to the key when unlabelled). */
+    label: string;
+    /** The raw value category from the field-type registry. */
+    valueType: DataValueType;
+    /** Display type, refined for arrays/grids: `string`, `number`, `string[]`, `row[]`, `file[]`, `object`, … */
+    typeLabel: string;
+    /** How the field accepts input, in words (e.g. "Email address", "Multiple choice", "Repeating rows"). */
+    accepts: string;
+    /** Constraint chips read from the field's attributes (e.g. `required`, `≤ 80 chars`, `≥ 1 selected`). */
+    constraints: string[];
+    /** `true` when visibility is conditional (may be absent from a given submission). */
+    conditional: boolean;
+    /** `true` when `persistent: false` — the field is excluded from the submission payload. */
+    excluded: boolean;
+    /** Per-row template fields (grids) or fixed sub-keys (`addressBlock`); else undefined. */
+    children?: DataContractField[];
+    /** A representative example value, used to assemble {@link DataContract.example}. */
+    example: unknown;
+}
+/** The whole derived contract: the ordered field list plus an example payload. */
+interface DataContract {
+    /** Every keyed field, in traversal order; containers flattened, grids nested. */
+    fields: DataContractField[];
+    /** An example submission payload (excludes `persistent: false` fields; grids/addressBlock nest). */
+    example: FormData;
+}
+/**
+ * Derive the data contract for a form schema. Optionally pass a custom
+ * {@link FieldTypeRegistry}; defaults to the standard field set.
+ */
+declare function deriveDataContract(schema: FormSchema, registry?: FieldTypeRegistry): DataContract;
+
+/**
  * Headless builder operations — the pure, framework-free schema-mutation layer the
  * (React) form builder is built on. Every function takes a {@link FormSchema} and
  * returns a NEW one (immutable; the input is never mutated), so a builder UI can
@@ -2292,4 +2363,4 @@ declare function setSettings(schema: FormSchema, patch: Partial<FormSettings>): 
 /** @lukeflow/form-core — the headless Lukeflow form engine. */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { ADDRESS_REQUIRED_PARTS, type AddressSuggestion, type AddressValue, type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataSource, type DataSourceTrigger, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { ADDRESS_REQUIRED_PARTS, type AddressSuggestion, type AddressValue, type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataContract, type DataContractField, type DataSource, type DataSourceTrigger, type DataValueType, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, deriveDataContract, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };

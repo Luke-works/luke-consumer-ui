@@ -21,6 +21,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   ATTRIBUTE_TABS: () => ATTRIBUTE_TABS,
+  DataStructureView: () => DataStructureView,
   FormBuilder: () => FormBuilder,
   NodePreview: () => NodePreview,
   SettingsPanel: () => SettingsPanel,
@@ -150,7 +151,7 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-var import_react11 = require("react");
+var import_react12 = require("react");
 var import_react_dom3 = require("react-dom");
 
 // src/SettingsPanel.tsx
@@ -2646,21 +2647,67 @@ function Problems({ builder }) {
   ] }) }, i)) }) });
 }
 
-// src/FormBuilder.tsx
+// src/builder/DataStructureView.tsx
+var import_react11 = require("react");
+var import_form_core9 = require("@lukeflow/form-core");
 var import_jsx_runtime13 = require("react/jsx-runtime");
-var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, className }, ref) {
+function DataStructureView({ schema, registry, onSelect }) {
+  const contract = (0, import_react11.useMemo)(() => (0, import_form_core9.deriveDataContract)(schema, registry), [schema, registry]);
+  const json = (0, import_react11.useMemo)(() => JSON.stringify(contract.example, null, 2), [contract.example]);
+  const n = contract.fields.length;
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds", role: "region", "aria-label": "Data structure", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-tree", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-head", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-headtitle", children: "Data structure" }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "lf-ds-count", children: [
+          n,
+          " field",
+          n === 1 ? "" : "s"
+        ] })
+      ] }),
+      n === 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FieldRow, { field: f, onSelect }, f.entityId)) })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-json", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-head", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-headtitle", children: "Example submission" }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: "JSON" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { children: json }) })
+    ] })
+  ] });
+}
+function FieldRow({ field, onSelect }) {
+  const children = field.children ?? [];
+  const selectable = !!onSelect && !field.entityId.includes(".");
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("li", { className: "lf-ds-item", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-ds-row${field.excluded ? " is-excluded" : ""}`, children: [
+      selectable ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-ds-key lf-ds-key--btn", onClick: () => onSelect(field.entityId), title: "Select this field on the canvas", children: field.key }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-key", children: field.key }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-type", children: field.typeLabel }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-accepts", children: field.accepts }),
+      field.constraints.map((c) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip", children: c }, c)),
+      field.conditional && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip is-cond", title: "Shown conditionally \u2014 may be absent from a given submission", children: "conditional" }),
+      field.excluded && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip is-excl", title: "persistent: false \u2014 excluded from the submission payload", children: "not saved" })
+    ] }),
+    children.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list lf-ds-children", children: children.map((c) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FieldRow, { field: c, onSelect }, c.entityId)) })
+  ] });
+}
+
+// src/FormBuilder.tsx
+var import_jsx_runtime14 = require("react/jsx-runtime");
+var FormBuilder = (0, import_react12.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, className }, ref) {
   const b = useFormBuilder(initialSchema);
-  (0, import_react11.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
-  const [showPreview, setShowPreview] = (0, import_react11.useState)(false);
-  const [toast, setToast] = (0, import_react11.useState)(null);
-  const editors = (0, import_react11.useMemo)(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
+  (0, import_react12.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
+  const [showPreview, setShowPreview] = (0, import_react12.useState)(false);
+  const [view, setView] = (0, import_react12.useState)("design");
+  const [toast, setToast] = (0, import_react12.useState)(null);
+  const editors = (0, import_react12.useMemo)(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
-  (0, import_react11.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
-  (0, import_react11.useEffect)(() => {
+  (0, import_react12.useEffect)(() => {
     const onKey = (e) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const t = e.target;
@@ -2680,45 +2727,52 @@ var FormBuilder = (0, import_react11.forwardRef)(function FormBuilder2({ initial
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [b.undo, b.redo]);
-  const onChangeRef = (0, import_react11.useRef)(onChange);
+  const onChangeRef = (0, import_react12.useRef)(onChange);
   onChangeRef.current = onChange;
-  const mounted = (0, import_react11.useRef)(false);
-  (0, import_react11.useEffect)(() => {
+  const mounted = (0, import_react12.useRef)(false);
+  (0, import_react12.useEffect)(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
     }
     onChangeRef.current?.(b.schema);
   }, [b.schema]);
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-builder ${className ?? ""}`, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-builder-toolbar", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", title: "Undo (\u2318/Ctrl+Z)", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconUndo, {}),
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: `lf-builder ${className ?? ""}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-builder-toolbar", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", title: "Undo (\u2318/Ctrl+Z)", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(IconUndo, {}),
         "Undo"
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", title: "Redo (\u2318/Ctrl+Shift+Z)", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconRedo, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", title: "Redo (\u2318/Ctrl+Shift+Z)", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(IconRedo, {}),
         "Redo"
       ] }),
-      !hidePreview && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconEye, {}),
+      !hidePreview && /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(IconEye, {}),
         "Preview"
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ProblemsBadge, { builder: b })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(CanvasDndProvider, { builder: b, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Palette, { builder: b, extra: extraFields }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Canvas, { builder: b, components, registry }),
-        modal ? aside && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SettingsPanel, { builder: b, editors })
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-builder-viewtoggle", role: "group", "aria-label": "Builder view", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: view === "design" ? "is-active" : "", "aria-pressed": view === "design", onClick: () => setView("design"), children: "Design" }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: view === "data" ? "is-active" : "", "aria-pressed": view === "data", onClick: () => setView("data"), title: "See the data structure this form produces", children: "Data" })
       ] }),
-      modal && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SettingsModal, { builder: b, editors, notify: setToast })
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ProblemsBadge, { builder: b })
     ] }),
-    showPreview && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(PreviewModal, { schema: b.schema, components, registry, onClose: () => setShowPreview(false), notify: setToast }),
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Problems, { builder: b }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(CanvasDndProvider, { builder: b, children: [
+      view === "data" ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-builder-body lf-builder-body--data", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(DataStructureView, { schema: b.schema, registry, onSelect: (id) => {
+        setView("design");
+        b.select(id);
+      } }) }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Palette, { builder: b, extra: extraFields }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Canvas, { builder: b, components, registry }),
+        modal ? aside && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(SettingsPanel, { builder: b, editors })
+      ] }),
+      modal && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(SettingsModal, { builder: b, editors, notify: setToast })
+    ] }),
+    showPreview && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(PreviewModal, { schema: b.schema, components, registry, onClose: () => setShowPreview(false), notify: setToast }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Problems, { builder: b }),
     toast && (0, import_react_dom3.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-toast lf-builder", role: "status", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-toast-tick", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconCheck, {}) }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-toast lf-builder", role: "status", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "lf-toast-tick", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(IconCheck, {}) }),
         " ",
         toast
       ] }),
@@ -2732,6 +2786,7 @@ var VERSION = "0.1.0-alpha.0";
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ATTRIBUTE_TABS,
+  DataStructureView,
   FormBuilder,
   NodePreview,
   SettingsPanel,

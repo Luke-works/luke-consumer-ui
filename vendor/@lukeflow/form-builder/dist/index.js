@@ -121,7 +121,7 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo5, useState as useState10, useEffect as useEffect9, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
+import { useMemo as useMemo6, useState as useState10, useEffect as useEffect9, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
 import { createPortal as createPortal3 } from "react-dom";
 
 // src/SettingsPanel.tsx
@@ -2621,14 +2621,60 @@ function Problems({ builder }) {
   ] }) }, i)) }) });
 }
 
-// src/FormBuilder.tsx
+// src/builder/DataStructureView.tsx
+import { useMemo as useMemo5 } from "react";
+import { deriveDataContract } from "@lukeflow/form-core";
 import { jsx as jsx13, jsxs as jsxs13 } from "react/jsx-runtime";
+function DataStructureView({ schema, registry, onSelect }) {
+  const contract = useMemo5(() => deriveDataContract(schema, registry), [schema, registry]);
+  const json = useMemo5(() => JSON.stringify(contract.example, null, 2), [contract.example]);
+  const n = contract.fields.length;
+  return /* @__PURE__ */ jsxs13("div", { className: "lf-ds", role: "region", "aria-label": "Data structure", children: [
+    /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-tree", children: [
+      /* @__PURE__ */ jsxs13("header", { className: "lf-ds-head", children: [
+        /* @__PURE__ */ jsx13("span", { className: "lf-ds-headtitle", children: "Data structure" }),
+        /* @__PURE__ */ jsxs13("span", { className: "lf-ds-count", children: [
+          n,
+          " field",
+          n === 1 ? "" : "s"
+        ] })
+      ] }),
+      n === 0 ? /* @__PURE__ */ jsx13("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ jsx13(FieldRow, { field: f, onSelect }, f.entityId)) })
+    ] }),
+    /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-json", children: [
+      /* @__PURE__ */ jsxs13("header", { className: "lf-ds-head", children: [
+        /* @__PURE__ */ jsx13("span", { className: "lf-ds-headtitle", children: "Example submission" }),
+        /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: "JSON" })
+      ] }),
+      /* @__PURE__ */ jsx13("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ jsx13("code", { children: json }) })
+    ] })
+  ] });
+}
+function FieldRow({ field, onSelect }) {
+  const children = field.children ?? [];
+  const selectable = !!onSelect && !field.entityId.includes(".");
+  return /* @__PURE__ */ jsxs13("li", { className: "lf-ds-item", children: [
+    /* @__PURE__ */ jsxs13("div", { className: `lf-ds-row${field.excluded ? " is-excluded" : ""}`, children: [
+      selectable ? /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-ds-key lf-ds-key--btn", onClick: () => onSelect(field.entityId), title: "Select this field on the canvas", children: field.key }) : /* @__PURE__ */ jsx13("span", { className: "lf-ds-key", children: field.key }),
+      /* @__PURE__ */ jsx13("span", { className: "lf-ds-type", children: field.typeLabel }),
+      /* @__PURE__ */ jsx13("span", { className: "lf-ds-accepts", children: field.accepts }),
+      field.constraints.map((c) => /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip", children: c }, c)),
+      field.conditional && /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip is-cond", title: "Shown conditionally \u2014 may be absent from a given submission", children: "conditional" }),
+      field.excluded && /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip is-excl", title: "persistent: false \u2014 excluded from the submission payload", children: "not saved" })
+    ] }),
+    children.length > 0 && /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list lf-ds-children", children: children.map((c) => /* @__PURE__ */ jsx13(FieldRow, { field: c, onSelect }, c.entityId)) })
+  ] });
+}
+
+// src/FormBuilder.tsx
+import { jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
 var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = useState10(false);
+  const [view, setView] = useState10("design");
   const [toast, setToast] = useState10(null);
-  const editors = useMemo5(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
+  const editors = useMemo6(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
   useEffect9(() => {
     if (!toast) return;
@@ -2665,35 +2711,42 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
     }
     onChangeRef.current?.(b.schema);
   }, [b.schema]);
-  return /* @__PURE__ */ jsxs13("div", { className: `lf-builder ${className ?? ""}`, children: [
-    /* @__PURE__ */ jsxs13("div", { className: "lf-builder-toolbar", children: [
-      /* @__PURE__ */ jsxs13("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", title: "Undo (\u2318/Ctrl+Z)", children: [
-        /* @__PURE__ */ jsx13(IconUndo, {}),
+  return /* @__PURE__ */ jsxs14("div", { className: `lf-builder ${className ?? ""}`, children: [
+    /* @__PURE__ */ jsxs14("div", { className: "lf-builder-toolbar", children: [
+      /* @__PURE__ */ jsxs14("button", { type: "button", onClick: b.undo, disabled: !b.canUndo, "aria-label": "Undo", title: "Undo (\u2318/Ctrl+Z)", children: [
+        /* @__PURE__ */ jsx14(IconUndo, {}),
         "Undo"
       ] }),
-      /* @__PURE__ */ jsxs13("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", title: "Redo (\u2318/Ctrl+Shift+Z)", children: [
-        /* @__PURE__ */ jsx13(IconRedo, {}),
+      /* @__PURE__ */ jsxs14("button", { type: "button", onClick: b.redo, disabled: !b.canRedo, "aria-label": "Redo", title: "Redo (\u2318/Ctrl+Shift+Z)", children: [
+        /* @__PURE__ */ jsx14(IconRedo, {}),
         "Redo"
       ] }),
-      !hidePreview && /* @__PURE__ */ jsxs13("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
-        /* @__PURE__ */ jsx13(IconEye, {}),
+      !hidePreview && /* @__PURE__ */ jsxs14("button", { type: "button", onClick: () => setShowPreview(true), title: "Preview the form", children: [
+        /* @__PURE__ */ jsx14(IconEye, {}),
         "Preview"
       ] }),
-      /* @__PURE__ */ jsx13(ProblemsBadge, { builder: b })
-    ] }),
-    /* @__PURE__ */ jsxs13(CanvasDndProvider, { builder: b, children: [
-      /* @__PURE__ */ jsxs13("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
-        /* @__PURE__ */ jsx13(Palette, { builder: b, extra: extraFields }),
-        /* @__PURE__ */ jsx13(Canvas, { builder: b, components, registry }),
-        modal ? aside && /* @__PURE__ */ jsx13("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx13(SettingsPanel, { builder: b, editors })
+      /* @__PURE__ */ jsxs14("div", { className: "lf-builder-viewtoggle", role: "group", "aria-label": "Builder view", children: [
+        /* @__PURE__ */ jsx14("button", { type: "button", className: view === "design" ? "is-active" : "", "aria-pressed": view === "design", onClick: () => setView("design"), children: "Design" }),
+        /* @__PURE__ */ jsx14("button", { type: "button", className: view === "data" ? "is-active" : "", "aria-pressed": view === "data", onClick: () => setView("data"), title: "See the data structure this form produces", children: "Data" })
       ] }),
-      modal && /* @__PURE__ */ jsx13(SettingsModal, { builder: b, editors, notify: setToast })
+      /* @__PURE__ */ jsx14(ProblemsBadge, { builder: b })
     ] }),
-    showPreview && /* @__PURE__ */ jsx13(PreviewModal, { schema: b.schema, components, registry, onClose: () => setShowPreview(false), notify: setToast }),
-    /* @__PURE__ */ jsx13(Problems, { builder: b }),
+    /* @__PURE__ */ jsxs14(CanvasDndProvider, { builder: b, children: [
+      view === "data" ? /* @__PURE__ */ jsx14("div", { className: "lf-builder-body lf-builder-body--data", children: /* @__PURE__ */ jsx14(DataStructureView, { schema: b.schema, registry, onSelect: (id) => {
+        setView("design");
+        b.select(id);
+      } }) }) : /* @__PURE__ */ jsxs14("div", { className: `lf-builder-body${modal ? " lf-builder-body--modal" : ""}${modal && aside ? " lf-builder-body--aside" : ""}`, children: [
+        /* @__PURE__ */ jsx14(Palette, { builder: b, extra: extraFields }),
+        /* @__PURE__ */ jsx14(Canvas, { builder: b, components, registry }),
+        modal ? aside && /* @__PURE__ */ jsx14("aside", { className: "lf-builder-aside", children: aside }) : /* @__PURE__ */ jsx14(SettingsPanel, { builder: b, editors })
+      ] }),
+      modal && /* @__PURE__ */ jsx14(SettingsModal, { builder: b, editors, notify: setToast })
+    ] }),
+    showPreview && /* @__PURE__ */ jsx14(PreviewModal, { schema: b.schema, components, registry, onClose: () => setShowPreview(false), notify: setToast }),
+    /* @__PURE__ */ jsx14(Problems, { builder: b }),
     toast && createPortal3(
-      /* @__PURE__ */ jsxs13("div", { className: "lf-toast lf-builder", role: "status", children: [
-        /* @__PURE__ */ jsx13("span", { className: "lf-toast-tick", "aria-hidden": "true", children: /* @__PURE__ */ jsx13(IconCheck, {}) }),
+      /* @__PURE__ */ jsxs14("div", { className: "lf-toast lf-builder", role: "status", children: [
+        /* @__PURE__ */ jsx14("span", { className: "lf-toast-tick", "aria-hidden": "true", children: /* @__PURE__ */ jsx14(IconCheck, {}) }),
         " ",
         toast
       ] }),
@@ -2706,6 +2759,7 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
 var VERSION = "0.1.0-alpha.0";
 export {
   ATTRIBUTE_TABS,
+  DataStructureView,
   FormBuilder,
   NodePreview,
   SettingsPanel,

@@ -2798,6 +2798,216 @@ function esc(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
+// src/dataContract.ts
+function attrsOf2(e) {
+  if (!e || typeof e.attributes !== "object" || e.attributes === null) return {};
+  return e.attributes;
+}
+function labelOf3(e) {
+  const l = attrsOf2(e).label;
+  return typeof l === "string" ? l : "";
+}
+function num(v) {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return void 0;
+}
+var ACCEPTS = {
+  textField: "Text",
+  textarea: "Multi-line text",
+  email: "Email address",
+  url: "URL",
+  phoneNumber: "Phone number",
+  password: "Password",
+  select: "Dropdown (single choice)",
+  searchSelect: "Searchable dropdown",
+  radio: "Single choice",
+  signature: "Signature",
+  address: "Address (free text)",
+  time: "Time",
+  richText: "Rich text (HTML)",
+  day: "Date",
+  datetime: "Date & time",
+  number: "Number",
+  currency: "Currency amount",
+  rating: "Rating (stars)",
+  checkbox: "Checkbox (yes / no)",
+  selectBoxes: "Multiple choice",
+  tags: "Tags",
+  tagsField: "Tags",
+  ranking: "Ranked list",
+  array: "List of values",
+  file: "File upload",
+  map: "Key\u2013value map",
+  matrix: "Survey grid",
+  addressBlock: "Structured address",
+  dataGrid: "Repeating rows",
+  editGrid: "Repeating rows"
+};
+var ADDRESS_PARTS = [
+  { key: "streetAddress", label: "Street address" },
+  { key: "steNumber", label: "Suite / unit" },
+  { key: "city", label: "City" },
+  { key: "region", label: "State / region" },
+  { key: "postalCode", label: "Postal code" },
+  { key: "country", label: "Country" }
+];
+function acceptsFor(fieldType) {
+  return ACCEPTS[fieldType] ?? fieldType.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
+}
+function typeLabelFor(fieldType, valueType, isGrid) {
+  if (isGrid) return "row[]";
+  switch (valueType) {
+    case "file":
+      return "file[]";
+    case "array":
+      return fieldType === "array" ? "any[]" : "string[]";
+    case "none":
+      return "\u2014";
+    default:
+      return valueType;
+  }
+}
+function constraintsFor(fieldType, a) {
+  const out = [];
+  if (a.required) out.push("required");
+  const minLen = num(a.minLength);
+  const maxLen = num(a.maxLength);
+  if (minLen !== void 0) out.push(`\u2265 ${minLen} chars`);
+  if (maxLen !== void 0) out.push(`\u2264 ${maxLen} chars`);
+  const minWords = num(a.minWords);
+  const maxWords = num(a.maxWords);
+  if (minWords !== void 0) out.push(`\u2265 ${minWords} words`);
+  if (maxWords !== void 0) out.push(`\u2264 ${maxWords} words`);
+  if (typeof a.pattern === "string" && a.pattern.trim() !== "") out.push("pattern");
+  const min = num(a.min);
+  const max = num(a.max);
+  if (min !== void 0) out.push(`\u2265 ${min}`);
+  if (max !== void 0) out.push(`\u2264 ${max}`);
+  for (const [attr, word] of [
+    ["minDate", "from"],
+    ["maxDate", "until"],
+    ["minTime", "from"],
+    ["maxTime", "until"]
+  ]) {
+    const v = a[attr];
+    if (typeof v === "string" && v.trim() !== "") out.push(`${word} ${v}`);
+  }
+  const counts = [
+    ["minSelected", "\u2265 {n} selected"],
+    ["maxSelected", "\u2264 {n} selected"],
+    ["minTags", "\u2265 {n} tags"],
+    ["maxTags", "\u2264 {n} tags"],
+    ["minRows", "\u2265 {n} rows"],
+    ["maxRows", "\u2264 {n} rows"],
+    ["minFiles", "\u2265 {n} files"],
+    ["maxFiles", "\u2264 {n} files"]
+  ];
+  for (const [attr, tpl] of counts) {
+    const n = num(a[attr]);
+    if (n !== void 0) out.push(tpl.replace("{n}", String(n)));
+  }
+  const maxSize = num(a.maxSize);
+  if (maxSize !== void 0) out.push(`\u2264 ${maxSize} MB`);
+  if (Array.isArray(a.options)) out.push(`${a.options.length} option${a.options.length === 1 ? "" : "s"}`);
+  return out;
+}
+function isConditional(a) {
+  const cond = a.conditional;
+  return cond != null && typeof cond.when === "string" && cond.when !== "" || typeof a.customConditional === "string" && a.customConditional.trim() !== "" || a.hidden === true || Array.isArray(a.logic) && a.logic.length > 0;
+}
+function leafExample(valueType) {
+  switch (valueType) {
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    case "array":
+    case "file":
+      return [];
+    case "object":
+      return {};
+    case "none":
+      return null;
+    default:
+      return "";
+  }
+}
+function rowExample(children) {
+  const row = {};
+  for (const c of children) row[c.key] = c.example;
+  return row;
+}
+function deriveDataContract(schema, registry) {
+  const reg = registry ?? createDefaultFieldTypeRegistry();
+  const entities = schema?.entities ?? {};
+  const seen = /* @__PURE__ */ new Set();
+  function walk(ids) {
+    const out = [];
+    for (const id of ids ?? []) {
+      if (seen.has(id)) continue;
+      const e = entities[id];
+      if (!e) continue;
+      seen.add(id);
+      const ft = reg.get(e.type);
+      if (ft?.isStatic) continue;
+      if (ft?.isContainer && !ft.isGrid) {
+        out.push(...walk(e.children));
+        continue;
+      }
+      if (ft && ft.valueType === "none") continue;
+      out.push(buildField(id, e, ft));
+    }
+    return out;
+  }
+  function buildField(id, e, ft) {
+    const a = attrsOf2(e);
+    const key = keyOf(id, e);
+    const valueType = ft?.valueType ?? "object";
+    const isGrid = ft?.isGrid === true;
+    let children;
+    if (isGrid) {
+      children = walk(e.children);
+    } else if (e.type === "addressBlock") {
+      children = ADDRESS_PARTS.map((p) => ({
+        key: p.key,
+        entityId: `${id}.${p.key}`,
+        fieldType: "textField",
+        label: p.label,
+        valueType: "string",
+        typeLabel: "string",
+        accepts: "Text",
+        constraints: [],
+        conditional: false,
+        excluded: false,
+        example: ""
+      }));
+    }
+    const example2 = isGrid ? [rowExample(children ?? [])] : children ? rowExample(children) : leafExample(valueType);
+    return {
+      key,
+      entityId: id,
+      fieldType: e.type,
+      label: labelOf3(e) || key,
+      valueType,
+      typeLabel: typeLabelFor(e.type, valueType, isGrid),
+      accepts: acceptsFor(e.type),
+      constraints: constraintsFor(e.type, a),
+      conditional: isConditional(a),
+      excluded: a.persistent === false,
+      children,
+      example: example2
+    };
+  }
+  const fields = walk(schema?.root ?? []);
+  const example = {};
+  for (const f of fields) {
+    if (f.excluded) continue;
+    example[f.key] = f.example;
+  }
+  return { fields, example };
+}
+
 // src/builder/operations.ts
 var _idCounter = 0;
 function defaultIdGen() {
@@ -3007,6 +3217,7 @@ exports.defaultFieldTypeRegistry = defaultFieldTypeRegistry;
 exports.defaultIdGen = defaultIdGen;
 exports.defaultRegistry = defaultRegistry;
 exports.defaultSameValue = defaultSameValue;
+exports.deriveDataContract = deriveDataContract;
 exports.downstreamClosure = downstreamClosure;
 exports.duplicate = duplicate;
 exports.duplicateKeyIds = duplicateKeyIds;
