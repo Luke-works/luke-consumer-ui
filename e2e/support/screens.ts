@@ -39,6 +39,69 @@ const formRoutes = {
   "/api/public/embed/*": ok({ code: "CONTACT", title: "Contact us", version: 1, schema: SCHEMA }),
 };
 
+// ── Access console ──────────────────────────────────────────────────────────
+// /access is ONE route hosting eight sections chosen by local state, so each section needs its
+// own row (clicked into via afterGoto) or seven of the eight would never be seen. Populated
+// rather than empty: the whole point of these baselines is the member rows, role/level pickers
+// and grids, none of which exist in an empty state.
+const ORG_MEMBERS = [
+  {
+    id: "workos:user_ada",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    email: "ada@example.com",
+    roles: { tenantAdmin: "read-write", tenantUser: "read-write", processUser: "read", taskUser: "none" },
+    candidateGroups: ["approvers"],
+    attributes: {},
+  },
+  {
+    id: "workos:user_grace",
+    firstName: "Grace",
+    lastName: "Hopper",
+    email: "grace@example.com",
+    roles: { tenantUser: "read", processUser: "none", taskUser: "none" },
+    candidateGroups: [],
+    attributes: {},
+  },
+];
+const ORG_CAPABILITIES = [
+  { code: "FORMS", name: "Forms", description: "Build and collect forms.", tier: "FREE", status: "READY" },
+  { code: "EMAIL", name: "Email", description: "Send templated email.", tier: "STANDARD", status: "READY" },
+];
+const ORG_GROUPS = [{ id: "approvers", name: "Approvers" }];
+const ACCESS_REQUESTS = [
+  {
+    id: "req-1",
+    capabilityCode: "EMAIL",
+    capabilityName: "Email",
+    requestedLevel: "contributor",
+    status: "PENDING",
+    note: "Need to send the onboarding sequence.",
+    requestedAt: "2026-06-01T00:00:00Z",
+    requesterName: "Grace Hopper",
+    requesterId: "workos:user_grace",
+  },
+];
+const accessRoutes = {
+  "/api/org/users": ok(ORG_MEMBERS),
+  "/api/org/capabilities": ok(ORG_CAPABILITIES),
+  "/api/org/candidate-groups": ok(ORG_GROUPS),
+  "/api/org/access-requests*": ok(ACCESS_REQUESTS),
+  "/auth/org/invitations": ok({
+    invitations: [{ id: "inv-1", email: "new.hire@example.com", state: "pending", expiresAt: "2026-07-01T00:00:00Z" }],
+  }),
+  // Per-member reads the sections fan out to (one request per member — there is no bulk read).
+  "/api/org/users/*/capabilities": ok([{ capabilityCode: "FORMS", level: "read-write" }]),
+  "/api/org/capabilities/*/owners": ok([{ id: "workos:user_ada", firstName: "Ada", lastName: "Lovelace" }]),
+  "/api/org/candidate-groups/*/managers": ok([{ id: "workos:user_ada", firstName: "Ada", lastName: "Lovelace" }]),
+};
+
+/** Click into an /access section by its sub-nav label, then wait for the pane to swap. */
+const accessSection = (label: RegExp) => async (page: Page) => {
+  const nav = page.getByRole("navigation", { name: /access sections/i });
+  await nav.getByRole("button", { name: label }).click();
+};
+
 export type Screen = {
   name: string;
   path: string;
@@ -66,7 +129,58 @@ export const SCREENS: Screen[] = [
   { name: "workflow-connections", path: "/workflow/connections", ready: heading(/connections/i) },
   { name: "profile", path: "/account/profile", ready: heading(/edit profile/i) },
   { name: "settings", path: "/account/settings" },
-  { name: "access", path: "/access", ready: heading(/access/i) },
+  // /access lands on "Manage My Access"; the other seven sections are local state, so each is
+  // clicked into. Without these rows a whole console of eight screens had one baseline.
+  { name: "access", path: "/access", opts: { routes: accessRoutes }, ready: heading(/access/i) },
+  {
+    name: "access-approve",
+    path: "/access",
+    opts: { routes: accessRoutes },
+    afterGoto: accessSection(/approve requests/i),
+    ready: heading(/pending requests/i),
+  },
+  {
+    name: "access-roles",
+    path: "/access",
+    opts: { routes: accessRoutes },
+    afterGoto: accessSection(/^roles$/i),
+    ready: heading(/what each role means/i),
+  },
+  {
+    name: "access-attributes",
+    path: "/access",
+    opts: { routes: accessRoutes },
+    afterGoto: accessSection(/^attributes$/i),
+    ready: heading(/^attributes$/i),
+  },
+  {
+    name: "access-capabilities",
+    path: "/access",
+    opts: { routes: accessRoutes },
+    afterGoto: accessSection(/^capabilities$/i),
+    ready: heading(/^capabilities$/i),
+  },
+  {
+    name: "access-members",
+    path: "/access",
+    opts: { routes: accessRoutes },
+    afterGoto: accessSection(/^members$/i),
+    ready: heading(/add user to organization/i),
+  },
+  {
+    name: "access-candidate-groups",
+    path: "/access",
+    opts: { routes: accessRoutes },
+    afterGoto: accessSection(/candidate groups/i),
+    ready: heading(/create a candidate group/i),
+  },
+  {
+    name: "access-invitations",
+    path: "/access",
+    opts: { routes: accessRoutes },
+    afterGoto: accessSection(/^invitations$/i),
+    ready: heading(/invite a teammate/i),
+  },
   { name: "support", path: "/support", ready: heading(/support/i) },
   { name: "forms", path: "/forms", ready: heading(/^forms$/i) },
   { name: "form-instances", path: "/forms/instances", ready: heading(/form instances/i) },

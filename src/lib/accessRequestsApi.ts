@@ -12,8 +12,18 @@ const MINE = "/api/my-access-requests";
 const ORG = "/api/org/access-requests";
 const seg = (s: string) => encodeURIComponent(s);
 
+/**
+ * The level a member can ask for. Mirrors core-engine `CapabilityLevel`, whose `isValid`
+ * already accepts `contributor` on both the create and approve endpoints (#104) — so this
+ * needs no backend change.
+ */
 export type AccessRequestLevel = "read" | "contributor" | "read-write";
-export type AccessRequestStatus = "PENDING" | "APPROVED" | "DENIED" | "CANCELLED";
+/**
+ * `RETURNED` is the workflow state: a resource owner rejected the request and the approval
+ * process handed it BACK to the requester, who revises and resubmits or withdraws. It is not
+ * terminal — unlike `DENIED`, which now only arises on the legacy non-orchestrated path.
+ */
+export type AccessRequestStatus = "PENDING" | "APPROVED" | "DENIED" | "CANCELLED" | "RETURNED";
 
 /** A capability access request (requester-submitted, owner-decided). */
 export type AccessRequest = {
@@ -33,6 +43,12 @@ export type AccessRequest = {
   requesterName?: string;
   /** Engine id of the deciding owner. */
   decidedBy?: string;
+  /** Display name of the deciding owner, when the server resolved it. */
+  decidedByName?: string;
+  /** The Camunda instance orchestrating this request; absent until the outbox has started it. */
+  processInstanceId?: string;
+  /** How many times the requester revised and resubmitted after a return. */
+  resubmitCount?: number;
 };
 
 // requestedAt / decidedAt may arrive as an ISO string, a [Y,M,D,h,m,s] array
@@ -72,6 +88,9 @@ const toAccessRequest = (r: ApiAccessRequest): AccessRequest => ({
   decidedAt: ms(r.decidedAt),
   requesterName: r.requesterName,
   decidedBy: r.decidedBy,
+  decidedByName: r.decidedByName,
+  processInstanceId: r.processInstanceId,
+  resubmitCount: r.resubmitCount,
 });
 
 function req<T>(tenant: string, path: string, init: RequestInit = {}): Promise<T> {
@@ -98,6 +117,28 @@ export async function createAccessRequest(
 export async function listMyAccessRequests(tenant: string): Promise<AccessRequest[]> {
   const list = await req<ApiAccessRequest[]>(tenant, MINE);
   return asArray<ApiAccessRequest>(list).map(toAccessRequest);
+}
+
+/**
+ * Revise a request that was RETURNED to the caller and send it back to the resource owners.
+ * Completes the requester's task in the approval process, which loops it to the approval step.
+ */
+export async function resubmitAccessRequest(
+  tenant: string,
+  id: string,
+  input: { level?: AccessRequestLevel; note?: string } = {},
+): Promise<AccessRequest> {
+  const r = await req<ApiAccessRequest>(tenant, `${BASE}/${seg(id)}/resubmit`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return toAccessRequest(r);
+}
+
+/** Give up on a RETURNED request; the approval process closes it out (409 if not RETURNED). */
+export async function withdrawAccessRequest(tenant: string, id: string): Promise<AccessRequest> {
+  const r = await req<ApiAccessRequest>(tenant, `${BASE}/${seg(id)}/withdraw`, { method: "POST" });
+  return toAccessRequest(r);
 }
 
 /** Cancel the caller's OWN pending request (403 if not owner, 409 if not PENDING). */
