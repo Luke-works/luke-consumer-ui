@@ -6,6 +6,7 @@ import ErrorBoundary from "../../components/common/ErrorBoundary";
 import LukeflowBadge from "../../components/common/LukeflowBadge";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import FormConsentGate, { focusConsent } from "../../components/formBuilder/FormConsentGate";
+import TurnstileGate from "../../components/formBuilder/TurnstileGate";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readAttachmentsEnabled, readConsent, readSubmitMessage } from "../../lib/formSchema";
 import { getEmbedForm, submitEmbed, type EmbedForm } from "../../lib/publicEmbedApi";
@@ -39,6 +40,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
   const [consentAgreed, setConsentAgreed] = useState(false);
   const [consentError, setConsentError] = useState(false);
   const consentRef = useRef<HTMLInputElement>(null);
+  // Cloudflare Turnstile. Platform-wide (the server decides), not a per-form setting. The token is
+  // single-use and short-lived, so it is state — not something we can capture once and reuse.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   // The host-page bridge: auto-reports our height and emits ready/submitted/error to the embedding
   // site via @lukeflow/form-embed (a no-op when this page is opened standalone, i.e. not framed).
@@ -86,12 +91,25 @@ export default function FormEmbedView({ token }: { token?: string }) {
       focusConsent(consentRef);
       return;
     }
+    // The server refuses a submission without a verified challenge, so catching it here only spares
+    // the filler a round-trip and a generic 400. With `interaction-only` the widget is usually
+    // invisible and the token is already there, so this rarely fires.
+    if (form?.captchaEnabled && !captchaToken) {
+      setError("Please wait a moment for the security check to finish, then try again.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       // Carry the honeypot value under the agreed key; the engine drops the submission if it's filled.
       // attachmentRef is bound server-side at submit so the formMetaData snapshot captures the uploads.
-      const res = await submitEmbed(token, { ...data, _lukehp: honeypot.current?.value ?? "" }, attachmentRef, consentAgreed);
+      const res = await submitEmbed(
+        token,
+        { ...data, _lukehp: honeypot.current?.value ?? "" },
+        attachmentRef,
+        consentAgreed,
+        captchaToken,
+      );
       // Belt-and-suspenders: re-bind any attachments to the created instance (idempotent; never blocks).
       if (res.instanceId) void linkEmbedDocuments(token, attachmentRef, res.instanceId);
       setDone(true);
@@ -99,6 +117,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
     } catch (e) {
       setError((e as Error).message);
       bridge.current?.error((e as Error).message);
+      // Turnstile tokens are single-use: whatever failed, the one we just sent is spent. Without a
+      // fresh challenge the retry would be refused for a reason the filler cannot see or fix.
+      setCaptchaToken(null);
+      setCaptchaReset((n) => n + 1);
     } finally {
       setSubmitting(false);
     }
@@ -157,6 +179,18 @@ export default function FormEmbedView({ token }: { token?: string }) {
                   error={consentError}
                   disabled={submitting}
                   inputRef={consentRef}
+                />
+              ) : null}
+
+              {/* The security check. Invisible for most fillers (`interaction-only`) — it only shows
+                  itself when Cloudflare actually wants one. Above the tabs so a challenge is never
+                  hidden behind an inactive tab. */}
+              {form.captchaEnabled && form.captchaSitekey ? (
+                <TurnstileGate
+                  sitekey={form.captchaSitekey}
+                  onToken={setCaptchaToken}
+                  onError={setError}
+                  resetSignal={captchaReset}
                 />
               ) : null}
 

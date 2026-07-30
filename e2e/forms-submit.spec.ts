@@ -136,6 +136,113 @@ test.describe("forms — public embed submit", () => {
     expect(payload.data?._lukehp ?? "").toBe("");
   });
 
+  test("a Turnstile-protected form sends the challenge token with the submission", async ({ page }) => {
+    // OFFLINE BY CONSTRUCTION. Cloudflare's script is intercepted and replaced with a stub that
+    // registers the same window.turnstile API and hands back their published dummy token — the same
+    // one the always-passes TEST sitekey emits. Nothing here reaches challenges.cloudflare.com, so
+    // this suite stays fast and cannot fail because of someone else's outage.
+    const submits: Record<string, unknown>[] = [];
+
+    await page.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body: `window.turnstile = {
+                 render: (el, o) => { setTimeout(() => o.callback("XXXX.DUMMY.TOKEN.XXXX"), 0); return "w1"; },
+                 reset: () => {}, remove: () => {},
+               };`,
+      }),
+    );
+
+    await stubBackend(page, {
+      loggedOut: true,
+      routes: {
+        "/api/public/embed/*": ok({
+          code: "CONTACT", title: "Contact us", version: 1, schema: SCHEMA,
+          // Cloudflare's published always-passes TEST sitekey — no account needed.
+          captchaEnabled: true, captchaSitekey: "1x00000000000000000000AA",
+        }),
+        "/api/public/embed/*/submit": capture(submits, { ok: true, instanceId: "inst-9", processStatus: "QUEUED" }),
+      },
+    });
+
+    await page.goto("/embed/tok_public_1");
+
+    await page.getByRole("textbox", { name: /name/i }).fill("Grace Hopper");
+    await page.getByRole("textbox", { name: /email/i }).fill("grace@example.com");
+    await page.getByRole("button", { name: /submit/i }).click();
+
+    await expect(page.getByText(/thanks — we got it\./i)).toBeVisible();
+    await expectHealthy(page);
+
+    expect(submits).toHaveLength(1);
+    const payload = submits[0] as { captchaToken?: string; data?: Record<string, unknown> };
+    expect(payload.captchaToken).toBe("XXXX.DUMMY.TOKEN.XXXX");
+    // The rest of the contract is unchanged — the captcha rides alongside, it does not replace.
+    expect(payload.data?.name).toBe("Grace Hopper");
+    expect(payload.data?._lukehp ?? "").toBe("");
+  });
+
+  test("the CSP core-engine serves actually permits the Turnstile script and frame", async ({ page }) => {
+    // WHAT THIS PROVES, AND WHAT IT DELIBERATELY DOES NOT.
+    //
+    // core-engine serves the embed document with a Content-Security-Policy; this suite is served by
+    // Vite, which sends none — and Vite's DEV server injects inline module preamble scripts that
+    // `script-src 'self'` correctly blocks. Attaching the real policy to the dev page therefore breaks
+    // the harness, not the product: production serves a static shell (EmbedPageController.SHELL) whose
+    // only script is an external same-origin tag, asserted separately in EmbedPageControllerTest.
+    //
+    // So this drives a MINIMAL document under the EXACT header instead. That answers the question the
+    // policy is actually about — may the Turnstile script execute, and may its challenge frame load —
+    // without Vite in the way. Keep the constant in sync with EmbedPageController.SCRIPT_AND_FRAME.
+    const CSP =
+      "frame-ancestors *; script-src 'self' https://challenges.cloudflare.com; " +
+      "frame-src https://challenges.cloudflare.com";
+
+    await page.route("https://challenges.cloudflare.com/turnstile/v0/api.js*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body: "window.__TURNSTILE_SCRIPT_RAN__ = true;",
+      }),
+    );
+    // The widget renders its challenge in an iframe from the same host — that is the frame-src half.
+    await page.route("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/**", (route) =>
+      route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>challenge</body></html>" }),
+    );
+
+    await page.route("**/csp-probe", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        headers: { "content-security-policy": CSP },
+        body: `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
+                 <script>
+                   window.__CSP__ = [];
+                   document.addEventListener("securitypolicyviolation", (e) =>
+                     window.__CSP__.push(e.violatedDirective + ":" + e.blockedURI));
+                 </script>
+                 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
+                 <iframe src="https://challenges.cloudflare.com/cdn-cgi/challenge-platform/x"></iframe>
+               </body></html>`,
+      }),
+    );
+
+    await page.goto("/csp-probe");
+
+    // The Turnstile script was ALLOWED to execute under this policy — the whole point of script-src.
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __TURNSTILE_SCRIPT_RAN__?: boolean }).__TURNSTILE_SCRIPT_RAN__))
+      .toBe(true);
+
+    // And nothing Cloudflare needs was refused. (The probe's own inline listener is expected to be
+    // reported — production has no inline script, so it is filtered rather than asserted away.)
+    const cloudflareBlocks = (await page.evaluate(
+      () => (window as unknown as { __CSP__?: string[] }).__CSP__ ?? [],
+    )).filter((v) => v.includes("challenges.cloudflare.com"));
+    expect(cloudflareBlocks, `CSP blocked Turnstile: ${cloudflareBlocks.join(", ")}`).toEqual([]);
+  });
+
   test("a consent-requiring form refuses to submit until the agreement is accepted", async ({ page }) => {
     // The consent record is what makes a submission provable, so the full browser path matters: the
     // statement renders, submit is refused with the answers intact, and the accepted tick reaches the
