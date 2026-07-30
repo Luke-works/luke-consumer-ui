@@ -33,6 +33,10 @@ export const TOOLBAR_BTN_BASE =
   "inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition focus:outline-hidden focus-visible:ring-3 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50";
 export const TOOLBAR_BTN_NEUTRAL =
   `${TOOLBAR_BTN_BASE} border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5`;
+/** Icon-only toolbar button (the settings gear). Square, and the SAME h-9 as every labelled button —
+ *  it was h-8, which read as a smaller, misaligned box wedged between 36px neighbours. */
+export const TOOLBAR_BTN_ICON =
+  `${TOOLBAR_BTN_BASE} w-9 justify-center border border-gray-200 px-0 text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200`;
 export const TOOLBAR_BTN_PRIMARY =
   `${TOOLBAR_BTN_BASE} border border-transparent bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:hover:bg-brand-500`;
 

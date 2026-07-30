@@ -25,15 +25,19 @@ import FormConsentGate from "../../components/formBuilder/FormConsentGate";
 import { FORM_FONTS, resolveFont } from "../../lib/formFonts";
 import { CONSENT_DEFAULT_TEXT, CONSENT_MAX_LENGTH } from "../../lib/formSchema";
 import type { AuditEvent, StoredForm } from "../../lib/formsApi";
-import { FileText, Gavel, Info, Palette, History } from "lucide-react";
+import { CircleCheckBig, Clock, Gavel, Info, Palette } from "lucide-react";
 import FormActivityTimeline from "./FormActivityTimeline";
 
+// Four of the five are circular, which reads far calmer than mixing diagonals (a paper plane and a
+// gavel side by side looked busier, not evener). Every icon here has EXACTLY 20x20 of ink inside its 24-unit viewBox (measured, not eyeballed).
+// Lucide glyphs vary from 14x14 to 20x20, and mixing them makes a uniform box + uniform gap still look
+// ragged — the icons appear to be different sizes and to sit at different distances from their labels.
 const TABS = [
   { id: "general", label: "General", icon: Info },
-  { id: "submission", label: "Submission", icon: FileText },
+  { id: "submission", label: "Submission", icon: CircleCheckBig },
   { id: "legal", label: "Legal", icon: Gavel },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "activity", label: "Activity", icon: History },
+  { id: "activity", label: "Activity", icon: Clock },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
