@@ -96,6 +96,28 @@ button[type="submit"],
   word-break: break-word;
 }
 
+/* The consent record: what the filler agreed to, quoted. Prose, not a table cell — a multi-sentence
+ * statement squeezed into a 32mm-label row reads like it was truncated. */
+.luke-submission-record__consent {
+  margin-top: 2.5mm;
+}
+
+.luke-submission-record__consent-label {
+  margin: 0 0 1mm;
+  font-size: 8pt;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.luke-submission-record__consent blockquote {
+  margin: 0;
+  padding-left: 3mm;
+  border-left: 0.6mm solid #9ca3af;
+  font-style: italic;
+  line-height: 1.45;
+  color: #1f2937;
+}
+
 .luke-submission-record__note {
   margin: 2mm 0 0;
   font-size: 7.5pt;

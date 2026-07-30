@@ -5,8 +5,9 @@ import { createPublicMinionClient } from "../../lib/minionsApi";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import LukeflowBadge from "../../components/common/LukeflowBadge";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
+import FormConsentGate, { focusConsent } from "../../components/formBuilder/FormConsentGate";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
-import { readAttachmentsEnabled, readSubmitMessage } from "../../lib/formSchema";
+import { readAttachmentsEnabled, readConsent, readSubmitMessage } from "../../lib/formSchema";
 import { getEmbedForm, submitEmbed, type EmbedForm } from "../../lib/publicEmbedApi";
 import { linkEmbedDocuments } from "../../lib/publicDocumentsApi";
 import EmbedAttachments from "./EmbedAttachments";
@@ -34,6 +35,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
   const [attachmentRef] = useState(newAttachmentRef); // stable per fill session
   const [tab, setTab] = useState<"form" | "files">("form"); // Attachments is a TAB, not an inline field
   const [attachmentCount, setAttachmentCount] = useState(0); // drives the tab badge
+  // Consent (opt-in per form): the filler's agreement to the statement published with this version.
+  const [consentAgreed, setConsentAgreed] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  const consentRef = useRef<HTMLInputElement>(null);
 
   // The host-page bridge: auto-reports our height and emits ready/submitted/error to the embedding
   // site via @lukeflow/form-embed (a no-op when this page is opened standalone, i.e. not framed).
@@ -67,14 +72,26 @@ export default function FormEmbedView({ token }: { token?: string }) {
     return () => ctl.abort();
   }, [token, reloadKey]);
 
+  // The agreement this VERSION published — read from the served schema, the same setting the server
+  // enforces against, so what the filler is asked and what gets recorded cannot diverge.
+  const consent = useMemo(() => readConsent(form?.schema), [form?.schema]);
+
   const handleSubmit = async (data: Record<string, unknown>) => {
     if (!token) return;
+    // Consent is enforced server-side (a submit without it is refused); catching it here just spares the
+    // filler a round-trip and a generic error. Send them back to the box rather than only colouring it —
+    // it sits above the form, so after a long fill it may well be off-screen.
+    if (consent.enabled && !consentAgreed) {
+      setConsentError(true);
+      focusConsent(consentRef);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       // Carry the honeypot value under the agreed key; the engine drops the submission if it's filled.
       // attachmentRef is bound server-side at submit so the formMetaData snapshot captures the uploads.
-      const res = await submitEmbed(token, { ...data, _lukehp: honeypot.current?.value ?? "" }, attachmentRef);
+      const res = await submitEmbed(token, { ...data, _lukehp: honeypot.current?.value ?? "" }, attachmentRef, consentAgreed);
       // Belt-and-suspenders: re-bind any attachments to the created instance (idempotent; never blocks).
       if (res.instanceId) void linkEmbedDocuments(token, attachmentRef, res.instanceId);
       setDone(true);
@@ -129,6 +146,19 @@ export default function FormEmbedView({ token }: { token?: string }) {
                 style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, opacity: 0 }}
               />
               {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
+
+              {/* The agreement, ABOVE the tabs so it stays visible on the Attachments tab too — consent
+                  covers the whole submission, files included, not just the form fields. */}
+              {consent.enabled ? (
+                <FormConsentGate
+                  text={consent.text}
+                  agreed={consentAgreed}
+                  onChange={(v) => { setConsentAgreed(v); if (v) setConsentError(false); }}
+                  error={consentError}
+                  disabled={submitting}
+                  inputRef={consentRef}
+                />
+              ) : null}
 
               {/* Attachments live in their own TAB (opt-in per form), not as an inline form field. Both
                   panels stay MOUNTED (toggled with `hidden`) so typed form data and any in-progress upload

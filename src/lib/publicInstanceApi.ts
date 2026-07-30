@@ -59,10 +59,17 @@ export function getRespondForm(token: string, accessToken: string): Promise<Resp
 }
 
 /** Final submit. */
+/** `consentAgreed` carries only the recipient's tick — the server records the wording from the schema it
+ *  served, so this cannot assert agreement to different terms. */
 export function submitRespond(
   token: string,
   accessToken: string,
   data: Record<string, unknown>,
+  consentAgreed?: boolean,
 ): Promise<{ ok: boolean; instanceId: string; state: string }> {
-  return call(`${seg(token)}/submit`, { method: "POST", body: JSON.stringify({ data }) }, accessToken);
+  return call(
+    `${seg(token)}/submit`,
+    { method: "POST", body: JSON.stringify({ data, consentAgreed: consentAgreed === true }) },
+    accessToken,
+  );
 }

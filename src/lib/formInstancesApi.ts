@@ -43,6 +43,11 @@ export type FormInstance = {
   submittedUserAgent?: string;
   /** Which door it came through: EMBED | RESPOND | APP. */
   submittedVia?: string;
+  /** The consent record: the EXACT statement the filler agreed to (resolved server-side from the version
+   *  they were served) and when. Absent means the form asked for no agreement, or the row predates the
+   *  feature — never that they declined, since such a submission is refused outright. */
+  consentText?: string;
+  consentAgreedAt?: number;
 };
 
 /** A loaded instance plus the pinned schema string to render it with. */
@@ -67,6 +72,8 @@ type ApiInstance = {
   submittedIp?: string | null;
   submittedUserAgent?: string | null;
   submittedVia?: string | null;
+  consentText?: string | null;
+  consentAgreedAt?: unknown;
 };
 type ApiView = { instance: ApiInstance; schema?: string | null };
 
@@ -103,6 +110,8 @@ function toInstance(i: ApiInstance): FormInstance {
     submittedIp: i.submittedIp ?? undefined,
     submittedUserAgent: i.submittedUserAgent ?? undefined,
     submittedVia: i.submittedVia ?? undefined,
+    consentText: i.consentText ?? undefined,
+    consentAgreedAt: ms(i.consentAgreedAt),
   };
 }
 
@@ -223,16 +232,18 @@ export async function saveInstanceData(
   return toView(await req<ApiView>(tenant, `${BASE}/${seg(id)}`, { method: "PATCH", body: JSON.stringify({ data }) }));
 }
 
-/** Submit the instance (optionally with a final data merge). */
+/** Submit the instance (optionally with a final data merge). `consentAgreed` carries only the filler's
+ *  tick — the server records the wording from the schema it served. */
 export async function submitInstance(
   tenant: string,
   id: string,
   data?: Record<string, unknown>,
+  consentAgreed?: boolean,
 ): Promise<InstanceView> {
   return toView(
     await req<ApiView>(tenant, `${BASE}/${seg(id)}/submit`, {
       method: "POST",
-      body: JSON.stringify(data ? { data } : {}),
+      body: JSON.stringify({ ...(data ? { data } : {}), consentAgreed: consentAgreed === true }),
     }),
   );
 }

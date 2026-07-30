@@ -132,7 +132,7 @@ describe("FormBuilderPage — settings modal", () => {
     await user.click(await screen.findByRole("button", { name: /^checkout$/i }));
     expect(await screen.findByRole("button", { name: /undo checkout/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /contact/i })); // form-name button
+    await user.click(screen.getByRole("button", { name: /form settings/i })); // the gear
     const nameInput = await screen.findByDisplayValue("Contact"); // seeded from the saved form
     fireEvent.change(nameInput, { target: { value: "Contact Form" } });
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -149,7 +149,7 @@ describe("FormBuilderPage — settings modal", () => {
     mocked.getForm.mockResolvedValue(form(CLEAN));
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: /contact/i })); // open settings (still view-only)
+    await user.click(await screen.findByRole("button", { name: /form settings/i })); // open settings (still view-only)
     expect(await screen.findByDisplayValue("Contact")).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
     expect(screen.getByText(/check the form out/i)).toBeInTheDocument();

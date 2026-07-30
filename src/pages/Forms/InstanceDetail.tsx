@@ -138,7 +138,7 @@ export default function InstanceDetail({
 
       {/* Submission record — the provenance captured at submit. Only rendered once there is something
           to show, so instances submitted before this was recorded don't display empty rows. */}
-      {(instance.submittedIp || instance.submittedVia || instance.submittedUserAgent) && (
+      {(instance.submittedIp || instance.submittedVia || instance.submittedUserAgent || instance.consentText) && (
         <div className="mb-5 rounded-xl border border-gray-100 px-4 dark:border-gray-800">
           <p className="border-b border-gray-100 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">
             Submission record
@@ -154,8 +154,23 @@ export default function InstanceDetail({
               </MetaRow>
             )}
           </div>
+          {/* The agreement, quoted verbatim and given its own block rather than a table row — this is the
+              part that shows what the person actually committed to, so it must be readable as prose and
+              obviously unedited. Only the exact stored statement is rendered, never the form's current
+              wording, so re-wording a live form can't retroactively change an old record. */}
+          {instance.consentText && (
+            <div className="border-t border-gray-100 py-3 dark:border-gray-800">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                Agreed to{instance.consentAgreedAt ? ` · ${fmt(instance.consentAgreedAt)}` : ""}
+              </p>
+              <blockquote className="mt-1.5 border-s-2 border-brand-300 ps-3 text-sm italic leading-relaxed text-gray-700 dark:border-brand-500/50 dark:text-gray-200">
+                “{instance.consentText}”
+              </blockquote>
+            </div>
+          )}
           <p className="pb-3 pt-2 text-[11px] text-gray-400">
-            Captured automatically at submission. The IP address is the address observed at that moment.
+            Captured automatically at submission. The IP address is the address observed at that moment
+            {instance.consentText ? "; the statement above is the exact wording the form presented" : ""}.
           </p>
         </div>
       )}

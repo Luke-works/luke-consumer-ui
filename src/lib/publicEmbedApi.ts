@@ -100,6 +100,7 @@ export async function submitEmbed(
   token: string,
   data: Record<string, unknown>,
   attachmentRef?: string,
+  consentAgreed?: boolean,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; instanceId: string }> {
   const res = await fetchWithRetry(
@@ -109,7 +110,9 @@ export async function submitEmbed(
       headers: { "Content-Type": "application/json" },
       // attachmentRef lets the server bind this session's uploads to the instance BEFORE it snapshots
       // them into formMetaData (the post-submit /link call remains a best-effort fallback).
-      body: JSON.stringify({ data, attachmentRef }),
+      // consentAgreed carries only the filler's tick; the server records the wording from the schema it
+      // served, so this cannot be used to assert agreement to different terms.
+      body: JSON.stringify({ data, attachmentRef, consentAgreed: consentAgreed === true }),
     },
     { signal, label: "submit" },
   );

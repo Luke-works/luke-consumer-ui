@@ -33,6 +33,9 @@ type RenderPayload = {
     ip?: string;
     userAgent?: string;
     via?: string;
+    /** The exact statement the filler agreed to, and when — the consent record. */
+    consentText?: string;
+    consentAgreedAt?: string;
   };
 };
 
@@ -57,23 +60,38 @@ function SubmissionRecord({ p }: { p: NonNullable<RenderPayload["provenance"]> }
     ["Reference", p.instanceId],
   ];
   const present = rows.filter(([, v]) => v != null && v !== "");
-  if (present.length === 0) return null;
+  if (present.length === 0 && !p.consentText) return null;
   return (
     <section className="luke-submission-record">
       <h2>Submission record</h2>
-      <table>
-        <tbody>
-          {present.map(([label, value]) => (
-            <tr key={label}>
-              <th>{label}</th>
-              <td>{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {present.length > 0 && (
+        <table>
+          <tbody>
+            {present.map(([label, value]) => (
+              <tr key={label}>
+                <th>{label}</th>
+                <td>{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {/* The agreement gets its own quoted block, not a table cell: on a printed page this is the part
+          someone will actually read back, and a wrapped multi-sentence statement crammed into a cell is
+          both unreadable and easy to mistake for a truncation. */}
+      {p.consentText && (
+        <div className="luke-submission-record__consent">
+          <p className="luke-submission-record__consent-label">
+            Agreed to
+            {p.consentAgreedAt ? ` on ${new Date(p.consentAgreedAt).toLocaleString()}` : ""}
+          </p>
+          <blockquote>“{p.consentText}”</blockquote>
+        </div>
+      )}
       <p className="luke-submission-record__note">
         Captured automatically by Lukeflow when the form was submitted. The IP address is the address
-        observed at submission time.
+        observed at submission time
+        {p.consentText ? "; the statement above is the exact wording the form presented" : ""}.
       </p>
     </section>
   );

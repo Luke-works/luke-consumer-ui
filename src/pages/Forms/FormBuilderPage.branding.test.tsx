@@ -49,11 +49,17 @@ function renderPage() {
   );
 }
 
-/** Check out (so settings are editable) and open the Form settings modal. */
+/** Check out (so settings are editable) and open the Form settings modal (lands on General). */
 async function openSettings(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: /^checkout$/i }));
-  await user.click(screen.getByRole("button", { name: /contact/i }));
+  await user.click(screen.getByRole("button", { name: /form settings/i })); // the gear
   await screen.findByRole("heading", { name: /form settings/i });
+}
+
+/** The badge option lives on the Appearance tab, alongside the font. */
+async function gotoAppearance(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("tab", { name: /appearance/i }));
+  await screen.findByRole("checkbox", { name: /developed at lukeflow/i });
 }
 
 const badgeToggle = () => screen.getByRole("checkbox", { name: /developed at lukeflow/i });
@@ -70,6 +76,7 @@ describe("Form settings — the “Developed at Lukeflow” option", () => {
     mocked.getForm.mockResolvedValue(form({ showBranding: true, brandingLocked: true }));
     renderPage();
     await openSettings(user);
+    await gotoAppearance(user);
 
     expect(badgeToggle()).toBeChecked();
     expect(badgeToggle()).toBeDisabled();
@@ -84,6 +91,7 @@ describe("Form settings — the “Developed at Lukeflow” option", () => {
     mocked.getForm.mockResolvedValue(form({ showBranding: true, brandingLocked: false }));
     renderPage();
     await openSettings(user);
+    await gotoAppearance(user);
 
     expect(badgeToggle()).toBeEnabled();
     expect(screen.queryByText(/^Paid plan$/)).not.toBeInTheDocument();
@@ -122,6 +130,7 @@ describe("Form settings — the “Developed at Lukeflow” option", () => {
     mocked.updateMeta.mockRejectedValue(new Error("Hiding the badge is available on paid plans."));
     renderPage();
     await openSettings(user);
+    await gotoAppearance(user);
 
     await user.click(badgeToggle());
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -137,8 +146,9 @@ describe("Form settings — the “Developed at Lukeflow” option", () => {
     mocked.getForm.mockResolvedValue(form({ showBranding: true, brandingLocked: false }));
     renderPage();
     // Open settings WITHOUT checking out.
-    await user.click(await screen.findByRole("button", { name: /contact/i }));
+    await user.click(await screen.findByRole("button", { name: /form settings/i }));
     await screen.findByRole("heading", { name: /form settings/i });
+    await gotoAppearance(user);
     expect(badgeToggle()).toBeDisabled();
   });
 });
