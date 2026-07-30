@@ -1,3 +1,4 @@
+import { ICON_LABEL_NUDGE } from "../../lib/iconAlign";
 /**
  * Form lifecycle gating — the single source of truth for whether each action (Check in,
  * Publish, Undo checkout) is currently allowed and why. Shared by the top-bar buttons
@@ -29,14 +30,32 @@ export type Gate = { ok: boolean; reason: string };
  * button — the next logical step in the workflow — and a uniform neutral style for everything
  * else, instead of three competing treatments.
  */
-export const TOOLBAR_BTN_BASE =
-  "inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition focus:outline-hidden focus-visible:ring-3 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+/** Geometry every toolbar button shares. Deliberately carries NO horizontal padding and no icon nudge —
+ *  each variant adds what it needs, because Tailwind utilities of the same property do not reliably
+ *  override one another by class order (a `px-0` appended after `px-3` lost the cascade and squeezed the
+ *  icon-only button's content box to 10px, shrinking its glyph to 10x10 while every other icon was 16). */
+const TOOLBAR_BTN_SHARED =
+  "inline-flex h-9 items-center gap-1.5 rounded-lg text-sm font-medium transition focus:outline-hidden focus-visible:ring-3 focus-visible:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+
+/**
+ * Base for a LABELLED toolbar button.
+ *
+ * The `[&>svg]` nudge is an optical correction, not a fudge: `items-center` aligns the icon to the
+ * text's LINE box, but a label's visible ink sits in the upper part of that box — the descender space
+ * below the baseline is empty for words like "Embed" and "Preview". Measured, every icon's ink centre
+ * sat 2.4–2.6px BELOW its label's; -2px brings them all under 0.65px, i.e. optically aligned. Without
+ * it the icon reads as hanging below the word it belongs to.
+ */
+export const TOOLBAR_BTN_BASE = `${TOOLBAR_BTN_SHARED} px-3 ${ICON_LABEL_NUDGE}`;
+
+/** Icon-ONLY toolbar button (the settings gear). Same h-9 as every labelled button, and built from
+ *  TOOLBAR_BTN_SHARED rather than _BASE so it never inherits the nudge — that correction aligns an icon
+ *  to adjacent TEXT, and this button has none, so inheriting it leaves the glyph sitting high in its
+ *  own square. Note both omissions rely on _SHARED carrying neither, not on overriding. */
+export const TOOLBAR_BTN_ICON =
+  `${TOOLBAR_BTN_SHARED} w-9 justify-center border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200`;
 export const TOOLBAR_BTN_NEUTRAL =
   `${TOOLBAR_BTN_BASE} border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5`;
-/** Icon-only toolbar button (the settings gear). Square, and the SAME h-9 as every labelled button —
- *  it was h-8, which read as a smaller, misaligned box wedged between 36px neighbours. */
-export const TOOLBAR_BTN_ICON =
-  `${TOOLBAR_BTN_BASE} w-9 justify-center border border-gray-200 px-0 text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200`;
 export const TOOLBAR_BTN_PRIMARY =
   `${TOOLBAR_BTN_BASE} border border-transparent bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:hover:bg-brand-500`;
 
