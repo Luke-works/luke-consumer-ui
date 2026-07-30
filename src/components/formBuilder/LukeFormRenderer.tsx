@@ -6,7 +6,15 @@
  * FormInbox, and the public embed. The package fully supports `playback`/`onResult`/
  * `autoSubmitSignal` (the Test flow). The in-tree coltorapps renderer was removed in the
  * builder cutover.
+ *
+ * CONTRACT — `initialValues` is read ONCE, when the engine is built (see `parsed` below and the
+ * package's `useFormEngine`). Changing it on a MOUNTED renderer has no effect. To show a different
+ * record under the same schema (e.g. flipping through submissions), remount with a
+ * `key={recordId}`; don't rely on a prop change. Today's callers are fine: FormFill/FormRespondView
+ * mount after their data has loaded, InstanceDetail changes the schema when you pick a version, and
+ * FormResponses' modal unmounts between records.
  */
+import { useMemo } from "react";
 import { FormRenderer as LukeRenderer } from "@lukeflow/form-react";
 import type { FormData, FormSchema, JsEvaluator } from "@lukeflow/form-core";
 import "@lukeflow/form-react/styles.css";
@@ -62,9 +70,17 @@ export default function LukeFormRenderer({
   jsEvaluator?: JsEvaluator;
 }) {
   void submitting; // the package manages submit state internally; accepted for prop-compat
+  // Parse ONCE per schema string. The engine rebuilds whenever the schema OBJECT identity changes
+  // (useFormEngine), so parsing inline in the render body handed it a brand-new object on every
+  // render — and any re-render of the *host* silently wiped the filler's in-progress answers while
+  // the DOM inputs kept showing them, so submit then failed with "field is required". Bit the
+  // public embed hardest: finishing an attachment upload bumps a count in the host, and switching
+  // to/from the Attachments tab re-renders too. Keying on the string is exact (strings compare by
+  // value), so a genuine schema edit — the builder's live preview — still rebuilds.
+  const parsed = useMemo(() => parseSchema(schema), [schema]);
   return (
     <LukeRenderer
-      schema={parseSchema(schema)}
+      schema={parsed}
       initialValues={initialValues as FormData | undefined}
       onSubmit={onSubmit}
       onChange={onChange ? (data: FormData) => onChange(data) : undefined}
