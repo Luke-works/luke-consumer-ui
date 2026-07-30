@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
+import LukeflowBadge from "../../components/common/LukeflowBadge";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readSubmitMessage } from "../../lib/formSchema";
@@ -154,6 +155,10 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
           </>
         ) : null}
       </div>
+      {/* Attribution, from the same server-resolved flag as the embed surface. It can only appear once
+          the recipient is verified and the form payload has arrived — the OTP challenge screens have no
+          form to attribute yet. The badge is centered on the page, which lines it up under the card. */}
+      {form?.showBranding ? <LukeflowBadge surface="respond" /> : null}
     </div>
   );
 }

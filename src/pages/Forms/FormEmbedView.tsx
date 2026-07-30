@@ -3,6 +3,7 @@ import { MinionProvider } from "@lukeflow/form-react";
 import { connectEmbedFrame, type FrameBridge } from "@lukeflow/form-embed";
 import { createPublicMinionClient } from "../../lib/minionsApi";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
+import LukeflowBadge from "../../components/common/LukeflowBadge";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readAttachmentsEnabled, readSubmitMessage } from "../../lib/formSchema";
@@ -40,8 +41,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
   const honeypot = useRef<HTMLInputElement>(null); // bot trap — humans never fill it (Route B M5)
   const bridge = useRef<FrameBridge | null>(null);
   useEffect(() => {
-    // Measure the CARD, not the min-h-screen root (which would pin height to the iframe's own viewport
-    // and never shrink to content).
+    // Measure the CARD + badge wrapper, not the min-h-screen root (which would pin height to the
+    // iframe's own viewport and never shrink to content). The ref sits on the wrapper rather than the
+    // card itself so the attribution badge BELOW the card is inside the reported height — measuring
+    // only the card would let the host iframe crop the badge off.
     const b = connectEmbedFrame({ element: cardRef.current ?? undefined });
     bridge.current = b;
     return () => { b.destroy(); bridge.current = null; };
@@ -94,80 +97,87 @@ export default function FormEmbedView({ token }: { token?: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-gray-950">
-      <div ref={cardRef} className="mx-auto max-w-[640px] rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
-        {loading ? (
-          <p className="py-12 text-center text-sm text-gray-400">Loading…</p>
-        ) : done ? (
-          <SubmissionSuccess message={form ? readSubmitMessage(form.schema) : undefined} />
-        ) : error && !form ? (
-          <div className="py-12 text-center">
-            <p className="text-sm text-error-500">{error}</p>
-            <button
-              type="button"
-              onClick={() => setReloadKey((k) => k + 1)}
-              className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
-            >
-              Try again
-            </button>
-          </div>
-        ) : form ? (
-          <>
-            <h1 className="mb-5 text-xl font-semibold text-gray-800 dark:text-white/90">{form.title}</h1>
-            {/* Honeypot bot-trap (M5): hidden from humans (off-screen, not tabbable, aria-hidden),
-                tempting to bots. A filled value makes the engine silently drop the submission. */}
-            <input
-              ref={honeypot}
-              type="text"
-              name="company_website"
-              tabIndex={-1}
-              autoComplete="off"
-              aria-hidden="true"
-              style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, opacity: 0 }}
-            />
-            {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
-
-            {/* Attachments live in their own TAB (opt-in per form), not as an inline form field. Both
-                panels stay MOUNTED (toggled with `hidden`) so typed form data and any in-progress upload
-                survive a tab switch. With attachments off, the form renders on its own — no tabs. */}
-            {showAttachments ? (
-              <div role="tablist" aria-label="Form sections" className="mb-5 flex gap-1 border-b border-gray-200 dark:border-gray-800">
-                <TabButton id="form" active={tab === "form"} onClick={() => setTab("form")}>
-                  Form
-                </TabButton>
-                <TabButton id="files" active={tab === "files"} onClick={() => setTab("files")} badge={attachmentCount}>
-                  Attachments
-                </TabButton>
-              </div>
-            ) : null}
-
-            <div role="tabpanel" hidden={showAttachments && tab !== "form"}>
-              {/* A bad schema must not blank the host's iframe — degrade to a message. */}
-              <ErrorBoundary
-                label="form-embed-renderer"
-                fallback={(e) => (
-                  <p className="py-8 text-center text-sm text-error-500">
-                    This form couldn't be displayed. {e.message}
-                  </p>
-                )}
+      <div ref={cardRef} className="mx-auto max-w-[640px]">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
+          {loading ? (
+            <p className="py-12 text-center text-sm text-gray-400">Loading…</p>
+          ) : done ? (
+            <SubmissionSuccess message={form ? readSubmitMessage(form.schema) : undefined} />
+          ) : error && !form ? (
+            <div className="py-12 text-center">
+              <p className="text-sm text-error-500">{error}</p>
+              <button
+                type="button"
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
               >
-                {minionClient ? (
-                  <MinionProvider client={minionClient}>
-                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
-                  </MinionProvider>
-                ) : (
-                  <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
-                )}
-              </ErrorBoundary>
+                Try again
+              </button>
             </div>
+          ) : form ? (
+            <>
+              <h1 className="mb-5 text-xl font-semibold text-gray-800 dark:text-white/90">{form.title}</h1>
+              {/* Honeypot bot-trap (M5): hidden from humans (off-screen, not tabbable, aria-hidden),
+                  tempting to bots. A filled value makes the engine silently drop the submission. */}
+              <input
+                ref={honeypot}
+                type="text"
+                name="company_website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, opacity: 0 }}
+              />
+              {error ? <p className="mb-4 rounded-lg bg-error-50 px-4 py-2 text-sm text-error-500 dark:bg-error-500/10">{error}</p> : null}
 
-            {/* Token-scoped attachments (uploaded before submit, linked to the instance after). */}
-            {showAttachments && token ? (
-              <div role="tabpanel" hidden={tab !== "files"}>
-                <EmbedAttachments token={token} processRef={attachmentRef} onCountChange={setAttachmentCount} />
+              {/* Attachments live in their own TAB (opt-in per form), not as an inline form field. Both
+                  panels stay MOUNTED (toggled with `hidden`) so typed form data and any in-progress upload
+                  survive a tab switch. With attachments off, the form renders on its own — no tabs. */}
+              {showAttachments ? (
+                <div role="tablist" aria-label="Form sections" className="mb-5 flex gap-1 border-b border-gray-200 dark:border-gray-800">
+                  <TabButton id="form" active={tab === "form"} onClick={() => setTab("form")}>
+                    Form
+                  </TabButton>
+                  <TabButton id="files" active={tab === "files"} onClick={() => setTab("files")} badge={attachmentCount}>
+                    Attachments
+                  </TabButton>
+                </div>
+              ) : null}
+
+              <div role="tabpanel" hidden={showAttachments && tab !== "form"}>
+                {/* A bad schema must not blank the host's iframe — degrade to a message. */}
+                <ErrorBoundary
+                  label="form-embed-renderer"
+                  fallback={(e) => (
+                    <p className="py-8 text-center text-sm text-error-500">
+                      This form couldn't be displayed. {e.message}
+                    </p>
+                  )}
+                >
+                  {minionClient ? (
+                    <MinionProvider client={minionClient}>
+                      <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
+                    </MinionProvider>
+                  ) : (
+                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
+                  )}
+                </ErrorBoundary>
               </div>
-            ) : null}
-          </>
-        ) : null}
+
+              {/* Token-scoped attachments (uploaded before submit, linked to the instance after). */}
+              {showAttachments && token ? (
+                <div role="tabpanel" hidden={tab !== "files"}>
+                  <EmbedAttachments token={token} processRef={attachmentRef} onCountChange={setAttachmentCount} />
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+        {/* Attribution. The server has already applied the tenant's plan, so this flag is the effective
+            answer — free tenants can't switch it off, paying tenants can (Form settings → "Show
+            'Developed at Lukeflow'"). Shown on every state of the page (including the thank-you), but
+            never before the form has loaded — an error/loading shell shouldn't advertise. */}
+        {form?.showBranding ? <LukeflowBadge surface="embed" /> : null}
       </div>
     </div>
   );

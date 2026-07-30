@@ -7,6 +7,14 @@ import TracePanel, { pidOf } from "./TracePanel";
 import { listVersions, type FormArtifact } from "../../lib/formsApi";
 import { getInstance, STATE_LABEL, type FormInstance, type InstanceState } from "../../lib/formInstancesApi";
 
+/** How a submission reached us, in words rather than the stored enum. Mirrors SubmissionSource
+ *  (core-engine) and the wording printed on the submission PDF, so the two agree. */
+const VIA_LABEL: Record<string, string> = {
+  EMBED: "Embedded form on a website",
+  RESPOND: "Emailed link, verified by one-time code",
+  APP: "Completed in Lukeflow by a signed-in user",
+};
+
 export const STATE_BADGE: Record<InstanceState, string> = {
   CREATED: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
   SENT: "bg-blue-50 text-blue-600 dark:bg-blue-500/15",
@@ -127,6 +135,30 @@ export default function InstanceDetail({
         </MetaRow>
         <MetaRow label="Token"><span className="font-mono text-xs">{instance.token}</span></MetaRow>
       </div>
+
+      {/* Submission record — the provenance captured at submit. Only rendered once there is something
+          to show, so instances submitted before this was recorded don't display empty rows. */}
+      {(instance.submittedIp || instance.submittedVia || instance.submittedUserAgent) && (
+        <div className="mb-5 rounded-xl border border-gray-100 px-4 dark:border-gray-800">
+          <p className="border-b border-gray-100 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">
+            Submission record
+          </p>
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {instance.submittedIp && (
+              <MetaRow label="IP address"><span className="font-mono text-xs">{instance.submittedIp}</span></MetaRow>
+            )}
+            {instance.submittedVia && <MetaRow label="Submitted via">{VIA_LABEL[instance.submittedVia] ?? instance.submittedVia}</MetaRow>}
+            {instance.submittedUserAgent && (
+              <MetaRow label="Device">
+                <span className="break-all text-xs text-gray-500 dark:text-gray-400">{instance.submittedUserAgent}</span>
+              </MetaRow>
+            )}
+          </div>
+          <p className="pb-3 pt-2 text-[11px] text-gray-400">
+            Captured automatically at submission. The IP address is the address observed at that moment.
+          </p>
+        </div>
+      )}
 
       {/* Submitted data + version toggle */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

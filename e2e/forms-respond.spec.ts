@@ -87,6 +87,28 @@ test.describe("forms — outbound recipient journey", () => {
     expect(payload.data?.accept).toBe("PO-99");
   });
 
+  test("the “Developed at Lukeflow” badge appears only after the recipient is verified", async ({ page }) => {
+    await stubBackend(page, {
+      loggedOut: true,
+      routes: {
+        "/api/public/form-instances/*/otp": ok({ ok: true, emailStatus: "SENT", sentTo: "j***@acme.com" }),
+        "/api/public/form-instances/*/verify": ok({ accessToken: "acc-tok" }),
+        "/api/public/form-instances/*": ok({ ...RESPOND, showBranding: true }),
+      },
+    });
+
+    await page.goto("/respond/inv_abc123");
+    const badge = page.getByRole("link", { name: /developed at lukeflow/i });
+    // The OTP challenge has no form payload yet, so there is nothing to attribute.
+    await expect(badge).toHaveCount(0);
+
+    await verifyAndOpen(page);
+    await expect(page.getByRole("heading", { name: /accept your quote/i })).toBeVisible();
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveAttribute("href", /utm_medium=respond/);
+    await expectHealthy(page);
+  });
+
   test("the preparer's field is shown but not editable; the recipient's are", async ({ page }) => {
     await stubBackend(page, {
       loggedOut: true,

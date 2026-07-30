@@ -48,6 +48,11 @@ export type StoredForm = {
   /** When the form last passed its self-test ("Test the form"), 0/undefined if never. */
   lastTestedAt?: number | null;
   lastTestedBy?: string | null;
+  /** Show the "Developed at Lukeflow" badge on this form's public surfaces (embed / respond). */
+  showBranding: boolean;
+  /** The tenant's plan does NOT allow hiding the badge — render the option locked with an upgrade
+   *  hint. Server-resolved; the server also rejects a hide attempt, so this is a UI affordance. */
+  brandingLocked: boolean;
 };
 
 /** A checked-in, immutable version (the artifact workflows resolve). */
@@ -78,6 +83,8 @@ type ApiForm = {
   updatedAt?: string | null;
   lastTestedAt?: string | null;
   lastTestedBy?: string | null;
+  showBranding?: boolean | null;
+  brandingLocked?: boolean | null;
 };
 type ApiVersion = { version: number; schema: string; checkedInBy?: string | null; checkedInAt: string; signedOffAt?: string | null; signedOffBy?: string | null };
 type ApiAudit = { action: string; detail?: string | null; actor?: string | null; actorName?: string | null; at: string };
@@ -110,6 +117,11 @@ function toForm(f: ApiForm, latestVersion = 0, latestVersionSignedOff = false): 
     updatedAt: ms(f.updatedAt) || ms(f.createdAt),
     lastTestedAt: f.lastTestedAt ? ms(f.lastTestedAt) : null,
     lastTestedBy: f.lastTestedBy ?? null,
+    // Default ON: an engine that predates the field, or a null column, still credits us. The lock
+    // defaults to ON too, so an unknown plan shows the option as paid-only rather than dangling a
+    // toggle the server would then reject.
+    showBranding: f.showBranding ?? true,
+    brandingLocked: f.brandingLocked ?? true,
   };
 }
 
@@ -233,9 +245,65 @@ export function saveDraft(tenant: string, id: string, schema: string): Promise<u
 export function updateMeta(
   tenant: string,
   id: string,
-  patch: { name?: string; description?: string; allowedEmbedOrigins?: string },
+  patch: { name?: string; description?: string; allowedEmbedOrigins?: string; showBranding?: boolean },
 ): Promise<unknown> {
   return req(tenant, `${BASE}/${seg(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+/** Which version this form's embeds serve, and whether a publish is waiting to reach fillers. */
+export type EmbedVersionState = {
+  /** AUTO = always serve the published version; PINNED = hold fillers on `pinnedVersion`. */
+  mode: "AUTO" | "PINNED";
+  pinnedVersion?: number | null;
+  publishedVersion?: number | null;
+  /** What fillers are actually being served right now. */
+  servingVersion?: number | null;
+  /** True when a newer published version exists that fillers are NOT seeing yet (PINNED only). */
+  updateAvailable: boolean;
+};
+
+/** A website OBSERVED framing this form (from the embed page's Referer). Intelligence, not a
+ *  permission — the allowlist is what the browser enforces. */
+export type EmbedSite = {
+  origin: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  /** SAMPLED — repeat views inside the server's throttle window aren't counted. */
+  renderCount: number;
+  /** Whether this origin is covered by the form's allowed-embed-domains list. */
+  allowed: boolean;
+};
+
+export function getEmbedVersion(tenant: string, id: string): Promise<EmbedVersionState> {
+  return req<EmbedVersionState>(tenant, `${BASE}/${seg(id)}/embed-version`);
+}
+
+/** Set the embed version policy. Omit `version` with PINNED to pin the CURRENT published version —
+ *  which is what "Update embeds to vN" does. */
+export function setEmbedVersion(
+  tenant: string,
+  id: string,
+  mode: "AUTO" | "PINNED",
+  version?: number,
+): Promise<EmbedVersionState> {
+  return req<EmbedVersionState>(tenant, `${BASE}/${seg(id)}/embed-version`, {
+    method: "PUT",
+    body: JSON.stringify({ mode, version }),
+  });
+}
+
+// LocalDateTime arrives as an ISO string, same as every other timestamp on this client.
+type ApiEmbedSite = { origin: string; firstSeenAt?: string | null; lastSeenAt?: string | null; renderCount?: number; allowed?: boolean };
+
+export async function listEmbedSites(tenant: string, id: string): Promise<EmbedSite[]> {
+  const rows = await req<ApiEmbedSite[]>(tenant, `${BASE}/${seg(id)}/embed-sites`);
+  return asArray<ApiEmbedSite>(rows).map((s) => ({
+    origin: s.origin,
+    firstSeenAt: ms(s.firstSeenAt),
+    lastSeenAt: ms(s.lastSeenAt),
+    renderCount: s.renderCount ?? 0,
+    allowed: s.allowed !== false,
+  }));
 }
 
 /** Check in (snapshot) the draft as a new immutable version. Never publishes — that's a

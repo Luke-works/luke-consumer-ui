@@ -315,6 +315,10 @@ export type FormSettings = {
   /** Opt-in: when true the completed submission is rendered to a PDF server-side and attached to
    *  the process instance (visible in the Form Inbox + Core UI Tasklist). Default off. */
   saveSubmissionAsPdf?: boolean;
+  /** The form's typeface, as a FONT CATALOG id (see lib/formFonts) — never a family name or a URL.
+   *  Absent/unknown → the Lukeflow default. Versioned with the schema, so the published form carries
+   *  the font its author approved. */
+  font?: string;
 };
 
 /** Read form-level settings from a schema JSON string (tolerant of anything). */
@@ -343,6 +347,12 @@ export function readAttachmentsEnabled(rawSchema: string | null | undefined): bo
 /** Whether the form renders each completed submission to a PDF attached to the process (default off). */
 export function readSaveSubmissionAsPdf(rawSchema: string | null | undefined): boolean {
   return readSettings(rawSchema).saveSubmissionAsPdf === true;
+}
+
+/** The form's stored font-catalog id, or "" when the author never chose one (→ the default). */
+export function readFont(rawSchema: string | null | undefined): string {
+  const f = readSettings(rawSchema).font;
+  return typeof f === "string" ? f : "";
 }
 
 /**

@@ -14,7 +14,17 @@ import { useEffect, useState } from "react";
 import { Modal } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import { MonitorPlay } from "lucide-react";
-import { getEmbedToken, rotateEmbedToken, setSubmissionHandling, updateMeta } from "../../lib/formsApi";
+import {
+  getEmbedToken,
+  getEmbedVersion,
+  listEmbedSites,
+  rotateEmbedToken,
+  setEmbedVersion,
+  setSubmissionHandling,
+  updateMeta,
+  type EmbedSite,
+  type EmbedVersionState,
+} from "../../lib/formsApi";
 
 export default function FormEmbedPanel({
   open,
@@ -47,6 +57,11 @@ export default function FormEmbedPanel({
   const [domainsSaved, setDomainsSaved] = useState(false);
   const [rotating, setRotating] = useState(false); // regenerating the embed token (M4)
   const [confirmRegen, setConfirmRegen] = useState(false); // "regenerate link" confirmation
+  // Which version fillers are served, and whether a publish is waiting to reach them (M6).
+  const [embedVersion, setEmbedVersionState] = useState<EmbedVersionState | null>(null);
+  const [savingVersion, setSavingVersion] = useState(false);
+  // Websites we have OBSERVED framing this form. Intelligence for the author, never a permission.
+  const [sites, setSites] = useState<EmbedSite[] | null>(null);
 
   // Mint the token lazily on first open (cached after). A published version is required —
   // the engine 404s an unpublished form; that surfaces here as an error.
@@ -88,6 +103,32 @@ export default function FormEmbedPanel({
   const embedSnippet = embedToken
     ? `<div data-lukeform-token="${embedToken}" data-lukeform-host="${gatewayOrigin}"></div>\n<script src="${window.location.origin}/embed.js" data-lukeform-auto></script>`
     : "";
+
+  // Load the version state + observed sites once the embed surface is actually usable.
+  useEffect(() => {
+    if (!open || needsHandling) return;
+    let active = true;
+    getEmbedVersion(tenant, formId)
+      .then((v) => active && setEmbedVersionState(v))
+      .catch(() => active && setEmbedVersionState(null));
+    listEmbedSites(tenant, formId)
+      .then((s) => active && setSites(s))
+      .catch(() => active && setSites([])); // an empty list reads the same as "nowhere yet"
+    return () => { active = false; };
+  }, [open, needsHandling, tenant, formId]);
+
+  /** Switch between AUTO (always latest) and PINNED, or move a pin up to the published version. */
+  const applyVersionMode = async (mode: "AUTO" | "PINNED", version?: number) => {
+    setSavingVersion(true);
+    setEmbedErr(null);
+    try {
+      setEmbedVersionState(await setEmbedVersion(tenant, formId, mode, version));
+    } catch (e) {
+      setEmbedErr((e as { message?: string })?.message ?? "Couldn’t change the embed version.");
+    } finally {
+      setSavingVersion(false);
+    }
+  };
 
   const copyEmbed = async () => {
     try { await navigator.clipboard.writeText(embedSnippet); setCopied(true); } catch { /* ignore */ }
@@ -135,9 +176,8 @@ export default function FormEmbedPanel({
         <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Embed this form</h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           Paste this snippet into any web page. Submissions create a response and start a process.
-          {publishedVersion != null && (
-            <> It always serves the <span className="font-medium text-gray-700 dark:text-gray-200">published version (v{publishedVersion})</span> — re-publish to update what visitors see.</>
-          )}
+          {" "}The snippet never has to change — it points at this form, and we decide which version to
+          serve.
         </p>
         {needsHandling ? (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white/5">
@@ -166,6 +206,124 @@ export default function FormEmbedPanel({
               <Button size="sm" variant="outline" onClick={() => setConfirmRegen(true)} disabled={rotating}>{rotating ? "Regenerating…" : "Regenerate link"}</Button>
             </div>
             <p className="mt-3 text-xs text-gray-400">The link is opaque and signed — it carries only this form, scoped to your organization.</p>
+
+            {/* WHICH VERSION fillers get. Publishing reaches every embed instantly in AUTO — nothing on
+                the embedding site ever changes. PINNED is the opposite promise: a publish does NOT move
+                a live form under people until you say so, which is what you want for anything
+                legally significant. */}
+            {embedVersion && (
+              <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Version visitors see</h3>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Live now:{" "}
+                    <span className="font-medium text-gray-800 dark:text-white/90">
+                      {embedVersion.servingVersion != null ? `v${embedVersion.servingVersion}` : "—"}
+                    </span>
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    Latest published:{" "}
+                    <span className="font-medium text-gray-800 dark:text-white/90">
+                      {embedVersion.publishedVersion != null ? `v${embedVersion.publishedVersion}` : "—"}
+                    </span>
+                  </span>
+                  {embedVersion.updateAvailable && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                      New version ready
+                    </span>
+                  )}
+                </div>
+
+                {embedVersion.updateAvailable && embedVersion.publishedVersion != null && (
+                  <div className="mt-3">
+                    <Button
+                      size="sm"
+                      onClick={() => void applyVersionMode("PINNED", embedVersion.publishedVersion ?? undefined)}
+                      disabled={savingVersion}
+                    >
+                      {savingVersion ? "Updating…" : `Update embeds to v${embedVersion.publishedVersion}`}
+                    </Button>
+                    <p className="mt-1.5 text-xs text-gray-400">
+                      Takes effect immediately, everywhere this form is embedded. No change needed on any
+                      website.
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-3 space-y-2">
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="embed-version-mode"
+                      checked={embedVersion.mode === "AUTO"}
+                      onChange={() => void applyVersionMode("AUTO")}
+                      disabled={savingVersion}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Always serve the latest</span>
+                      <span className="block text-xs text-gray-400">
+                        Publishing a version puts it in front of visitors straight away.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="embed-version-mode"
+                      checked={embedVersion.mode === "PINNED"}
+                      onChange={() => void applyVersionMode("PINNED", embedVersion.servingVersion ?? undefined)}
+                      disabled={savingVersion}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        Hold on a version I choose
+                      </span>
+                      <span className="block text-xs text-gray-400">
+                        Publishing won’t change the live form until you update the embed here.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* WHERE the form is live. Learned from the embedding page's Referer, so it's an observation:
+                a site that hides its referrer simply never appears. */}
+            <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Embedded on</h3>
+              {sites == null ? (
+                <p className="mt-1 text-xs text-gray-400">Checking…</p>
+              ) : sites.length === 0 ? (
+                <p className="mt-1 text-xs text-gray-400">
+                  No sites seen yet. A website appears here the first time someone loads the form on it.
+                </p>
+              ) : (
+                <ul className="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
+                  {sites.map((s) => (
+                    <li key={s.origin} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                      <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{s.origin}</span>
+                      <span className="flex items-center gap-2 text-[11px] text-gray-400">
+                        {!s.allowed && (
+                          <span
+                            title="This site is not in your allowed embed domains, so the browser is blocking it."
+                            className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-600 dark:bg-amber-500/15 dark:text-amber-400"
+                          >
+                            Not allowed
+                          </span>
+                        )}
+                        {s.lastSeenAt ? `last seen ${new Date(s.lastSeenAt).toLocaleString()}` : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-1.5 text-xs text-gray-400">
+                Detected from the embedding page, and sampled — treat it as a guide, not an audit. Sites
+                that send no referrer won’t show up.
+              </p>
+            </div>
 
             <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
               <label htmlFor="embed-domains" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Allowed embed domains</label>

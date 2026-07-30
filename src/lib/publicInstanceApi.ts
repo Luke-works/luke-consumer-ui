@@ -15,6 +15,8 @@ export type RespondForm = {
   outboundRoles: Record<string, "PREPARER" | "RECIPIENT" | "EITHER">;
   recipient: { firstName?: string; lastName?: string };
   state: string;
+  /** Effective "Developed at Lukeflow" attribution flag (plan already applied server-side). */
+  showBranding?: boolean;
 };
 
 async function call<T>(path: string, init: RequestInit = {}, accessToken?: string): Promise<T> {
