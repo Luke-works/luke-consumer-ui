@@ -20,6 +20,14 @@ export type EmbedForm = {
    *  plan (free plans can't switch it off), so render it as given. Optional for forward/backward
    *  compatibility with an engine that predates the field. */
   showBranding?: boolean;
+  /** Whether this deployment demands a Cloudflare Turnstile challenge before a submission is accepted.
+   *  Platform-wide, not per-form. Optional for compatibility with an engine that predates the field —
+   *  absent means "no widget", and the server simply won't be asking for a token either. */
+  captchaEnabled?: boolean;
+  /** The PUBLIC Turnstile sitekey to mount the widget with. Carried in the payload so a key rotation or
+   *  an environment difference never requires rebuilding and re-vendoring this bundle. The SECRET half
+   *  stays in core-engine and is never served. */
+  captchaSitekey?: string | null;
 };
 
 /** Thrown when the server is rate-limiting (HTTP 429) — callers wait + retry. */
@@ -101,6 +109,7 @@ export async function submitEmbed(
   data: Record<string, unknown>,
   attachmentRef?: string,
   consentAgreed?: boolean,
+  captchaToken?: string | null,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; instanceId: string }> {
   const res = await fetchWithRetry(
@@ -112,7 +121,14 @@ export async function submitEmbed(
       // them into formMetaData (the post-submit /link call remains a best-effort fallback).
       // consentAgreed carries only the filler's tick; the server records the wording from the schema it
       // served, so this cannot be used to assert agreement to different terms.
-      body: JSON.stringify({ data, attachmentRef, consentAgreed: consentAgreed === true }),
+      // captchaToken is the Turnstile challenge response. It proves nothing by itself — core-engine
+      // verifies it against Cloudflare — and it is single-use, so a retry needs a fresh one.
+      body: JSON.stringify({
+        data,
+        attachmentRef,
+        consentAgreed: consentAgreed === true,
+        captchaToken: captchaToken ?? null,
+      }),
     },
     { signal, label: "submit" },
   );
