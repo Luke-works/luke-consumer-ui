@@ -48,6 +48,23 @@ export function linkifyConsent(text: string): Piece[] {
   return out.length ? out : [{ text }];
 }
 
+/**
+ * Send the filler back to the agreement after a refused submit: focus it, and scroll it into view since
+ * the gate sits above the form and may be off-screen after a long fill.
+ *
+ * `scrollIntoView` is guarded because jsdom does not implement it — without the check, a refused submit
+ * threw an unhandled TypeError under test while working fine in a browser, which is the worst kind of
+ * gap: green locally, and a real crash if any environment ever lacks it.
+ */
+export function focusConsent(ref?: React.RefObject<HTMLInputElement | null>): void {
+  const el = ref?.current;
+  if (!el) return;
+  el.focus();
+  if (typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
 export default function FormConsentGate({
   text,
   agreed,

@@ -8,7 +8,7 @@ import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { createAuthedMinionClient } from "../../lib/minionsApi";
 import AttachmentsButton from "../../components/documents/AttachmentsButton";
-import FormConsentGate from "../../components/formBuilder/FormConsentGate";
+import FormConsentGate, { focusConsent } from "../../components/formBuilder/FormConsentGate";
 import { readConsent, readSubmitMessage } from "../../lib/formSchema";
 import {
   createInstance,
@@ -114,8 +114,7 @@ export default function FormFill() {
     // Enforced server-side; this only spares a round-trip and a generic error.
     if (consent.enabled && !consentAgreed) {
       setConsentError(true);
-      consentRef.current?.focus();
-      consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      focusConsent(consentRef);
       return;
     }
     if (saveTimer.current) window.clearTimeout(saveTimer.current);

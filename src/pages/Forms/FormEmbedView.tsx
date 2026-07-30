@@ -5,7 +5,7 @@ import { createPublicMinionClient } from "../../lib/minionsApi";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import LukeflowBadge from "../../components/common/LukeflowBadge";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
-import FormConsentGate from "../../components/formBuilder/FormConsentGate";
+import FormConsentGate, { focusConsent } from "../../components/formBuilder/FormConsentGate";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readAttachmentsEnabled, readConsent, readSubmitMessage } from "../../lib/formSchema";
 import { getEmbedForm, submitEmbed, type EmbedForm } from "../../lib/publicEmbedApi";
@@ -83,8 +83,7 @@ export default function FormEmbedView({ token }: { token?: string }) {
     // it sits above the form, so after a long fill it may well be off-screen.
     if (consent.enabled && !consentAgreed) {
       setConsentError(true);
-      consentRef.current?.focus();
-      consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      focusConsent(consentRef);
       return;
     }
     setSubmitting(true);

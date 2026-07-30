@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import LukeflowBadge from "../../components/common/LukeflowBadge";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
-import FormConsentGate from "../../components/formBuilder/FormConsentGate";
+import FormConsentGate, { focusConsent } from "../../components/formBuilder/FormConsentGate";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { readConsent, readSubmitMessage } from "../../lib/formSchema";
 import { schemaForRecipient } from "../../lib/outboundRoles";
@@ -82,8 +82,7 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
     // Enforced server-side; this only spares the recipient a round-trip and a generic error.
     if (consent.enabled && !consentAgreed) {
       setConsentError(true);
-      consentRef.current?.focus();
-      consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      focusConsent(consentRef);
       return;
     }
     setBusy(true);
