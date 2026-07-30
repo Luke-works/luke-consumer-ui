@@ -86,6 +86,15 @@ export const HIDDEN_CAPABILITIES: ReadonlySet<string> = new Set<string>(
   ].filter((c): c is string => c !== null),
 );
 
+/**
+ * Analytics is a SECTION, not a backend capability — there is no ANALYTICS code in core-engine's
+ * catalog yet, so it deliberately does NOT go in {@link HIDDEN_CAPABILITIES} (that set is keyed by
+ * codes the gateway emits, and seeding it with an invented one would put a phantom capability in
+ * front of the access/request lists). It reads FORMS data, so the page gates on FORMS access plus
+ * this flag; when the ANALYTICS capability ships, this becomes a normal capability gate.
+ */
+export const ANALYTICS_ENABLED = flagOn(import.meta.env.VITE_ANALYTICS_ENABLED);
+
 /** False when a capability is force-hidden (not ready) — filter catalog/access lists by this. */
 export function isCapabilityVisible(code: string): boolean {
   return !HIDDEN_CAPABILITIES.has(code);
