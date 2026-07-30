@@ -220,7 +220,7 @@ test.describe("forms — public embed submit", () => {
                  <script>
                    window.__CSP__ = [];
                    document.addEventListener("securitypolicyviolation", (e) =>
-                     window.__CSP__.push(e.violatedDirective + ":" + e.blockedURI));
+                     window.__CSP__.push({ directive: e.violatedDirective, uri: e.blockedURI }));
                  </script>
                  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
                  <iframe src="https://challenges.cloudflare.com/cdn-cgi/challenge-platform/x"></iframe>
@@ -237,10 +237,23 @@ test.describe("forms — public embed submit", () => {
 
     // And nothing Cloudflare needs was refused. (The probe's own inline listener is expected to be
     // reported — production has no inline script, so it is filtered rather than asserted away.)
-    const cloudflareBlocks = (await page.evaluate(
-      () => (window as unknown as { __CSP__?: string[] }).__CSP__ ?? [],
-    )).filter((v) => v.includes("challenges.cloudflare.com"));
-    expect(cloudflareBlocks, `CSP blocked Turnstile: ${cloudflareBlocks.join(", ")}`).toEqual([]);
+    const reported = await page.evaluate(
+      () => (window as unknown as { __CSP__?: { directive: string; uri: string }[] }).__CSP__ ?? [],
+    );
+    // Compare the blocked URI's HOST exactly. A substring match would also fire on, say,
+    // `https://challenges.cloudflare.com.evil.test/x`, which is the whole point of the directive.
+    const host = (uri: string) => {
+      try {
+        return new URL(uri).host;
+      } catch {
+        return ""; // "inline" / "eval" and friends are not URLs
+      }
+    };
+    const cloudflareBlocks = reported.filter((v) => host(v.uri) === "challenges.cloudflare.com");
+    expect(
+      cloudflareBlocks,
+      `CSP blocked Turnstile: ${cloudflareBlocks.map((v) => `${v.directive}:${v.uri}`).join(", ")}`,
+    ).toEqual([]);
   });
 
   test("a consent-requiring form refuses to submit until the agreement is accepted", async ({ page }) => {
