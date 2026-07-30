@@ -4,6 +4,18 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   className?: string;
+  /**
+   * Classes for the wrapper around `children`.
+   *
+   * Children are wrapped in a div, so a dialog laying itself out as a flex column — header, scrolling
+   * body, footer, the standard shape for anything with more content than fits — cannot do it from
+   * `className` alone: that styles the OUTER box, and the wrapper in between stays block-flow, which
+   * silently defeats `flex-1` / `min-h-0` on the body. (It did exactly that to the form settings
+   * dialog: the body grew to its content, the footer was pushed out, and `overflow-hidden` clipped
+   * the lot with nothing scrollable.) Pass the layout here instead — e.g.
+   * `className="h-[32rem] overflow-hidden"` + `contentClassName="flex h-full flex-col"`.
+   */
+  contentClassName?: string;
   children: React.ReactNode;
   showCloseButton?: boolean; // New prop to control close button visibility
   isFullscreen?: boolean; // Default to false for backwards compatibility
@@ -19,6 +31,7 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   children,
   className,
+  contentClassName,
   showCloseButton = true, // Default to true for backwards compatibility
   isFullscreen = false,
   ariaLabel = "Dialog",
@@ -141,7 +154,7 @@ export const Modal: React.FC<ModalProps> = ({
             </svg>
           </button>
         )}
-        <div>{children}</div>
+        <div className={contentClassName}>{children}</div>
       </div>
     </div>
   );

@@ -133,7 +133,9 @@ export default function FormSettingsModal({
       isOpen={open}
       onClose={onClose}
       ariaLabel="Form settings"
-      className="mx-4 flex h-[min(88vh,42rem)] w-full max-w-[720px] flex-col overflow-hidden"
+      className="mx-4 h-[min(88vh,42rem)] w-full max-w-[720px] overflow-hidden"
+      // The column has to live on the CHILD wrapper, not here — see Modal's contentClassName.
+      contentClassName="flex h-full flex-col"
     >
       <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pt-6 dark:border-gray-800">
         <h2 className="pr-8 text-lg font-semibold text-gray-800 dark:text-white/90">Form settings</h2>

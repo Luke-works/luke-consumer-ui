@@ -128,8 +128,12 @@ export default function FormActivityTimeline({ events }: { events: AuditEvent[] 
     <div className="space-y-5">
       {groupByDay(events).map(({ day, events: dayEvents }) => (
         <section key={day}>
-          {/* Sticky so the day you're reading stays named while you scroll a long trail. */}
-          <h3 className="sticky top-0 z-10 -mx-1 bg-white/95 px-1 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 backdrop-blur dark:bg-gray-900/95">
+          {/* Sticky so the day you're reading stays named while you scroll a long trail. It must span
+              the panel's FULL width (hence -mx-6 against the panel's px-6) and be fully opaque: a
+              translucent, inset heading let the row passing underneath show through and read as a
+              rendering glitch. z-20 puts it above the rail icons (z-10), which otherwise slide over
+              the heading of their own day group as you scroll through it. */}
+          <h3 className="sticky top-0 z-20 -mx-6 border-b border-gray-100 bg-white px-6 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:bg-gray-900">
             {day}
           </h3>
           <ol className="relative mt-1">
