@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { ICON_LABEL_NUDGE_SELF } from "../../../lib/iconAlign";
 
 interface ButtonProps {
   children: ReactNode; // Button text or content
@@ -47,9 +48,15 @@ const Button: React.FC<ButtonProps> = ({
       onClick={onClick}
       disabled={disabled}
     >
-      {startIcon && <span className="flex items-center">{startIcon}</span>}
+      {/* The nudge applies only when the icon actually accompanies a LABEL — see ICON_LABEL_NUDGE_SELF.
+          With no label there is nothing to align to and it would just sit the glyph high. */}
+      {startIcon && (
+        <span className={`flex items-center ${children ? ICON_LABEL_NUDGE_SELF : ""}`}>{startIcon}</span>
+      )}
       {children}
-      {endIcon && <span className="flex items-center">{endIcon}</span>}
+      {endIcon && (
+        <span className={`flex items-center ${children ? ICON_LABEL_NUDGE_SELF : ""}`}>{endIcon}</span>
+      )}
     </button>
   );
 };

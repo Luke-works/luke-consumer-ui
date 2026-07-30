@@ -25,6 +25,7 @@ import FormConsentGate from "../../components/formBuilder/FormConsentGate";
 import { FORM_FONTS, resolveFont } from "../../lib/formFonts";
 import { CONSENT_DEFAULT_TEXT, CONSENT_MAX_LENGTH } from "../../lib/formSchema";
 import type { AuditEvent, StoredForm } from "../../lib/formsApi";
+import { ICON_LABEL_NUDGE } from "../../lib/iconAlign";
 import { CircleCheckBig, Clock, Gavel, Info, Palette } from "lucide-react";
 import FormActivityTimeline from "./FormActivityTimeline";
 
@@ -164,7 +165,7 @@ export default function FormSettingsModal({
             aria-selected={tab === id}
             aria-controls={`form-settings-panel-${id}`}
             onClick={() => setTab(id)}
-            className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition ${
+            className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition ${ICON_LABEL_NUDGE} ${
               tab === id
                 ? "border-brand-500 text-brand-600 dark:text-brand-400"
                 : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -180,8 +181,13 @@ export default function FormSettingsModal({
         role="tabpanel"
         id={`form-settings-panel-${tab}`}
         aria-labelledby={`form-settings-tab-${tab}`}
-        className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
+        // Vertical padding lives on the INNER wrapper, not here. A sticky `top-0` heading pins to the
+        // scroll container's CONTENT box, so padding-top on the scroller left a 20px window above the
+        // pinned heading through which scrolled rows were visible — the day label looked like entries
+        // were sliding over it. With the padding inside, the heading pins flush to the panel's top.
+        className="min-h-0 flex-1 overflow-y-auto px-6"
       >
+        <div className="py-5">
         {/* Editing settings is part of the edit lifecycle (it dirties the draft and re-gates publish),
             so it needs a checkout — matching the builder canvas. */}
         {canEdit && !checkedOut && tab !== "activity" && (
@@ -403,6 +409,7 @@ export default function FormSettingsModal({
         )}
 
         {tab === "activity" && <FormActivityTimeline events={auditEvents} />}
+        </div>
       </div>
 
       <div className="shrink-0 border-t border-gray-100 px-6 py-4 dark:border-gray-800">

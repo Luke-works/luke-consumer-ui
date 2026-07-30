@@ -93,6 +93,36 @@ test.describe("form settings dialog", () => {
     await expect(page.getByRole("button", { name: /^close$|^cancel$/i })).toBeInViewport();
   });
 
+  test("the sticky day heading pins flush, with no window for rows to show above it", async ({ page }) => {
+    // A sticky `top-0` heading pins to the scroll container's CONTENT box, so padding-top on the
+    // scroller left a gap above the pinned heading through which scrolled entries were visible — the
+    // day label looked like the rows were sliding over it. The padding now lives on an inner wrapper.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openSettings(page);
+    await page.getByRole("tab", { name: /activity/i }).click();
+
+    const panel = page.getByRole("tabpanel");
+    await panel.evaluate((el) => { el.scrollTop = 130; }); // mid-scroll, so the heading is pinned
+    await page.waitForTimeout(200);
+
+    const gap = await panel.evaluate((el) => {
+      const h = el.querySelector("h3")!;
+      return +(h.getBoundingClientRect().top - el.getBoundingClientRect().top).toFixed(1);
+    });
+    expect(gap, "the pinned day heading must sit flush with the top of the scroll area").toBe(0);
+
+    // And nothing is painted in the strip it occupies: no list item is VISIBLE above its bottom edge.
+    const leaking = await panel.evaluate((el) => {
+      const hb = el.querySelector("h3")!.getBoundingClientRect();
+      const pt = el.getBoundingClientRect().top;
+      return Array.from(el.querySelectorAll("li")).filter((li) => {
+        const r = li.getBoundingClientRect();
+        return r.bottom > pt && r.top < hb.bottom && r.bottom > hb.top; // overlaps the heading strip
+      }).length;
+    });
+    expect(leaking, "entries must scroll BEHIND the day heading, never above it").toBeLessThanOrEqual(1);
+  });
+
   test("every tab keeps its content inside the dialog", async ({ page }) => {
     // The overflow was reported on Activity, but nothing about the cause was Activity-specific — any
     // tab taller than the dialog would have done the same. Checked at a SHORT viewport, where even
