@@ -319,7 +319,49 @@ export type FormSettings = {
    *  Absent/unknown → the Lukeflow default. Versioned with the schema, so the published form carries
    *  the font its author approved. */
   font?: string;
+  /** The agreement the filler must accept before the submission counts. Versioned with the schema so the
+   *  wording is pinned to the version someone was shown — that pinning is what makes it evidence. The
+   *  server reads the SAME setting off the served version and refuses a submission without agreement, so
+   *  this is a contract, not a UI hint. */
+  consent?: {
+    enabled?: boolean;
+    text?: string;
+  };
 };
+
+/** The consent statement a form requires, and whether it requires one at all. */
+export type ConsentSettings = { enabled: boolean; text: string };
+
+/** Longest statement we store — mirrors ConsentTerms.MAX_LENGTH in core-engine, which truncates. */
+export const CONSENT_MAX_LENGTH = 2000;
+
+/**
+ * Wording used when a form requires consent but its author left the statement blank (a misconfiguration
+ * the builder blocks; only a hand-edited schema reaches it).
+ *
+ * MUST stay byte-identical to `ConsentTerms.DEFAULT_TEXT` in core-engine. The server records the text it
+ * resolves, the filler agrees to the text shown here — if the two drift, we would store an agreement to
+ * wording nobody was shown, which is precisely the defect this whole feature exists to prevent.
+ */
+export const CONSENT_DEFAULT_TEXT =
+  "I confirm that the information I have provided is accurate, and I agree to it being submitted and processed.";
+
+/**
+ * Read the form's consent requirement. Tolerant of anything, and deliberately NOT the authority: the
+ * server resolves the same setting from the version it served and enforces it. This drives what the
+ * filler is shown and whether the client bothers attempting a submit.
+ *
+ * <p>`enabled` with blank wording falls back to {@link CONSENT_DEFAULT_TEXT} — the same substitution the
+ * server makes — so the UI never silently drops a consent step the server will insist on, and never
+ * shows a statement other than the one that gets recorded.
+ */
+export function readConsent(rawSchema: string | null | undefined): ConsentSettings {
+  const c = readSettings(rawSchema).consent;
+  const enabled = !!c && c.enabled === true;
+  const text = c && typeof c.text === "string" ? c.text.trim() : "";
+  if (!enabled) return { enabled: false, text: text.slice(0, CONSENT_MAX_LENGTH) };
+  return { enabled: true, text: text ? text.slice(0, CONSENT_MAX_LENGTH) : CONSENT_DEFAULT_TEXT };
+}
 
 /** Read form-level settings from a schema JSON string (tolerant of anything). */
 export function readSettings(rawSchema: string | null | undefined): FormSettings {

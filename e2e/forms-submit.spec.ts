@@ -136,6 +136,58 @@ test.describe("forms — public embed submit", () => {
     expect(payload.data?._lukehp ?? "").toBe("");
   });
 
+  test("a consent-requiring form refuses to submit until the agreement is accepted", async ({ page }) => {
+    // The consent record is what makes a submission provable, so the full browser path matters: the
+    // statement renders, submit is refused with the answers intact, and the accepted tick reaches the
+    // wire. (core-engine refuses a consentAgreed=false submission independently — this pins the client
+    // half, so a filler never meets a raw 400 on the good path.)
+    const submits: Record<string, unknown>[] = [];
+    const CONSENT_SCHEMA = JSON.stringify({
+      ...JSON.parse(SCHEMA),
+      settings: {
+        submitMessage: "Thanks — we got it.",
+        consent: { enabled: true, text: "I agree to the Acme terms of service." },
+      },
+    });
+
+    await stubBackend(page, {
+      loggedOut: true,
+      routes: {
+        "/api/public/embed/*": ok({ code: "CONTACT", title: "Contact us", version: 1, schema: CONSENT_SCHEMA }),
+        "/api/public/embed/*/submit": capture(submits, { ok: true, instanceId: "inst-9", processStatus: "QUEUED" }),
+      },
+    });
+
+    await page.goto("/embed/tok_public_1");
+
+    const agree = page.getByRole("checkbox", { name: /acme terms of service/i });
+    await expect(agree).toBeVisible();
+    await expect(agree).not.toBeChecked();
+
+    await page.getByRole("textbox", { name: /name/i }).fill("Grace Hopper");
+    await page.getByRole("textbox", { name: /email/i }).fill("grace@example.com");
+    await page.getByRole("button", { name: /submit/i }).click();
+
+    // Refused, with a reason — and nothing posted.
+    await expect(page.getByRole("alert")).toContainText(/accept this before the form can be submitted/i);
+    expect(submits, "a form without consent must not be posted").toHaveLength(0);
+    // The answers survive the refusal; being sent back to re-type them would be its own defect.
+    await expect(page.getByRole("textbox", { name: /name/i })).toHaveValue("Grace Hopper");
+
+    await agree.check();
+    await page.getByRole("button", { name: /submit/i }).click();
+
+    await expect(page.getByText(/thanks — we got it\./i)).toBeVisible();
+    await expectHealthy(page);
+
+    expect(submits).toHaveLength(1);
+    const payload = submits[0] as { data?: Record<string, unknown>; consentAgreed?: boolean };
+    expect(payload.consentAgreed).toBe(true);
+    // The WORDING is never sent — the server resolves it from the version it served, so a tampered
+    // client cannot record agreement to different terms.
+    expect(JSON.stringify(payload)).not.toContain("Acme terms of service");
+  });
+
   test("the “Developed at Lukeflow” badge renders below the form and survives submission", async ({ page }) => {
     await stubBackend(page, {
       loggedOut: true,

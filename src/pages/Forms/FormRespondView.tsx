@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import LukeflowBadge from "../../components/common/LukeflowBadge";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
+import FormConsentGate from "../../components/formBuilder/FormConsentGate";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
-import { readSubmitMessage } from "../../lib/formSchema";
+import { readConsent, readSubmitMessage } from "../../lib/formSchema";
 import { schemaForRecipient } from "../../lib/outboundRoles";
 import { getRespondForm, requestOtp, submitRespond, verifyOtp, type RespondForm } from "../../lib/publicInstanceApi";
 
@@ -23,6 +24,14 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Consent (opt-in per form): the recipient's agreement to the statement this version published.
+  const [consentAgreed, setConsentAgreed] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  const consentRef = useRef<HTMLInputElement>(null);
+
+  // Read from the served schema — the same setting the server enforces against, so what the recipient is
+  // asked and what gets recorded cannot diverge.
+  const consent = useMemo(() => readConsent(form?.schema), [form?.schema]);
 
   const initialValues = useMemo(
     () => (form ? { ...(form.prefill ?? {}), ...(form.data ?? {}) } : undefined),
@@ -70,10 +79,17 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
 
   const onSubmit = async (data: Record<string, unknown>) => {
     if (!accessToken) return;
+    // Enforced server-side; this only spares the recipient a round-trip and a generic error.
+    if (consent.enabled && !consentAgreed) {
+      setConsentError(true);
+      consentRef.current?.focus();
+      consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await submitRespond(token, accessToken, data);
+      await submitRespond(token, accessToken, data, consentAgreed);
       setStep("done");
     } catch (e) {
       setError((e as Error).message);
@@ -143,6 +159,16 @@ export default function FormRespondView({ token = "" }: { token?: string }) {
         ) : form ? (
           <>
             <h1 className="mb-5 text-xl font-semibold text-gray-800 dark:text-white/90">{form.name}</h1>
+            {consent.enabled ? (
+              <FormConsentGate
+                text={consent.text}
+                agreed={consentAgreed}
+                onChange={(v) => { setConsentAgreed(v); if (v) setConsentError(false); }}
+                error={consentError}
+                disabled={busy}
+                inputRef={consentRef}
+              />
+            ) : null}
             <ErrorBoundary
               label="form-respond-renderer"
               fallback={(e) => (

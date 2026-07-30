@@ -8,7 +8,8 @@ import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import { createAuthedMinionClient } from "../../lib/minionsApi";
 import AttachmentsButton from "../../components/documents/AttachmentsButton";
-import { readSubmitMessage } from "../../lib/formSchema";
+import FormConsentGate from "../../components/formBuilder/FormConsentGate";
+import { readConsent, readSubmitMessage } from "../../lib/formSchema";
 import {
   createInstance,
   isOpen,
@@ -37,6 +38,11 @@ export default function FormFill() {
   const [done, setDone] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState(false);
+  // Consent (opt-in per form). The in-app door is gated too: whoever ticks the box is the person the
+  // record will name, so exempting staff would make the evidence inconsistent across doors.
+  const [consentAgreed, setConsentAgreed] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  const consentRef = useRef<HTMLInputElement>(null);
 
   const created = useRef(false);
   const saveTimer = useRef<number | null>(null);
@@ -86,6 +92,8 @@ export default function FormFill() {
     () => ({ ...(instance?.prefill ?? {}), ...(instance?.data ?? {}) }),
     [instance],
   );
+  // The agreement this instance's PINNED version published — the same setting the server enforces.
+  const consent = useMemo(() => readConsent(view?.schema), [view?.schema]);
 
   const handleChange = (data: Record<string, unknown>) => {
     if (!tenant || !instance || !open) return;
@@ -103,10 +111,17 @@ export default function FormFill() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     if (!tenant || !instance) return;
+    // Enforced server-side; this only spares a round-trip and a generic error.
+    if (consent.enabled && !consentAgreed) {
+      setConsentError(true);
+      consentRef.current?.focus();
+      consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     setSubmitting(true);
     try {
-      await submitInstance(tenant, instance.id, data);
+      await submitInstance(tenant, instance.id, data, consentAgreed);
       setDone(true);
     } catch (e) {
       setError(messageFor(e));
@@ -164,6 +179,16 @@ export default function FormFill() {
                   )}
                 </div>
               </div>
+              {consent.enabled ? (
+                <FormConsentGate
+                  text={consent.text}
+                  agreed={consentAgreed}
+                  onChange={(v) => { setConsentAgreed(v); if (v) setConsentError(false); }}
+                  error={consentError}
+                  disabled={submitting}
+                  inputRef={consentRef}
+                />
+              ) : null}
               {minionClient ? (
                 <MinionProvider client={minionClient}>
                   <FormRenderer

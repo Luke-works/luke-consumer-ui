@@ -16,13 +16,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { FormBuilder, type FormBuilderHandle } from "@lukeflow/form-builder";
 import BuilderMobileNotice from "../../components/common/BuilderMobileNotice";
-import LukeflowBadge from "../../components/common/LukeflowBadge";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
 import { readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
-import { readAttachmentsEnabled, readFont, readSaveSubmissionAsPdf } from "../../lib/formSchema";
-import { FORM_FONTS, resolveFont } from "../../lib/formFonts";
+import {
+  CONSENT_DEFAULT_TEXT,
+  readAttachmentsEnabled,
+  readFont,
+  readSaveSubmissionAsPdf,
+  readSettings,
+} from "../../lib/formSchema";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import AiAssistPanel from "./AiAssistPanel";
@@ -45,19 +49,16 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink, Send, Users } from "lucide-react";
+import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink, Send, Users, Settings } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import FormTestPanel from "./FormTestPanel";
 import FormEmbedPanel from "./FormEmbedPanel";
 import FormSendPanel from "./FormSendPanel";
 import FormRolesPanel from "./FormRolesPanel";
+import FormSettingsModal from "./FormSettingsModal";
 import { guardedLeave } from "../../lib/leaveGuard";
 import { useMutationLock } from "../../hooks/useMutationLock";
-import { PencilIcon } from "../../icons";
-import Label from "../../components/form/Label";
-import Input from "../../components/form/input/InputField";
-import Checkbox from "../../components/form/input/Checkbox";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import LifecycleActions from "./LifecycleActions";
@@ -142,6 +143,12 @@ export default function FormBuilderPage() {
   // The form's typeface. Lives in the VERSIONED schema settings (like attachments), so the published
   // form carries the font its author approved and a change re-gates sign-off/publish.
   const [font, setFont] = useState<string>("");
+  // The agreement a filler must accept before their submission counts. Versioned schema settings, like
+  // the font — so the wording is pinned to the version someone was shown, which is exactly what makes it
+  // usable as evidence. core-engine reads the SAME setting off the served version and refuses a
+  // submission that arrives without agreement, so this is a contract and not a UI preference.
+  const [consentEnabled, setConsentEnabled] = useState(false);
+  const [consentText, setConsentText] = useState("");
   // "Developed at Lukeflow" attribution on the public embed / respond surfaces. Form METADATA (not
   // versioned schema), so it saves with name/description and takes effect on the live form with no
   // re-publish. Free plans can't turn it off — the server enforces that too.
@@ -155,6 +162,8 @@ export default function FormBuilderPage() {
   const allowAttachmentsRef = useRef(false);
   const saveSubmissionPdfRef = useRef(false);
   const fontRef = useRef("");
+  const consentEnabledRef = useRef(false);
+  const consentTextRef = useRef("");
   const saveTimer = useRef<number | null>(null);
   const unsaved = useRef(false);
   // Imperative handle: lets the AI apply a new schema WITHOUT remounting the builder,
@@ -196,6 +205,15 @@ export default function FormBuilderPage() {
         const fnt = readFont(f.schema);
         setFont(fnt);
         fontRef.current = fnt;
+        // Read the RAW stored statement, not readConsent's blank→default substitution: the builder must
+        // show what is actually saved, or an author would see wording they never wrote and assume it is.
+        const stored = readSettings(f.schema).consent;
+        const cOn = stored?.enabled === true;
+        const cText = typeof stored?.text === "string" ? stored.text : "";
+        setConsentEnabled(cOn);
+        consentEnabledRef.current = cOn;
+        setConsentText(cText);
+        consentTextRef.current = cText;
         setShowBranding(f.showBranding);
         latestRef.current = null;
         setLiveSchema(parseSchema(f.schema) as unknown as BuilderSchemaLike);
@@ -255,7 +273,17 @@ export default function FormBuilderPage() {
     (schema: FormSchema) =>
       JSON.stringify({
         ...schema,
-        settings: { ...(schema.settings ?? {}), submitMessage: submitMsgRef.current, attachments: allowAttachmentsRef.current, saveSubmissionAsPdf: saveSubmissionPdfRef.current, font: fontRef.current },
+        settings: {
+          ...(schema.settings ?? {}),
+          submitMessage: submitMsgRef.current,
+          attachments: allowAttachmentsRef.current,
+          saveSubmissionAsPdf: saveSubmissionPdfRef.current,
+          font: fontRef.current,
+          // Written UNCONDITIONALLY. Omitting it when consent is off would let the spread above carry a
+          // previously-saved `consent` forward, so switching the requirement off would appear to work in
+          // the builder while the published form kept demanding agreement.
+          consent: { enabled: consentEnabledRef.current, text: consentTextRef.current },
+        },
       }),
     [],
   );
@@ -532,6 +560,33 @@ export default function FormBuilderPage() {
     scheduleSave(latestRef.current ?? initialSchema);
   };
 
+  // Require (or stop requiring) an agreement. Versioned schema settings: dirties the draft and re-gates
+  // sign-off/publish, so a change to what people are asked to accept cannot reach a live form without
+  // going back through sign-off — which is the point.
+  const onToggleConsent = (on: boolean) => {
+    setConsentEnabled(on);
+    consentEnabledRef.current = on;
+    // Seed the statement so "on" can never mean "on, with nothing to agree to". The server substitutes
+    // the same default, but an author should see the words, not discover them later on a live form.
+    if (on && !consentTextRef.current.trim()) {
+      setConsentText(CONSENT_DEFAULT_TEXT);
+      consentTextRef.current = CONSENT_DEFAULT_TEXT;
+    }
+    if (!canEdit) return;
+    setDirtySinceCheckIn(true);
+    setLatestSignedOff(false);
+    scheduleSave(latestRef.current ?? initialSchema);
+  };
+
+  const onConsentText = (v: string) => {
+    setConsentText(v);
+    consentTextRef.current = v;
+    if (!canEdit) return;
+    setDirtySinceCheckIn(true);
+    setLatestSignedOff(false);
+    scheduleSave(latestRef.current ?? initialSchema);
+  };
+
   // Load the activity feed when the settings modal opens. The inputs are seeded by the
   // name button's onClick (NOT here) so a re-render mid-edit can't clobber what's typed.
   useEffect(() => {
@@ -542,6 +597,17 @@ export default function FormBuilderPage() {
       .catch(() => active && setAuditEvents([]));
     return () => { active = false; };
   }, [formSettingsOpen, tenant, id]);
+
+  // Open the settings dialog, seeding the metadata inputs HERE (not in an effect) so a re-render
+  // mid-edit can't clobber what's being typed.
+  const openSettings = () => {
+    if (!form) return;
+    setFormName(form.name);
+    setFormDesc(form.description ?? "");
+    setShowBranding(form.showBranding);
+    setSettingsError(null);
+    setFormSettingsOpen(true);
+  };
 
   // Persist name + description (form metadata, not schema). The submission message lives in the
   // schema and autosaves separately via onSubmitMessage; updateMeta only touches name/description.
@@ -647,33 +713,35 @@ export default function FormBuilderPage() {
         >
           <ArrowLeft className="size-4" />Forms
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            // Seed the inputs HERE (not in an effect) so a re-render mid-edit can't clobber typing.
-            setFormName(form.name);
-            setFormDesc(form.description ?? "");
-            setShowBranding(form.showBranding);
-            setSettingsError(null);
-            setFormSettingsOpen(true);
-          }}
-          title="Form settings"
-          className="group flex min-w-0 items-center gap-1.5 text-lg font-semibold text-gray-800 dark:text-white/90"
-        >
-          <span className="truncate">{form.name}</span>
-          <PencilIcon className="size-3.5 shrink-0 text-gray-300 transition group-hover:text-gray-500" />
-        </button>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status]}`}>{status}</span>
-        <span className="text-xs text-gray-400">v{version}</span>
-        {latestSignedOff && (
-          <span
-            title={lastTestedAt ? `Signed off ${new Date(lastTestedAt).toLocaleString()}` : "Latest version is signed off"}
-            className="inline-flex items-center gap-1 text-xs text-success-600 dark:text-success-400"
+        {/* The name is a heading, not a control. It used to be a button with a pencil, which read as
+            "rename" while actually opening every setting the form has — the gear says that plainly. */}
+        <h1 className="min-w-0 truncate text-lg font-semibold text-gray-800 dark:text-white/90">{form.name}</h1>
+        <Tooltip content="Form settings — name, submission, legal, appearance and activity.">
+          <button
+            type="button"
+            onClick={openSettings}
+            aria-label="Form settings"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700 focus:outline-hidden focus-visible:ring-3 focus-visible:ring-brand-500/20 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
           >
-            <BadgeCheck className="size-3.5" />Signed off
-          </span>
-        )}
-        <span className={`text-xs ${saveError ? "text-error-500" : "text-gray-400"}`}>{canEdit ? saveLabel : "View only"}</span>
+            <Settings className="size-4" />
+          </button>
+        </Tooltip>
+        {/* Status cluster: what version this is and whether it's safe to publish. Grouped and separated
+            from the actions on the right so the row reads as "what you're looking at" then "what you can
+            do", instead of one undifferentiated line of chips and buttons. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2 border-gray-200 ps-1 dark:border-gray-700 sm:border-s sm:ps-3">
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status]}`}>{status}</span>
+          <span className="text-xs text-gray-400">v{version}</span>
+          {latestSignedOff && (
+            <span
+              title={lastTestedAt ? `Signed off ${new Date(lastTestedAt).toLocaleString()}` : "Latest version is signed off"}
+              className="inline-flex items-center gap-1 text-xs text-success-600 dark:text-success-400"
+            >
+              <BadgeCheck className="size-3.5" />Signed off
+            </span>
+          )}
+          <span className={`text-xs ${saveError ? "text-error-500" : "text-gray-400"}`}>{canEdit ? saveLabel : "View only"}</span>
+        </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {/* Preview + Test are available to view-only users too (read access can validate). */}
@@ -877,161 +945,35 @@ export default function FormBuilderPage() {
         </>
       ) : null}
 
-      <Modal isOpen={formSettingsOpen} onClose={() => setFormSettingsOpen(false)} className="mx-4 w-full max-w-[480px]">
-        <div className="p-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">Form settings</h2>
-          <div className="mb-4 rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">
-            <span className="text-xs text-gray-400">Form ID</span>
-            <p className="font-mono text-sm font-medium text-gray-700 dark:text-gray-200">{form.code}</p>
-          </div>
-          {(form.createdByName || form.updatedByName) && (
-            <p className="mb-4 text-xs text-gray-400">
-              {form.createdByName && <>Created by <span className="text-gray-600 dark:text-gray-300">{form.createdByName}</span></>}
-              {form.updatedByName && <>{form.createdByName ? " · " : ""}last edited by <span className="text-gray-600 dark:text-gray-300">{form.updatedByName}</span></>}
-            </p>
-          )}
-          {/* Editing settings is part of the edit lifecycle — changing the name, description,
-              submission message or attachments dirties the draft and re-gates publish, so it requires
-              a checkout (matching the builder canvas). View-only shows the values but disables editing. */}
-          {canEdit && !checkedOut && (
-            <p className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400">
-              Check the form out (Checkout in the toolbar) to edit these settings.
-            </p>
-          )}
-          <div className="mb-4">
-            <Label>Form name</Label>
-            <Input value={formName} onChange={(e) => setFormName(e.target.value)} disabled={!editable} />
-          </div>
-          <div className="mb-4">
-            <Label>Description</Label>
-            <Input value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Optional" disabled={!editable} />
-          </div>
-          <div className="mb-6">
-            <Label>Submission message</Label>
-            <textarea
-              value={submitMessage}
-              onChange={(e) => onSubmitMessage(e.target.value)}
-              disabled={!editable}
-              rows={3}
-              placeholder="Thank you! Your response has been recorded."
-              className="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
-            />
-            <p className="mt-1 text-xs text-gray-400">Shown with a success animation after the form is submitted. Leave blank for the default.</p>
-          </div>
-          <div className="mb-6">
-            <Checkbox
-              checked={allowAttachments}
-              onChange={onToggleAttachments}
-              disabled={!editable}
-              label="Allow file attachments"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              Adds an Attachments tab to the embedded form so people can upload supporting files with their submission.
-            </p>
-          </div>
-          <div className="mb-6">
-            <Checkbox
-              checked={saveSubmissionPdf}
-              onChange={onToggleSaveSubmissionPdf}
-              disabled={!editable}
-              label="Save submission as Attachment"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              On submit, generates a PDF of the completed form and attaches it to the process instance — viewable in the Form Inbox and Core UI Tasklist.
-            </p>
-          </div>
-          {/* Font. Versioned schema settings (like attachments), so it autosaves on change, re-gates
-              sign-off/publish, and the published form carries the approved typeface. Applies everywhere
-              the form renders: the builder preview, the embed, the respond page and the submission PDF. */}
-          <div className="mb-6">
-            <Label>Font</Label>
-            <select
-              value={font || "default"}
-              onChange={(e) => onFontChange(e.target.value)}
-              disabled={!editable}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
-            >
-              {FORM_FONTS.map((f) => (
-                // The option itself is set in its own face, so the list previews the choices. (Native
-                // <option> styling is limited on some platforms — the live preview below is the honest one.)
-                <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-400">{resolveFont(font).hint}</p>
-            <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-white/5">
-              <p className="text-[11px] uppercase tracking-wide text-gray-400">Preview</p>
-              <p className="mt-1 text-base text-gray-800 dark:text-white/90" style={{ fontFamily: resolveFont(font).stack }}>
-                {form.name} — Aa Bb Cc 0123
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400" style={{ fontFamily: resolveFont(font).stack }}>
-                The quick brown fox jumps over the lazy dog.
-              </p>
-            </div>
-            {resolveFont(font).google && (
-              <p className="mt-1.5 text-xs text-gray-400">
-                This font is downloaded from Google Fonts when someone opens the form, which means their
-                browser contacts Google. Pick one of the “System” fonts to avoid any third-party request.
-              </p>
-            )}
-          </div>
-
-          {/* Attribution. Form METADATA (not versioned schema): it saves with the button below and
-              takes effect on the live embed / respond link immediately — no re-publish. On the free
-              plan the option is locked ON; the server enforces that independently of this UI. */}
-          <div className="mb-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <Checkbox
-                checked={showBranding}
-                onChange={setShowBranding}
-                disabled={!editable || form.brandingLocked}
-                label="Show the “Developed at Lukeflow” tag"
-              />
-              {form.brandingLocked && (
-                <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-                  Paid plan
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-gray-400">
-              {form.brandingLocked
-                ? "A small Lukeflow credit appears under this form on your embed and respond links. Hiding it is available on paid plans."
-                : "Adds a small Lukeflow credit under this form on your embed and respond links. Thanks for the support — switch it off any time."}
-            </p>
-            {showBranding && (
-              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 pb-3 pt-1 dark:border-gray-700 dark:bg-white/5">
-                <p className="pt-2 text-[11px] uppercase tracking-wide text-gray-400">Preview</p>
-                {/* The real badge, so what they approve here is exactly what a filler sees. */}
-                <LukeflowBadge surface="embed" className="!mt-2" />
-              </div>
-            )}
-          </div>
-          {settingsError && (
-            <p className="mb-4 rounded-lg bg-error-50 px-3 py-2 text-xs text-error-500 dark:bg-error-500/10">
-              {settingsError}
-            </p>
-          )}
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setFormSettingsOpen(false)}>{editable ? "Cancel" : "Close"}</Button>
-            {editable && <Button onClick={saveFormSettings} disabled={!formName.trim()}>Save</Button>}
-          </div>
-
-          {auditEvents.length > 0 && (
-            <div className="mt-6 border-t border-gray-100 pt-4 dark:border-gray-800">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Activity</p>
-              <ul className="max-h-40 space-y-1 overflow-y-auto">
-                {auditEvents.map((ev, i) => (
-                  <li key={i} className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span><span className="font-medium text-gray-700 dark:text-gray-300">{ev.action.replace(/_/g, " ")}</span>{ev.detail ? ` ${ev.detail}` : ""}{ev.actorName ? ` · ${ev.actorName}` : ""}</span>
-                    <span className="text-gray-400">{new Date(ev.at).toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </Modal>
+      <FormSettingsModal
+        open={formSettingsOpen}
+        onClose={() => setFormSettingsOpen(false)}
+        form={form}
+        canEdit={canEdit}
+        checkedOut={checkedOut}
+        editable={editable}
+        formName={formName}
+        onFormName={setFormName}
+        formDesc={formDesc}
+        onFormDesc={setFormDesc}
+        submitMessage={submitMessage}
+        onSubmitMessage={onSubmitMessage}
+        allowAttachments={allowAttachments}
+        onToggleAttachments={onToggleAttachments}
+        saveSubmissionPdf={saveSubmissionPdf}
+        onToggleSaveSubmissionPdf={onToggleSaveSubmissionPdf}
+        consentEnabled={consentEnabled}
+        onToggleConsent={onToggleConsent}
+        consentText={consentText}
+        onConsentText={onConsentText}
+        font={font}
+        onFontChange={onFontChange}
+        showBranding={showBranding}
+        onShowBranding={setShowBranding}
+        auditEvents={auditEvents}
+        settingsError={settingsError}
+        onSave={() => void saveFormSettings()}
+      />
 
       {showScrollTop && (
         <button
