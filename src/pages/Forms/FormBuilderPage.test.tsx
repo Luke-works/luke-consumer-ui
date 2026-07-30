@@ -144,6 +144,26 @@ describe("FormBuilderPage — settings modal", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /check in/i })).toBeEnabled());
   });
 
+  it("keeps a long tab scrolling INSIDE the dialog rather than growing past it", async () => {
+    // The Activity trail grew the dialog until the list rendered outside the rounded card. Two causes,
+    // both fenced here: a flex child defaults to `min-height:auto`, so `flex-1` could not shrink below
+    // its content and `overflow-y-auto` never engaged; and the card had no `overflow-hidden`, so the
+    // spill painted past its own corners. jsdom has no layout engine, so the classes are the only
+    // thing assertable — but they are precisely the two that make it work.
+    const user = userEvent.setup();
+    mocked.getForm.mockResolvedValue(form(CLEAN));
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: /form settings/i }));
+    const panel = await screen.findByRole("tabpanel");
+    expect(panel.className).toContain("min-h-0");
+    expect(panel.className).toContain("overflow-y-auto");
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.className).toContain("overflow-hidden");
+    expect(dialog.className).toMatch(/h-\[min\(/); // bounded height, so the panel has a remainder to fill
+  });
+
   it("view-only disables the settings fields and hides Save", async () => {
     const user = userEvent.setup();
     mocked.getForm.mockResolvedValue(form(CLEAN));
