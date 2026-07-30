@@ -1,12 +1,65 @@
 // Helpers for reading capability access off the session. The gateway returns
 // `session.capabilities` as a { CODE: level } map (e.g. { FORMS: "read-write" })
 // and `session.can` as a flattened list (e.g. ["forms:read", "forms:write"]).
-// Levels and tiers mirror the capability-engine (read | read-write; FREE/STANDARD/PREMIUM).
+// Levels and tiers mirror the capability-engine (read | contributor | read-write;
+// FREE/STANDARD/PREMIUM).
 import type { SessionView } from "./authApi";
 
-// `contributor` (core-engine #104) sits between read and read-write: create/edit ordinary content,
-// but NOT the privileged actions (publish, sign-off, delete/purge) — the engine enforces that split.
+/**
+ * A capability access level. Mirrors core-engine `CapabilityLevel` (#104), plus the
+ * client-only "none" for "not granted".
+ *
+ * - `read` — look only.
+ * - `contributor` — create/edit ordinary content, but NOT the privileged actions
+ *   (publish/sign-off/seal, hard-delete/purge).
+ * - `read-write` — everything, including the privileged actions (grandfathered).
+ */
 export type CapabilityLevel = "none" | "read" | "contributor" | "read-write";
+
+/** The levels an admin can actually grant (i.e. every level except "not granted"). */
+export const GRANTABLE_LEVELS: readonly Exclude<CapabilityLevel, "none">[] = [
+  "read",
+  "contributor",
+  "read-write",
+] as const;
+
+/** Ascending privilege order — use to compare two levels (is this an upgrade or a downgrade?). */
+export const LEVEL_RANK: Record<CapabilityLevel, number> = {
+  none: 0,
+  read: 1,
+  contributor: 2,
+  "read-write": 3,
+};
+
+/**
+ * A named action a route can require, finer-grained than the read/write split.
+ * Mirrors core-engine `CapabilityLevel.Action` (read by `@RequiresCapabilityAction`).
+ */
+export type CapabilityAction = "read" | "write" | "publish" | "delete";
+
+/** Narrow an arbitrary wire value to a known level ("none" when unset/unknown). */
+export function toLevel(raw: unknown): CapabilityLevel {
+  return raw === "read" || raw === "contributor" || raw === "read-write" ? raw : "none";
+}
+
+/**
+ * Does `level` permit `action`? Mirrors core-engine `CapabilityLevel.permits` —
+ * `read-write` permits everything, `contributor` permits read + ordinary write only,
+ * `read` permits reads only.
+ */
+export function permits(level: CapabilityLevel, action: CapabilityAction): boolean {
+  switch (action) {
+    case "read":
+      return level !== "none";
+    case "write":
+      return level === "contributor" || level === "read-write";
+    case "publish":
+    case "delete":
+      return level === "read-write";
+    default:
+      return false;
+  }
+}
 
 /** Well-known capability codes (the map keys the gateway emits, uppercase). */
 export const FORMS = "FORMS";
@@ -44,21 +97,43 @@ export function capabilityLevel(
   code: string,
 ): CapabilityLevel {
   if (HIDDEN_CAPABILITIES.has(code)) return "none"; // gate nav + routes for not-yet-ready features
-  const v = session?.capabilities?.[code];
-  return v === "read" || v === "contributor" || v === "read-write" ? v : "none";
+  return toLevel(session?.capabilities?.[code]);
 }
 
 /** True when the caller can at least view the capability's resource. */
 export function canRead(session: SessionView | null | undefined, code: string): boolean {
-  return capabilityLevel(session, code) !== "none";
+  return permits(capabilityLevel(session, code), "read");
 }
 
 /** True when the caller can create/edit within the capability's resource. Both `contributor` and
  *  `read-write` can edit; the privileged actions (publish/delete) are gated server-side, so a
- *  contributor may see those controls but the engine rejects them (#104). */
+ *  contributor may see those controls but the engine rejects them (#104).
+ *
+ *  The follow-on that closes that gap is per-screen, not here: move each privileged control onto
+ *  {@link canPublish} / {@link canDelete} and the remaining edit controls onto
+ *  {@link canContribute}, then this flag stops gating anything privileged. */
 export function canWrite(session: SessionView | null | undefined, code: string): boolean {
   const lvl = capabilityLevel(session, code);
   return lvl === "read-write" || lvl === "contributor";
+}
+
+/**
+ * True when the caller may make ordinary edits — the TRUE backend contract for writing
+ * (`contributor` or `read-write`). Use this to gate create/edit controls on a screen that has
+ * already moved its publish/delete controls onto {@link canPublish} / {@link canDelete}.
+ */
+export function canContribute(session: SessionView | null | undefined, code: string): boolean {
+  return permits(capabilityLevel(session, code), "write");
+}
+
+/** True when the caller can perform privileged/finalizing actions: publish, sign-off, seal, retire. */
+export function canPublish(session: SessionView | null | undefined, code: string): boolean {
+  return permits(capabilityLevel(session, code), "publish");
+}
+
+/** True when the caller can irreversibly hard-delete/purge within the capability's resource. */
+export function canDelete(session: SessionView | null | undefined, code: string): boolean {
+  return permits(capabilityLevel(session, code), "delete");
 }
 
 /** Pricing/availability tiers as surfaced by the capability catalog. */
@@ -75,10 +150,32 @@ export const TIER_BADGE: Record<string, string> = {
   PREMIUM: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
 };
 
+/**
+ * The levels a member holding `current` can submit an access request for: anything strictly
+ * more privileged than what they already hold.
+ *
+ * Mirrors core-engine `CapabilityLevel.atLeast`, which the request endpoint uses for its
+ * duplicate check. (It previously compared ACTION CLASSES instead of rank, which rejected every
+ * upgrade through the middle level — a `read` holder could not ask for `contributor`, and a
+ * `contributor` could not ask for anything. Fixed in core-engine alongside the approval
+ * workflow; this must stay in step with it.)
+ */
+export function requestableLevels(current: CapabilityLevel): CapabilityLevel[] {
+  return GRANTABLE_LEVELS.filter((l) => LEVEL_RANK[l] > LEVEL_RANK[current]);
+}
+
 /** Human label for a capability level. */
 export const LEVEL_LABEL: Record<CapabilityLevel, string> = {
   none: "No access",
   read: "Read-only",
   contributor: "Contributor",
   "read-write": "Read & write",
+};
+
+/** One-line description of a level, for pickers and legends (non-engineer wording). */
+export const LEVEL_HINT: Record<CapabilityLevel, string> = {
+  none: "No access at all — the section stays hidden.",
+  read: "Can view, but cannot change anything.",
+  contributor: "Can create and edit, but cannot publish or delete.",
+  "read-write": "Full access, including publishing and deleting.",
 };

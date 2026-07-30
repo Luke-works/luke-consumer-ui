@@ -3,7 +3,7 @@
 // access token lives in memory here; the long-lived refresh token is an HttpOnly
 // cookie set by the gateway (sent via credentials:"include").
 
-import { isCapabilityVisible } from "./capabilities";
+import { isCapabilityVisible, type CapabilityLevel } from "./capabilities";
 
 const BASE = (import.meta.env.VITE_AUTH_API_URL || "").replace(/\/$/, "");
 
@@ -269,7 +269,30 @@ export type MemberRoles = {
   taskUser?: RoleLevel;
 };
 
-export type OrgMember = {
+/**
+ * Where a piece of access came from. Today every grant is decided in Lukeflow, so the backend
+ * does not yet stamp a source and callers should treat "absent" as {@link LOCAL_SOURCE}. The
+ * field exists so that when access starts arriving from a customer's own identity system
+ * (WorkOS Directory Sync bridging Okta/Entra/Google groups), the UI can show who owns a grant
+ * and stop admins editing one that the directory will simply overwrite on its next sync.
+ */
+export type AccessSource = "LOCAL" | "DIRECTORY" | "SSO" | "SCIM";
+
+export const LOCAL_SOURCE: AccessSource = "LOCAL";
+
+/** Provenance fields shared by anything that can be directory-managed. All optional today. */
+export type AccessProvenance = {
+  /** Absent on the current backend — treat as "LOCAL". */
+  source?: AccessSource;
+  /** Display name of the external system when known, e.g. "Okta" or "Microsoft Entra ID". */
+  sourceName?: string;
+  /** The external group/role that produced this access, for "why do I have this?". */
+  sourceRef?: string;
+  /** True when the external system owns it and Lukeflow must not edit it. */
+  managedExternally?: boolean;
+};
+
+export type OrgMember = AccessProvenance & {
   id: string;
   firstName: string | null;
   lastName: string | null;
@@ -278,6 +301,12 @@ export type OrgMember = {
   candidateGroups: string[];
   /** True for platform/support accounts (camunda-admin) auto-added to every tenant. */
   platform?: boolean;
+  /**
+   * Directory-synced profile attributes (department, title, location, manager, …), as sent by
+   * the identity provider. Absent until a directory is connected — the UI must render an empty
+   * state rather than inventing values.
+   */
+  attributes?: Record<string, string | null>;
 };
 
 export type OrgGroup = { id: string; name: string };
@@ -292,7 +321,7 @@ export type CapabilityCatalogItem = {
   tier?: string;
 };
 
-export type CapabilityGrant = { capabilityCode: string; level: string };
+export type CapabilityGrant = AccessProvenance & { capabilityCode: string; level: string };
 
 /**
  * A capability the caller's tenant is subscribed to (active for the org). Shape
@@ -435,6 +464,29 @@ export function deleteGroup(tenantId: string, groupId: string): Promise<void> {
 /** A delegated owner (manager) of a candidate group — someone who may edit its membership. */
 export type OrgGroupManager = { id: string; firstName: string | null; lastName: string | null };
 
+/**
+ * Resource owners of a capability: who an access request for it is routed to for approval.
+ * When empty, core-engine falls back to the tenant owners, so requests never strand.
+ */
+export async function listCapabilityOwners(
+  tenantId: string,
+  code: string,
+): Promise<OrgGroupManager[]> {
+  return asArray<OrgGroupManager>(
+    await authed(`/api/org/capabilities/${seg(code)}/owners`, tenantInit(tenantId)),
+  );
+}
+
+export function addCapabilityOwner(tenantId: string, code: string, userId: string): Promise<void> {
+  return authed(`/api/org/capabilities/${seg(code)}/owners/${seg(userId)}`,
+    tenantInit(tenantId, { method: "PUT" }));
+}
+
+export function removeCapabilityOwner(tenantId: string, code: string, userId: string): Promise<void> {
+  return authed(`/api/org/capabilities/${seg(code)}/owners/${seg(userId)}`,
+    tenantInit(tenantId, { method: "DELETE" }));
+}
+
 /** List the owners (delegated managers) of a candidate group. */
 export async function listGroupOwners(tenantId: string, groupId: string): Promise<OrgGroupManager[]> {
   return asArray<OrgGroupManager>(
@@ -475,11 +527,16 @@ export async function getUserCapabilities(tenantId: string, userId: string): Pro
   return asArray<CapabilityGrant>(await authed(`/api/org/users/${seg(userId)}/capabilities`, tenantInit(tenantId)));
 }
 
+/**
+ * Set a member's level on one capability. Accepts the full capability level set — including
+ * `contributor` (core-engine #104: create/edit but not publish/purge) — which is wider than
+ * the role level set, so it is deliberately NOT typed as RoleLevel. "none" revokes.
+ */
 export function setUserCapability(
   tenantId: string,
   userId: string,
   code: string,
-  level: RoleLevel,
+  level: CapabilityLevel,
 ): Promise<unknown> {
   return authed(
     `/api/org/users/${seg(userId)}/capabilities/${seg(code)}`,

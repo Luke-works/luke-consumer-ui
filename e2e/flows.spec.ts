@@ -172,3 +172,47 @@ test.describe("form builder responsive shell", () => {
     await expect(page.getByText(/best on a larger screen/i)).toBeHidden();
   });
 });
+
+test.describe("access — sections and LukeExplains", () => {
+  // An org owner with an empty org: every owner-only section must render its own empty
+  // state rather than blanking, and LukeExplains must appear where access is chosen.
+  const CATALOG = [
+    { code: "FORMS", name: "Forms", tier: "STANDARD", status: "ACTIVE", description: "Design and collect forms." },
+  ];
+
+  test("owner can move between Roles, Attributes and Capabilities", async ({ page }) => {
+    await stubBackend(page, { routes: { "/api/org/capabilities": ok(CATALOG) } });
+    await page.goto("/access");
+
+    // Roles — the catalog is explained even before anyone holds a role.
+    await page.getByRole("button", { name: /^Roles$/ }).click();
+    await expect(page.getByText(/What each role means/i)).toBeVisible();
+    await expect(page.getByText(/LukeExplains — Org owner/i)).toBeVisible();
+
+    // Attributes — no directory connected, so an honest empty state (never invented rows).
+    await page.getByRole("button", { name: /^Attributes$/ }).click();
+    await expect(page.getByText(/No directory is sending attributes yet/i)).toBeVisible();
+
+    // Capabilities — the capability picker plus the level legend, including Contributor.
+    await page.getByRole("button", { name: /^Capabilities$/ }).click();
+    await expect(page.getByRole("button", { name: "Forms Standard" })).toBeVisible();
+    await expect(page.getByText(/cannot publish or delete/i).first()).toBeVisible();
+
+    await expectNoOverflow(page);
+  });
+
+  test("a member's own access is explained in plain language", async ({ page }) => {
+    await stubBackend(page);
+    await page.goto("/access");
+
+    // "Manage My Access" is the default section for everyone.
+    await expect(page.getByRole("heading", { name: /^My access$/ })).toBeVisible();
+    const explains = page.getByRole("button", { name: /LukeExplains — what this lets you do/i }).first();
+    await expect(explains).toBeVisible();
+
+    // The explanation is a disclosure: closed until asked, then it states what the level allows.
+    await explains.click();
+    await expect(page.getByText(/What this allows/i).first()).toBeVisible();
+    await expectNoOverflow(page);
+  });
+});
