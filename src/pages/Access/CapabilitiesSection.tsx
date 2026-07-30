@@ -389,14 +389,15 @@ export default function CapabilitiesSection({ tenant }: { tenant: string }) {
               ))}
             </dl>
 
-            {/* Honest about the current state: the API enforces Contributor, but the product
-                screens still show contributors a read-only view until each one splits its
-                publish/delete controls out of its edit gate. Better an owner reads this here
-                than discovers it from a confused member. */}
+            {/* Honest about the current state: a contributor CAN edit (canWrite includes them), but
+                the product screens still gate their privileged controls on that same flag, so those
+                buttons are visible and the server refuses them. Better an owner reads this here than
+                discovers it from a confused member. Delete this note once each screen moves
+                publish/retire/purge onto canPublish/canDelete. */}
             <p className="mt-3 text-xs text-gray-400">
-              Contributor is enforced by the API today. The product screens don't unlock editing
-              for it yet, so a contributor currently sees a read-only view — grant Read &amp; write
-              if someone needs to edit right now.
+              A contributor can create and edit right away. Publishing, retiring and purging are
+              refused by the API — but the product screens still show those buttons today, so they
+              will error rather than being hidden.
             </p>
 
             {selected && (
