@@ -16,11 +16,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { FormBuilder, type FormBuilderHandle } from "@lukeflow/form-builder";
 import BuilderMobileNotice from "../../components/common/BuilderMobileNotice";
+import LukeflowBadge from "../../components/common/LukeflowBadge";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
 import { readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
-import { readAttachmentsEnabled, readSaveSubmissionAsPdf } from "../../lib/formSchema";
+import { readAttachmentsEnabled, readFont, readSaveSubmissionAsPdf } from "../../lib/formSchema";
+import { FORM_FONTS, resolveFont } from "../../lib/formFonts";
 import { useAuth } from "../../context/AuthContext";
 import { canWrite, FORMS } from "../../lib/capabilities";
 import AiAssistPanel from "./AiAssistPanel";
@@ -137,6 +139,14 @@ export default function FormBuilderPage() {
   // Opt-in: render each completed submission to a PDF and attach it to the process instance
   // (visible in the Form Inbox + Core UI Tasklist). Versioned in the schema settings.
   const [saveSubmissionPdf, setSaveSubmissionPdf] = useState(false);
+  // The form's typeface. Lives in the VERSIONED schema settings (like attachments), so the published
+  // form carries the font its author approved and a change re-gates sign-off/publish.
+  const [font, setFont] = useState<string>("");
+  // "Developed at Lukeflow" attribution on the public embed / respond surfaces. Form METADATA (not
+  // versioned schema), so it saves with name/description and takes effect on the live form with no
+  // re-publish. Free plans can't turn it off — the server enforces that too.
+  const [showBranding, setShowBranding] = useState(true);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
 
   // Latest schema reported by the (uncontrolled) builder; the lifecycle reads it.
@@ -144,6 +154,7 @@ export default function FormBuilderPage() {
   const submitMsgRef = useRef("");
   const allowAttachmentsRef = useRef(false);
   const saveSubmissionPdfRef = useRef(false);
+  const fontRef = useRef("");
   const saveTimer = useRef<number | null>(null);
   const unsaved = useRef(false);
   // Imperative handle: lets the AI apply a new schema WITHOUT remounting the builder,
@@ -182,6 +193,10 @@ export default function FormBuilderPage() {
         const sap = readSaveSubmissionAsPdf(f.schema);
         setSaveSubmissionPdf(sap);
         saveSubmissionPdfRef.current = sap;
+        const fnt = readFont(f.schema);
+        setFont(fnt);
+        fontRef.current = fnt;
+        setShowBranding(f.showBranding);
         latestRef.current = null;
         setLiveSchema(parseSchema(f.schema) as unknown as BuilderSchemaLike);
         // Show the "being edited" banner only if someone else holds the lock AND we haven't taken it.
@@ -240,7 +255,7 @@ export default function FormBuilderPage() {
     (schema: FormSchema) =>
       JSON.stringify({
         ...schema,
-        settings: { ...(schema.settings ?? {}), submitMessage: submitMsgRef.current, attachments: allowAttachmentsRef.current, saveSubmissionAsPdf: saveSubmissionPdfRef.current },
+        settings: { ...(schema.settings ?? {}), submitMessage: submitMsgRef.current, attachments: allowAttachmentsRef.current, saveSubmissionAsPdf: saveSubmissionPdfRef.current, font: fontRef.current },
       }),
     [],
   );
@@ -506,6 +521,17 @@ export default function FormBuilderPage() {
     scheduleSave(latestRef.current ?? initialSchema);
   };
 
+  // Pick the form's typeface. Schema-settings like attachments: flipping it dirties the draft and
+  // re-gates sign-off/publish, and autosaves immediately so the builder preview re-renders in the font.
+  const onFontChange = (id: string) => {
+    setFont(id);
+    fontRef.current = id;
+    if (!canEdit) return;
+    setDirtySinceCheckIn(true);
+    setLatestSignedOff(false);
+    scheduleSave(latestRef.current ?? initialSchema);
+  };
+
   // Load the activity feed when the settings modal opens. The inputs are seeded by the
   // name button's onClick (NOT here) so a re-render mid-edit can't clobber what's typed.
   useEffect(() => {
@@ -524,8 +550,24 @@ export default function FormBuilderPage() {
     const name = formName.trim() || form?.name || "";
     const changed = name !== form?.name || (formDesc || "") !== (form?.description || "");
     setFormName(name);
-    await updateMeta(tenant, id, { name, description: formDesc });
-    setForm((f) => (f ? { ...f, name, description: formDesc } : f));
+    setSettingsError(null);
+    // The badge is metadata like name/description, so it rides the same PATCH. Only send it when it
+    // actually changed: an unchanged value from a locked (free-plan) form must not trip the paid gate.
+    const brandingChanged = showBranding !== form?.showBranding;
+    try {
+      await updateMeta(tenant, id, {
+        name,
+        description: formDesc,
+        ...(brandingChanged ? { showBranding } : {}),
+      });
+    } catch (e) {
+      // Most likely the plan no longer allows hiding the badge (402) — keep the modal open, tell them
+      // why, and snap the checkbox back to what the server still has.
+      setSettingsError((e as Error).message || "Couldn't save these settings.");
+      setShowBranding(form?.showBranding ?? true);
+      return;
+    }
+    setForm((f) => (f ? { ...f, name, description: formDesc, showBranding } : f));
     // Form metadata is part of the form's published identity, so a name/description change must go
     // through the lifecycle like any edit: it dirties the draft (Check-in lights up) and invalidates
     // the signed-off version, so Publish re-gates until the new state is signed off and published.
@@ -607,7 +649,14 @@ export default function FormBuilderPage() {
         </button>
         <button
           type="button"
-          onClick={() => { setFormName(form.name); setFormDesc(form.description ?? ""); setFormSettingsOpen(true); }}
+          onClick={() => {
+            // Seed the inputs HERE (not in an effect) so a re-render mid-edit can't clobber typing.
+            setFormName(form.name);
+            setFormDesc(form.description ?? "");
+            setShowBranding(form.showBranding);
+            setSettingsError(null);
+            setFormSettingsOpen(true);
+          }}
           title="Form settings"
           className="group flex min-w-0 items-center gap-1.5 text-lg font-semibold text-gray-800 dark:text-white/90"
         >
@@ -891,6 +940,78 @@ export default function FormBuilderPage() {
               On submit, generates a PDF of the completed form and attaches it to the process instance — viewable in the Form Inbox and Core UI Tasklist.
             </p>
           </div>
+          {/* Font. Versioned schema settings (like attachments), so it autosaves on change, re-gates
+              sign-off/publish, and the published form carries the approved typeface. Applies everywhere
+              the form renders: the builder preview, the embed, the respond page and the submission PDF. */}
+          <div className="mb-6">
+            <Label>Font</Label>
+            <select
+              value={font || "default"}
+              onChange={(e) => onFontChange(e.target.value)}
+              disabled={!editable}
+              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
+            >
+              {FORM_FONTS.map((f) => (
+                // The option itself is set in its own face, so the list previews the choices. (Native
+                // <option> styling is limited on some platforms — the live preview below is the honest one.)
+                <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-400">{resolveFont(font).hint}</p>
+            <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-white/5">
+              <p className="text-[11px] uppercase tracking-wide text-gray-400">Preview</p>
+              <p className="mt-1 text-base text-gray-800 dark:text-white/90" style={{ fontFamily: resolveFont(font).stack }}>
+                {form.name} — Aa Bb Cc 0123
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400" style={{ fontFamily: resolveFont(font).stack }}>
+                The quick brown fox jumps over the lazy dog.
+              </p>
+            </div>
+            {resolveFont(font).google && (
+              <p className="mt-1.5 text-xs text-gray-400">
+                This font is downloaded from Google Fonts when someone opens the form, which means their
+                browser contacts Google. Pick one of the “System” fonts to avoid any third-party request.
+              </p>
+            )}
+          </div>
+
+          {/* Attribution. Form METADATA (not versioned schema): it saves with the button below and
+              takes effect on the live embed / respond link immediately — no re-publish. On the free
+              plan the option is locked ON; the server enforces that independently of this UI. */}
+          <div className="mb-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Checkbox
+                checked={showBranding}
+                onChange={setShowBranding}
+                disabled={!editable || form.brandingLocked}
+                label="Show the “Developed at Lukeflow” tag"
+              />
+              {form.brandingLocked && (
+                <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                  Paid plan
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-gray-400">
+              {form.brandingLocked
+                ? "A small Lukeflow credit appears under this form on your embed and respond links. Hiding it is available on paid plans."
+                : "Adds a small Lukeflow credit under this form on your embed and respond links. Thanks for the support — switch it off any time."}
+            </p>
+            {showBranding && (
+              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 pb-3 pt-1 dark:border-gray-700 dark:bg-white/5">
+                <p className="pt-2 text-[11px] uppercase tracking-wide text-gray-400">Preview</p>
+                {/* The real badge, so what they approve here is exactly what a filler sees. */}
+                <LukeflowBadge surface="embed" className="!mt-2" />
+              </div>
+            )}
+          </div>
+          {settingsError && (
+            <p className="mb-4 rounded-lg bg-error-50 px-3 py-2 text-xs text-error-500 dark:bg-error-500/10">
+              {settingsError}
+            </p>
+          )}
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setFormSettingsOpen(false)}>{editable ? "Cancel" : "Close"}</Button>
             {editable && <Button onClick={saveFormSettings} disabled={!formName.trim()}>Save</Button>}

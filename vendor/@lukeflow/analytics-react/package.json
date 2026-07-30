@@ -1,0 +1,32 @@
+{
+  "name": "@lukeflow/analytics-react",
+  "version": "0.1.0-alpha.0",
+  "description": "React adapter + chart renderer for @lukeflow/analytics-core. Wraps Nivo for the SVG drawing layer.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "@nivo/bar": "^0.99.0",
+    "@nivo/core": "^0.99.0",
+    "@nivo/line": "^0.99.0",
+    "@nivo/pie": "^0.99.0"
+  },
+  "dependencies": {
+    "@lukeflow/analytics-core": "0.1.0-alpha.0"
+  }
+}

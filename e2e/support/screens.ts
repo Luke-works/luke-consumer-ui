@@ -185,6 +185,27 @@ export const SCREENS: Screen[] = [
   { name: "forms", path: "/forms", ready: heading(/^forms$/i) },
   { name: "form-instances", path: "/forms/instances", ready: heading(/form instances/i) },
   { name: "form-inbox", path: "/forms/inbox", ready: heading(/form inbox/i) },
+  // Analytics charts the instance list, so it needs rows to draw anything but its empty state.
+  {
+    name: "analytics",
+    path: "/analytics",
+    opts: {
+      routes: {
+        "/api/form-instances*": ok({
+          items: [
+            { id: "a1", token: "t1", definitionCode: "CONTACT", version: 1, state: "SUBMITTED",
+              createdAt: "2026-06-01T09:00:00Z", submittedAt: "2026-06-01T11:00:00Z" },
+            { id: "a2", token: "t2", definitionCode: "CONTACT", version: 1, state: "PROCESSED",
+              createdAt: "2026-06-02T09:00:00Z", submittedAt: "2026-06-02T12:00:00Z" },
+            { id: "a3", token: "t3", definitionCode: "SIGNUP", version: 1, state: "OPEN",
+              createdAt: "2026-06-03T09:00:00Z" },
+          ],
+          total: 3, firstResult: 0, maxResults: 200,
+        }),
+      },
+    },
+    ready: heading(/analytics/i),
+  },
   { name: "form-builder", path: `/forms/${FORM_ID}`, opts: { routes: formRoutes } },
   { name: "form-responses", path: "/forms/CONTACT/responses", opts: { routes: formRoutes }, ready: heading(/responses/i) },
   { name: "form-fill", path: "/forms/CONTACT/fill", opts: { routes: formRoutes } },

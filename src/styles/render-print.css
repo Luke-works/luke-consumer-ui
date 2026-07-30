@@ -50,3 +50,54 @@ button[type="submit"],
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+/* ── Submission record (provenance) ───────────────────────────────────────────
+ * The evidence block printed under the form: when it was submitted, from which IP, on what device.
+ * Deliberately plain — this is a legal record, not decoration. It must never split across pages, and
+ * it must stay legible if the form's chosen font is decorative, so it prints in a system stack.
+ */
+.luke-submission-record {
+  margin-top: 10mm;
+  padding-top: 4mm;
+  border-top: 1px solid #d1d5db;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 9pt;
+  color: #374151;
+}
+
+.luke-submission-record h2 {
+  margin: 0 0 2mm;
+  font-size: 9pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.luke-submission-record table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.luke-submission-record th {
+  width: 32mm;
+  padding: 0.8mm 0;
+  text-align: left;
+  font-weight: 500;
+  color: #6b7280;
+  vertical-align: top;
+}
+
+.luke-submission-record td {
+  padding: 0.8mm 0;
+  /* A user-agent string is long and has no spaces to break on. */
+  word-break: break-word;
+}
+
+.luke-submission-record__note {
+  margin: 2mm 0 0;
+  font-size: 7.5pt;
+  color: #9ca3af;
+}

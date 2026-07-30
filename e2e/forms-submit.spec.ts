@@ -135,4 +135,54 @@ test.describe("forms — public embed submit", () => {
     expect(payload.data?.name).toBe("Grace Hopper");
     expect(payload.data?._lukehp ?? "").toBe("");
   });
+
+  test("the “Developed at Lukeflow” badge renders below the form and survives submission", async ({ page }) => {
+    await stubBackend(page, {
+      loggedOut: true,
+      routes: {
+        // showBranding is the EFFECTIVE flag: core-engine has already applied the tenant's plan.
+        "/api/public/embed/*": ok({
+          code: "CONTACT", title: "Contact us", version: 1, schema: SCHEMA, showBranding: true,
+        }),
+        "/api/public/embed/*/submit": ok({ ok: true, instanceId: "inst-9", processStatus: "QUEUED" }),
+      },
+    });
+    await page.goto("/embed/tok_public_1");
+
+    const badge = page.getByRole("link", { name: /developed at lukeflow/i });
+    await expect(badge).toBeVisible();
+
+    // It sits BELOW the form card and inside the element the iframe host measures for auto-height —
+    // if it escaped that box, embedding sites would crop it off.
+    const card = page.locator(".rounded-2xl").first();
+    const cardBox = (await card.boundingBox())!;
+    const badgeBox = (await badge.boundingBox())!;
+    expect(badgeBox.y).toBeGreaterThanOrEqual(cardBox.y + cardBox.height);
+    const measured = page.locator(".max-w-\\[640px\\]").first();
+    const measuredBox = (await measured.boundingBox())!;
+    expect(badgeBox.y + badgeBox.height).toBeLessThanOrEqual(measuredBox.y + measuredBox.height + 1);
+
+    // And it stays through the thank-you state (attribution outlives the form).
+    await page.getByRole("textbox", { name: /name/i }).fill("Grace Hopper");
+    await page.getByRole("textbox", { name: /email/i }).fill("grace@example.com");
+    await page.getByRole("button", { name: /submit/i }).click();
+    await expect(page.getByText(/thanks — we got it\./i)).toBeVisible();
+    await expect(badge).toBeVisible();
+    await expectHealthy(page);
+  });
+
+  test("no badge when a paying tenant has switched it off", async ({ page }) => {
+    await stubBackend(page, {
+      loggedOut: true,
+      routes: {
+        "/api/public/embed/*": ok({
+          code: "CONTACT", title: "Contact us", version: 1, schema: SCHEMA, showBranding: false,
+        }),
+      },
+    });
+    await page.goto("/embed/tok_public_1");
+    await expect(page.getByRole("heading", { name: /contact us/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /developed at lukeflow/i })).toHaveCount(0);
+    await expectHealthy(page);
+  });
 });

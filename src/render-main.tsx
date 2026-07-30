@@ -20,7 +20,64 @@ type RenderPayload = {
   data?: Record<string, unknown>;
   /** Optional theme tokens to match the form's branding. */
   theme?: FormTheme;
+  /**
+   * Submission provenance — the evidence block printed under the form so the PDF stands on its own as
+   * a record of WHO submitted WHAT, from WHERE and WHEN. Server-supplied (core-engine captures it at
+   * the submit choke point); omitted → no block, so older callers render exactly as before.
+   */
+  provenance?: {
+    instanceId?: string;
+    formCode?: string;
+    version?: number;
+    submittedAt?: string;
+    ip?: string;
+    userAgent?: string;
+    via?: string;
+  };
 };
+
+/** How the submission reached us, in words a non-engineer can read in a legal context. */
+const VIA_LABEL: Record<string, string> = {
+  EMBED: "Embedded form on a website",
+  RESPOND: "Emailed link, verified by one-time code",
+  APP: "Completed in Lukeflow by a signed-in user",
+};
+
+/**
+ * The "Submission record" block. Deliberately plain and dense — this is evidence, not decoration —
+ * and it prints AFTER the form. `break-inside: avoid` keeps it from splitting across pages.
+ */
+function SubmissionRecord({ p }: { p: NonNullable<RenderPayload["provenance"]> }) {
+  const rows: [string, string | undefined][] = [
+    ["Submitted", p.submittedAt ? new Date(p.submittedAt).toLocaleString() : undefined],
+    ["IP address", p.ip],
+    ["Submitted via", p.via ? (VIA_LABEL[p.via] ?? p.via) : undefined],
+    ["Device", p.userAgent],
+    ["Form", p.formCode ? `${p.formCode}${p.version != null ? ` (version ${p.version})` : ""}` : undefined],
+    ["Reference", p.instanceId],
+  ];
+  const present = rows.filter(([, v]) => v != null && v !== "");
+  if (present.length === 0) return null;
+  return (
+    <section className="luke-submission-record">
+      <h2>Submission record</h2>
+      <table>
+        <tbody>
+          {present.map(([label, value]) => (
+            <tr key={label}>
+              <th>{label}</th>
+              <td>{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="luke-submission-record__note">
+        Captured automatically by Lukeflow when the form was submitted. The IP address is the address
+        observed at submission time.
+      </p>
+    </section>
+  );
+}
 
 const READY_FLAG = "__LUKE_RENDER_READY__";
 
@@ -45,7 +102,12 @@ if (payload && mount) {
   const schema = typeof payload.schema === "string" ? payload.schema : JSON.stringify(payload.schema);
   // allowJs=false: this harness renders untrusted author schemas in headless Chromium; submitted
   // values are already computed, so no author JS needs to run to produce the PDF.
-  const form = <LukeFormRenderer schema={schema} initialValues={payload.data} readOnly allowJs={false} />;
+  const form = (
+    <>
+      <LukeFormRenderer schema={schema} initialValues={payload.data} readOnly allowJs={false} />
+      {payload.provenance ? <SubmissionRecord p={payload.provenance} /> : null}
+    </>
+  );
   createRoot(mount).render(payload.theme ? <FormThemeProvider theme={payload.theme}>{form}</FormThemeProvider> : form);
   markReady();
 } else {

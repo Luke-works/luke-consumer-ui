@@ -15,10 +15,11 @@
  * FormResponses' modal unmounts between records.
  */
 import { useMemo } from "react";
-import { FormRenderer as LukeRenderer } from "@lukeflow/form-react";
+import { FormRenderer as LukeRenderer, type FormTheme } from "@lukeflow/form-react";
 import type { FormData, FormSchema, JsEvaluator } from "@lukeflow/form-core";
 import "@lukeflow/form-react/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
+import { ensureFontLoaded, fontStack } from "../../lib/formFonts";
 
 function parseSchema(schema: string | FormSchema): FormSchema {
   if (typeof schema !== "string") return schema;
@@ -78,8 +79,20 @@ export default function LukeFormRenderer({
   // to/from the Attachments tab re-renders too. Keying on the string is exact (strings compare by
   // value), so a genuine schema edit — the builder's live preview — still rebuilds.
   const parsed = useMemo(() => parseSchema(schema), [schema]);
+
+  // The form's chosen typeface (Form settings → Font), applied as the renderer's `--lf-font` token.
+  // Done HERE, in the one adapter every surface goes through, so the builder preview, the in-app fill,
+  // the public embed, the outbound respond page and the PDF harness all render in the same face with no
+  // call-site changes. `font` is a catalog ID, so an unknown/hand-edited value falls back to the default
+  // rather than injecting anything into the token.
+  const fontId = (parsed.settings as { font?: string } | undefined)?.font;
+  const theme = useMemo<FormTheme>(() => ({ "--lf-font": fontStack(fontId) }), [fontId]);
+  // Webfonts are fetched only when a form actually selects one (a no-op for the system stacks).
+  ensureFontLoaded(fontId);
+
   return (
     <LukeRenderer
+      theme={theme}
       schema={parsed}
       initialValues={initialValues as FormData | undefined}
       onSubmit={onSubmit}

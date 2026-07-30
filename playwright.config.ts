@@ -56,6 +56,7 @@ export default defineConfig({
       VITE_PHONE_ENABLED: "true",
       VITE_SIGNATURES_ENABLED: "true",
       VITE_WORKFLOW_ENABLED: "true",
+      VITE_ANALYTICS_ENABLED: "true",
     },
   },
 });

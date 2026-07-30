@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { ChevronDownIcon, GridIcon, HorizontaLDots, ListIcon, LockIcon, MailIcon, PhoneIcon } from "../icons";
-import { FileText, Inbox, Link2, Mail, MailPlus, PenLine, Workflow } from "lucide-react";
+import { BarChart3, FileText, Inbox, Link2, Mail, MailPlus, PenLine, Workflow } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { canRead, EMAIL, FORMS, PHONE, SIGNATURES, WORKFLOW } from "../lib/capabilities";
+import { ANALYTICS_ENABLED, canRead, EMAIL, FORMS, PHONE, SIGNATURES, WORKFLOW } from "../lib/capabilities";
 import SidebarFooter from "./SidebarFooter";
 import SidebarTenantSwitcher from "./SidebarTenantSwitcher";
 
@@ -25,6 +25,10 @@ const FORMS_ITEM: NavItem = {
   subItems: [
     { name: "Forms", path: "/forms", icon: <FileText className="size-4" /> },
     { name: "Form Inbox", path: "/forms/inbox", icon: <Inbox className="size-4" /> },
+    // Post-MVP: only present when VITE_ANALYTICS_ENABLED is set (matches its route guard).
+    ...(ANALYTICS_ENABLED
+      ? [{ name: "Analytics", path: "/analytics", icon: <BarChart3 className="size-4" /> }]
+      : []),
   ],
 };
 const EMAIL_ITEM: NavItem = {

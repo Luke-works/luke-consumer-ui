@@ -11,7 +11,16 @@ import { reportError } from "./reportError";
 const BASE = (import.meta.env.VITE_AUTH_API_URL || "").replace(/\/$/, "");
 const seg = (s: string) => encodeURIComponent(s);
 
-export type EmbedForm = { code: string; title: string; version: number; schema: string };
+export type EmbedForm = {
+  code: string;
+  title: string;
+  version: number;
+  schema: string;
+  /** Effective "Developed at Lukeflow" attribution flag — the server has ALREADY applied the tenant's
+   *  plan (free plans can't switch it off), so render it as given. Optional for forward/backward
+   *  compatibility with an engine that predates the field. */
+  showBranding?: boolean;
+};
 
 /** Thrown when the server is rate-limiting (HTTP 429) — callers wait + retry. */
 export class EmbedRateLimitedError extends Error {

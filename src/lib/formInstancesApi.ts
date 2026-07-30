@@ -37,6 +37,12 @@ export type FormInstance = {
   expiresAt?: number;
   submittedAt?: number;
   updatedAt?: number;
+  /** Submission provenance, captured server-side at submit — the evidence that makes a completed form
+   *  enforceable. Absent on instances submitted before this was recorded. */
+  submittedIp?: string;
+  submittedUserAgent?: string;
+  /** Which door it came through: EMBED | RESPOND | APP. */
+  submittedVia?: string;
 };
 
 /** A loaded instance plus the pinned schema string to render it with. */
@@ -58,6 +64,9 @@ type ApiInstance = {
   expiresAt?: unknown;
   submittedAt?: unknown;
   updatedAt?: unknown;
+  submittedIp?: string | null;
+  submittedUserAgent?: string | null;
+  submittedVia?: string | null;
 };
 type ApiView = { instance: ApiInstance; schema?: string | null };
 
@@ -91,6 +100,9 @@ function toInstance(i: ApiInstance): FormInstance {
     expiresAt: ms(i.expiresAt),
     submittedAt: ms(i.submittedAt),
     updatedAt: ms(i.updatedAt),
+    submittedIp: i.submittedIp ?? undefined,
+    submittedUserAgent: i.submittedUserAgent ?? undefined,
+    submittedVia: i.submittedVia ?? undefined,
   };
 }
 

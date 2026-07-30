@@ -31,6 +31,8 @@
   },
   "dependencies": {
     "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",
+    "@lukeflow/analytics-core": "file:./vendor/@lukeflow/analytics-core",
+    "@lukeflow/analytics-react": "file:./vendor/@lukeflow/analytics-react",
     "@lukeflow/email-builder": "file:./vendor/@lukeflow/email-builder",
     "@lukeflow/email-core": "file:./vendor/@lukeflow/email-core",
     "@lukeflow/email-react": "file:./vendor/@lukeflow/email-react",
@@ -43,6 +45,10 @@
     "@lukeflow/workflow-builder": "file:./vendor/@lukeflow/workflow-builder",
     "@lukeflow/workflow-core": "file:./vendor/@lukeflow/workflow-core",
     "@nangohq/frontend": "^0.70.9",
+    "@nivo/bar": "^0.99.0",
+    "@nivo/core": "^0.99.0",
+    "@nivo/line": "^0.99.0",
+    "@nivo/pie": "^0.99.0",
     "@react-email/components": "^1.0.11",
     "@react-email/render": "^2.0.9",
     "@sentry/react": "^10.59.0",
@@ -87,9 +93,11 @@
     "vitest": "^4.1.8"
   },
   "overrides": {
+    "@lukeflow/analytics-core": "file:./vendor/@lukeflow/analytics-core",
+    "@lukeflow/analytics-react": "file:./vendor/@lukeflow/analytics-react",
+    "@lukeflow/form-builder": "file:./vendor/@lukeflow/form-builder",
     "@lukeflow/form-core": "file:./vendor/@lukeflow/form-core",
     "@lukeflow/form-react": "file:./vendor/@lukeflow/form-react",
-    "@lukeflow/form-builder": "file:./vendor/@lukeflow/form-builder",
     "react-helmet-async": {
       "react": "^16.8.0 || ^17 || ^18 || ^19"
     }

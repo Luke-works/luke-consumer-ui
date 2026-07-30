@@ -8,6 +8,13 @@ vi.mock("../../lib/formsApi", () => ({
   getEmbedToken: vi.fn(),
   rotateEmbedToken: vi.fn(),
   updateMeta: vi.fn(),
+  // The panel also loads which version embeds serve + where the form is observed embedded. Those are
+  // covered in FormEmbedPanel.versions.test.tsx; here they only need to resolve so this file keeps
+  // testing the snippet/allowlist/rotation behaviour it is about.
+  getEmbedVersion: vi.fn(),
+  listEmbedSites: vi.fn(),
+  setEmbedVersion: vi.fn(),
+  setSubmissionHandling: vi.fn(),
 }));
 
 const mocked = vi.mocked(formsApi);
@@ -17,6 +24,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  mocked.getEmbedVersion.mockResolvedValue({
+    mode: "AUTO", pinnedVersion: null, publishedVersion: 1, servingVersion: 1, updateAvailable: false,
+  });
+  mocked.listEmbedSites.mockResolvedValue([]);
 });
 
 function renderOpen() {
