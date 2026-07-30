@@ -62,7 +62,7 @@ import { useMutationLock } from "../../hooks/useMutationLock";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import LifecycleActions from "./LifecycleActions";
-import { lifecycleGate, TOOLBAR_BTN_NEUTRAL, type LifecycleState } from "./lifecycle";
+import { lifecycleGate, TOOLBAR_BTN_ICON, TOOLBAR_BTN_NEUTRAL, type LifecycleState } from "./lifecycle";
 import PageMeta from "../../components/common/PageMeta";
 
 const EMPTY: FormSchema = { root: [], entities: {} };
@@ -721,7 +721,7 @@ export default function FormBuilderPage() {
             type="button"
             onClick={openSettings}
             aria-label="Form settings"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700 focus:outline-hidden focus-visible:ring-3 focus-visible:ring-brand-500/20 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+            className={`${TOOLBAR_BTN_ICON} shrink-0`}
           >
             <Settings className="size-4" />
           </button>
