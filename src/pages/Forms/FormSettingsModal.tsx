@@ -26,6 +26,7 @@ import { FORM_FONTS, resolveFont } from "../../lib/formFonts";
 import { CONSENT_DEFAULT_TEXT, CONSENT_MAX_LENGTH } from "../../lib/formSchema";
 import type { AuditEvent, StoredForm } from "../../lib/formsApi";
 import { FileText, Gavel, Info, Palette, History } from "lucide-react";
+import FormActivityTimeline from "./FormActivityTimeline";
 
 const TABS = [
   { id: "general", label: "General", icon: Info },
@@ -132,7 +133,7 @@ export default function FormSettingsModal({
       isOpen={open}
       onClose={onClose}
       ariaLabel="Form settings"
-      className="mx-4 flex max-h-[88vh] w-full max-w-[720px] flex-col"
+      className="mx-4 flex h-[min(88vh,42rem)] w-full max-w-[720px] flex-col overflow-hidden"
     >
       <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pt-6 dark:border-gray-800">
         <h2 className="pr-8 text-lg font-semibold text-gray-800 dark:text-white/90">Form settings</h2>
@@ -173,11 +174,11 @@ export default function FormSettingsModal({
         role="tabpanel"
         id={`form-settings-panel-${tab}`}
         aria-labelledby={`form-settings-tab-${tab}`}
-        className="min-h-[280px] flex-1 overflow-y-auto px-6 py-5"
+        className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
       >
         {/* Editing settings is part of the edit lifecycle (it dirties the draft and re-gates publish),
             so it needs a checkout — matching the builder canvas. */}
-        {canEdit && !checkedOut && (
+        {canEdit && !checkedOut && tab !== "activity" && (
           <p className="mb-5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400">
             Check the form out (Checkout in the toolbar) to change these settings.
           </p>
@@ -395,31 +396,7 @@ export default function FormSettingsModal({
           </>
         )}
 
-        {tab === "activity" && (
-          <>
-            {auditEvents.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">Nothing has happened to this form yet.</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {auditEvents.map((ev, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start justify-between gap-3 border-b border-gray-100 pb-1.5 text-xs text-gray-500 last:border-0 dark:border-gray-800 dark:text-gray-400"
-                  >
-                    <span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {ev.action.replace(/_/g, " ")}
-                      </span>
-                      {ev.detail ? ` ${ev.detail}` : ""}
-                      {ev.actorName ? ` · ${ev.actorName}` : ""}
-                    </span>
-                    <span className="shrink-0 text-gray-400">{new Date(ev.at).toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
+        {tab === "activity" && <FormActivityTimeline events={auditEvents} />}
       </div>
 
       <div className="shrink-0 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
@@ -432,9 +409,11 @@ export default function FormSettingsModal({
           {/* The two save models, stated rather than implied — otherwise "Save" looks like it covers
               everything and a font change appearing without it looks like a bug. */}
           <p className="text-xs text-gray-400">
-            {editable
-              ? "Submission, Legal and Font settings save as you change them. Save applies the name, description and tag."
-              : "Read-only."}
+            {tab === "activity"
+              ? "A read-only record of everything that has happened to this form."
+              : editable
+                ? "Submission, Legal and Font settings save as you change them. Save applies the name, description and tag."
+                : "Read-only."}
           </p>
           <div className="flex items-center gap-3">
             <Button variant="outline" onClick={onClose}>{editable ? "Cancel" : "Close"}</Button>
