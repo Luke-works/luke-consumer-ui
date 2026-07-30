@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stubBackend, expectHealthy, expectSettled, forceTheme, ok, type StubOptions } from "./support/harness";
+import { VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
 
 /**
  * VISUAL REGRESSION — UI STATES.
@@ -263,9 +264,11 @@ test.describe("visual states", () => {
   // Baselines are linux-only (font rendering is platform-specific). VERIFY_SETUP=1 runs the suite
   // anyway on any OS: the screenshots won't match, but every `setup` still executes, which is how
   // you check a NEW state is actually reachable before asking CI to bless a baseline for it.
+  // VERIFY_SETUP=1 still runs the setups anywhere, so a state that stops being REACHABLE can be
+  // caught locally without a baseline — that half of this spec is a functional check, not a pixel one.
   test.skip(
-    process.env.VERIFY_SETUP !== "1" && process.platform !== "linux",
-    "visual baselines are linux-only — see e2e/README.md (VERIFY_SETUP=1 to check setups here)",
+    process.env.VERIFY_SETUP !== "1" && !VISUAL_ENABLED,
+    `${VISUAL_SKIP_REASON} (VERIFY_SETUP=1 to check the setups here)`,
   );
 
   for (const state of STATES) {

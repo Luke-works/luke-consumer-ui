@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { stubBackend, expectHealthy, expectRendered, expectSettled, forceTheme } from "./support/harness";
 import { SCREENS } from "./support/screens";
+import { VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
 
 /**
  * VISUAL REGRESSION — a pixel baseline for every screen.
@@ -23,15 +24,12 @@ import { SCREENS } from "./support/screens";
  * layout actually breaks; laptop (1280) is where the product is really used. Tablet and desktop
  * are interpolations between them and have historically caught nothing the other two didn't.
  *
- * WHY BASELINES ARE LINUX-ONLY. Font rasterisation and subpixel antialiasing differ per OS, so a
- * macOS baseline can never match an ubuntu CI run — Playwright encodes this by suffixing snapshot
- * files with the platform. The committed baselines are generated in the Playwright Docker image
- * that matches CI (see e2e/README.md); on any other platform this suite skips rather than failing
- * with a wall of diffs that mean nothing.
+ * WHERE THIS RUNS. Linux only (font rasterisation is platform-specific) AND only on the parity
+ * branches — develop / qa / prod — plus the manual baseline job. Feature PRs run the functional,
+ * render and overflow matrices, which answer "is this page broken"; this answers "does it look
+ * different", which is worth gating once a change is heading for a deployed environment rather than
+ * on every push. See `support/visual.ts` for the rule and the reasoning.
  */
-
-/** Where a baseline is meaningful. Everything else skips — see the note above. */
-const BASELINE_PLATFORM = "linux";
 
 const THEMES = ["light", "dark"] as const;
 
@@ -47,10 +45,7 @@ const VISUAL_VIEWPORTS = [
 test.use({ video: "off" });
 
 test.describe("visual", () => {
-  test.skip(
-    process.platform !== BASELINE_PLATFORM,
-    `visual baselines are ${BASELINE_PLATFORM}-only (font rendering is platform-specific) — run via the Playwright Docker image`,
-  );
+  test.skip(!VISUAL_ENABLED, VISUAL_SKIP_REASON);
 
   for (const screen of SCREENS) {
     test.describe(screen.name, () => {

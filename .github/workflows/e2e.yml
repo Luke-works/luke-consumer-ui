@@ -6,7 +6,9 @@ name: E2E
 on:
   pull_request:
   push:
-    branches: [develop, main]
+    # The PARITY branches (plus main) — where the visual baselines are enforced. See the `VISUAL`
+    # env on the e2e job below.
+    branches: [develop, qa, prod, main]
   workflow_dispatch: {}
 
 jobs:
@@ -29,7 +31,16 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
+      # VISUAL gates the two pixel-baseline suites (e2e/support/visual.ts). They run only on a PUSH
+      # to a parity branch — develop / qa / prod — because a committed baseline needs a human to
+      # re-approve it on every intended redesign, and making that a per-PR gate turned every
+      # legitimate UI change into push → fail → dispatch → download → commit → push. Feature PRs
+      # still run the full functional, render and overflow matrices; those catch "this page is
+      # broken". Visual catches "this page looks different", which is the question worth asking as a
+      # change reaches a deployed environment.
       - name: Run E2E tests
+        env:
+          VISUAL: ${{ (github.event_name == 'push' && (github.ref_name == 'develop' || github.ref_name == 'qa' || github.ref_name == 'prod')) && '1' || '0' }}
         run: npm run test:e2e
 
       - name: Upload failure diagnostics
@@ -74,6 +85,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Regenerate baselines
+        env:
+          VISUAL: '1' # this job exists to shoot them, so it always opts in
         run: npx playwright test e2e/visual.spec.ts e2e/visual-states.spec.ts --update-snapshots
 
       - name: Upload the baselines to commit

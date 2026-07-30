@@ -66,9 +66,26 @@ a macOS baseline can never match the ubuntu CI runner; Playwright encodes this b
 filenames with the platform. On any non-Linux machine the suite **skips itself** rather than
 producing a wall of meaningless diffs. Locally you get the other specs; CI is where pixels are judged.
 
+### When the visual suites run
+
+They are gated on **two** things (`e2e/support/visual.ts`):
+
+1. **Linux** — font rasterisation is platform-specific, so a macOS baseline can never match CI.
+2. **`VISUAL=1`** — set by the E2E workflow only on a **push to a parity branch** (`develop` / `qa` /
+   `prod`) and by the manual baseline job.
+
+So a feature branch / PR runs everything EXCEPT the pixel comparisons. That is deliberate: a committed
+baseline needs a human to re-approve it on every intended redesign, and gating that per-PR turned each
+legitimate UI change into push → fail → dispatch → download → commit → push. The functional, render and
+overflow matrices still run on every PR — they catch *"this page is broken"*. Visual catches *"this page
+looks different"*, which is the question worth gating as a change reaches a deployed environment.
+
+Run them locally on Linux (or in the Docker image) with `VISUAL=1 npx playwright test e2e/visual.spec.ts`.
+
 ### After an intended visual change
 
-The baselines are committed, so a deliberate redesign will (correctly) fail the visual suite. To
+The baselines are committed, so a deliberate redesign will (correctly) fail the visual suite **once it
+lands on a parity branch** — or immediately, if you dispatch the workflow yourself. To
 re-approve:
 
 1. **Actions → E2E → Run workflow** on your branch. The `Update visual baselines (manual)` job
