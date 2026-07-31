@@ -49,7 +49,7 @@ import {
 } from "../../lib/formsApi";
 import { lukeAttributeEditors } from "./lukeAttributeEditors";
 import { Modal } from "../../components/ui/modal";
-import { FlaskConical, BadgeCheck, CodeXml, ArrowUp, Eye, ArrowLeft, Lock, ExternalLink, Send, Users, Settings } from "lucide-react";
+import { FlaskConical, CodeXml, ArrowUp, Eye, ArrowLeft, ExternalLink, Send, Users, Settings } from "lucide-react";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
 import FormTestPanel from "./FormTestPanel";
@@ -61,6 +61,7 @@ import { guardedLeave } from "../../lib/leaveGuard";
 import { useMutationLock } from "../../hooks/useMutationLock";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
+import FormStatusPopover from "./FormStatusPopover";
 import LifecycleActions from "./LifecycleActions";
 import { lifecycleGate, TOOLBAR_BTN_ICON, TOOLBAR_BTN_NEUTRAL, type LifecycleState } from "./lifecycle";
 import PageMeta from "../../components/common/PageMeta";
@@ -76,12 +77,6 @@ function parseSchema(raw: string): FormSchema {
   }
   return EMPTY;
 }
-
-const STATUS_BADGE: Record<FormStatus, string> = {
-  draft: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
-  published: "bg-success-50 text-success-600 dark:bg-success-500/15",
-  archived: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
-};
 
 export default function FormBuilderPage() {
   const { id } = useParams();
@@ -726,22 +721,23 @@ export default function FormBuilderPage() {
             <Settings className="size-4" />
           </button>
         </Tooltip>
-        {/* Status cluster: what version this is and whether it's safe to publish. Grouped and separated
-            from the actions on the right so the row reads as "what you're looking at" then "what you can
-            do", instead of one undifferentiated line of chips and buttons. */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2 border-gray-200 ps-1 dark:border-gray-700 sm:border-s sm:ps-3">
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[status]}`}>{status}</span>
-          <span className="text-xs text-gray-400">v{version}</span>
-          {latestSignedOff && (
-            <span
-              title={lastTestedAt ? `Signed off ${new Date(lastTestedAt).toLocaleString()}` : "Latest version is signed off"}
-              className="inline-flex items-center gap-1 text-xs text-success-600 dark:text-success-400"
-            >
-              <BadgeCheck className="size-3.5" />Signed off
-            </span>
-          )}
-          <span className={`text-xs ${saveError ? "text-error-500" : "text-gray-400"}`}>{canEdit ? saveLabel : "View only"}</span>
-        </div>
+        {/* Everything about the form's STATE lives behind this one icon, beside the gear: published
+            or not, which version, sign-off, save state, and the view-only message with its way out.
+            The glyph and colour still say which of those three states you're in without a click. */}
+        <FormStatusPopover
+          info={{
+            status,
+            version,
+            publishedVersion,
+            signedOff: latestSignedOff,
+            lastTestedAt,
+            canEdit,
+            checkedOut,
+            saveLabel,
+            saveError: !!saveError,
+          }}
+          onCheckout={onCheckout}
+        />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {/* Preview + Test are available to view-only users too (read access can validate). */}
@@ -802,16 +798,6 @@ export default function FormBuilderPage() {
           )}
         </div>
       </div>
-
-      {/* View-only notice: an editor hasn't checked the form out yet (the Checkout button is above). */}
-      {canEdit && !checkedOut && (
-        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300">
-          <Tooltip content="Read-only — your edits won't be saved until you check the form out.">
-            <Lock className="size-4 shrink-0 text-gray-400" />
-          </Tooltip>
-          <span>View-only — you're looking at v{version}. Use <span className="font-medium">Checkout</span> above to edit it.</span>
-        </div>
-      )}
 
       <BuilderMobileNotice label="form builder" />
       {/* The builder is non-interactive (inert) until checked out — true view-only, not just visual. */}

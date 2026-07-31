@@ -245,7 +245,16 @@ export function saveDraft(tenant: string, id: string, schema: string): Promise<u
 export function updateMeta(
   tenant: string,
   id: string,
-  patch: { name?: string; description?: string; allowedEmbedOrigins?: string; showBranding?: boolean },
+  patch: {
+    name?: string;
+    description?: string;
+    allowedEmbedOrigins?: string;
+    /** Friendly labels for the allowlist, keyed by origin. The server keeps only labels whose origin
+     *  survives normalization, so removing a site drops its name with it. Purely presentational —
+     *  the CSP is computed from `allowedEmbedOrigins` alone. */
+    embedOriginNames?: Record<string, string>;
+    showBranding?: boolean;
+  },
 ): Promise<unknown> {
   return req(tenant, `${BASE}/${seg(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
@@ -369,11 +378,20 @@ export async function getAudit(tenant: string, id: string): Promise<AuditEvent[]
   return asArray<ApiAudit>(list).map(toAudit);
 }
 
+export type EmbedTokenResponse = {
+  token: string;
+  code: string;
+  /** Canonical comma-separated allowlist as the server stores it — the CSP source of truth. */
+  allowedEmbedOrigins?: string | null;
+  /** Friendly labels keyed by canonical origin. Absent on an engine that predates the field. */
+  embedOriginNames?: Record<string, string> | null;
+};
+
 /** Mint an opaque, signed embed token for a published form (for the iframe). */
 export async function getEmbedToken(
   tenant: string,
   id: string,
-): Promise<{ token: string; code: string; allowedEmbedOrigins?: string | null }> {
+): Promise<EmbedTokenResponse> {
   return req(tenant, `${BASE}/${seg(id)}/embed-token`);
 }
 
@@ -382,7 +400,7 @@ export async function getEmbedToken(
 export async function rotateEmbedToken(
   tenant: string,
   id: string,
-): Promise<{ token: string; code: string; allowedEmbedOrigins?: string | null }> {
+): Promise<EmbedTokenResponse> {
   return req(tenant, `${BASE}/${seg(id)}/embed-token/rotate`, { method: "POST" });
 }
 

@@ -94,6 +94,32 @@ function collectKeys(schema) {
   }
   return out;
 }
+function isSubmitButton(e) {
+  if (!e || e.type !== "button") return false;
+  const action = e.attributes?.buttonAction;
+  return action !== "reset" && action !== "button";
+}
+function submitButtonId(schema) {
+  const entities = schema.entities ?? {};
+  const seen = /* @__PURE__ */ new Set();
+  const visit = (id) => {
+    if (seen.has(id)) return null;
+    seen.add(id);
+    const e = entities[id];
+    if (!e) return null;
+    if (isSubmitButton(e)) return id;
+    for (const child of e.children ?? []) {
+      const hit = visit(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  for (const id of schema.root ?? []) {
+    const hit = visit(id);
+    if (hit) return hit;
+  }
+  return null;
+}
 function duplicateKeyIds(schema) {
   const seen = /* @__PURE__ */ new Set();
   const dupes = /* @__PURE__ */ new Set();
@@ -3329,6 +3355,7 @@ exports.sanitizeKey = sanitizeKey;
 exports.seedFields = seedFields;
 exports.setSettings = setSettings;
 exports.sourcePriority = sourcePriority;
+exports.submitButtonId = submitButtonId;
 exports.toAddressSuggestions = toAddressSuggestions;
 exports.toCamelKey = toCamelKey;
 exports.toOptions = toOptions;
