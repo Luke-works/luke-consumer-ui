@@ -143,6 +143,7 @@ var TEXTUAL = ["textField", "textarea", "email", "url", "phoneNumber", "password
 var OPTIONED = ["select", "searchSelect", "radio", "selectBoxes", "ranking"];
 var NUMERIC = ["number", "currency"];
 var GRIDS = ["dataGrid", "editGrid"];
+var GROUPED = ["radio", "selectBoxes"];
 function isDataField(type) {
   const ft = REGISTRY.get(type);
   return !!ft && ft.valueType !== "none";
@@ -165,14 +166,18 @@ var inGrid = (e, schema) => {
   }
   return false;
 };
+var notInCell = (e, schema) => !inGrid(e, schema);
 var CURRENCY_CODES = ["USD", "EUR", "GBP", "INR", "JPY", "CAD", "AUD", "CNY", "BRL", "ZAR"].map((c) => ({ label: c, value: c }));
 function createDefaultAttributeEditors() {
   return [
     // ── DISPLAY ──────────────────────────────────────────────────────────────
     { id: "label", tab: "display", attribute: "label", label: "Label", control: "text", order: 1 },
     { id: "placeholder", tab: "display", attribute: "placeholder", label: "Placeholder", control: "text", order: 10, when: (e) => textual(e) || optioned(e) || numeric(e) },
-    { id: "description", tab: "display", attribute: "description", label: "Description", control: "textarea", order: 20 },
-    { id: "tooltip", tab: "display", attribute: "tooltip", label: "Tooltip", control: "text", order: 30, when: data },
+    // A grid CELL is a bare control in a <td>: its `label` becomes the column header, but it has
+    // no description/tooltip element, no class hook and no inline error, so these would be
+    // settings the author can fill in and never see. See `notInCell`.
+    { id: "description", tab: "display", attribute: "description", label: "Description", control: "textarea", order: 20, when: notInCell },
+    { id: "tooltip", tab: "display", attribute: "tooltip", label: "Tooltip", control: "text", order: 30, when: (e, s) => data(e) && notInCell(e, s) },
     {
       id: "labelPosition",
       tab: "display",
@@ -180,15 +185,18 @@ function createDefaultAttributeEditors() {
       label: "Label position",
       control: "select",
       order: 40,
-      when: data,
+      // Grouped choices are labelled by a <legend>, which the UA lays out inside the fieldset's
+      // border and which therefore cannot be placed in a grid column reliably across browsers.
+      // Offering the control there would be offering a setting that does nothing.
+      when: (e, s) => data(e) && !GROUPED.includes(e.type) && notInCell(e, s),
       options: [
         { label: "Top", value: "top" },
         { label: "Left", value: "left" },
         { label: "Right", value: "right" }
       ]
     },
-    { id: "hideLabel", tab: "display", attribute: "hideLabel", label: "Hide label", control: "checkbox", order: 50, when: data },
-    { id: "customClass", tab: "display", attribute: "customClass", label: "Custom CSS class", control: "text", order: 60 },
+    { id: "hideLabel", tab: "display", attribute: "hideLabel", label: "Hide label", control: "checkbox", order: 50, when: (e, s) => data(e) && notInCell(e, s) },
+    { id: "customClass", tab: "display", attribute: "customClass", label: "Custom CSS class", control: "text", order: 60, when: notInCell },
     { id: "hidden", tab: "display", attribute: "hidden", label: "Hidden", control: "checkbox", order: 70 },
     { id: "disabled", tab: "display", attribute: "disabled", label: "Disabled", control: "checkbox", order: 80, when: data },
     // ── SETTINGS (structural config for layout containers + static blocks) ──────
@@ -329,7 +337,9 @@ function createDefaultAttributeEditors() {
       label: "Validate on",
       control: "select",
       order: 50,
-      when: data,
+      // A cell surfaces no inline error of its own (the grid reports at field level), so there is
+      // nothing for the timing to change.
+      when: (e, s) => data(e) && notInCell(e, s),
       options: [
         { label: "Change", value: "change" },
         { label: "Blur", value: "blur" }

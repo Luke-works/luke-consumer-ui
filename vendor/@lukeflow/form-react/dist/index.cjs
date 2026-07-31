@@ -911,15 +911,25 @@ function NumberInput({
   currency,
   prefix,
   suffix,
+  decimalLimit,
+  delimiter,
   onChange
 }) {
   const { formatNumber } = useLocale();
   const [focused, setFocused] = (0, import_react10.useState)(false);
   const raw = asText(value);
   let display = raw;
-  if (!focused && raw !== "" && currency) {
+  if (!focused && raw !== "") {
     const n = Number(raw);
-    if (!Number.isNaN(n)) display = formatNumber(n, { style: "currency", currency });
+    const fixed = typeof decimalLimit === "number" && Number.isFinite(decimalLimit) && decimalLimit >= 0;
+    if (!Number.isNaN(n) && (currency || fixed || delimiter)) {
+      display = formatNumber(n, {
+        ...currency ? { style: "currency", currency } : {},
+        ...fixed ? { minimumFractionDigits: decimalLimit, maximumFractionDigits: decimalLimit } : {},
+        // A plain number groups only when the author asked; currency groups by locale convention.
+        ...currency ? {} : { useGrouping: Boolean(delimiter) }
+      });
+    }
   }
   return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "lf-number", children: [
     prefix && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "lf-affix lf-prefix", children: prefix }),
@@ -932,7 +942,10 @@ function NumberInput({
         ...extra,
         value: display,
         onFocus: () => setFocused(true),
-        onBlur: () => setFocused(false),
+        onBlur: () => {
+          setFocused(false);
+          a11y.onBlur?.();
+        },
         onChange: (e) => onChange(e.target.value)
       }
     ),
@@ -980,7 +993,17 @@ function FileField({
     }
   };
   return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "lf-file", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("input", { ...a11y, type: "file", multiple, disabled: disabled || uploading, onChange: (e) => handle(e.target.files) }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+      "input",
+      {
+        ...a11y,
+        type: "file",
+        accept: typeof entity.attributes?.accept === "string" && entity.attributes.accept ? entity.attributes.accept : void 0,
+        multiple,
+        disabled: disabled || uploading,
+        onChange: (e) => handle(e.target.files)
+      }
+    ),
     uploading && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "lf-file-uploading", children: "Uploading\u2026" }),
     error && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { role: "alert", className: "lf-error", children: error }),
     files.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("ul", { className: "lf-file-list", children: files.map((f, i) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: typeof f.url === "string" && /^(https?:|mailto:)/i.test(f.url.trim()) ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("a", { href: f.url, target: "_blank", rel: "noreferrer", children: f.name ?? "file" }) : f.name ?? "file" }, i)) })
@@ -1975,17 +1998,35 @@ function Group({
   ctx,
   children
 }) {
-  const error = ctx.showErrors ? fs.error : null;
+  const a = entity.attributes ?? {};
+  const error = ctx.showErrors || ctx.revealed?.has(fs.key) ? fs.error : null;
   const asyncMsg = !error ? ctx.asyncErrors[fs.key] : void 0;
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("fieldset", { className: "lf-field lf-group", "data-type": entity.type, "aria-invalid": error || asyncMsg ? true : void 0, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("legend", { className: "lf-label", children: [
-      labelText(entity.attributes) ?? fs.key,
-      fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "aria-hidden": "true", children: " *" })
-    ] }),
-    children,
-    error && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error", children: error.message }),
-    !error && asyncMsg && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
-  ] });
+  const hideLabel = Boolean(a.hideLabel);
+  const desc = labelText(a, "description");
+  const descId = desc ? `${entity.id}-desc` : void 0;
+  const cls = ["lf-field", "lf-group", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+    "fieldset",
+    {
+      className: cls,
+      "data-type": entity.type,
+      "data-inline": a.inline ? "true" : void 0,
+      "data-hide-label": hideLabel || void 0,
+      "aria-invalid": error || asyncMsg ? true : void 0,
+      "aria-describedby": descId,
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("legend", { className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
+          ctx.t(labelText(a) ?? fs.key),
+          fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "aria-hidden": "true", children: " *" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Tooltip, { text: tooltipText(a) })
+        ] }),
+        children,
+        desc && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { id: descId, className: "lf-desc", children: ctx.t(desc) }),
+        error && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
+        !error && asyncMsg && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
+      ]
+    }
+  );
 }
 function GridField({
   entity,
@@ -2370,6 +2411,15 @@ function FormRenderer(props) {
   const [submitted, setSubmitted] = (0, import_react15.useState)(false);
   const client = useMinionClient();
   const [asyncErrors, setAsyncErrors] = (0, import_react15.useState)({});
+  const [revealed, setRevealed] = (0, import_react15.useState)(() => /* @__PURE__ */ new Set());
+  const validateField = form.validate;
+  const reveal = (0, import_react15.useCallback)(
+    (key) => {
+      validateField([key]);
+      setRevealed((prev) => prev.has(key) ? prev : new Set(prev).add(key));
+    },
+    [validateField]
+  );
   const onAutosaveRef = (0, import_react15.useRef)(onAutosave);
   onAutosaveRef.current = onAutosave;
   const autosaveTimer = (0, import_react15.useRef)(null);
@@ -2446,7 +2496,7 @@ function FormRenderer(props) {
   const dataTheme = dataThemeAttr(resolvedScheme);
   const sanitize = sanitizeHtml ?? defaultSanitizeHtml;
   const slotOnAuthorButton = authorSubmitId && !readOnly ? beforeSubmit : void 0;
-  const ctx = { form, reg, readOnly, showErrors: submitted, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: slotOnAuthorButton, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
+  const ctx = { form, reg, readOnly, showErrors: submitted, revealed, reveal, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: slotOnAuthorButton, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
@@ -2533,6 +2583,15 @@ function FormWizardView({
 }) {
   const [index, setIndex] = (0, import_react15.useState)(0);
   const [showErrors, setShowErrors] = (0, import_react15.useState)(false);
+  const [revealed, setRevealed] = (0, import_react15.useState)(() => /* @__PURE__ */ new Set());
+  const validateField = form.validate;
+  const reveal = (0, import_react15.useCallback)(
+    (key) => {
+      validateField([key]);
+      setRevealed((prev) => prev.has(key) ? prev : new Set(prev).add(key));
+    },
+    [validateField]
+  );
   const { t, dir } = useLocale();
   const pageRef = (0, import_react15.useRef)(null);
   const firstRender = (0, import_react15.useRef)(true);
@@ -2547,7 +2606,7 @@ function FormWizardView({
     }
     pageRef.current?.focus();
   }, [safeIndex]);
-  const ctx = { form, reg, readOnly, showErrors, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: authorSubmitId && !readOnly ? beforeSubmit : void 0, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
+  const ctx = { form, reg, readOnly, showErrors, revealed, reveal, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: authorSubmitId && !readOnly ? beforeSubmit : void 0, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const next = () => {
     if (!currentId) return;
     if (keysValid(form, pageFieldKeys(schema, currentId, form))) {
@@ -2645,11 +2704,15 @@ function Field({ entity, fs, ctx }) {
   const live = useMinionData(entity, ctx.scope);
   const fieldOptions = live.options.length ? live.options : options(a);
   const disabled = fs.isDisabled || ctx.readOnly;
-  const error = ctx.showErrors ? fs.error : null;
+  const validateOn = a.validateOn === "blur" || a.validateOn === "change" ? a.validateOn : null;
+  const error = ctx.showErrors || ctx.revealed?.has(key) ? fs.error : null;
   const errId = error ? `${id}-error` : void 0;
   const asyncErrId = !error && ctx.asyncErrors[key] ? `${id}-async-error` : void 0;
   const descId = labelText(a, "description") ? `${id}-desc` : void 0;
-  const set = (value) => ctx.form.update(key, value);
+  const set = (value) => {
+    ctx.form.update(key, value);
+    if (validateOn === "change" || ctx.revealed?.has(key)) ctx.reveal?.(key);
+  };
   const a11y = {
     id,
     name: key,
@@ -2657,6 +2720,8 @@ function Field({ entity, fs, ctx }) {
     "aria-invalid": error || asyncErrId ? true : void 0,
     "aria-required": fs.isRequired ? true : void 0,
     "aria-describedby": [descId, errId, asyncErrId].filter(Boolean).join(" ") || void 0,
+    // Every control spreads this bag, so one handler covers the whole field set.
+    ...validateOn === "blur" ? { onBlur: () => ctx.reveal?.(key) } : {},
     // Autofill is suppressed on every input, platform-wide (no escape hatch).
     ...noAutofill(id)
   };
@@ -2683,7 +2748,8 @@ function Field({ entity, fs, ctx }) {
           value: o.value,
           checked: String(fs.value ?? "") === o.value,
           disabled,
-          onChange: () => set(o.value)
+          onChange: () => set(o.value),
+          onBlur: a11y.onBlur
         }
       ),
       ctx.t(o.label)
@@ -2699,6 +2765,7 @@ function Field({ entity, fs, ctx }) {
           value: o.value,
           checked: selected.has(o.value),
           disabled,
+          onBlur: a11y.onBlur,
           onChange: (e) => {
             const next = new Set(selected);
             if (e.target.checked) next.add(o.value);
@@ -2752,6 +2819,8 @@ function Field({ entity, fs, ctx }) {
             currency: entity.type === "currency" ? typeof a.currency === "string" ? a.currency : typeof a.currencyCode === "string" ? a.currencyCode : "USD" : void 0,
             prefix: typeof a.prefix === "string" ? a.prefix : void 0,
             suffix: typeof a.suffix === "string" ? a.suffix : void 0,
+            decimalLimit: typeof a.decimalLimit === "number" ? a.decimalLimit : void 0,
+            delimiter: Boolean(a.delimiter),
             onChange: set
           }
         );
