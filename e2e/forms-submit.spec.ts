@@ -170,6 +170,27 @@ test.describe("forms — public embed submit", () => {
 
     await page.getByRole("textbox", { name: /name/i }).fill("Grace Hopper");
     await page.getByRole("textbox", { name: /email/i }).fill("grace@example.com");
+
+    // The challenge sits IMMEDIATELY above Submit, inside the form. Note "above" alone would be a
+    // useless assertion — the old top-of-page placement was also above it. Adjacency is the claim.
+    const placement = await page.evaluate(() => {
+      const gate = document.querySelector("[data-testid='turnstile-gate']");
+      const submit = document.querySelector("form.lf-form button.lf-submit");
+      if (!gate || !submit) return { gate: !!gate, submit: !!submit };
+      return {
+        gate: true,
+        submit: true,
+        isPreviousSibling: gate.nextElementSibling === submit,
+        insideForm: gate.closest("form.lf-form") !== null,
+        // A real layout engine — jsdom cannot answer this one.
+        gapPx: submit.getBoundingClientRect().top - gate.getBoundingClientRect().bottom,
+      };
+    });
+    expect(placement).toMatchObject({ gate: true, submit: true, isPreviousSibling: true, insideForm: true });
+    // Laid out above with only the form's own row gap between them, not stacked or overlapping.
+    expect(placement.gapPx).toBeGreaterThanOrEqual(0);
+    expect(placement.gapPx).toBeLessThan(40);
+
     await page.getByRole("button", { name: /submit/i }).click();
 
     await expect(page.getByText(/thanks — we got it\./i)).toBeVisible();

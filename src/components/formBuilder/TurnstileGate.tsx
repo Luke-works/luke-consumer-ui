@@ -12,6 +12,10 @@
  *
  * <p>Rendered with `appearance: "interaction-only"`, so most fillers see nothing at all and completion
  * rates are unaffected — the widget only becomes visible when Cloudflare actually wants a check.
+ *
+ * <p>Mounted through the renderer's `beforeSubmit` slot, so it sits immediately above the Submit
+ * button rather than at the top of the page — when it DOES become visible, it appears where the
+ * filler is already looking instead of somewhere they have to scroll back to.
  */
 import { useEffect, useRef } from "react";
 import { loadTurnstile, type TurnstileApi } from "../../lib/turnstile";
@@ -90,5 +94,7 @@ export default function TurnstileGate({
     if (api.current && widgetId.current) api.current.reset(widgetId.current);
   }, [resetSignal]);
 
-  return <div ref={holder} data-testid="turnstile-gate" className="mb-4 empty:mb-0" />;
+  // No margin: this mounts in the renderer's `beforeSubmit` slot, inside `.lf-form` — a gap-managed
+  // flex column that already spaces its children. Adding our own would double it.
+  return <div ref={holder} data-testid="turnstile-gate" />;
 }
