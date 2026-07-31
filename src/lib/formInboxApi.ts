@@ -1,8 +1,13 @@
-// Client for the Form Inbox (core-engine /api/form-inbox) — the open user tasks
-// for the tenant (e.g. "Review Submission"), each linked to its submission.
+// Client for the work Inbox (core-engine /api/form-inbox) — every open user task for the
+// tenant, whatever created it: form submissions to review AND inbound email to triage.
+// The path is historical (it is registered by name in the engine's ApiAuthFilter); the
+// endpoint has always returned all tasks, which is precisely why `kind` exists.
 import { authed, tenantInit } from "./authApi";
 
 const seg = (s: string) => encodeURIComponent(s);
+
+/** What a task is about. Drives which preview the inbox renders. */
+export type InboxTaskKind = "form" | "email";
 
 export type InboxTask = {
   taskId: string;
@@ -11,12 +16,38 @@ export type InboxTask = {
   assignee?: string | null;
   processInstanceId?: string;
   processDefinitionKey?: string;
-  /** The FormInstance id this task is about (the process business key). */
+  /** Camunda task priority — set by an email routing rule, otherwise the engine default. */
+  priority?: number | null;
+  /**
+   * What this task is about. Absent on an older engine, where every task was assumed to be a
+   * form — `taskKind()` below applies that fallback in one place rather than at each use.
+   */
+  kind?: InboxTaskKind;
+  /** FORM only: the FormInstance id this task is about. Null for email tasks — an email has
+   *  no submission behind it, and treating the business key as one is what broke those rows. */
   instanceId?: string | null;
-  /** The form definition (code) this task's submission belongs to — for grouping the
+  /** FORM only: the form definition (code) this task's submission belongs to — for grouping the
    *  inbox by form. Absent on older engines (falls back to "ungrouped" in the UI). */
   definitionCode?: string | null;
+  /** EMAIL only: the stored message id; fetch its body with `getInboundEmail`. */
+  emailMessageId?: string | null;
+  /** EMAIL only: who sent it. */
+  emailFrom?: string | null;
+  /** EMAIL only: the inbound box it arrived at — the grouping key for email tasks. */
+  emailBox?: string | null;
 };
+
+/**
+ * The task's kind, tolerating an engine that predates the field.
+ *
+ * The fallback is deliberately `emailMessageId`-first rather than a blanket "form": during a
+ * deploy window a new UI can meet an old engine, and mislabelling an email task as a form is
+ * exactly the bug this field was added to fix.
+ */
+export function taskKind(t: InboxTask): InboxTaskKind {
+  if (t.kind) return t.kind;
+  return t.emailMessageId ? "email" : "form";
+}
 
 /** A page of inbox tasks plus the full server-side total (#26). */
 export type InboxPage = { items: InboxTask[]; total: number; firstResult: number; maxResults: number };
