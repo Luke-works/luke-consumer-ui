@@ -5,7 +5,7 @@
  * link (they verify by email OTP, then fill the rest). Shows the resulting link + email status.
  */
 import { useEffect, useState } from "react";
-import { Modal } from "../../components/ui/modal";
+import { Modal, MODAL_HEADER_SAFE } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
@@ -98,9 +98,10 @@ export default function FormSendPanel({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} className="mx-4 max-h-[90vh] w-full max-w-[560px] overflow-y-auto">
+    <Modal isOpen={open} onClose={onClose} className="mx-4 flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
       <div className="p-6">
-        <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Send to a recipient</h2>
+        <h2 className={`mb-1 text-lg font-semibold text-gray-800 dark:text-white/90 ${MODAL_HEADER_SAFE}`}>Send to a recipient</h2>
         <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
           We'll create a prefilled copy and email the recipient a secure link. They verify by email before filling.
         </p>

@@ -504,7 +504,8 @@ function Builder({ tenant, templateId, template }: {
       </Modal>
 
       {/* Send test */}
-      <Modal isOpen={testOpen} onClose={() => setTestOpen(false)} className="mx-4 max-h-[90vh] w-full max-w-[520px] overflow-y-auto">
+      <Modal isOpen={testOpen} onClose={() => setTestOpen(false)} className="mx-4 flex max-h-[90vh] w-full max-w-[520px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
         <div className="p-6 sm:p-8">
           <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Send a test — {template.name}</h2>
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">

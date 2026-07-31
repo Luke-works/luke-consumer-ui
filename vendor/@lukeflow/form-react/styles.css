@@ -91,6 +91,35 @@
 .lf-field[data-label-position="right"] > .lf-error {
   grid-column: 1 / -1;
 }
+/* A single checkbox belongs BESIDE its label, not stacked above it.
+   `.lf-field` is a flex column whose default `align-items: stretch` stretched the input to the full
+   row width — and browsers paint the ~13px tick box CENTRED inside that, so the checkbox appeared
+   adrift in the middle of the form with its label orphaned above. Scoped to the default (top) label
+   position: `left`/`right` switch the field to a grid and place the label themselves. */
+.lf-field[data-type="checkbox"][data-label-position="top"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+}
+.lf-field[data-type="checkbox"][data-label-position="top"] > .lf-label {
+  order: 2; /* control first, label after — the conventional reading order for a checkbox */
+}
+/* Never stretch, in either layout: `align-self` covers the flex column, `justify-self` the grid. */
+.lf-field[data-type="checkbox"] > input[type="checkbox"] {
+  flex: none;
+  align-self: center;
+  justify-self: start;
+  margin: 0;
+}
+/* Description, error and counter belong under the pair, not squeezed alongside it. */
+.lf-field[data-type="checkbox"][data-label-position="top"] > .lf-desc,
+.lf-field[data-type="checkbox"][data-label-position="top"] > .lf-error,
+.lf-field[data-type="checkbox"][data-label-position="top"] > .lf-count {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* hideLabel: keep the label for assistive tech but hide it visually. */
 .lf-sr-only {
   position: absolute !important;

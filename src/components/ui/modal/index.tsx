@@ -1,5 +1,19 @@
 import { useRef, useEffect } from "react";
 
+/**
+ * Space a dialog's top-right content must leave for the floating close button.
+ *
+ * The X is absolutely positioned over the content (44px, inset 24px), so anything a caller puts in
+ * the top-right corner runs underneath it — which has now bitten a heading, a paragraph and a
+ * button row in three different dialogs. It is NOT applied automatically: padding the whole content
+ * wrapper would indent every dialog body by 56px, and a float spacer breaks the callers whose
+ * content is a flex column. Reserving it belongs to whatever the caller actually puts up there.
+ *
+ * Apply to the element that reaches furthest right at the top — usually the header row, or the
+ * heading AND its description when they are separate blocks.
+ */
+export const MODAL_HEADER_SAFE = "pe-14";
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;

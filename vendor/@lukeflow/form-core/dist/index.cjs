@@ -3043,12 +3043,15 @@ function toCsv(headers) {
   return `${BOM}${headers.map(csvCell).join(",")}\r
 `;
 }
-function buildFormTemplate(schema, registry) {
+function buildFormTemplate(schema, registry, options) {
   const { fields } = deriveDataContract(schema, registry);
   const columns = [];
   const skipped = [];
+  const include = options?.includeKeys ? new Set(options.includeKeys) : null;
+  const metaColumns = [...options?.metaColumns ?? []];
   for (const f of fields) {
     if (f.excluded) continue;
+    if (include && !include.has(f.key)) continue;
     if (f.typeLabel === "row[]") {
       skipped.push(f.key);
       continue;
@@ -3073,7 +3076,12 @@ function buildFormTemplate(schema, registry) {
       example: f.example
     });
   }
-  return { columns, skipped, csv: toCsv(columns.map((c) => c.key)) };
+  return {
+    metaColumns,
+    columns,
+    skipped,
+    csv: toCsv([...metaColumns.map((m) => m.key), ...columns.map((c) => c.key)])
+  };
 }
 
 // src/builder/operations.ts

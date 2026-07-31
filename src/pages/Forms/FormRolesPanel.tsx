@@ -11,9 +11,12 @@
  * said when their instance was created, because the recipient surface reads the map at render.
  */
 import { useEffect, useState } from "react";
-import { Modal } from "../../components/ui/modal";
+import { Modal, MODAL_HEADER_SAFE } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import { setOutboundConfig, type StoredForm } from "../../lib/formsApi";
+import { buildFormTemplate, type TemplateMetaColumn } from "@lukeflow/form-core";
+import { Download } from "lucide-react";
+import { ICON_LABEL_NUDGE } from "../../lib/iconAlign";
 import { FIELD_ROLES, ROLE_LABEL, fieldsWithRoles, type FieldRole } from "../../lib/outboundRoles";
 
 const ROLE_HINT: Record<FieldRole, string> = {
@@ -56,6 +59,56 @@ export default function FormRolesPanel({
 
   const fields = fieldsWithRoles(schema, roles);
 
+  /**
+   * Who the row is being sent to. Prepended to every generated template because a prefill row is
+   * useless without a recipient — the form data alone says WHAT to send, never to whom.
+   *
+   * Email and phone form a "one of these" pair rather than each being required. Note the engine's
+   * send endpoint currently requires an email and has no SMS delivery, so a phone-only row cannot
+   * actually be sent yet; the column is here because the recipient record wants it, and the header
+   * note is honest about which one does the work today.
+   */
+  const RECIPIENT_META: TemplateMetaColumn[] = [
+    { key: "recipient.firstName", label: "First name", type: "string", required: false, example: "Ada" },
+    { key: "recipient.lastName", label: "Last name", type: "string", required: false, example: "Lovelace" },
+    { key: "recipient.email", label: "Email", type: "string", required: false, requiredGroup: "contact", example: "ada@example.com" },
+    { key: "recipient.phone", label: "Phone", type: "string", required: false, requiredGroup: "contact", example: "+44 7700 900000" },
+  ];
+
+  /**
+   * The template carries ONLY what the preparer supplies: the recipient, plus the fields they own.
+   * A column for a field only the recipient can answer is noise at best, and at worst reads as an
+   * instruction to answer on their behalf — which the engine would then strip anyway.
+   */
+  const preparerKeys = fields.filter((f) => f.role === "PREPARER" || f.role === "EITHER").map((f) => f.key);
+
+  const generateTemplate = () => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(schema);
+    } catch {
+      setError("Couldn't read this form's schema to build a template.");
+      return;
+    }
+    const template = buildFormTemplate(parsed as never, undefined, {
+      includeKeys: preparerKeys,
+      metaColumns: RECIPIENT_META,
+    });
+    const stem = (form.name || "form").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "form";
+    // A second header row naming the "one of these" rule: there is no import to enforce it, so the
+    // only place it can be stated is where the preparer is looking when they fill the sheet.
+    const note = "# fill one of recipient.email or recipient.phone for every row\r\n";
+    const blob = new Blob([template.csv + note], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${stem}-template.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const save = async () => {
     if (saving) return;
     setSaving(true);
@@ -72,10 +125,11 @@ export default function FormRolesPanel({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
+    <Modal isOpen={open} onClose={onClose} className="mx-4 flex max-h-[90vh] w-full max-w-[640px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
       <div className="p-6">
-        <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Who fills each field</h2>
-        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
+        <h2 className={`mb-1 text-lg font-semibold text-gray-800 dark:text-white/90 ${MODAL_HEADER_SAFE}`}>Who fills each field</h2>
+        <p className={`mb-5 text-sm text-gray-500 dark:text-gray-400 ${MODAL_HEADER_SAFE}`}>
           This form is completed by two people. Choose which fields you answer before sending, and
           which you're asking the recipient for.
         </p>
@@ -132,7 +186,22 @@ export default function FormRolesPanel({
           </div>
         )}
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+          {/* The template depends on these very decisions, so it belongs here rather than in a
+              separate view the author would have to go and find. */}
+          <button
+            type="button"
+            onClick={generateTemplate}
+            disabled={preparerKeys.length === 0}
+            title={
+              preparerKeys.length === 0
+                ? "Assign at least one field to yourself to generate a template."
+                : "Download a spreadsheet: the recipient's details plus the fields you fill."
+            }
+            className={`me-auto inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5 ${ICON_LABEL_NUDGE}`}
+          >
+            <Download className="size-4" />Generate template
+          </button>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={save} disabled={saving || fields.length === 0}>
             {saving ? "Saving…" : "Save"}

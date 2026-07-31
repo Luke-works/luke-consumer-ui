@@ -2658,9 +2658,6 @@ function IconDownload() {
     /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M5 21h14" })
   ] });
 }
-function IconPlus() {
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M12 5v14M5 12h14" }) });
-}
 function downloadCsv(csv, filename) {
   if (typeof document === "undefined") return;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -2673,46 +2670,10 @@ function downloadCsv(csv, filename) {
   a.remove();
   URL.revokeObjectURL(url);
 }
-function labelFor(a, id) {
-  if (!id) return null;
-  if (a.modifier && id === a.modifier.id) {
-    const base = a.options.find((o) => o.id === a.modifier.under);
-    return base ? `${base.label} \xB7 ${a.modifier.label}` : a.modifier.label;
-  }
-  return a.options.find((o) => o.id === id)?.label ?? null;
-}
-function groupFields(fields, a) {
-  const bucketOf = (key) => {
-    const v = a.value[key];
-    if (!v) return null;
-    if (a.modifier && v === a.modifier.id) return a.modifier.under;
-    return a.options.some((o) => o.id === v) ? v : null;
-  };
-  const groups = a.options.map((o) => ({ id: o.id, label: o.label, fields: [] }));
-  const unassigned = { id: "", label: a.unassignedLabel ?? "Not assigned", fields: [] };
-  for (const f of fields) {
-    const b = bucketOf(f.key);
-    const g = groups.find((x) => x.id === b);
-    (g ?? unassigned).fields.push(f);
-  }
-  return [...groups, unassigned].filter((g) => g.fields.length > 0);
-}
-function DataStructureView({
-  schema,
-  registry,
-  onSelect,
-  formName,
-  onGenerateTemplate,
-  annotations,
-  metadata
-}) {
+function DataStructureView({ schema, registry, onSelect, formName, onGenerateTemplate }) {
   const contract = (0, import_react11.useMemo)(() => (0, import_form_core9.deriveDataContract)(schema, registry), [schema, registry]);
   const json = (0, import_react11.useMemo)(() => JSON.stringify(contract.example, null, 2), [contract.example]);
   const n = contract.fields.length;
-  const groups = (0, import_react11.useMemo)(
-    () => annotations ? groupFields(contract.fields, annotations) : null,
-    [contract.fields, annotations]
-  );
   const handleGenerateTemplate = () => {
     const template = (0, import_form_core9.buildFormTemplate)(schema, registry);
     const stem = (formName || "form").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "form";
@@ -2722,7 +2683,6 @@ function DataStructureView({
     }
     downloadCsv(template.csv, `${stem}-template.csv`);
   };
-  const rows = (list) => list.map((f) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FieldRow, { field: f, onSelect, annotations }, f.entityId));
   return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds", role: "region", "aria-label": "Data structure", children: [
     /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-bar", children: [
       /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-bar-heading", children: [
@@ -2750,128 +2710,22 @@ function DataStructureView({
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-panes", children: [
       /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-tree", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-pane-head", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-pane-title", children: "Fields" }),
-          annotations ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: annotations.title }) : null
-        ] }),
-        n === 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : groups ? groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-group", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("h4", { className: `lf-ds-group-head${g.id ? "" : " is-unassigned"}`, children: [
-            g.label,
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: g.fields.length })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list", children: rows(g.fields) })
-        ] }, g.id || "__unassigned")) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list", children: rows(contract.fields) })
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("header", { className: "lf-ds-pane-head", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-pane-title", children: "Fields" }) }),
+        n === 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FieldRow, { field: f, onSelect }, f.entityId)) })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-ds-side", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-json", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-pane-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-pane-title", children: "Example submission" }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: "JSON" })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { children: json }) })
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-json", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-pane-head", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-pane-title", children: "Example submission" }),
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: "JSON" })
         ] }),
-        metadata && metadata.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "lf-ds-pane lf-ds-meta", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("header", { className: "lf-ds-pane-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-pane-title", children: "Always recorded" }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-count", children: metadata.length })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-metalist", children: metadata.map((m) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("li", { className: "lf-ds-metarow", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-key", children: m.key }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-type", children: m.typeLabel }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-accepts", children: m.description })
-          ] }, m.key)) })
-        ] }) : null
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("code", { children: json }) })
       ] })
     ] })
   ] });
 }
-function AnnotationPicker({
-  fieldKey,
-  annotations
-}) {
-  const [open, setOpen] = (0, import_react11.useState)(false);
-  const box2 = (0, import_react11.useRef)(null);
-  const btn = (0, import_react11.useRef)(null);
-  const current = annotations.value[fieldKey];
-  const label = labelFor(annotations, current);
-  const mod = annotations.modifier;
-  const selected = mod && current === mod.id ? mod.under : current;
-  (0, import_react11.useEffect)(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      if (!box2.current?.contains(e.target) && !btn.current?.contains(e.target)) setOpen(false);
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        btn.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "lf-ds-annot", children: [
-    label ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip is-annot", children: label }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-      "button",
-      {
-        ref: btn,
-        type: "button",
-        className: "lf-ds-annot-btn",
-        "aria-expanded": open,
-        "aria-haspopup": "dialog",
-        "aria-label": `${annotations.title} \u2014 ${fieldKey}`,
-        title: annotations.title,
-        onClick: () => setOpen((o) => !o),
-        children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(IconPlus, {})
-      }
-    ),
-    open ? /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { ref: box2, className: "lf-ds-annot-pop", role: "dialog", "aria-label": `${annotations.title} \u2014 ${fieldKey}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "lf-ds-annot-title", children: annotations.title }),
-      annotations.options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "lf-ds-annot-opt", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-          "input",
-          {
-            type: "radio",
-            name: `lf-ds-annot-${fieldKey}`,
-            checked: selected === o.id,
-            onChange: () => annotations.onChange(fieldKey, o.id)
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-annot-opt-label", children: o.label }),
-          o.hint ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-annot-opt-hint", children: o.hint }) : null,
-          mod && mod.under === o.id && selected === o.id ? /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "lf-ds-annot-mod", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
-              "input",
-              {
-                type: "checkbox",
-                checked: current === mod.id,
-                onChange: (e) => annotations.onChange(fieldKey, e.target.checked ? mod.id : mod.under)
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { children: [
-              mod.label,
-              mod.hint ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-annot-opt-hint", children: mod.hint }) : null
-            ] })
-          ] }) : null
-        ] })
-      ] }, o.id))
-    ] }) : null
-  ] });
-}
-function FieldRow({
-  field,
-  onSelect,
-  annotations
-}) {
+function FieldRow({ field, onSelect }) {
   const children = field.children ?? [];
   const selectable = !!onSelect && !field.entityId.includes(".");
-  const annotatable = annotations && !field.entityId.includes(".") && !field.excluded;
   return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("li", { className: "lf-ds-item", children: [
     /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-ds-row${field.excluded ? " is-excluded" : ""}`, children: [
       selectable ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-ds-key lf-ds-key--btn", onClick: () => onSelect(field.entityId), title: "Select this field on the canvas", children: field.key }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-key", children: field.key }),
@@ -2879,8 +2733,7 @@ function FieldRow({
       /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-accepts", children: field.accepts }),
       field.constraints.map((c) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip", children: c }, c)),
       field.conditional && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip is-cond", title: "Shown conditionally \u2014 may be absent from a given submission", children: "conditional" }),
-      field.excluded && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip is-excl", title: "persistent: false \u2014 excluded from the submission payload", children: "not saved" }),
-      annotatable ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(AnnotationPicker, { fieldKey: field.key, annotations }) : null
+      field.excluded && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-ds-chip is-excl", title: "persistent: false \u2014 excluded from the submission payload", children: "not saved" })
     ] }),
     children.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { className: "lf-ds-list lf-ds-children", children: children.map((c) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FieldRow, { field: c, onSelect }, c.entityId)) })
   ] });
@@ -2888,7 +2741,7 @@ function FieldRow({
 
 // src/FormBuilder.tsx
 var import_jsx_runtime14 = require("react/jsx-runtime");
-var FormBuilder = (0, import_react12.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, formName, onGenerateTemplate, hideDataView, dataAnnotations, dataMetadata, className }, ref) {
+var FormBuilder = (0, import_react12.forwardRef)(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, formName, onGenerateTemplate, hideDataView, className }, ref) {
   const b = useFormBuilder(initialSchema);
   (0, import_react12.useImperativeHandle)(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
   const [showPreview, setShowPreview] = (0, import_react12.useState)(false);
@@ -2959,8 +2812,6 @@ var FormBuilder = (0, import_react12.forwardRef)(function FormBuilder2({ initial
           registry,
           formName,
           onGenerateTemplate,
-          annotations: dataAnnotations,
-          metadata: dataMetadata,
           onSelect: (id) => {
             setView("design");
             b.select(id);

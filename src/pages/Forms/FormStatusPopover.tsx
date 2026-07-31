@@ -13,7 +13,7 @@
  * banner. A conflict warning nobody opened is a conflict warning that did not work.
  */
 import { useEffect, useRef, useState } from "react";
-import { BadgeCheck, CircleCheck, CircleDashed, Lock } from "lucide-react";
+import { BadgeCheck, Info } from "lucide-react";
 import { Dropdown } from "../../components/ui/dropdown/Dropdown";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
@@ -37,30 +37,26 @@ export type FormStatusInfo = {
   saveError: boolean;
 };
 
-/** The three states the icon distinguishes, in the order they matter to the author. */
+/**
+ * The three states the icon distinguishes, in the order they matter to the author.
+ *
+ * <p>The GLYPH is always the info mark — it is "information about this form", and swapping the shape
+ * per state made it read as three unrelated controls (a dashed circle in particular looked like a
+ * spinner or a disabled button rather than a status). State is carried by COLOUR and by the
+ * accessible name, so it is still answerable at a glance without the shape moving under you.
+ */
 function summarize(info: FormStatusInfo) {
   if (info.canEdit && !info.checkedOut) {
-    return {
-      icon: Lock,
-      tone: "text-gray-400",
-      label: "View only",
-      hint: "You're not editing this form yet.",
-    };
+    return { tone: "text-gray-400", label: "View only", hint: "You're not editing this form yet." };
   }
   if (info.publishedVersion != null) {
     return {
-      icon: CircleCheck,
       tone: "text-success-500",
       label: `Published v${info.publishedVersion}`,
       hint: "Live on your public surfaces.",
     };
   }
-  return {
-    icon: CircleDashed,
-    tone: "text-amber-500",
-    label: "Not published",
-    hint: "No version is live yet.",
-  };
+  return { tone: "text-amber-500", label: "Not published", hint: "No version is live yet." };
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -84,7 +80,6 @@ export default function FormStatusPopover({
 }) {
   const [open, setOpen] = useState(false);
   const summary = summarize(info);
-  const Icon = summary.icon;
   const btnRef = useRef<HTMLButtonElement>(null);
 
   // Escape closes it. Dropdown already handles the outside click; without this the popover survived
@@ -113,14 +108,14 @@ export default function FormStatusPopover({
           aria-haspopup="dialog"
           className="dropdown-toggle inline-flex size-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50 focus:outline-hidden focus-visible:ring-3 focus-visible:ring-brand-500/20 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10"
         >
-          <Icon className={`size-4 ${summary.tone}`} />
+          <Info className={`size-4 ${summary.tone}`} />
         </button>
       </Tooltip>
 
       <Dropdown isOpen={open} onClose={() => setOpen(false)} className="left-0 right-auto w-72 p-4">
         <div role="dialog" aria-label="Form status">
           <div className="flex items-center gap-2">
-            <Icon className={`size-4 shrink-0 ${summary.tone}`} />
+            <Info className={`size-4 shrink-0 ${summary.tone}`} />
             <span className="text-sm font-semibold text-gray-800 dark:text-white/90">{summary.label}</span>
           </div>
           <p className="mt-0.5 text-xs text-gray-400">{summary.hint}</p>

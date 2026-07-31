@@ -15,7 +15,7 @@
  * lifecycle (dirty tracking, autosave debounce, the paid-plan gate on branding).
  */
 import { useEffect, useState } from "react";
-import { Modal } from "../../components/ui/modal";
+import { Modal, MODAL_HEADER_SAFE } from "../../components/ui/modal";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Checkbox from "../../components/form/input/Checkbox";
@@ -143,8 +143,8 @@ export default function FormSettingsModal({
       contentClassName="flex h-full flex-col"
     >
       <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pt-6 dark:border-gray-800">
-        <h2 className="pr-8 text-lg font-semibold text-gray-800 dark:text-white/90">Form settings</h2>
-        <p className="mt-0.5 truncate text-sm text-gray-400">
+        <h2 className={`text-lg font-semibold text-gray-800 dark:text-white/90 ${MODAL_HEADER_SAFE}`}>Form settings</h2>
+        <p className={`mt-0.5 truncate text-sm text-gray-400 ${MODAL_HEADER_SAFE}`}>
           {form.name} · <span className="font-mono text-xs">{form.code}</span>
         </p>
       </div>
