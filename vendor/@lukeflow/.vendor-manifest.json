@@ -1,13 +1,13 @@
 {
-  "vendoredAt": "2026-07-31T08:25:25.012Z",
+  "vendoredAt": "2026-07-31T22:11:40.963Z",
   "packages": {
     "form-core": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "8922f6111aed4545d8b319a58da94d8e683363ce97d7337a6b1eaa9145ca8c48",
-        "dist/index.d.cts": "363f039da0951109f63404c380222b14901beac1e50bec8ce7501618c78242d7",
-        "dist/index.d.ts": "363f039da0951109f63404c380222b14901beac1e50bec8ce7501618c78242d7",
-        "dist/index.js": "a06ef4e3078520befd9a4e3270a154ea339e12296a798257b57e32bfbd964445",
+        "dist/index.cjs": "193b099bc0aadee47f4b0b8d50a43159cb51beb318cd903ebab2eb84bdb7cc30",
+        "dist/index.d.cts": "e0b00dc20d9f71972d07f82f58688a4864ff07109afc4b3cbde82a8a9d7f85bd",
+        "dist/index.d.ts": "e0b00dc20d9f71972d07f82f58688a4864ff07109afc4b3cbde82a8a9d7f85bd",
+        "dist/index.js": "82ed52d5c13d357298a8878915b2f0df65c229785ea0281c757b32c2f1d8bf39",
         "dist/quickjs.cjs": "690881833d0bacccc4f61c68ce34caa19a700264b61e730495dfce1b7b21ac0d",
         "dist/quickjs.d.cts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
         "dist/quickjs.d.ts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
@@ -17,20 +17,20 @@
     "form-react": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "1a9d3472f546298ede2c6d5cadc329acc183e8a6f33e031ce0bb6604d0e29593",
+        "dist/index.cjs": "211e30520e40eb39cc4b2c663ae8970f480c7a12b5f38be6111aa6959d49060b",
         "dist/index.d.cts": "a848728a5707990e08db7a7c1192f58228cdae95699e6a47d107adb5a79c17c4",
         "dist/index.d.ts": "a848728a5707990e08db7a7c1192f58228cdae95699e6a47d107adb5a79c17c4",
-        "dist/index.js": "e32057e4da45b7a2a31eaf73006eac51112498653e8bbfbedc40e75e16d6afe3",
-        "styles.css": "1536993fe134faa11e80860bc1d1cd0decafb47ddb356736133efe9e1ac46b61"
+        "dist/index.js": "34f4bbe73ee0b573acdc9404c5ac4a816242cb8042b362224d816abf4b0f1aa4",
+        "styles.css": "56b95c63272441e8ce12b146ac32124a9e9b382e84760d0e1b44ca51db680920"
       }
     },
     "form-builder": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "603c083be6d081416b0ccb2adf99556fb91dd609791cdd45c460d3c882459b41",
+        "dist/index.cjs": "0ece96f3528bda8bf201afd2880521e26c70d3c374ba0bf3d1b61e58d1cbc873",
         "dist/index.d.cts": "64659e3d20051832096f7c03e618c107e8e9519bd427951160dff1bed0bce09f",
         "dist/index.d.ts": "64659e3d20051832096f7c03e618c107e8e9519bd427951160dff1bed0bce09f",
-        "dist/index.js": "a4e66113d5a531195e17197729055f1aa70e3d0e78ed2ac317752f18f8ebe2c7",
+        "dist/index.js": "9ee12d3738d0ec7bcccead75ffc676a0caf35270c0153420484269849914895d",
         "styles.css": "5c8a07686e5db9a6919479b5a955fcff3be9e62c484341de24bb7a6d21aa47ec"
       }
     },

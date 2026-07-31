@@ -624,9 +624,15 @@ declare function migrateSchema(schema: FormSchema, migrations?: readonly SchemaM
  * - `minTags`/`maxTags`         — tag count out of bounds.
  * - `minRows`/`maxRows`         — grid row count out of bounds.
  * - `minFiles`/`maxFiles`/`maxFileSize` — file-count / size limits.
+ * - `type`           — the value isn't the KIND the field holds (letters in a number,
+ *                      an unparseable date). Nothing else checks this: every other rule is a
+ *                      CONSTRAINT that only runs when the author sets its attribute, so an
+ *                      unconstrained field accepted anything at all.
+ * - `option`         — the value isn't one the author offered (select / radio / checkboxes /
+ *                      ranking / matrix). Only enforced against a STATIC option list.
  * - `custom`          — the `customValidation` expression returned falsy.
  */
-type ValidationCode = "required" | "minLength" | "maxLength" | "minWords" | "maxWords" | "min" | "max" | "pattern" | "email" | "url" | "minDate" | "maxDate" | "minTime" | "maxTime" | "minSelected" | "maxSelected" | "minTags" | "maxTags" | "minRows" | "maxRows" | "minFiles" | "maxFiles" | "maxFileSize" | "custom";
+type ValidationCode = "required" | "minLength" | "maxLength" | "minWords" | "maxWords" | "min" | "max" | "pattern" | "email" | "url" | "minDate" | "maxDate" | "minTime" | "maxTime" | "minSelected" | "maxSelected" | "minTags" | "maxTags" | "minRows" | "maxRows" | "minFiles" | "maxFiles" | "maxFileSize" | "type" | "option" | "custom";
 /**
  * The outcome of validating ONE field's value.
  *
@@ -835,11 +841,21 @@ declare const maxFilesRule: ValidatorRule;
  */
 declare const maxFileSizeRule: ValidatorRule;
 /**
- * The built-in rules in evaluation ORDER. The composer runs them head-to-tail and
- * returns the FIRST failure (one error per field), matching the reference
- * renderer's short-circuit: `required` first, then string/number/shape/bound/count
- * checks, with `customValidation` (registered separately) running last.
+ * `type` — the value must be the KIND the field holds. Blank always passes (that is `required`'s
+ * job) and an unknown field type imposes nothing, so this can only reject a value that is
+ * genuinely the wrong shape.
  */
+declare const typeRule: ValidatorRule;
+/**
+ * `option` — a choice field's value must be one the author actually offered.
+ *
+ * Deliberately inert unless there is a STATIC option list: a field whose options load from a
+ * Minion `dataSource` (or a type-ahead that fetches as you type) has no client-side list to check
+ * against, and rejecting there would fail every valid answer. Where a list does exist, an
+ * off-list value can only come from a tampered payload, a stale prefill, or an import — none of
+ * which the author asked to accept.
+ */
+declare const optionRule: ValidatorRule;
 declare const BUILTIN_RULES: readonly ValidatorRule[];
 
 /**
@@ -2452,4 +2468,4 @@ declare function setSettings(schema: FormSchema, patch: Partial<FormSettings>): 
 /** @lukeflow/form-core — the headless Lukeflow form engine. */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { ADDRESS_REQUIRED_PARTS, type AddressSuggestion, type AddressValue, type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataContract, type DataContractField, type DataSource, type DataSourceTrigger, type DataValueType, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type FormTemplate, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, type TemplateColumn, type TemplateMetaColumn, type TemplateOptions, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, buildFormTemplate, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, deriveDataContract, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, submitButtonId, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { ADDRESS_REQUIRED_PARTS, type AddressSuggestion, type AddressValue, type AsyncValidation, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, type CompiledExpression, type Conditional, type CreateFormEngine, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, type DataContract, type DataContractField, type DataSource, type DataSourceTrigger, type DataValueType, type DependencyCycle, type DependencyEdge, type DependencyGraph, type DependencySource, type Diagnostic, type DiagnosticCode, type DiagnosticReport, type DiagnosticSeverity, type EngineOptions, type EngineState, type EntityAttributes, type EntityKey, type EvalField, type EvalModel, type EvalNode, type EvalResult, type EvalTrace, type EvalTraceStep, type EvaluatorOptions, type ExpressionDiagnosticCode, type ExpressionString, type FieldState, type FieldType, type FieldTypeRegistry, type FormData, type FormEngine, type FormSchema, type FormSettings, type FormTemplate, type InsertTarget, type JsEvaluator, type JsResult, KEY_RE, KEY_REGEX_SOURCE, type KeyDiagnosticCode, LOGIC_ACTIONS, type LogicAction, type LogicRule, type MigrationResult, type MinionClient, type MinionOption, type ParseResult, type PrintOptions, RESERVED_KEYS, type SchemaDiagnosticCode, type SchemaEntity, type SchemaMigration, type Scope, type SerializedEngineState, type SettlementResult, type TemplateColumn, type TemplateMetaColumn, type TemplateOptions, VERSION, type ValidationCode, type ValidationContext, type ValidationReport, type ValidationResult, type Validator, ValidatorRegistry, type ValidatorRule, type ValueComputed, type ValueSource, buildDependencyGraph, buildEvalModel, buildFieldValidators, buildFormTemplate, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, deriveDataContract, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, optionRule, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, submitButtonId, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, typeRule, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };

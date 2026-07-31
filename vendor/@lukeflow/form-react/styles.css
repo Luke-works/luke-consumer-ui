@@ -22,6 +22,28 @@
   --lf-font: inherit; /* inherit the host app's font by default; override to force one */
 }
 
+/* ── Box model ────────────────────────────────────────────────────────────────────
+   `width: 100%` alongside padding or a border only fits under BORDER-box, and the UA default is
+   content-box for most elements. Fixing that one rule at a time is how this defect keeps coming
+   back: the text inputs overflowed their field by 22px, and when that was patched the signature
+   pad — a <canvas>, so not covered by an input selector — still overflowed by 2px. <select> is
+   border-box in some UA stylesheets and not others, so the same form even measured differently
+   per browser.
+
+   So it is settled once, for the whole subtree. This is SCOPED to the form root and to the
+   portaled popovers (which render outside it) — it is not a global reset and cannot reach the
+   host app's own layout. */
+.lf-form,
+.lf-form *,
+.lf-form *::before,
+.lf-form *::after,
+.lf-pop,
+.lf-pop *,
+.lf-pop *::before,
+.lf-pop *::after {
+  box-sizing: border-box;
+}
+
 .lf-form {
   color: var(--lf-text);
   background: var(--lf-bg);
@@ -82,6 +104,15 @@
 .lf-field[data-label-position="right"] {
   grid-template-columns: 1fr minmax(110px, max-content);
 }
+/* A grid item's default `min-width: auto` resolves to its MIN-CONTENT width, so a track can never
+   shrink below the widest thing in it. A control with a large intrinsic minimum — `<input
+   type="file">`, whose button and filename text don't shrink — therefore pushed the whole field
+   wider than the form and scrolled the page sideways on a phone. `min-width: 0` lets the `1fr`
+   track take its fair share and the control fit inside it. */
+.lf-field[data-label-position="left"] > *,
+.lf-field[data-label-position="right"] > * {
+  min-width: 0;
+}
 .lf-field[data-label-position="right"] > .lf-label {
   order: 2;
 }
@@ -90,6 +121,13 @@
 .lf-field[data-label-position="right"] > .lf-desc,
 .lf-field[data-label-position="right"] > .lf-error {
   grid-column: 1 / -1;
+}
+/* A visually-hidden label is `position: absolute`, and an absolutely-positioned grid child
+   occupies NO cell — so the control slid up into the 110px label column and rendered at a
+   fraction of its width. With no label to sit beside, the field is a single column. */
+.lf-field[data-hide-label][data-label-position="left"],
+.lf-field[data-hide-label][data-label-position="right"] {
+  grid-template-columns: 1fr;
 }
 /* A single checkbox belongs BESIDE its label, not stacked above it.
    `.lf-field` is a flex column whose default `align-items: stretch` stretched the input to the full
@@ -112,10 +150,14 @@
   justify-self: start;
   margin: 0;
 }
-/* Description, error and counter belong under the pair, not squeezed alongside it. */
+/* Description, error and counter belong under the PAIR — below both the box and its label.
+   `flex-basis: 100%` alone only gives them their own row: their `order` still defaults to 0, so
+   they sorted ahead of the `order: 2` label and the field read
+   "☐ / Please read first / I agree is required / I agree" — the error above the label naming it. */
 .lf-field[data-type="checkbox"][data-label-position="top"] > .lf-desc,
 .lf-field[data-type="checkbox"][data-label-position="top"] > .lf-error,
 .lf-field[data-type="checkbox"][data-label-position="top"] > .lf-count {
+  order: 3;
   flex-basis: 100%;
   margin: 0;
 }
@@ -321,11 +363,43 @@
   border-radius: var(--lf-radius);
   padding: var(--lf-space);
 }
+/* The file field is off-palette (attachments are the host's concern) but a legacy schema still
+   renders one. An `<input type="file">` is excluded from the width rule above and has a large
+   intrinsic minimum — its button plus the filename — so beside a label on a phone it pushed the
+   field wider than the form and scrolled the whole page sideways. */
+.lf-file input[type="file"] {
+  max-width: 100%;
+}
+
 .lf-option {
   display: flex;
   align-items: center;
   gap: 6px;
   font-weight: 400;
+}
+/* A flex child may SHRINK below its intrinsic size: a long option label squeezed the tick box
+   into an ellipse. The box is a fixed affordance, never the flexible part of the row. */
+.lf-option > input[type="checkbox"],
+.lf-option > input[type="radio"] {
+  flex: none;
+  margin: 0;
+}
+/* `inline`: lay the choices across the row instead of stacking them. `flex-direction` must be
+   restated — `.lf-field` above sets `column`, and declaring only `display: flex` here would
+   inherit that and leave the options stacked. */
+.lf-group[data-inline="true"] {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 6px;
+}
+/* The legend and any description/error own a full row of their own, so only the choices flow. */
+.lf-group[data-inline="true"] > .lf-label,
+.lf-group[data-inline="true"] > .lf-desc,
+.lf-group[data-inline="true"] > .lf-error {
+  flex-basis: 100%;
 }
 
 .lf-container {

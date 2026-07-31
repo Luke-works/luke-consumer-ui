@@ -478,6 +478,8 @@ var DEFAULT_MESSAGES = {
   maxRows: "Add at most {max} {units}",
   minFiles: "Upload at least {min} {units}",
   maxFiles: "Upload at most {max} {units}",
+  type: "{label} must be a valid {expected}",
+  option: "{label} must be one of the available choices",
   maxFileSize: "Each file must be \u2264 {max} MB",
   custom: "Invalid value"
 };
@@ -729,8 +731,93 @@ var maxFileSizeRule = {
     };
   }
 };
+function isBlank(v) {
+  return v === void 0 || v === null || v === "" || Array.isArray(v) && v.length === 0;
+}
+var NUMERIC_TYPES = /* @__PURE__ */ new Set(["number", "currency", "rating"]);
+var DATE_TYPES = /* @__PURE__ */ new Set(["day", "datetime"]);
+var typeRule = {
+  code: "type",
+  build(attributes) {
+    const type = asStr(attributes.type);
+    const custom = customMessageOf(attributes);
+    const label = labelOf(attributes);
+    if (NUMERIC_TYPES.has(type)) {
+      return ({ field, value }) => {
+        if (isBlank(value)) return ok(field);
+        const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+        return Number.isFinite(n) ? ok(field) : fail(field, "type", { label, expected: "number" }, custom);
+      };
+    }
+    if (DATE_TYPES.has(type)) {
+      return ({ field, value }) => {
+        if (isBlank(value)) return ok(field);
+        const t = typeof value === "string" || value instanceof Date ? Date.parse(String(value)) : NaN;
+        return Number.isFinite(t) ? ok(field) : fail(field, "type", { label, expected: "date" }, custom);
+      };
+    }
+    if (type === "time") {
+      return ({ field, value }) => {
+        if (isBlank(value)) return ok(field);
+        const m = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?$/.exec(String(value));
+        const okTime = !!m && Number(m[1]) <= 23;
+        return okTime ? ok(field) : fail(field, "type", { label, expected: "time" }, custom);
+      };
+    }
+    return null;
+  }
+};
+var SINGLE_CHOICE = /* @__PURE__ */ new Set(["select", "radio", "searchSelect"]);
+var MULTI_CHOICE = /* @__PURE__ */ new Set(["selectBoxes", "ranking"]);
+function optionValues(attributes) {
+  const raw = attributes.options ?? attributes.values ?? attributes.data?.values;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const out = /* @__PURE__ */ new Set();
+  for (const o of raw) {
+    if (typeof o === "string") out.add(o);
+    else if (o && typeof o === "object") out.add(String(o.value ?? ""));
+  }
+  return out.size > 0 ? out : null;
+}
+var optionRule = {
+  code: "option",
+  build(attributes) {
+    const type = asStr(attributes.type);
+    const single = SINGLE_CHOICE.has(type);
+    const multi = MULTI_CHOICE.has(type);
+    const isMatrix = type === "matrix";
+    if (!single && !multi && !isMatrix) return null;
+    if (attributes.dataSource) return null;
+    const custom = customMessageOf(attributes);
+    const label = labelOf(attributes);
+    if (isMatrix) {
+      const cols = optionValues({ options: attributes.columns });
+      if (!cols) return null;
+      return ({ field, value }) => {
+        if (isBlank(value)) return ok(field);
+        if (!value || typeof value !== "object" || Array.isArray(value)) return ok(field);
+        for (const answer of Object.values(value)) {
+          if (isBlank(answer)) continue;
+          const picks = Array.isArray(answer) ? answer : [answer];
+          for (const p of picks) if (!cols.has(String(p))) return fail(field, "option", { label }, custom);
+        }
+        return ok(field);
+      };
+    }
+    const allowed = optionValues(attributes);
+    if (!allowed) return null;
+    return ({ field, value }) => {
+      if (isBlank(value)) return ok(field);
+      const picks = Array.isArray(value) ? value : [value];
+      for (const p of picks) if (!allowed.has(String(p))) return fail(field, "option", { label }, custom);
+      return ok(field);
+    };
+  }
+};
 var BUILTIN_RULES = [
   requiredRule,
+  typeRule,
+  optionRule,
   minLengthRule,
   maxLengthRule,
   minWordsRule,
@@ -1989,11 +2076,12 @@ function numberType(name) {
     compare: (a, b) => defaultSameValue(a, b)
   };
 }
+var TRUE_TOKENS = /* @__PURE__ */ new Set(["true", "1", "on", "yes", "y", "checked"]);
 function boolType(name) {
   return {
     name,
     valueType: "boolean",
-    coerce: (v) => Boolean(v),
+    coerce: (v) => typeof v === "string" ? TRUE_TOKENS.has(v.trim().toLowerCase()) : Boolean(v),
     empty: () => false,
     // Dedicated compare (NOT defaultSameValue) so `false` never reads equal to `""`
     // (Number("") === Number(false) === 0 would otherwise collide).
@@ -2059,7 +2147,7 @@ var STRING_TYPES = [
   "richText"
   // WYSIWYG → sanitized HTML string
 ];
-var DATE_TYPES = ["day", "datetime"];
+var DATE_TYPES2 = ["day", "datetime"];
 var NUMBER_TYPES = ["number", "currency", "rating"];
 var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField", "array", "ranking"];
 var GRID_TYPES = ["dataGrid", "editGrid"];
@@ -2069,7 +2157,7 @@ function createDefaultFieldTypeRegistry() {
   const map = /* @__PURE__ */ new Map();
   const add = (t) => map.set(t.name, t);
   for (const name of STRING_TYPES) add(stringType(name));
-  for (const name of DATE_TYPES) add(stringType(name, "date"));
+  for (const name of DATE_TYPES2) add(stringType(name, "date"));
   for (const name of NUMBER_TYPES) add(numberType(name));
   add(boolType("checkbox"));
   for (const name of ARRAY_TYPES) add(arrayType(name));
@@ -2420,7 +2508,7 @@ var createFormEngine = (factoryOptions = {}) => {
   function validateField(key) {
     const node = model.byKey.get(key);
     const f = fields.get(key);
-    const attributes = { ...node.entity.attributes, type: node.entity.type };
+    const attributes = { ...node.entity.attributes, type: node.entity.type, required: f.isRequired };
     const base = validateValue(attributes, { field: key, value: f.value, scope: scopeOf() }, validatorRegistry);
     if (!base.valid) return base;
     const rawJs = node.entity.attributes?.customValidationJs;
@@ -3266,6 +3354,6 @@ function clampIndex(index, length) {
 // src/index.ts
 var VERSION = "0.1.0-alpha.0";
 
-export { ADDRESS_REQUIRED_PARTS, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, buildFormTemplate, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, deriveDataContract, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, submitButtonId, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { ADDRESS_REQUIRED_PARTS, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, buildFormTemplate, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, deriveDataContract, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, optionRule, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, submitButtonId, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, typeRule, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
