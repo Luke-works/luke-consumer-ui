@@ -36,15 +36,64 @@ function renderOpen() {
   return { onClose };
 }
 
+/** The dialog is tabbed; the allowlist lives behind "Websites". */
+async function openWebsites(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("tab", { name: /websites/i }));
+}
+
 describe("FormEmbedPanel", () => {
-  it("mints a token on open and shows the snippet + saved allowlist", async () => {
-    mocked.getEmbedToken.mockResolvedValue({ token: "tok_abc", code: "C1", allowedEmbedOrigins: "https://acme.com" });
+  it("mints a token on open and shows the snippet + saved websites", async () => {
+    mocked.getEmbedToken.mockResolvedValue({
+      token: "tok_abc", code: "C1",
+      allowedEmbedOrigins: "https://acme.com",
+      embedOriginNames: { "https://acme.com": "Acme main site" },
+    });
+    const user = userEvent.setup();
     renderOpen();
     await waitFor(() => expect(mocked.getEmbedToken).toHaveBeenCalledWith("t1", "f1"));
-    // Snippet carries the token + the auto-mount attribute.
+    // The Snippet tab opens first, carrying the token + the auto-mount attribute.
     expect(await screen.findByText(/data-lukeform-token="tok_abc"/)).toBeInTheDocument();
-    // Allowlist seeded from the response.
-    expect(screen.getByLabelText(/allowed embed domains/i)).toHaveValue("https://acme.com");
+
+    // Allowlist seeded from the response, as NAMED rows rather than a blob of text.
+    await openWebsites(user);
+    expect(screen.getByLabelText(/website 1 address/i)).toHaveValue("https://acme.com");
+    expect(screen.getByLabelText(/website 1 name/i)).toHaveValue("Acme main site");
+  });
+
+  it("shows an origin with no stored label as an unnamed row, not a blank list", async () => {
+    mocked.getEmbedToken.mockResolvedValue({ token: "t", code: "C1", allowedEmbedOrigins: "https://acme.com" });
+    const user = userEvent.setup();
+    renderOpen();
+    await openWebsites(user);
+    expect(screen.getByLabelText(/website 1 address/i)).toHaveValue("https://acme.com");
+    expect(screen.getByLabelText(/website 1 name/i)).toHaveValue("");
+  });
+
+  it("adds and removes rows", async () => {
+    mocked.getEmbedToken.mockResolvedValue({ token: "t", code: "C1", allowedEmbedOrigins: "https://acme.com" });
+    const user = userEvent.setup();
+    renderOpen();
+    await openWebsites(user);
+
+    await user.click(screen.getByRole("button", { name: /add another/i }));
+    expect(screen.getByLabelText(/website 2 address/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /remove website 2/i }));
+    expect(screen.queryByLabelText(/website 2 address/i)).not.toBeInTheDocument();
+  });
+
+  it("refuses to save a malformed website, and says which row", async () => {
+    // The engine fails this closed with a generic 400; naming the row is friendlier, and it keeps a
+    // typo from looking saved while the site it meant to allow stays blocked.
+    mocked.getEmbedToken.mockResolvedValue({ token: "t", code: "C1", allowedEmbedOrigins: "" });
+    const user = userEvent.setup();
+    renderOpen();
+    await openWebsites(user);
+
+    await user.type(screen.getByLabelText(/website 1 address/i), "acme.com");
+    expect(screen.getByRole("button", { name: /save websites/i })).toBeDisabled();
+    expect(screen.getByLabelText(/website 1 address/i)).toHaveAttribute("aria-invalid", "true");
+    expect(mocked.updateMeta).not.toHaveBeenCalled();
   });
 
   it("copies the snippet to the clipboard", async () => {
@@ -59,17 +108,26 @@ describe("FormEmbedPanel", () => {
     expect(await screen.findByRole("button", { name: /copied/i })).toBeInTheDocument();
   });
 
-  it("saves the allowlist and reflects the canonical stored value", async () => {
+  it("saves name + website and reflects the canonical stored value", async () => {
     mocked.getEmbedToken.mockResolvedValue({ token: "tok_abc", code: "C1", allowedEmbedOrigins: "" });
-    mocked.updateMeta.mockResolvedValue({ allowedEmbedOrigins: "https://acme.com" });
+    mocked.updateMeta.mockResolvedValue({
+      allowedEmbedOrigins: "https://acme.com",
+      embedOriginNames: { "https://acme.com": "Acme main site" },
+    });
     const user = userEvent.setup();
     renderOpen();
-    const ta = await screen.findByLabelText(/allowed embed domains/i);
-    await user.type(ta, "https://ACME.com");
-    await user.click(screen.getByRole("button", { name: /save domains/i }));
-    await waitFor(() => expect(mocked.updateMeta).toHaveBeenCalledWith("t1", "f1", { allowedEmbedOrigins: "https://ACME.com" }));
-    // Canonical (lower-cased) value reflected back into the textarea.
-    await waitFor(() => expect(ta).toHaveValue("https://acme.com"));
+    await openWebsites(user);
+
+    await user.type(screen.getByLabelText(/website 1 name/i), "Acme main site");
+    await user.type(screen.getByLabelText(/website 1 address/i), "https://ACME.com");
+    await user.click(screen.getByRole("button", { name: /save websites/i }));
+
+    // The label is keyed by the CANONICAL origin — keyed by the typed casing the server would drop it.
+    await waitFor(() => expect(mocked.updateMeta).toHaveBeenCalledWith("t1", "f1", {
+      allowedEmbedOrigins: "https://acme.com",
+      embedOriginNames: { "https://acme.com": "Acme main site" },
+    }));
+    await waitFor(() => expect(screen.getByLabelText(/website 1 address/i)).toHaveValue("https://acme.com"));
   });
 
   it("rotates the token only after confirming in the modal (no window.confirm)", async () => {

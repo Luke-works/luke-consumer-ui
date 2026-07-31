@@ -65,13 +65,19 @@ beforeEach(() => {
   mocked.checkout.mockResolvedValue({} as formsApi.StoredForm);
 });
 
+/**
+ * View-only is now readable from the status ICON's accessible name — that is the at-a-glance claim
+ * the popover consolidation rests on, so assert it there rather than on the prose that moved inside.
+ */
+const statusIcon = () => screen.getByRole("button", { name: /^form status:/i });
+
 describe("FormBuilderPage — lifecycle gating", () => {
   it("opens an existing form view-only: Checkout shown, Check in disabled, error chip for a blocking schema", async () => {
     mocked.getForm.mockResolvedValue(form(DUP));
     renderPage();
     // Existing form (has a version) opens view-only — you check out to edit.
     expect(await screen.findByRole("button", { name: /^checkout$/i })).toBeEnabled();
-    expect(screen.getByText(/you're looking at v/i)).toBeInTheDocument(); // the view-only banner
+    expect(statusIcon()).toHaveAccessibleName(/view only/i); // state readable without opening anything
     expect(screen.getByRole("button", { name: /check in/i })).toBeDisabled(); // not checked out
     expect(screen.getByText(/\d+ error/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
@@ -83,7 +89,7 @@ describe("FormBuilderPage — lifecycle gating", () => {
     renderPage();
     await user.click(await screen.findByRole("button", { name: /^checkout$/i }));
     expect(await screen.findByRole("button", { name: /undo checkout/i })).toBeInTheDocument();
-    expect(screen.queryByText(/you're looking at v/i)).not.toBeInTheDocument(); // banner gone
+    expect(statusIcon()).not.toHaveAccessibleName(/view only/i); // no longer read-only
   });
 
   it("shows no error chip for a clean schema", async () => {
@@ -98,7 +104,9 @@ describe("FormBuilderPage — lifecycle gating", () => {
     mocked.getForm.mockResolvedValue(form(CLEAN, { latestVersionSignedOff: true, publishedVersion: undefined }));
     renderPage();
     await waitFor(() => expect(screen.getByRole("button", { name: /^publish$/i })).toBeEnabled());
-    expect(screen.getByText(/signed off/i)).toBeInTheDocument(); // the badge
+    // Sign-off detail lives in the status popover now.
+    await userEvent.setup().click(statusIcon());
+    expect(await screen.findByText(/sign-off/i)).toBeInTheDocument();
   });
 
   it("disables Publish (shows 'Published') when the latest version is already the live one", async () => {
@@ -117,7 +125,7 @@ describe("FormBuilderPage — lifecycle gating", () => {
     await user.click(screen.getByRole("button", { name: /^publish$/i }));
     // Back to view-only: Checkout returns and the view-only banner is shown again.
     expect(await screen.findByRole("button", { name: /^checkout$/i })).toBeInTheDocument();
-    expect(screen.getByText(/you're looking at v/i)).toBeInTheDocument();
+    expect(statusIcon()).toHaveAccessibleName(/view only/i);
     await waitFor(() => expect(mocked.publishVersion).toHaveBeenCalledWith("t1", "f1", 1));
   });
 });

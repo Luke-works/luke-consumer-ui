@@ -144,15 +144,24 @@ interface FormRendererProps {
     onAutosave?: (snapshot: SerializedEngineState) => void;
     /** Autosave debounce in ms (default 800). */
     autosaveDelay?: number;
-    /** Submit button label (omit the button entirely with `null`). */
+    /**
+     * Submit button label. `null` omits the button entirely.
+     *
+     * <p>Left unset, the renderer draws a "Submit" button — UNLESS the schema already contains an
+     * author-placed submit button (see {@link import("@lukeflow/form-core").submitButtonId}), in which
+     * case theirs is the form's submit affordance and the renderer draws none. Passing a value
+     * explicitly always wins, including over that inference.
+     */
     submitLabel?: string | null;
     /**
      * Content rendered INSIDE the form, immediately above the submit button — for the things a host
      * must gate a submission on (a consent tick, a captcha, terms). Placing them here rather than
      * around the renderer keeps them where the filler is looking when they go to submit.
      *
-     * Rendered only where the submit button itself is: never under `readOnly` or `submitLabel: null`,
-     * and in wizard mode only on the LAST step. A gate above a "Next" button would be misleading.
+     * <p>It follows whichever button actually submits: the author's own if the schema has one
+     * (wherever it sits in the tree), otherwise the renderer's. Never rendered twice, and never under
+     * `readOnly` or `submitLabel: null` — in wizard mode, only on the LAST step, because a gate above
+     * a "Next" button would be misleading.
      */
     beforeSubmit?: ReactNode;
     /** Design-token overrides applied as CSS custom properties on the form root, e.g. `{ "--lf-primary": "#0a7" }`. */
