@@ -12,7 +12,13 @@ vi.mock("../../context/AuthContext", () => ({
 }));
 // Heavy children render nothing — the gate is computed from the loaded schema via the
 // REAL form-core validateSchema (not mocked), the same validator the builder's badge uses.
-vi.mock("@lukeflow/form-builder", () => ({ FormBuilder: React.forwardRef(() => null) }));
+const builderProps: { current: Record<string, unknown> } = { current: {} };
+vi.mock("@lukeflow/form-builder", () => ({
+  FormBuilder: React.forwardRef((props: Record<string, unknown>) => {
+    builderProps.current = props;
+    return null;
+  }),
+}));
 vi.mock("../../components/common/PageMeta", () => ({ default: () => null })); // uses react-helmet-async (needs a provider)
 vi.mock("./AiAssistPanel", () => ({ default: () => null }));
 vi.mock("./FormTestPanel", () => ({ default: () => null }));
@@ -29,6 +35,7 @@ vi.mock("../../lib/formsApi", () => ({
   updateMeta: vi.fn().mockResolvedValue({}),
   getAudit: vi.fn().mockResolvedValue([]),
   latestVersion: () => 1,
+  setOutboundConfig: vi.fn().mockResolvedValue({}),
 }));
 
 const mocked = vi.mocked(formsApi);
@@ -179,5 +186,72 @@ describe("FormBuilderPage — edit-lock take-over", () => {
 
     await waitFor(() => expect(mocked.checkout).toHaveBeenCalledWith("t1", "f1", true));
     await waitFor(() => expect(screen.queryByText(/being edited by/i)).not.toBeInTheDocument());
+  });
+});
+
+describe("FormBuilderPage — the Data view is outbound-only", () => {
+  const settled = async () => {
+    await screen.findByRole("button", { name: /^checkout$/i });
+    return builderProps.current as {
+      hideDataView?: boolean;
+      dataAnnotations?: {
+        options: { id: string }[];
+        modifier?: { id: string; under: string };
+        value: Record<string, string>;
+        onChange: (key: string, role: string) => void;
+      };
+      dataMetadata?: { key: string }[];
+    };
+  };
+
+  it("hides it for an INBOUND form", async () => {
+    // One filler, so there is nothing to divide the data between — the view has nothing to say.
+    mocked.getForm.mockResolvedValue(form(CLEAN, { kind: "INBOUND" }));
+    renderPage();
+    const p = await settled();
+    expect(p.hideDataView).toBe(true);
+    expect(p.dataAnnotations).toBeUndefined();
+  });
+
+  it("shows it, annotated, for an OUTBOUND form", async () => {
+    mocked.getForm.mockResolvedValue(form(CLEAN, { kind: "OUTBOUND" }));
+    renderPage();
+    const p = await settled();
+    expect(p.hideDataView).toBe(false);
+    // Exactly two answers — the engine's third role is offered as a qualifier, not a third option.
+    expect(p.dataAnnotations!.options.map((o) => o.id)).toEqual(["PREPARER", "RECIPIENT"]);
+    expect(p.dataAnnotations!.modifier).toMatchObject({ id: "EITHER", under: "PREPARER" });
+  });
+
+  it("seeds every variable from its EFFECTIVE role, not the (empty) stored map", async () => {
+    // A form authored before roles existed has no entries at all; showing them as unassigned would
+    // misreport how the form already behaves.
+    mocked.getForm.mockResolvedValue(form(CLEAN, { kind: "OUTBOUND" }));
+    renderPage();
+    const p = await settled();
+    expect(Object.keys(p.dataAnnotations!.value).sort()).toEqual(["a1", "b1"]);
+  });
+
+  it("persists a pick immediately, carrying the OTHER fields' roles with it", async () => {
+    // Saving one key alone would freeze the rest at whatever they happened to derive to, silently.
+    mocked.getForm.mockResolvedValue(form(CLEAN, { kind: "OUTBOUND" }));
+    renderPage();
+    const p = await settled();
+
+    p.dataAnnotations!.onChange("a1", "PREPARER");
+
+    await waitFor(() => expect(mocked.setOutboundConfig).toHaveBeenCalled());
+    const sent = mocked.setOutboundConfig.mock.calls[0]![2] as Record<string, string>;
+    expect(sent.a1).toBe("PREPARER");
+    expect(Object.keys(sent).sort()).toEqual(["a1", "b1"]);
+  });
+
+  it("lists what the engine always records, so the contract shown is the whole contract", async () => {
+    mocked.getForm.mockResolvedValue(form(CLEAN, { kind: "OUTBOUND" }));
+    renderPage();
+    const p = await settled();
+    const keys = (p.dataMetadata ?? []).map((m) => m.key);
+    expect(keys).toContain("submittedBy.at");
+    expect(keys).toContain("consent");
   });
 });

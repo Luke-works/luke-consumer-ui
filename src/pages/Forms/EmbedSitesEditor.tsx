@@ -40,7 +40,11 @@ export default function EmbedSitesEditor({
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_auto] gap-x-3 gap-y-2">
         <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Name</div>
         <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Website</div>
-        <div className="sr-only">Remove</div>
+        {/* The third header cell must stay IN FLOW. `sr-only` is position:absolute, and an
+            absolutely-positioned grid child occupies no cell — the header then claimed two columns
+            instead of three and every input after it auto-placed one column late, throwing the whole
+            editor out of alignment. Hide the text, not the cell. */}
+        <div aria-hidden className="w-9" />
 
         {rows.map((row, i) => {
           const bad = invalid.has(i);

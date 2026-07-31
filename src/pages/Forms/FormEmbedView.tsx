@@ -128,7 +128,13 @@ export default function FormEmbedView({ token }: { token?: string }) {
 
   // Attachments are opt-in per form (Form settings → "Allow file attachments"). The tab only appears
   // when the published schema enables it; otherwise the form renders on its own with no tabs.
-  const showAttachments = !!form && token != null && readAttachmentsEnabled(form.schema);
+  // The SERVER decides: attachments are a paid feature, so the effective flag already has the
+  // tenant's plan applied. Fall back to the schema only for an engine that predates the field —
+  // re-reading it here on a modern engine would re-open the tab for a free tenant whose uploads the
+  // upload endpoint is going to refuse anyway.
+  const showAttachments =
+    !!form && token != null &&
+    (form.attachmentsEnabled ?? readAttachmentsEnabled(form.schema));
 
   // Secure minion client for this embed: token-scoped, no auth header. Powers server-side field
   // features (e.g. address autocomplete) without exposing any provider key to the browser.

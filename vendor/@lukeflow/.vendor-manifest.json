@@ -1,5 +1,5 @@
 {
-  "vendoredAt": "2026-07-31T01:26:53.850Z",
+  "vendoredAt": "2026-07-31T07:12:40.033Z",
   "packages": {
     "form-core": {
       "version": "0.1.0-alpha.0",
@@ -27,11 +27,11 @@
     "form-builder": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "afff84b497fb6c87e92281d905719a4321813917f2e3b78e6f9671aa5bc5758b",
-        "dist/index.d.cts": "bed11bc0de6feef836a69e426776fbdfe8599f695a6d56603ebc5215f01826e1",
-        "dist/index.d.ts": "bed11bc0de6feef836a69e426776fbdfe8599f695a6d56603ebc5215f01826e1",
-        "dist/index.js": "806e6813ace13ebcb4b4d054fb59df594390fce1e3cb22ca29009dd893d3a7c9",
-        "styles.css": "55dd2cf098bedb44dad6cbb21a78244f7c16bb1a7c8b2a532523a8d9bc731b73"
+        "dist/index.cjs": "691075fd4673b3fe734248e41e7399cd00f5d7a2bd57f5ce568da89402b79250",
+        "dist/index.d.cts": "f76a6ed55f6d7efdaae3d723b4751608bebac336c78f30879752a7bf7743a3dc",
+        "dist/index.d.ts": "f76a6ed55f6d7efdaae3d723b4751608bebac336c78f30879752a7bf7743a3dc",
+        "dist/index.js": "ae7ece9ada5b8b1fd9e2f26ae332366d1aa66e104fedf9fe078853df0747d972",
+        "styles.css": "7e934aaeb5e930adb30f6ccc8feee70ac3cae05b52d4c6e04b16730df1d6bc68"
       }
     },
     "form-embed": {

@@ -20,6 +20,11 @@ export type EmbedForm = {
    *  plan (free plans can't switch it off), so render it as given. Optional for forward/backward
    *  compatibility with an engine that predates the field. */
   showBranding?: boolean;
+  /** Effective "this form collects file attachments" flag — the server has ALREADY applied the
+   *  tenant's plan (attachments are a paid feature), so render it as given rather than re-reading the
+   *  schema. Optional for compatibility with an engine that predates the field; absent falls back to
+   *  the schema, which is what older engines effectively meant. */
+  attachmentsEnabled?: boolean;
   /** Whether this deployment demands a Cloudflare Turnstile challenge before a submission is accepted.
    *  Platform-wide, not per-form. Optional for compatibility with an engine that predates the field —
    *  absent means "no widget", and the server simply won't be asking for a token either. */
