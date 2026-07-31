@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router";
 import FormBuilderPage from "./FormBuilderPage";
@@ -137,16 +137,27 @@ describe("Form settings — Legal tab (the consent record)", () => {
     mocked.getForm.mockResolvedValue(form()); // latestVersionSignedOff: true
     renderPage();
     await user.click(await screen.findByRole("button", { name: /^checkout$/i }));
+
+    // Sign-off state lives in the status popover. Read it THERE rather than page-wide: with the
+    // popover closed a "not in the document" assertion would pass for the wrong reason.
+    const signOffRow = async () => {
+      await user.click(screen.getByRole("button", { name: /^form status:/i }));
+      const panel = await screen.findByRole("dialog", { name: /form status/i });
+      const text = within(panel).getByText(/sign-off/i).parentElement!.textContent ?? "";
+      await user.keyboard("{Escape}");
+      return text;
+    };
+
     // Signed off on load → Publish is live-able.
-    expect(screen.getByText(/signed off/i)).toBeInTheDocument();
+    expect(await signOffRow()).not.toMatch(/not signed off/i);
 
     await user.click(await screen.findByRole("button", { name: /form settings/i }));
     await user.click(await screen.findByRole("tab", { name: /legal/i }));
     await user.click(requireBox());
+    await user.keyboard("{Escape}"); // close settings so the status icon is reachable again
 
-    // Sign-off is cleared and Check in has something to do — a wording change cannot reach a live form
-    // without going back through sign-off.
-    await waitFor(() => expect(screen.queryByText(/signed off/i)).not.toBeInTheDocument());
+    // Sign-off is cleared — a wording change cannot reach a live form without going back through it.
+    await waitFor(async () => expect(await signOffRow()).toMatch(/not signed off/i));
   });
 
   it("warns, and shows the substitute, if the author clears the wording", async () => {

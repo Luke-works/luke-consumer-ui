@@ -92,6 +92,32 @@ function collectKeys(schema) {
   }
   return out;
 }
+function isSubmitButton(e) {
+  if (!e || e.type !== "button") return false;
+  const action = e.attributes?.buttonAction;
+  return action !== "reset" && action !== "button";
+}
+function submitButtonId(schema) {
+  const entities = schema.entities ?? {};
+  const seen = /* @__PURE__ */ new Set();
+  const visit = (id) => {
+    if (seen.has(id)) return null;
+    seen.add(id);
+    const e = entities[id];
+    if (!e) return null;
+    if (isSubmitButton(e)) return id;
+    for (const child of e.children ?? []) {
+      const hit = visit(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  for (const id of schema.root ?? []) {
+    const hit = visit(id);
+    if (hit) return hit;
+  }
+  return null;
+}
 function duplicateKeyIds(schema) {
   const seen = /* @__PURE__ */ new Set();
   const dupes = /* @__PURE__ */ new Set();
@@ -3232,6 +3258,6 @@ function clampIndex(index, length) {
 // src/index.ts
 var VERSION = "0.1.0-alpha.0";
 
-export { ADDRESS_REQUIRED_PARTS, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, buildFormTemplate, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, deriveDataContract, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
+export { ADDRESS_REQUIRED_PARTS, BUILTIN_RULES, CURRENT_SCHEMA_VERSION, DEFAULT_MAX_PASSES, DEFAULT_MESSAGES, KEY_RE, KEY_REGEX_SOURCE, LOGIC_ACTIONS, RESERVED_KEYS, VERSION, ValidatorRegistry, buildDependencyGraph, buildEvalModel, buildFieldValidators, buildFormTemplate, camelCaseKeys, collectKeys, createDefaultFieldTypeRegistry, createDefaultRegistry, createEntity, createFormEngine, customValidationValidator, defaultFieldTypeRegistry, defaultIdGen, defaultRegistry, defaultSameValue, deriveDataContract, downstreamClosure, duplicate, duplicateKeyIds, emailRule, evaluate2 as evaluate, evaluateCompiled, evaluateExpression, evaluateIncremental, evaluateJs, evaluateRequired, evaluateVisibility, expressionVariables, extractDataRefs, fail, getPath, hasBlockingProblems, hasHostileIdentifier, insert, interpolate, isAutoKey, isEmptyValue, isKeyed, isValidKey, keyOf, maxDateRule, maxFileSizeRule, maxFilesRule, maxLengthRule, maxRowsRule, maxRule, maxSelectedRule, maxTagsRule, maxTimeRule, maxWordsRule, migrateSchema, minDateRule, minFilesRule, minLengthRule, minRowsRule, minRule, minSelectedRule, minTagsRule, minTimeRule, minWordsRule, move, normalizeKeys, ok, orderedIds, parseExpression, patternRule, readAsyncValidation, readAttachmentsEnabled, readDataSource, readSaveSubmissionAsPdf, readSettings, readSubmitMessage, registerValidator, remove, renderMessage, reorder, repairSchema, requiredRule, resolveMinionParams, runAsyncValidation, sanitizeKey, seedFields, setSettings, sourcePriority, submitButtonId, toAddressSuggestions, toCamelKey, toOptions, toPrintableHtml, uniqueKey, updateAttributes, urlRule, validateSchema, validateSchemaReport, validateValue };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

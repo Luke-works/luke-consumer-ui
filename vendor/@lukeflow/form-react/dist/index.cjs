@@ -2361,7 +2361,9 @@ function EditGridField({
 // src/FormRenderer.tsx
 var import_jsx_runtime13 = require("react/jsx-runtime");
 function FormRenderer(props) {
-  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
+  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
+  const authorSubmitId = (0, import_react15.useMemo)(() => (0, import_form_core8.submitButtonId)(schema), [schema]);
+  const submitLabel = props.submitLabel !== void 0 ? props.submitLabel : authorSubmitId ? null : "Submit";
   const formClass = ["lf-form", virtualize && "lf-virtualized", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore, allowJs, jsEvaluator };
   const form = useFormEngine(schema, engineOptions);
@@ -2443,7 +2445,8 @@ function FormRenderer(props) {
   const mergedTheme = mergedTokens;
   const dataTheme = dataThemeAttr(resolvedScheme);
   const sanitize = sanitizeHtml ?? defaultSanitizeHtml;
-  const ctx = { form, reg, readOnly, showErrors: submitted, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope() };
+  const slotOnAuthorButton = authorSubmitId && !readOnly ? beforeSubmit : void 0;
+  const ctx = { form, reg, readOnly, showErrors: submitted, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: slotOnAuthorButton, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitted(true);
@@ -2488,6 +2491,7 @@ function FormRenderer(props) {
       readOnly,
       submitLabel,
       beforeSubmit,
+      authorSubmitId,
       className: formClass,
       theme: mergedTheme,
       dataTheme,
@@ -2501,7 +2505,7 @@ function FormRenderer(props) {
   ) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { noValidate: true, dir, "data-theme": dataTheme, className: formClass, style: mergedTheme, onSubmit: handleSubmit, children: [
     schema.root.map((id) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
     submitLabel !== null && !readOnly && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
-      beforeSubmit,
+      !authorSubmitId && beforeSubmit,
       /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
     ] })
   ] });
@@ -2516,6 +2520,7 @@ function FormWizardView({
   readOnly,
   submitLabel,
   beforeSubmit,
+  authorSubmitId,
   className,
   theme,
   dataTheme,
@@ -2542,7 +2547,7 @@ function FormWizardView({
     }
     pageRef.current?.focus();
   }, [safeIndex]);
-  const ctx = { form, reg, readOnly, showErrors, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope() };
+  const ctx = { form, reg, readOnly, showErrors, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: authorSubmitId && !readOnly ? beforeSubmit : void 0, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const next = () => {
     if (!currentId) return;
     if (keysValid(form, pageFieldKeys(schema, currentId, form))) {
@@ -2573,7 +2578,7 @@ function FormWizardView({
   return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { noValidate: true, dir, "data-theme": dataTheme, className, style: theme, onSubmit: submit, children: [
     /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
     /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RenderEntity, { id: currentId, schema, ctx }) }),
-    isLast && submitLabel !== null && !readOnly ? beforeSubmit : null,
+    isLast && submitLabel !== null && !readOnly && !authorSubmitId ? beforeSubmit : null,
     /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-wizard-nav", children: [
       /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
       !isLast && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
@@ -2590,7 +2595,18 @@ function FormWizardView({
     ] })
   ] });
 }
-function RenderEntity({ id, schema, ctx }) {
+function RenderEntity(props) {
+  const node = RenderEntityNode(props);
+  const { id, ctx } = props;
+  if (node !== null && ctx.beforeSubmit && ctx.beforeSubmitAnchorId === id) {
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
+      ctx.beforeSubmit,
+      node
+    ] });
+  }
+  return node;
+}
+function RenderEntityNode({ id, schema, ctx }) {
   const entity = schema.entities[id];
   if (!entity) return null;
   const fs = ctx.form.state.fields[id];

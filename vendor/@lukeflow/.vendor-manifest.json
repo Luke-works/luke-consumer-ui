@@ -1,13 +1,13 @@
 {
-  "vendoredAt": "2026-07-31T00:47:31.484Z",
+  "vendoredAt": "2026-07-31T01:26:53.850Z",
   "packages": {
     "form-core": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "f008ef7a4d72d205d780ae285b6e496f461a41d19f63ea2f90d0644180d125fc",
-        "dist/index.d.cts": "df3e4296d455ea8fedf3d67f03446e07da8a28f347822d0697074c205a36ed56",
-        "dist/index.d.ts": "df3e4296d455ea8fedf3d67f03446e07da8a28f347822d0697074c205a36ed56",
-        "dist/index.js": "ac919fce5ca796d8283caaa5fc2c6149b557acaca2ad62f509299ee0ea22e5f4",
+        "dist/index.cjs": "6f4e52092ded8697adc000cafcab50ab1cd4d0dbe1d8c5433248e0c39b2fc7d5",
+        "dist/index.d.cts": "b1696cfcbc514c3185a6e8f292d904e1b9cbc2d5e87ee14175ce4b68ad20d263",
+        "dist/index.d.ts": "b1696cfcbc514c3185a6e8f292d904e1b9cbc2d5e87ee14175ce4b68ad20d263",
+        "dist/index.js": "a1a9bede2239961de6cbf3ac670c5b11da7768fc3a242f6f17dba135ea4a8217",
         "dist/quickjs.cjs": "690881833d0bacccc4f61c68ce34caa19a700264b61e730495dfce1b7b21ac0d",
         "dist/quickjs.d.cts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
         "dist/quickjs.d.ts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
@@ -17,10 +17,10 @@
     "form-react": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "733f6f4bbd76c3cd57e5019c3246f148072108e8f61277f832a7f4dc7a3eeff3",
-        "dist/index.d.cts": "7162db1319200ff168bc1342e22545d293ccf28d2b5601f4e51aede772b0b390",
-        "dist/index.d.ts": "7162db1319200ff168bc1342e22545d293ccf28d2b5601f4e51aede772b0b390",
-        "dist/index.js": "a2df935e1b6c1c9887ce11a5cbb4fdd46b95c31801bd1e2c9c60881e8c7ea544",
+        "dist/index.cjs": "1a9d3472f546298ede2c6d5cadc329acc183e8a6f33e031ce0bb6604d0e29593",
+        "dist/index.d.cts": "a848728a5707990e08db7a7c1192f58228cdae95699e6a47d107adb5a79c17c4",
+        "dist/index.d.ts": "a848728a5707990e08db7a7c1192f58228cdae95699e6a47d107adb5a79c17c4",
+        "dist/index.js": "e32057e4da45b7a2a31eaf73006eac51112498653e8bbfbedc40e75e16d6afe3",
         "styles.css": "8aa9b192fcde447f7b48e3849e00e5b606d4ac05e633a2d48b4597024ffb219d"
       }
     },
