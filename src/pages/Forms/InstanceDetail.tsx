@@ -220,7 +220,8 @@ export default function InstanceDetail({
       </div>
 
       {/* The actual submission, rendered read-only under the selected version. */}
-      <Modal isOpen={showForm} onClose={() => setShowForm(false)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
+      <Modal isOpen={showForm} onClose={() => setShowForm(false)} className="mx-4 flex max-h-[90vh] w-full max-w-[640px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
         <div className="p-6 sm:p-8">
           <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">{formName ?? instance.definitionCode}</h2>
           <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">Submission rendered with v{selectedVersion}{selectedVersion !== instance.version ? ` (submitted on v${instance.version})` : ""}.</p>
@@ -228,7 +229,8 @@ export default function InstanceDetail({
         </div>
       </Modal>
 
-      <Modal isOpen={showTrace} onClose={() => setShowTrace(false)} className="mx-4 max-h-[85vh] w-full max-w-[560px] overflow-y-auto">
+      <Modal isOpen={showTrace} onClose={() => setShowTrace(false)} className="mx-4 flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
         {showTrace ? <TracePanel tenant={tenant} instance={instance} formName={formName} /> : null}
       </Modal>
     </div>

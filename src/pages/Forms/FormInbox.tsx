@@ -266,7 +266,8 @@ export default function FormInbox() {
       <Modal
         isOpen={mode === "table" && !!selected}
         onClose={() => { setSelected(null); setView(null); }}
-        className="mx-4 max-h-[90vh] w-full max-w-[680px] overflow-y-auto"
+        className="mx-4 flex max-h-[90vh] w-full max-w-[680px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto"
       >
         {selected ? (
           <div className="p-6 sm:p-8">

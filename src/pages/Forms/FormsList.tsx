@@ -541,7 +541,8 @@ export default function FormsList() {
       </Modal>
 
       {/* Artifact preview */}
-      <Modal isOpen={!!previewSchema} onClose={() => setPreviewSchema(null)} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
+      <Modal isOpen={!!previewSchema} onClose={() => setPreviewSchema(null)} className="mx-4 flex max-h-[90vh] w-full max-w-[640px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
         <div className="p-6 sm:p-8">
           <h2 className="mb-6 text-lg font-semibold text-gray-800 dark:text-white/90">Preview</h2>
           {previewSchema ? (

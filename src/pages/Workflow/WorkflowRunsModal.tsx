@@ -149,7 +149,8 @@ export default function WorkflowRunsModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} className="mx-4 max-h-[90vh] w-full max-w-[720px] overflow-y-auto">
+    <Modal isOpen={isOpen} onClose={onClose} className="mx-4 flex max-h-[90vh] w-full max-w-[720px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
       <div className="p-6 sm:p-8">
         <div className="mb-5 flex items-center justify-between">
           <div>

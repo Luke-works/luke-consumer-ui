@@ -14,7 +14,7 @@
  * navigating to another form's builder mints a fresh token rather than reusing a stale one.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Modal } from "../../components/ui/modal";
+import { Modal, MODAL_HEADER_SAFE } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import { Code2, Globe, History, MonitorPlay } from "lucide-react";
 import { ICON_LABEL_NUDGE } from "../../lib/iconAlign";
@@ -385,8 +385,8 @@ export default function FormEmbedPanel({
         contentClassName="flex h-full flex-col"
       >
         <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pt-6 dark:border-gray-800">
-          <h2 className="pr-8 text-lg font-semibold text-gray-800 dark:text-white/90">Embed this form</h2>
-          <p className="mt-0.5 text-sm text-gray-400">
+          <h2 className={`text-lg font-semibold text-gray-800 dark:text-white/90 ${MODAL_HEADER_SAFE}`}>Embed this form</h2>
+          <p className={`mt-0.5 text-sm text-gray-400 ${MODAL_HEADER_SAFE}`}>
             Put this form on any website. Submissions create a response and start a process.
           </p>
         </div>

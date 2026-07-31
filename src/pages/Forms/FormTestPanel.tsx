@@ -19,7 +19,7 @@
  * fix through the imperative `onApplyAiSchema` handle, so the builder + AI chat stay mounted.
  */
 import { useEffect, useRef, useState } from "react";
-import { Modal } from "../../components/ui/modal";
+import { Modal, MODAL_HEADER_SAFE } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import { BadgeCheck } from "lucide-react";
@@ -270,7 +270,8 @@ export default function FormTestPanel({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} className="mx-4 max-h-[90vh] w-full max-w-[640px] overflow-y-auto">
+    <Modal isOpen={open} onClose={onClose} className="mx-4 flex max-h-[90vh] w-full max-w-[640px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
       <div className="relative p-6 sm:p-8">
         {/* LukeTests working overlay — the user sees it building/fixing in the background. */}
         {(aiFilling || aiFixing) && (
@@ -279,7 +280,7 @@ export default function FormTestPanel({
             steps={aiFixing ? TEST_FIX_STEPS : TEST_GEN_STEPS}
           />
         )}
-        <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Test — {formName}</h2>
+        <h2 className={`mb-1 text-lg font-semibold text-gray-800 dark:text-white/90 ${MODAL_HEADER_SAFE}`}>Test — {formName}</h2>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           <strong>Positive</strong> fills valid data (must pass). <strong>Negative</strong> fills invalid data (validation must reject it). LukeTests can generate richer datasets for either. Regex / custom-rule fields may need a manual value.
         </p>

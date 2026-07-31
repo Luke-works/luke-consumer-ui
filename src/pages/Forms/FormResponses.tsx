@@ -196,7 +196,8 @@ export default function FormResponses() {
         </div>
       </div>
 
-      <Modal isOpen={!!selected || viewLoading} onClose={() => setSelected(null)} className="mx-4 max-h-[90vh] w-full max-w-[680px] overflow-y-auto">
+      <Modal isOpen={!!selected || viewLoading} onClose={() => setSelected(null)} className="mx-4 flex max-h-[90vh] w-full max-w-[680px] flex-col overflow-hidden"
+      contentClassName="min-h-0 flex-1 overflow-y-auto">
         <div className="p-6 sm:p-8">
           {viewLoading && !selected ? (
             <p className="py-10 text-center text-sm text-gray-400">Loading…</p>
