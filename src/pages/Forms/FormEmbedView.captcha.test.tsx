@@ -96,6 +96,24 @@ describe("Turnstile on the public embed surface", () => {
     expect(ts.options?.appearance).toBe("interaction-only");
   });
 
+  it("mounts the widget directly above the Submit button, inside the form", async () => {
+    // Placement is a product decision, not incidental: when Cloudflare DOES show a challenge it has
+    // to appear where the filler is already looking. At the top of the page it sat above the tabs,
+    // so on a long form it was off-screen by the time they reached Submit.
+    installTurnstile();
+    embed.getEmbedForm.mockResolvedValue(form());
+    const { container } = render(<FormEmbedView token="tok" />);
+    await screen.findByLabelText(/full name/i);
+
+    const gate = await screen.findByTestId("turnstile-gate");
+    const submit = container.querySelector("button.lf-submit");
+    // Assert the button EXISTS first: without this, a missing button would make both sides `null`
+    // and the adjacency check below would pass on a page that renders neither in the right place.
+    expect(submit).not.toBeNull();
+    expect(gate.nextElementSibling).toBe(submit);
+    expect(gate.closest("form")).not.toBeNull();
+  });
+
   it("is absent entirely when the server says the captcha is off", async () => {
     const ts = installTurnstile();
     embed.getEmbedForm.mockResolvedValue(form({ captchaEnabled: false, captchaSitekey: null }));
@@ -206,5 +224,26 @@ describe("Turnstile on the public embed surface", () => {
 
     expect(document.querySelectorAll("script[src*='challenges.cloudflare.com']").length)
       .toBeLessThanOrEqual(1);
+  });
+
+  it("does not re-create the widget as the filler types", async () => {
+    // The gate lives INSIDE the renderer now, and the renderer re-renders on every keystroke. If the
+    // widget were re-rendered along with it, Cloudflare would restart the challenge mid-fill and the
+    // solved token would keep being thrown away — the form would become unsubmittable.
+    const user = userEvent.setup();
+    const ts = installTurnstile({ token: "stable-token" });
+    embed.getEmbedForm.mockResolvedValue(form());
+    render(<FormEmbedView token="tok" />);
+    const input = await screen.findByLabelText(/full name/i);
+    await waitFor(() => expect(ts.rendered).toBe(1));
+
+    await user.type(input, "Ada Lovelace");
+
+    expect(ts.rendered).toBe(1);
+    expect(ts.resets).toBe(0);
+    // ...and the token survived, so the submission still carries it.
+    await user.click(screen.getByRole("button", { name: /submit/i }));
+    await waitFor(() => expect(embed.submitEmbed).toHaveBeenCalled());
+    expect(sentToken()).toBe("stable-token");
   });
 });

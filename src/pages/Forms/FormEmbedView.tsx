@@ -134,6 +134,22 @@ export default function FormEmbedView({ token }: { token?: string }) {
   // features (e.g. address autocomplete) without exposing any provider key to the browser.
   const minionClient = useMemo(() => (token ? createPublicMinionClient(token) : null), [token]);
 
+  // The security check, handed to the renderer's `beforeSubmit` slot so it sits directly above the
+  // Submit button — where the filler is looking when they go to submit. Invisible for most of them
+  // (`interaction-only`); it only shows itself when Cloudflare actually wants a challenge.
+  //
+  // It lives in the Form tab, which is also the only tab with a Submit button, so nothing is ever
+  // stranded behind an inactive tab.
+  const captchaGate =
+    form?.captchaEnabled && form.captchaSitekey ? (
+      <TurnstileGate
+        sitekey={form.captchaSitekey}
+        onToken={setCaptchaToken}
+        onError={setError}
+        resetSignal={captchaReset}
+      />
+    ) : null;
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-gray-950">
       <div ref={cardRef} className="mx-auto max-w-[640px]">
@@ -182,18 +198,6 @@ export default function FormEmbedView({ token }: { token?: string }) {
                 />
               ) : null}
 
-              {/* The security check. Invisible for most fillers (`interaction-only`) — it only shows
-                  itself when Cloudflare actually wants one. Above the tabs so a challenge is never
-                  hidden behind an inactive tab. */}
-              {form.captchaEnabled && form.captchaSitekey ? (
-                <TurnstileGate
-                  sitekey={form.captchaSitekey}
-                  onToken={setCaptchaToken}
-                  onError={setError}
-                  resetSignal={captchaReset}
-                />
-              ) : null}
-
               {/* Attachments live in their own TAB (opt-in per form), not as an inline form field. Both
                   panels stay MOUNTED (toggled with `hidden`) so typed form data and any in-progress upload
                   survive a tab switch. With attachments off, the form renders on its own — no tabs. */}
@@ -220,10 +224,10 @@ export default function FormEmbedView({ token }: { token?: string }) {
                 >
                   {minionClient ? (
                     <MinionProvider client={minionClient}>
-                      <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
+                      <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} beforeSubmit={captchaGate} />
                     </MinionProvider>
                   ) : (
-                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} />
+                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} beforeSubmit={captchaGate} />
                   )}
                 </ErrorBoundary>
               </div>

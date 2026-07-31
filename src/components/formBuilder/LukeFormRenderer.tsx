@@ -1,7 +1,7 @@
 /**
  * Adapter: renders a stored form via the published @lukeflow/form-react engine, exposing a
  * small stable prop shape (schema/initialValues/onSubmit/onChange/onResult/playback/
- * autoSubmitSignal/readOnly). This is the ONLY form renderer in the app — every surface goes
+ * autoSubmitSignal/readOnly/beforeSubmit). This is the ONLY form renderer in the app — every surface goes
  * through it: the builder's Preview + "Test the form", FormFill, FormResponses, InstanceDetail,
  * FormInbox, and the public embed. The package fully supports `playback`/`onResult`/
  * `autoSubmitSignal` (the Test flow). The in-tree coltorapps renderer was removed in the
@@ -14,7 +14,7 @@
  * mount after their data has loaded, InstanceDetail changes the schema when you pick a version, and
  * FormResponses' modal unmounts between records.
  */
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { FormRenderer as LukeRenderer, type FormTheme } from "@lukeflow/form-react";
 import type { FormData, FormSchema, JsEvaluator } from "@lukeflow/form-core";
 import "@lukeflow/form-react/styles.css";
@@ -42,6 +42,7 @@ export default function LukeFormRenderer({
   submitting = false,
   allowJs = false,
   jsEvaluator,
+  beforeSubmit,
 }: {
   schema: string;
   initialValues?: Record<string, unknown>;
@@ -69,6 +70,12 @@ export default function LukeFormRenderer({
    * access instead of via the built-in `new Function`. Omit on author-self-trust surfaces.
    */
   jsEvaluator?: JsEvaluator;
+  /**
+   * Content rendered inside the form, immediately above the Submit button — for a gate the filler
+   * must clear before submitting (the public embed's Turnstile challenge). Suppressed automatically
+   * where there is no Submit button (`readOnly`), and in a wizard shown only on the last step.
+   */
+  beforeSubmit?: ReactNode;
 }) {
   void submitting; // the package manages submit state internally; accepted for prop-compat
   // Parse ONCE per schema string. The engine rebuilds whenever the schema OBJECT identity changes
@@ -103,6 +110,7 @@ export default function LukeFormRenderer({
       readOnly={readOnly}
       allowJs={allowJs}
       jsEvaluator={jsEvaluator}
+      beforeSubmit={beforeSubmit}
     />
   );
 }

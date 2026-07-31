@@ -146,6 +146,15 @@ interface FormRendererProps {
     autosaveDelay?: number;
     /** Submit button label (omit the button entirely with `null`). */
     submitLabel?: string | null;
+    /**
+     * Content rendered INSIDE the form, immediately above the submit button — for the things a host
+     * must gate a submission on (a consent tick, a captcha, terms). Placing them here rather than
+     * around the renderer keeps them where the filler is looking when they go to submit.
+     *
+     * Rendered only where the submit button itself is: never under `readOnly` or `submitLabel: null`,
+     * and in wizard mode only on the LAST step. A gate above a "Next" button would be misleading.
+     */
+    beforeSubmit?: ReactNode;
     /** Design-token overrides applied as CSS custom properties on the form root, e.g. `{ "--lf-primary": "#0a7" }`. */
     theme?: FormTheme;
     /** Color scheme: `"light"`/`"dark"` force it; `"auto"` (default) follows the OS preference. */

@@ -2328,9 +2328,9 @@ function EditGridField({
 }
 
 // src/FormRenderer.tsx
-import { jsx as jsx13, jsxs as jsxs9 } from "react/jsx-runtime";
+import { Fragment, jsx as jsx13, jsxs as jsxs9 } from "react/jsx-runtime";
 function FormRenderer(props) {
-  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
+  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, submitLabel = "Submit", beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
   const formClass = ["lf-form", virtualize && "lf-virtualized", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore, allowJs, jsEvaluator };
   const form = useFormEngine(schema, engineOptions);
@@ -2456,6 +2456,7 @@ function FormRenderer(props) {
       components: comps,
       readOnly,
       submitLabel,
+      beforeSubmit,
       className: formClass,
       theme: mergedTheme,
       dataTheme,
@@ -2468,7 +2469,10 @@ function FormRenderer(props) {
     }
   ) : /* @__PURE__ */ jsxs9("form", { noValidate: true, dir, "data-theme": dataTheme, className: formClass, style: mergedTheme, onSubmit: handleSubmit, children: [
     schema.root.map((id) => /* @__PURE__ */ jsx13(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
-    submitLabel !== null && !readOnly && /* @__PURE__ */ jsx13("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
+    submitLabel !== null && !readOnly && /* @__PURE__ */ jsxs9(Fragment, { children: [
+      beforeSubmit,
+      /* @__PURE__ */ jsx13("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
+    ] })
   ] });
   return /* @__PURE__ */ jsx13(FormErrorBoundary, { fallback: errorFallback, onError: (error) => onEvent?.({ type: "error", error }), children: /* @__PURE__ */ jsx13(FormThemeProvider, { theme: mergedTokens, colorScheme: resolvedScheme, children: content }) });
 }
@@ -2480,6 +2484,7 @@ function FormWizardView({
   components,
   readOnly,
   submitLabel,
+  beforeSubmit,
   className,
   theme,
   dataTheme,
@@ -2537,6 +2542,7 @@ function FormWizardView({
   return /* @__PURE__ */ jsxs9("form", { noValidate: true, dir, "data-theme": dataTheme, className, style: theme, onSubmit: submit, children: [
     /* @__PURE__ */ jsx13("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ jsx13("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
     /* @__PURE__ */ jsx13("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ jsx13(RenderEntity, { id: currentId, schema, ctx }) }),
+    isLast && submitLabel !== null && !readOnly ? beforeSubmit : null,
     /* @__PURE__ */ jsxs9("div", { className: "lf-wizard-nav", children: [
       /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
       !isLast && /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
