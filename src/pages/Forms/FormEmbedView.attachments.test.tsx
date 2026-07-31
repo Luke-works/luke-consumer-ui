@@ -74,3 +74,37 @@ describe("embedded form with attachments", () => {
     expect(embed.submitEmbed.mock.calls[0][1]).toMatchObject({ fullName: "Ada Lovelace" });
   });
 });
+
+describe("attachments are a paid feature", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    docs.listEmbedDocuments.mockResolvedValue([]);
+  });
+
+  it("hides the tab when the SERVER says attachments are off, even though the schema asks for them", async () => {
+    // The server has already applied the tenant's plan. Re-reading the schema here would re-open a
+    // tab whose uploads the upload endpoint is going to refuse with a 402 anyway.
+    embed.getEmbedForm.mockResolvedValue({
+      code: "F1", title: "Intake", version: 1, schema: SCHEMA, attachmentsEnabled: false,
+    });
+    render(<FormEmbedView token="tok" />);
+    await screen.findByLabelText(/full name/i);
+    expect(screen.queryByRole("tab", { name: /attachments/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the tab when the server confirms the tenant is entitled", async () => {
+    embed.getEmbedForm.mockResolvedValue({
+      code: "F1", title: "Intake", version: 1, schema: SCHEMA, attachmentsEnabled: true,
+    });
+    render(<FormEmbedView token="tok" />);
+    await screen.findByLabelText(/full name/i);
+    expect(await screen.findByRole("tab", { name: /attachments/i })).toBeInTheDocument();
+  });
+
+  it("falls back to the schema for an engine that predates the flag", async () => {
+    // Older engines sent no flag and meant "whatever the schema says" — that must keep working.
+    embed.getEmbedForm.mockResolvedValue({ code: "F1", title: "Intake", version: 1, schema: SCHEMA });
+    render(<FormEmbedView token="tok" />);
+    expect(await screen.findByRole("tab", { name: /attachments/i })).toBeInTheDocument();
+  });
+});

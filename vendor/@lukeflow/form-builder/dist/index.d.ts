@@ -185,6 +185,69 @@ declare function editorsByTab(editors: AttributeEditor[]): Array<{
     editors: AttributeEditor[];
 }>;
 
+/** One choice a host offers for every data variable. */
+interface DataAnnotationOption {
+    /** The value stored when this option is picked. */
+    id: string;
+    label: string;
+    /** One line explaining what picking this means, shown under the label. */
+    hint?: string;
+}
+/**
+ * A host-defined per-variable choice, surfaced as a `+` beside each key and used to group the
+ * field list. Lukeflow drives outbound fill roles through this.
+ */
+interface DataAnnotations {
+    /** The question the picker asks, e.g. "Who provides it?". */
+    title: string;
+    /** The primary choices, in the order they should be offered AND grouped. */
+    options: readonly DataAnnotationOption[];
+    /**
+     * An optional qualifier nested under one option. Ticking it stores `id` INSTEAD of `under`, so a
+     * host whose model has three stored states can still present exactly two primary choices — which
+     * is the point: a third top-level option would be a third thing to explain.
+     */
+    modifier?: {
+        under: string;
+        id: string;
+        label: string;
+        hint?: string;
+    };
+    /** The current stored value per field key (an option id, or the modifier's id). */
+    value: Readonly<Record<string, string>>;
+    /** Store a new value for a key. */
+    onChange: (key: string, id: string) => void;
+    /** Heading for fields with no answer yet (default "Not assigned"). */
+    unassignedLabel?: string;
+}
+/** A row that is always in the payload regardless of the form's fields (host-supplied). */
+interface DataMetadataRow {
+    key: string;
+    typeLabel: string;
+    description: string;
+}
+interface DataStructureViewProps {
+    /** The schema to describe (the live working schema). */
+    schema: FormSchema;
+    /** Field-type registry (defaults to the standard set) — must match the builder's. */
+    registry?: FieldTypeRegistry;
+    /** Called with an entity id when a field key is clicked (e.g. jump to it on the canvas). */
+    onSelect?: (entityId: string) => void;
+    /** Filename stem for the downloaded template (default "form"). */
+    formName?: string;
+    /**
+     * Override the "Generate template" download with a custom encoder (e.g. a real
+     * `.xlsx`). Receives the derived {@link FormTemplate} and the sanitized file stem.
+     * When omitted, a CSV is downloaded.
+     */
+    onGenerateTemplate?: (template: FormTemplate, fileStem: string) => void;
+    /** A per-variable choice offered beside each key; also groups the field list. */
+    annotations?: DataAnnotations;
+    /** Rows always recorded alongside the answers — shown as their own card. */
+    metadata?: readonly DataMetadataRow[];
+}
+declare function DataStructureView({ schema, registry, onSelect, formName, onGenerateTemplate, annotations, metadata, }: DataStructureViewProps): react.JSX.Element;
+
 interface FormBuilderProps {
     /** The schema to edit (uncontrolled — the builder owns it after mount). */
     initialSchema?: FormSchema;
@@ -237,6 +300,16 @@ interface FormBuilderProps {
      * when omitted, a CSV is downloaded.
      */
     onGenerateTemplate?: (template: FormTemplate, fileStem: string) => void;
+    /**
+     * Hide the Design/Data toggle and stay on the canvas. For a form whose data contract tells the
+     * author nothing they can act on — Lukeflow hides it on INBOUND forms, where every field is simply
+     * filled by whoever opens the form and there is no second party to divide the data between.
+     */
+    hideDataView?: boolean;
+    /** A host-defined choice offered against every data variable in the Data view. */
+    dataAnnotations?: DataAnnotations;
+    /** Rows always recorded alongside the answers, listed in the Data view. */
+    dataMetadata?: readonly DataMetadataRow[];
     className?: string;
 }
 /** Imperative handle (via `ref`) for replacing the schema without a remount. */
@@ -265,24 +338,6 @@ declare function NodePreview({ entity, field, components }: {
     components?: Record<string, FieldComponent>;
 }): react.JSX.Element | null;
 
-interface DataStructureViewProps {
-    /** The schema to describe (the live working schema). */
-    schema: FormSchema;
-    /** Field-type registry (defaults to the standard set) — must match the builder's. */
-    registry?: FieldTypeRegistry;
-    /** Called with an entity id when a field key is clicked (e.g. jump to it on the canvas). */
-    onSelect?: (entityId: string) => void;
-    /** Filename stem for the downloaded template (default "form"). */
-    formName?: string;
-    /**
-     * Override the "Generate template" download with a custom encoder (e.g. a real
-     * `.xlsx`). Receives the derived {@link FormTemplate} and the sanitized file stem.
-     * When omitted, a CSV is downloaded.
-     */
-    onGenerateTemplate?: (template: FormTemplate, fileStem: string) => void;
-}
-declare function DataStructureView({ schema, registry, onSelect, formName, onGenerateTemplate }: DataStructureViewProps): react.JSX.Element;
-
 /**
  * @lukeflow/form-builder — the reference React form builder for @lukeflow/form-core.
  *
@@ -294,4 +349,4 @@ declare function DataStructureView({ schema, registry, onSelect, formName, onGen
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, DataStructureView, type DataStructureViewProps, FormBuilder, type FormBuilderHandle, type FormBuilderProps, NodePreview, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };
+export { ATTRIBUTE_TABS, type AttributeControl, type AttributeEditor, type AttributeEditorContext, type AttributeEditorsInput, type AttributeTab, type DataAnnotationOption, type DataAnnotations, type DataMetadataRow, DataStructureView, type DataStructureViewProps, FormBuilder, type FormBuilderHandle, type FormBuilderProps, NodePreview, SettingsPanel, type SettingsPanelProps, type UseFormBuilderResult, VERSION, createDefaultAttributeEditors, defaultAttributeEditors, editorsByTab, editorsForEntity, isContainerType, isDataField, isStaticType, mergeAttributeEditors, useFormBuilder };

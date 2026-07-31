@@ -41,6 +41,7 @@ import {
   release,
   restoreVersion,
   saveDraft,
+  setOutboundConfig,
   signOffTest,
   updateMeta,
   type AuditEvent,
@@ -62,6 +63,7 @@ import { useMutationLock } from "../../hooks/useMutationLock";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import FormStatusPopover from "./FormStatusPopover";
+import { fieldsWithRoles, type FieldRole } from "../../lib/outboundRoles";
 import LifecycleActions from "./LifecycleActions";
 import { lifecycleGate, TOOLBAR_BTN_ICON, TOOLBAR_BTN_NEUTRAL, type LifecycleState } from "./lifecycle";
 import PageMeta from "../../components/common/PageMeta";
@@ -657,6 +659,61 @@ export default function FormBuilderPage() {
 
   const saveLabel = saveError ? "Save failed" : saved ? "Saved" : "Saving…";
 
+  // OUTBOUND forms are filled by two people, so every data variable belongs to one of them. The Data
+  // view's "+" is the second way to say which (the "Who fills" panel is the first); both write the
+  // same outboundRoles map, and this one persists immediately because it is a per-variable action
+  // rather than a form to submit.
+  //
+  // Seeded from the EFFECTIVE roles rather than the stored map: a form authored before roles existed
+  // has no entries at all, and saving one key on its own would freeze the rest at whatever they
+  // happened to derive to, silently.
+  const effectiveRoles: Record<string, string> = {};
+  // `fieldsWithRoles` reads the stored JSON form of a schema; the builder mirrors its working schema
+  // as an object, so serialize it here — using the LIVE one so a field added seconds ago is offered.
+  const rolesSchemaJson = JSON.stringify((liveSchema as unknown) ?? initialSchema);
+  if (isOutbound) for (const f of fieldsWithRoles(rolesSchemaJson, form.outboundRoles)) effectiveRoles[f.key] = f.role;
+
+  // The engine's third role, EITHER, is offered as a QUALIFIER on "I pre-fill it" rather than as a
+  // third option — it is a refinement of pre-filling ("...and they can still change it"), not a
+  // separate answer, and presenting it as one made the choice harder than it is.
+  const dataAnnotations = isOutbound
+    ? {
+        title: "Who provides it?",
+        options: [
+          { id: "PREPARER", label: "I pre-fill it", hint: "You answer it when you send the form." },
+          { id: "RECIPIENT", label: "The recipient fills it", hint: "They see an empty field to complete." },
+        ],
+        modifier: {
+          under: "PREPARER",
+          id: "EITHER",
+          label: "Recipient may change it",
+          hint: "They see your answer and can correct it.",
+        },
+        value: effectiveRoles,
+        unassignedLabel: "Not decided yet",
+        onChange: (key: string, role: string) => {
+          const next = { ...effectiveRoles, [key]: role } as Record<string, FieldRole>;
+          setForm((prev) => (prev ? { ...prev, outboundRoles: next } : prev));
+          void setOutboundConfig(tenant, id, next).catch(() => {});
+        },
+      }
+    : undefined;
+
+  // What the engine records alongside the answers on every submission (FormSubmissionService's
+  // formMetaData). Listed so the data contract an integration reads is the WHOLE contract, not just
+  // the fields the author drew.
+  const dataMetadata = [
+    { key: "instanceId", typeLabel: "string", description: "Id of the submission this created" },
+    { key: "formCode", typeLabel: "string", description: "The form's stable code" },
+    { key: "version", typeLabel: "number", description: "The published version that was filled" },
+    { key: "submittedBy.at", typeLabel: "string", description: "When it was submitted" },
+    { key: "submittedBy.ip", typeLabel: "string", description: "Caller IP, as seen by the engine" },
+    { key: "submittedBy.userAgent", typeLabel: "string", description: "Browser user-agent string" },
+    { key: "submittedBy.via", typeLabel: "string", description: "Which door it came through" },
+    { key: "attachments", typeLabel: "object[]", description: "Audit of any files attached" },
+    { key: "consent", typeLabel: "object", description: "Agreed wording + timestamp, when the form requires it" },
+  ];
+
   // Shared by the top-bar buttons and the LukeBuilds chat so both gate identically.
   const editable = canEdit && checkedOut;
   const lifecycleState: LifecycleState = {
@@ -814,6 +871,11 @@ export default function FormBuilderPage() {
           settings="modal"
           hidePreview /* Preview lives in the top bar (works in view-only too) */
           formName={form.name} /* file stem for the Data view's "Generate template" download */
+          /* INBOUND forms have one filler, so there is nothing to divide the data between and the
+             contract tells the author nothing they can act on — the whole view is hidden. */
+          hideDataView={!isOutbound}
+          dataAnnotations={dataAnnotations}
+          dataMetadata={dataMetadata}
           aside={
             canEdit ? (
               <AiAssistPanel

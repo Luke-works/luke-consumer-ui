@@ -244,13 +244,29 @@ export default function FormSettingsModal({
                 className={TEXTAREA}
               />
             </Field>
-            <Field hint="Adds an Attachments tab to the form so people can upload supporting files with their submission.">
-              <Checkbox
-                checked={allowAttachments}
-                onChange={onToggleAttachments}
-                disabled={!editable}
-                label="Allow file attachments"
-              />
+            {/* Attachments are a PAID feature: they are object storage we hold, retain and serve on
+                the tenant's behalf. Locked here on the free plan, and refused independently by the
+                upload endpoint — this UI is a courtesy, not the gate. */}
+            <Field
+              hint={
+                form.attachmentsLocked
+                  ? "Adds an Attachments tab so people can upload supporting files with their submission. Available on paid plans."
+                  : "Adds an Attachments tab to the form so people can upload supporting files with their submission."
+              }
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Checkbox
+                  checked={allowAttachments && !form.attachmentsLocked}
+                  onChange={onToggleAttachments}
+                  disabled={!editable || form.attachmentsLocked}
+                  label="Allow file attachments"
+                />
+                {form.attachmentsLocked && (
+                  <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                    Paid plan
+                  </span>
+                )}
+              </div>
             </Field>
             <Field hint="On submit, generates a PDF of the completed form — including the submission record — and attaches it to the process instance, viewable in the Form Inbox and Core UI Tasklist.">
               <Checkbox

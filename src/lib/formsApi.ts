@@ -53,6 +53,8 @@ export type StoredForm = {
   /** The tenant's plan does NOT allow hiding the badge — render the option locked with an upgrade
    *  hint. Server-resolved; the server also rejects a hide attempt, so this is a UI affordance. */
   brandingLocked: boolean;
+  /** True when the tenant's plan does NOT include file attachments — the option renders locked. */
+  attachmentsLocked: boolean;
 };
 
 /** A checked-in, immutable version (the artifact workflows resolve). */
@@ -85,6 +87,7 @@ type ApiForm = {
   lastTestedBy?: string | null;
   showBranding?: boolean | null;
   brandingLocked?: boolean | null;
+  attachmentsLocked?: boolean | null;
 };
 type ApiVersion = { version: number; schema: string; checkedInBy?: string | null; checkedInAt: string; signedOffAt?: string | null; signedOffBy?: string | null };
 type ApiAudit = { action: string; detail?: string | null; actor?: string | null; actorName?: string | null; at: string };
@@ -122,6 +125,9 @@ function toForm(f: ApiForm, latestVersion = 0, latestVersionSignedOff = false): 
     // toggle the server would then reject.
     showBranding: f.showBranding ?? true,
     brandingLocked: f.brandingLocked ?? true,
+    // Default LOCKED, matching the engine: a response that skipped the enrichment must not offer a
+    // feature the upload endpoint then refuses.
+    attachmentsLocked: f.attachmentsLocked ?? true,
   };
 }
 

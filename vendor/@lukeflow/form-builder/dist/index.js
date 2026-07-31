@@ -121,7 +121,7 @@ function useFormBuilder(initialSchema = EMPTY) {
 }
 
 // src/FormBuilder.tsx
-import { useMemo as useMemo6, useState as useState10, useEffect as useEffect9, useRef as useRef8, useImperativeHandle, forwardRef } from "react";
+import { useMemo as useMemo6, useState as useState11, useEffect as useEffect10, useRef as useRef9, useImperativeHandle, forwardRef } from "react";
 import { createPortal as createPortal3 } from "react-dom";
 
 // src/SettingsPanel.tsx
@@ -2622,7 +2622,7 @@ function Problems({ builder }) {
 }
 
 // src/builder/DataStructureView.tsx
-import { useMemo as useMemo5 } from "react";
+import { useEffect as useEffect9, useMemo as useMemo5, useRef as useRef8, useState as useState10 } from "react";
 import {
   deriveDataContract,
   buildFormTemplate
@@ -2634,6 +2634,9 @@ function IconDownload() {
     /* @__PURE__ */ jsx13("path", { d: "m7 11 5 5 5-5" }),
     /* @__PURE__ */ jsx13("path", { d: "M5 21h14" })
   ] });
+}
+function IconPlus() {
+  return /* @__PURE__ */ jsx13("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", "aria-hidden": "true", children: /* @__PURE__ */ jsx13("path", { d: "M12 5v14M5 12h14" }) });
 }
 function downloadCsv(csv, filename) {
   if (typeof document === "undefined") return;
@@ -2647,10 +2650,46 @@ function downloadCsv(csv, filename) {
   a.remove();
   URL.revokeObjectURL(url);
 }
-function DataStructureView({ schema, registry, onSelect, formName, onGenerateTemplate }) {
+function labelFor(a, id) {
+  if (!id) return null;
+  if (a.modifier && id === a.modifier.id) {
+    const base = a.options.find((o) => o.id === a.modifier.under);
+    return base ? `${base.label} \xB7 ${a.modifier.label}` : a.modifier.label;
+  }
+  return a.options.find((o) => o.id === id)?.label ?? null;
+}
+function groupFields(fields, a) {
+  const bucketOf = (key) => {
+    const v = a.value[key];
+    if (!v) return null;
+    if (a.modifier && v === a.modifier.id) return a.modifier.under;
+    return a.options.some((o) => o.id === v) ? v : null;
+  };
+  const groups = a.options.map((o) => ({ id: o.id, label: o.label, fields: [] }));
+  const unassigned = { id: "", label: a.unassignedLabel ?? "Not assigned", fields: [] };
+  for (const f of fields) {
+    const b = bucketOf(f.key);
+    const g = groups.find((x) => x.id === b);
+    (g ?? unassigned).fields.push(f);
+  }
+  return [...groups, unassigned].filter((g) => g.fields.length > 0);
+}
+function DataStructureView({
+  schema,
+  registry,
+  onSelect,
+  formName,
+  onGenerateTemplate,
+  annotations,
+  metadata
+}) {
   const contract = useMemo5(() => deriveDataContract(schema, registry), [schema, registry]);
   const json = useMemo5(() => JSON.stringify(contract.example, null, 2), [contract.example]);
   const n = contract.fields.length;
+  const groups = useMemo5(
+    () => annotations ? groupFields(contract.fields, annotations) : null,
+    [contract.fields, annotations]
+  );
   const handleGenerateTemplate = () => {
     const template = buildFormTemplate(schema, registry);
     const stem = (formName || "form").trim().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "") || "form";
@@ -2660,6 +2699,7 @@ function DataStructureView({ schema, registry, onSelect, formName, onGenerateTem
     }
     downloadCsv(template.csv, `${stem}-template.csv`);
   };
+  const rows = (list) => list.map((f) => /* @__PURE__ */ jsx13(FieldRow, { field: f, onSelect, annotations }, f.entityId));
   return /* @__PURE__ */ jsxs13("div", { className: "lf-ds", role: "region", "aria-label": "Data structure", children: [
     /* @__PURE__ */ jsxs13("div", { className: "lf-ds-bar", children: [
       /* @__PURE__ */ jsxs13("div", { className: "lf-ds-bar-heading", children: [
@@ -2687,22 +2727,128 @@ function DataStructureView({ schema, registry, onSelect, formName, onGenerateTem
     ] }),
     /* @__PURE__ */ jsxs13("div", { className: "lf-ds-panes", children: [
       /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-tree", children: [
-        /* @__PURE__ */ jsx13("header", { className: "lf-ds-pane-head", children: /* @__PURE__ */ jsx13("span", { className: "lf-ds-pane-title", children: "Fields" }) }),
-        n === 0 ? /* @__PURE__ */ jsx13("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list", children: contract.fields.map((f) => /* @__PURE__ */ jsx13(FieldRow, { field: f, onSelect }, f.entityId)) })
-      ] }),
-      /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-json", children: [
         /* @__PURE__ */ jsxs13("header", { className: "lf-ds-pane-head", children: [
-          /* @__PURE__ */ jsx13("span", { className: "lf-ds-pane-title", children: "Example submission" }),
-          /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: "JSON" })
+          /* @__PURE__ */ jsx13("span", { className: "lf-ds-pane-title", children: "Fields" }),
+          annotations ? /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: annotations.title }) : null
         ] }),
-        /* @__PURE__ */ jsx13("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ jsx13("code", { children: json }) })
+        n === 0 ? /* @__PURE__ */ jsx13("p", { className: "lf-ds-empty", children: "Add fields to the form to see the data it produces." }) : groups ? groups.map((g) => /* @__PURE__ */ jsxs13("div", { className: "lf-ds-group", children: [
+          /* @__PURE__ */ jsxs13("h4", { className: `lf-ds-group-head${g.id ? "" : " is-unassigned"}`, children: [
+            g.label,
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: g.fields.length })
+          ] }),
+          /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list", children: rows(g.fields) })
+        ] }, g.id || "__unassigned")) : /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list", children: rows(contract.fields) })
+      ] }),
+      /* @__PURE__ */ jsxs13("div", { className: "lf-ds-side", children: [
+        /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-json", children: [
+          /* @__PURE__ */ jsxs13("header", { className: "lf-ds-pane-head", children: [
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-pane-title", children: "Example submission" }),
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: "JSON" })
+          ] }),
+          /* @__PURE__ */ jsx13("pre", { className: "lf-ds-code", "aria-label": "Example submission JSON", children: /* @__PURE__ */ jsx13("code", { children: json }) })
+        ] }),
+        metadata && metadata.length > 0 ? /* @__PURE__ */ jsxs13("section", { className: "lf-ds-pane lf-ds-meta", children: [
+          /* @__PURE__ */ jsxs13("header", { className: "lf-ds-pane-head", children: [
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-pane-title", children: "Always recorded" }),
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-count", children: metadata.length })
+          ] }),
+          /* @__PURE__ */ jsx13("ul", { className: "lf-ds-metalist", children: metadata.map((m) => /* @__PURE__ */ jsxs13("li", { className: "lf-ds-metarow", children: [
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-key", children: m.key }),
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-type", children: m.typeLabel }),
+            /* @__PURE__ */ jsx13("span", { className: "lf-ds-accepts", children: m.description })
+          ] }, m.key)) })
+        ] }) : null
       ] })
     ] })
   ] });
 }
-function FieldRow({ field, onSelect }) {
+function AnnotationPicker({
+  fieldKey,
+  annotations
+}) {
+  const [open, setOpen] = useState10(false);
+  const box2 = useRef8(null);
+  const btn = useRef8(null);
+  const current = annotations.value[fieldKey];
+  const label = labelFor(annotations, current);
+  const mod = annotations.modifier;
+  const selected = mod && current === mod.id ? mod.under : current;
+  useEffect9(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (!box2.current?.contains(e.target) && !btn.current?.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        btn.current?.focus();
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return /* @__PURE__ */ jsxs13("span", { className: "lf-ds-annot", children: [
+    label ? /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip is-annot", children: label }) : null,
+    /* @__PURE__ */ jsx13(
+      "button",
+      {
+        ref: btn,
+        type: "button",
+        className: "lf-ds-annot-btn",
+        "aria-expanded": open,
+        "aria-haspopup": "dialog",
+        "aria-label": `${annotations.title} \u2014 ${fieldKey}`,
+        title: annotations.title,
+        onClick: () => setOpen((o) => !o),
+        children: /* @__PURE__ */ jsx13(IconPlus, {})
+      }
+    ),
+    open ? /* @__PURE__ */ jsxs13("div", { ref: box2, className: "lf-ds-annot-pop", role: "dialog", "aria-label": `${annotations.title} \u2014 ${fieldKey}`, children: [
+      /* @__PURE__ */ jsx13("p", { className: "lf-ds-annot-title", children: annotations.title }),
+      annotations.options.map((o) => /* @__PURE__ */ jsxs13("label", { className: "lf-ds-annot-opt", children: [
+        /* @__PURE__ */ jsx13(
+          "input",
+          {
+            type: "radio",
+            name: `lf-ds-annot-${fieldKey}`,
+            checked: selected === o.id,
+            onChange: () => annotations.onChange(fieldKey, o.id)
+          }
+        ),
+        /* @__PURE__ */ jsxs13("span", { children: [
+          /* @__PURE__ */ jsx13("span", { className: "lf-ds-annot-opt-label", children: o.label }),
+          o.hint ? /* @__PURE__ */ jsx13("span", { className: "lf-ds-annot-opt-hint", children: o.hint }) : null,
+          mod && mod.under === o.id && selected === o.id ? /* @__PURE__ */ jsxs13("label", { className: "lf-ds-annot-mod", children: [
+            /* @__PURE__ */ jsx13(
+              "input",
+              {
+                type: "checkbox",
+                checked: current === mod.id,
+                onChange: (e) => annotations.onChange(fieldKey, e.target.checked ? mod.id : mod.under)
+              }
+            ),
+            /* @__PURE__ */ jsxs13("span", { children: [
+              mod.label,
+              mod.hint ? /* @__PURE__ */ jsx13("span", { className: "lf-ds-annot-opt-hint", children: mod.hint }) : null
+            ] })
+          ] }) : null
+        ] })
+      ] }, o.id))
+    ] }) : null
+  ] });
+}
+function FieldRow({
+  field,
+  onSelect,
+  annotations
+}) {
   const children = field.children ?? [];
   const selectable = !!onSelect && !field.entityId.includes(".");
+  const annotatable = annotations && !field.entityId.includes(".") && !field.excluded;
   return /* @__PURE__ */ jsxs13("li", { className: "lf-ds-item", children: [
     /* @__PURE__ */ jsxs13("div", { className: `lf-ds-row${field.excluded ? " is-excluded" : ""}`, children: [
       selectable ? /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-ds-key lf-ds-key--btn", onClick: () => onSelect(field.entityId), title: "Select this field on the canvas", children: field.key }) : /* @__PURE__ */ jsx13("span", { className: "lf-ds-key", children: field.key }),
@@ -2710,7 +2856,8 @@ function FieldRow({ field, onSelect }) {
       /* @__PURE__ */ jsx13("span", { className: "lf-ds-accepts", children: field.accepts }),
       field.constraints.map((c) => /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip", children: c }, c)),
       field.conditional && /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip is-cond", title: "Shown conditionally \u2014 may be absent from a given submission", children: "conditional" }),
-      field.excluded && /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip is-excl", title: "persistent: false \u2014 excluded from the submission payload", children: "not saved" })
+      field.excluded && /* @__PURE__ */ jsx13("span", { className: "lf-ds-chip is-excl", title: "persistent: false \u2014 excluded from the submission payload", children: "not saved" }),
+      annotatable ? /* @__PURE__ */ jsx13(AnnotationPicker, { fieldKey: field.key, annotations }) : null
     ] }),
     children.length > 0 && /* @__PURE__ */ jsx13("ul", { className: "lf-ds-list lf-ds-children", children: children.map((c) => /* @__PURE__ */ jsx13(FieldRow, { field: c, onSelect }, c.entityId)) })
   ] });
@@ -2718,20 +2865,20 @@ function FieldRow({ field, onSelect }) {
 
 // src/FormBuilder.tsx
 import { jsx as jsx14, jsxs as jsxs14 } from "react/jsx-runtime";
-var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, formName, onGenerateTemplate, className }, ref) {
+var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, extraFields, components, registry, attributeEditors, settings = "panel", aside, hidePreview, formName, onGenerateTemplate, hideDataView, dataAnnotations, dataMetadata, className }, ref) {
   const b = useFormBuilder(initialSchema);
   useImperativeHandle(ref, () => ({ setSchema: b.setSchema, getSchema: () => b.schema }), [b.setSchema, b.schema]);
-  const [showPreview, setShowPreview] = useState10(false);
-  const [view, setView] = useState10("design");
-  const [toast, setToast] = useState10(null);
+  const [showPreview, setShowPreview] = useState11(false);
+  const [view, setView] = useState11("design");
+  const [toast, setToast] = useState11(null);
   const editors = useMemo6(() => mergeAttributeEditors(createDefaultAttributeEditors(), attributeEditors), [attributeEditors]);
   const modal = settings === "modal";
-  useEffect9(() => {
+  useEffect10(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
-  useEffect9(() => {
+  useEffect10(() => {
     const onKey = (e) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const t = e.target;
@@ -2751,10 +2898,10 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [b.undo, b.redo]);
-  const onChangeRef = useRef8(onChange);
+  const onChangeRef = useRef9(onChange);
   onChangeRef.current = onChange;
-  const mounted = useRef8(false);
-  useEffect9(() => {
+  const mounted = useRef9(false);
+  useEffect10(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
@@ -2775,20 +2922,22 @@ var FormBuilder = forwardRef(function FormBuilder2({ initialSchema, onChange, ex
         /* @__PURE__ */ jsx14(IconEye, {}),
         "Preview"
       ] }),
-      /* @__PURE__ */ jsxs14("div", { className: "lf-builder-viewtoggle", role: "group", "aria-label": "Builder view", children: [
+      !hideDataView && /* @__PURE__ */ jsxs14("div", { className: "lf-builder-viewtoggle", role: "group", "aria-label": "Builder view", children: [
         /* @__PURE__ */ jsx14("button", { type: "button", className: view === "design" ? "is-active" : "", "aria-pressed": view === "design", onClick: () => setView("design"), children: "Design" }),
         /* @__PURE__ */ jsx14("button", { type: "button", className: view === "data" ? "is-active" : "", "aria-pressed": view === "data", onClick: () => setView("data"), title: "See the data structure this form produces", children: "Data" })
       ] }),
       /* @__PURE__ */ jsx14(ProblemsBadge, { builder: b })
     ] }),
     /* @__PURE__ */ jsxs14(CanvasDndProvider, { builder: b, children: [
-      view === "data" ? /* @__PURE__ */ jsx14("div", { className: "lf-ds-shell", children: /* @__PURE__ */ jsx14(
+      view === "data" && !hideDataView ? /* @__PURE__ */ jsx14("div", { className: "lf-ds-shell", children: /* @__PURE__ */ jsx14(
         DataStructureView,
         {
           schema: b.schema,
           registry,
           formName,
           onGenerateTemplate,
+          annotations: dataAnnotations,
+          metadata: dataMetadata,
           onSelect: (id) => {
             setView("design");
             b.select(id);
