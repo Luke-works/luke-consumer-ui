@@ -258,7 +258,7 @@ export default function FormInbox() {
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Inbox</h1>
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Form Inbox</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Everything waiting on you — form submissions to review and email to triage.</p>
         </div>
         <ViewToggle mode={mode} onChange={setViewMode} />

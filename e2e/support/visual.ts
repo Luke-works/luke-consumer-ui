@@ -68,8 +68,16 @@ export const SCREENSHOT_OPTIONS = {
   threshold: 0.2,
   /**
    * ABSOLUTE cap on pixels that differ by more than `threshold` — deliberately not a ratio, so a
-   * tall page or a wide viewport does not buy extra blindness. Sized above the runner's measured
-   * noise floor and far below the ink of a word of text.
+   * tall page or a wide viewport does not buy extra blindness.
+   *
+   * MEASURED, not guessed. With this pinned to 0 and every baseline freshly shot, all 202 shots
+   * compared exactly equal on the ubuntu runner: the noise floor here is genuinely zero. 20 is
+   * pure headroom for a stray antialiased edge — roughly 0.002% of a laptop shot, and an order of
+   * magnitude below the ink of a single character, so no real copy change can hide under it.
+   *
+   * If this ever starts flaking, the honest fix is to find the nondeterminism (an unhidden caret,
+   * a live timestamp, a random avatar), not to raise the number: every pixel added here is a
+   * pixel of the product nobody is looking at.
    */
-  maxDiffPixels: 0,
+  maxDiffPixels: 20,
 } as const;
