@@ -23,10 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload failure diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report
           # The HTML report embeds the trace, video and screenshot for each failure; test-results/
@@ -76,10 +76,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
@@ -97,8 +97,14 @@ jobs:
       - name: Regenerate or verify baselines
         env:
           VISUAL: '1' # this job exists to shoot them, so it always opts in
+          # Passed through the ENVIRONMENT, never interpolated into the script body. A `${{ }}`
+          # expression inside `run:` is substituted before the shell sees it, so the input becomes
+          # part of the program rather than data to it — the standard Actions script-injection
+          # shape. `mode` is a constrained choice today, but the safe form costs nothing and does
+          # not depend on that staying true.
+          MODE: ${{ inputs.mode }}
         run: |
-          if [ "${{ inputs.mode }}" = "verify" ]; then
+          if [ "$MODE" = "verify" ]; then
             npx playwright test e2e/visual.spec.ts e2e/visual-states.spec.ts
           else
             npx playwright test e2e/visual.spec.ts e2e/visual-states.spec.ts --update-snapshots
@@ -106,7 +112,7 @@ jobs:
 
       - name: Upload the baselines to commit
         if: ${{ inputs.mode != 'verify' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: visual-baselines
           path: |
@@ -117,7 +123,7 @@ jobs:
       # is the whole point of running it. Without this the run just says "some pixels differed".
       - name: Upload the diff report
         if: ${{ failure() && inputs.mode == 'verify' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: visual-diff-report
           path: playwright-report/
@@ -133,12 +139,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get the UI
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: luke-consumer-ui
 
       - name: Get core-engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: Luke-works/luke-core-engine
           ref: develop
@@ -146,14 +152,14 @@ jobs:
           path: luke-core-engine
 
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: npm
@@ -174,7 +180,7 @@ jobs:
 
       - name: Upload report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-live-report
           path: |
