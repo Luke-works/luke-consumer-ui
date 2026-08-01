@@ -108,6 +108,18 @@ describe("htmlToText", () => {
     expect(htmlToText("&lt;tag&gt; &amp; &quot;quotes&quot;")).toBe('<tag> & "quotes"');
   });
 
+  it("decodes each entity exactly once, so nothing is double-unescaped", () => {
+    // A sender who writes "&amp;lt;" means the reader to SEE "&lt;". Decoding &amp; first and
+    // then &lt; would turn it into "<" — the shape CodeQL flags as js/double-escaping.
+    expect(htmlToText("&amp;lt;")).toBe("&lt;");
+    expect(htmlToText("&amp;amp;")).toBe("&amp;");
+    expect(htmlToText("a &amp;gt; b")).toBe("a &gt; b");
+    // Ordinary single-level entities still decode.
+    expect(htmlToText("&lt;b&gt; &amp; &quot;q&quot; &#39;a&#39;")).toBe("<b> & \"q\" 'a'");
+    // An entity we do not know is left alone rather than mangled.
+    expect(htmlToText("&copy; 2026")).toBe("&copy; 2026");
+  });
+
   it("collapses runaway whitespace and handles empty input", () => {
     expect(htmlToText("")).toBe("");
     expect(htmlToText("<div>a</div><div></div><div></div><div>b</div>")).toBe("a\n\nb");

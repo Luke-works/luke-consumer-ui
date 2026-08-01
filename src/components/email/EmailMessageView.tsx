@@ -130,6 +130,11 @@ export function readableBody(email: Pick<InboundEmail, "strippedTextReply" | "te
  * still resolves external references in some browsers. Script and style CONTENT is dropped
  * first, so their bodies don't survive as visible text once the tags are stripped.
  */
+/** The handful of entities worth decoding for a plain-text read. Keys are lowercase. */
+const ENTITIES: Record<string, string> = {
+  nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", "#39": "'",
+};
+
 export function htmlToText(html: string): string {
   if (!html) return "";
   return html
@@ -137,12 +142,12 @@ export function htmlToText(html: string): string {
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
+    // ONE pass over the entities, not a chain of replaces. Decoding &amp; first and &lt; after
+    // double-unescapes: a sender who writes "&amp;lt;" means the reader to SEE "&lt;", but the
+    // chain turns it into "&lt;" and then into "<". A single scan consumes each entity once and
+    // never revisits what it produced. (Not an XSS here — this is rendered as text, and React
+    // escapes it — but it is wrong, and CodeQL flags the shape for good reason.)
+    .replace(/&(nbsp|amp|lt|gt|quot|apos|#39);/gi, (_m, name: string) => ENTITIES[name.toLowerCase()] ?? _m)
     .replace(/[ \t]+/g, " ")
     // Stripping tags leaves a space where each one stood, so without this every recovered line
     // starts and ends with padding — visible as a ragged left edge in the rendered body.
