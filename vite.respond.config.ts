@@ -16,6 +16,12 @@ export default defineConfig({
   // The recipient page is served by core-engine at the gateway origin (same origin as the public
   // /api/public/form-instances API), so it must call the API SAME-ORIGIN/relative. Force the public
   // API base to "" — otherwise publicInstanceApi bakes in the build host's VITE_AUTH_API_URL.
+  // NO developer environment reaches this bundle. Vite loads .env.local from the project root
+  // for every mode and inlines every VITE_* value it finds; this file is committed into
+  // luke-core-engine and served to third-party sites, so a stray local flag becomes part of a
+  // public artefact and the output stops depending only on committed source. Pointing envDir at
+  // an empty folder makes the build byte-identical whoever runs it. See that folder's README.
+  envDir: fileURLToPath(new URL("./config/public-bundle-env", import.meta.url)),
   define: {
     "import.meta.env.VITE_AUTH_API_URL": JSON.stringify(""),
   },

@@ -5,6 +5,10 @@
 //
 // Assumes luke-core-engine is a sibling of this repo; override with CORE_STATIC_DIR when it isn't
 // (point it at core-engine's src/main/resources).
+//
+// This copy is MANUAL and used to be unverified, which is how both bundles ended up five days
+// stale while the embed served a form with none of its layout fixes. scripts/bundle-lock.mjs
+// now fails CI the moment the built output stops matching what was last vendored.
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,4 +58,8 @@ for (const f of cfg.files) {
   copyFileSync(src, join(targetDir, f));
   console.log(`  ✓ ${cfg.dist}/${f} → ${cfg.target}/${f}`);
 }
-console.log(`\nVendored the ${name} bundle into core-engine.\n→ Now commit + push luke-core-engine to deploy it.`);
+console.log(
+  `\nVendored the ${name} bundle into core-engine.\n` +
+    `→ 1. commit + push luke-core-engine  — this is what actually deploys it\n` +
+    `→ 2. npm run bundles:lock            — record the new hashes so CI stops failing`,
+);

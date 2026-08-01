@@ -20,6 +20,8 @@
     "vendor:check": "node scripts/vendor-forms.mjs --check",
     "vendor:respond": "npm run build:respond && node scripts/vendor-bundle.mjs respond",
     "vendor:embed": "npm run build:embed && node scripts/vendor-bundle.mjs embed",
+    "bundles:check": "node scripts/bundle-lock.mjs",
+    "bundles:lock": "npm run build:embed && npm run build:respond && node scripts/bundle-lock.mjs --write",
     "lint": "eslint . --max-warnings 0",
     "lint:a11y": "eslint . -c eslint.config.a11y.js",
     "preview": "vite preview",

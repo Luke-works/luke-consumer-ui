@@ -25,6 +25,28 @@ In `luke-forms`: `npm run build -w @lukeflow/<pkg>`. Here: copy
 `npm run build` → commit to **`develop`** → push → confirm **CI + E2E** green via
 `gh run list --branch develop`.
 
+## Public bundles (/embed and /respond) are served by ANOTHER repo
+
+`embed.js/css` and `respond.js/css` are built here and **served by luke-core-engine** from
+`src/main/resources/static/{embed,respond}-assets/`. A deploy of *this* app does not ship them —
+they only reach users when core-engine is committed and deployed.
+
+After changing the embed/respond pages **or any `@lukeflow/form-*` package vendored into them**:
+
+```
+npm run vendor:embed && npm run vendor:respond   # copies into ../luke-core-engine
+npm run bundles:lock                             # record the new hashes here
+# then commit + push BOTH repos
+```
+
+`npm run bundles:check` runs in CI and fails when the built output stops matching
+`public-bundles.lock.json` — this exists because the copy was unverified and both bundles once sat
+five days stale, serving a form with none of its layout fixes.
+
+Do **not** hand-edit the vendored files, and note the bundles read **no** `.env` (their `envDir`
+points at an empty folder): a local `VITE_*` flag would otherwise be compiled into a public
+artefact. Values they need are set explicitly via `define:` in the vite configs.
+
 ## Gotchas
 
 - Build shows benign `Unexpected ")"` CSS warnings (TailAdmin/simplebar `:is()`); not ours.
