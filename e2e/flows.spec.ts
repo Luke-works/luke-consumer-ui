@@ -119,6 +119,47 @@ test.describe("form inbox — complete task (split view)", () => {
   });
 });
 
+test.describe("inbox — an inbound email is work, not a broken row", () => {
+  test("opens the message in the reading pane and never fetches it as a submission", async ({ page }) => {
+    const EMAIL_TASK = {
+      taskId: "task-email", name: "Review: Refund request", created: 1717200000000, assignee: null,
+      kind: "email", emailMessageId: "msg-1", emailFrom: "jo@example.com",
+      emailBox: "support@acme.com", instanceId: null, definitionCode: null,
+    };
+    // If the page regresses to treating email as a form, it hits this route — and the test fails
+    // on the call itself, not on a downstream symptom.
+    let submissionFetched = false;
+    await stubBackend(page, {
+      routes: {
+        "/api/form-inbox*": ok({ items: [EMAIL_TASK], total: 1, firstResult: 0, maxResults: 200 }),
+        "/api/form-instances/*": (route) => { submissionFetched = true; return route.fulfill({ status: 404, body: "{}" }); },
+        "/api/emails/*/inbound": ok({
+          id: "msg-1", tenantId: "t1", boxId: "b1", boxAddress: "support@acme.com",
+          mailboxHash: "support", fromName: "Jo Bloggs", toFull: "support@acme.com",
+          ccAddresses: null, replyTo: null,
+          textBody: "I was charged twice and would like a refund.",
+          htmlBody: null, strippedTextReply: null, messageIdHeader: "<a@b>", inReplyTo: null,
+          attachments: JSON.stringify([{ name: "receipt.pdf", contentType: "application/pdf", contentLength: 2048 }]),
+          headers: null, attachmentCount: 1,
+        }),
+      },
+    });
+    await page.addInitScript(() => localStorage.setItem("lk.inbox.view", "split"));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/forms/inbox");
+
+    // The box is a source in its own right, and the message is readable.
+    await expect(page.getByText("support@acme.com").first()).toBeVisible();
+    await expect(page.getByTestId("email-message")).toBeVisible();
+    await expect(page.getByText("I was charged twice and would like a refund.")).toBeVisible();
+    await expect(page.getByText("Jo Bloggs <jo@example.com>")).toBeVisible();
+    await expect(page.getByText("receipt.pdf")).toBeVisible();
+
+    expect(submissionFetched).toBe(false);
+    await expectNoOverflow(page);
+  });
+});
+
 test.describe("form inbox — by form definition (two-section left pane)", () => {
   test("lists every form (incl. task-less) and picking one shows its tasks", async ({ page }) => {
     const TASKS = [
@@ -146,7 +187,7 @@ test.describe("form inbox — by form definition (two-section left pane)", () =>
     await expect(page.getByRole("button", { name: /Alice submission/ })).toBeVisible();
     // Pick the task-less "Survey" form → its (empty) task section shows; Alice's task is gone.
     await page.getByRole("button", { name: /Survey/ }).click();
-    await expect(page.getByText("No open tasks for this form")).toBeVisible();
+    await expect(page.getByText("No open tasks here.")).toBeVisible();
     await expect(page.getByRole("button", { name: /Alice submission/ })).toHaveCount(0);
     await expectNoOverflow(page);
   });
