@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stubBackend, expectHealthy, expectSettled, forceTheme, ok, type StubOptions } from "./support/harness";
-import { VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
+import { SCREENSHOT_OPTIONS, VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
 
 /**
  * VISUAL REGRESSION — UI STATES.
@@ -286,11 +286,7 @@ test.describe("visual states", () => {
             await page.evaluate(() => document.fonts.ready);
             await expectSettled(page);
 
-            await expect(page).toHaveScreenshot(`${state.name}-${vp.name}-${theme}.png`, {
-              fullPage: true,
-              animations: "disabled",
-              maxDiffPixelRatio: 0.01,
-            });
+            await expect(page).toHaveScreenshot(`${state.name}-${vp.name}-${theme}.png`, SCREENSHOT_OPTIONS);
           });
         }
       }

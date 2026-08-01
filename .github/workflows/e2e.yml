@@ -9,7 +9,13 @@ on:
     # The PARITY branches (plus main) — where the visual baselines are enforced. See the `VISUAL`
     # env on the e2e job below.
     branches: [develop, qa, prod, main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'update = rewrite the committed baselines; verify = compare against them and fail on drift'
+        type: choice
+        options: [update, verify]
+        default: update
 
 jobs:
   e2e:
@@ -65,7 +71,7 @@ jobs:
   # rather than pushed, so a human still approves every pixel change — that approval IS the
   # test, and a job that force-pushed new baselines would quietly approve regressions.
   visual-baselines:
-    name: Update visual baselines (manual)
+    name: Visual baselines (manual update/verify)
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -84,18 +90,38 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Regenerate baselines
+      # VERIFY compares against the committed images and fails on drift; UPDATE rewrites them.
+      # Verify exists because the only way to ask "do the committed baselines still match?" used to
+      # be pushing to a parity branch — so a tolerance change could not be evaluated before merging
+      # it, and a stale baseline could not be detected at all.
+      - name: Regenerate or verify baselines
         env:
           VISUAL: '1' # this job exists to shoot them, so it always opts in
-        run: npx playwright test e2e/visual.spec.ts e2e/visual-states.spec.ts --update-snapshots
+        run: |
+          if [ "${{ inputs.mode }}" = "verify" ]; then
+            npx playwright test e2e/visual.spec.ts e2e/visual-states.spec.ts
+          else
+            npx playwright test e2e/visual.spec.ts e2e/visual-states.spec.ts --update-snapshots
+          fi
 
       - name: Upload the baselines to commit
+        if: ${{ inputs.mode != 'verify' }}
         uses: actions/upload-artifact@v4
         with:
           name: visual-baselines
           path: |
             e2e/visual.spec.ts-snapshots/
             e2e/visual-states.spec.ts-snapshots/
+
+      # On a failed VERIFY the report carries expected/actual/diff for every drifted shot, which
+      # is the whole point of running it. Without this the run just says "some pixels differed".
+      - name: Upload the diff report
+        if: ${{ failure() && inputs.mode == 'verify' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diff-report
+          path: playwright-report/
+          retention-days: 7
 
   # LIVE lane — the same browser automation against a REAL core-engine (embedded H2).
   # Separate job because it needs a JVM and takes minutes, not seconds; the hermetic lane stays

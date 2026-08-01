@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { stubBackend, expectHealthy, expectRendered, expectSettled, forceTheme } from "./support/harness";
 import { SCREENS } from "./support/screens";
-import { VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
+import { SCREENSHOT_OPTIONS, VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
 
 /**
  * VISUAL REGRESSION — a pixel baseline for every screen.
@@ -68,12 +68,9 @@ test.describe("visual", () => {
           await page.evaluate(() => document.fonts.ready);
           await expectSettled(page);
 
-          await expect(page).toHaveScreenshot(`${screen.name}-${vp.name}-${theme}.png`, {
-            fullPage: true, // below-the-fold layout is exactly what the other checks can't see
-            animations: "disabled",
-            // Tolerate antialiasing noise; a real layout break moves far more than 1% of pixels.
-            maxDiffPixelRatio: 0.01,
-          });
+          // Comparison policy (threshold + an ABSOLUTE pixel budget) lives in support/visual.ts,
+          // shared with visual-states.spec so the two can never drift apart.
+          await expect(page).toHaveScreenshot(`${screen.name}-${vp.name}-${theme}.png`, SCREENSHOT_OPTIONS);
         });
         }
       }
