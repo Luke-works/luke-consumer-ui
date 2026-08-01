@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stubBackend, expectHealthy, expectSettled, forceTheme, ok, type StubOptions } from "./support/harness";
-import { VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
+import { SCREENSHOT_OPTIONS, VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
 
 /**
  * VISUAL REGRESSION — UI STATES.
@@ -82,6 +82,29 @@ const STATES: State[] = [
     setup: async (page) => {
       await page.getByRole("button", { name: "Open menu" }).click();
       await expect(page.getByRole("link", { name: /forms/i }).first()).toBeVisible();
+    },
+  },
+  {
+    // The desktop sidebar defaults to COLLAPSED (SidebarContext: useState(false)), so it renders as
+    // icons in every other shot and no baseline contained a single navigation LABEL. Renaming a nav
+    // item was therefore pixel-free on desktop — the primary navigation of the product was the one
+    // surface the visual suite could not see. Expanding it here covers that.
+    name: "desktop-nav-expanded",
+    path: "/dashboard",
+    viewports: [LAPTOP], // the lock control is lg-only; below that the sidebar is the drawer above
+    setup: async (page) => {
+      // Click the lock, not hover: a hover-held state is not reliably captured in a screenshot.
+      await page.getByRole("button", { name: "Lock sidebar open" }).click();
+
+      const inbox = page.getByRole("link", { name: /^inbox$/i });
+      // toBeInViewport, NOT toBeVisible. Sub-menus live in an overflow-hidden container animated
+      // to height 0, and toBeVisible is not clipping-aware: the clipped link still reports a
+      // 24x40 box and passes, so an assertion written that way verifies nothing. Measured, not
+      // assumed — toBeVisible() returned true here while the item was invisible.
+      await expect(inbox).not.toBeInViewport();
+      await page.getByRole("button", { name: /^forms$/i }).click();
+      // Open the sub-menu so the shot actually CONTAINS the nav labels it exists to protect.
+      await expect(inbox).toBeInViewport();
     },
   },
   {
@@ -286,11 +309,7 @@ test.describe("visual states", () => {
             await page.evaluate(() => document.fonts.ready);
             await expectSettled(page);
 
-            await expect(page).toHaveScreenshot(`${state.name}-${vp.name}-${theme}.png`, {
-              fullPage: true,
-              animations: "disabled",
-              maxDiffPixelRatio: 0.01,
-            });
+            await expect(page).toHaveScreenshot(`${state.name}-${vp.name}-${theme}.png`, SCREENSHOT_OPTIONS);
           });
         }
       }
