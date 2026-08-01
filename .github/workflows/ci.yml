@@ -46,17 +46,6 @@ jobs:
         # already produced both bundles, so this only hashes them.
         run: npm run bundles:check
 
-      # TEMPORARY diagnostic: capture the runner's bundles so the cross-platform difference
-      # can be inspected against a local build. Removed once the design is settled.
-      - name: TEMP upload runner bundles
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: runner-bundles
-          path: |
-            dist-embed/
-            dist-respond/
-
       - name: Unit tests
         # Runs the vitest suite once (skips automatically if there's no test script).
         run: npm test --if-present
