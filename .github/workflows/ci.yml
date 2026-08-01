@@ -37,6 +37,15 @@ jobs:
         # broken imports before they ship.
         run: npm run build
 
+      - name: Public bundles match the lock
+        # /embed and /respond are built HERE but SERVED by luke-core-engine, and copied across
+        # by hand (scripts/vendor-bundle.mjs). Nothing verified that copy, so both bundles
+        # silently rotted five days behind their source — the third-party embed was serving a
+        # form with none of the layout fixes. This fails the moment the built output changes,
+        # which is exactly when a re-vendor becomes necessary. Free: `npm run build` above
+        # already produced both bundles, so this only hashes them.
+        run: npm run bundles:check
+
       - name: Unit tests
         # Runs the vitest suite once (skips automatically if there's no test script).
         run: npm test --if-present
