@@ -17,6 +17,7 @@ import * as emailApi from "../../lib/emailApi";
 import type { EmailServer, Verification } from "../../lib/emailApi";
 import * as boxesApi from "../../lib/emailBoxesApi";
 import type { EmailBox, EmailBoxDirection } from "../../lib/emailBoxesApi";
+import EmailRoutingRules from "../../components/email/EmailRoutingRules";
 
 type Phase = "loading" | "form" | "code" | "done" | "error";
 
@@ -472,6 +473,7 @@ function EmailBoxes({ tenant, senderDomain }: { tenant: string; senderDomain: st
   }
 
   return (
+    <>
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] sm:p-8">
       <div className="flex items-start gap-4">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/10">
@@ -609,6 +611,10 @@ function EmailBoxes({ tenant, senderDomain }: { tenant: string; senderDomain: st
         )}
       </div>
     </div>
+    {/* Routing rules render off the SAME box list loaded above, so the two views of "which
+        inbound boxes exist" cannot drift apart. */}
+    <EmailRoutingRules tenant={tenant} boxes={boxes} />
+    </>
   );
 }
 

@@ -24,7 +24,10 @@ const FORMS_ITEM: NavItem = {
   name: "Forms",
   subItems: [
     { name: "Forms", path: "/forms", icon: <FileText className="size-4" /> },
-    { name: "Form Inbox", path: "/forms/inbox", icon: <Inbox className="size-4" /> },
+    // "Inbox", not "Form Inbox": it holds inbound email as well as submissions, and a reviewer
+    // would never look under a forms label for the email they were told to triage. The PATH is
+    // unchanged — it is registered by name in the engine's ApiAuthFilter and e2e screen list.
+    { name: "Inbox", path: "/forms/inbox", icon: <Inbox className="size-4" /> },
     // Post-MVP: only present when VITE_ANALYTICS_ENABLED is set (matches its route guard).
     ...(ANALYTICS_ENABLED
       ? [{ name: "Analytics", path: "/analytics", icon: <BarChart3 className="size-4" /> }]

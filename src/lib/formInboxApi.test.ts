@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { taskKind } from "./formInboxApi";
 
 // Mock the transport so we can drive the raw response shape.
 vi.mock("./authApi", () => ({
@@ -33,5 +34,24 @@ describe("getInbox response-shape tolerance (#26 deploy-window hotfix)", () => {
     const page = await getInbox("tenant");
     expect(page.items).toEqual([]);
     expect(page.total).toBe(0);
+  });
+});
+
+describe("taskKind discriminates what a task is about", () => {
+  it("trusts an explicit kind from the engine", () => {
+    expect(taskKind({ taskId: "t", kind: "email", emailMessageId: "m1" })).toBe("email");
+    expect(taskKind({ taskId: "t", kind: "form", instanceId: "i1" })).toBe("form");
+  });
+
+  it("falls back to the email message id when the engine predates the field", () => {
+    // A new UI can meet an old engine during a deploy. Defaulting everything to "form" would
+    // reintroduce the exact bug `kind` exists to fix: an email task fetched as a submission.
+    expect(taskKind({ taskId: "t", emailMessageId: "m1" })).toBe("email");
+    expect(taskKind({ taskId: "t", instanceId: "i1" })).toBe("form");
+    expect(taskKind({ taskId: "t" })).toBe("form");
+  });
+
+  it("prefers the explicit kind over the fallback if they ever disagree", () => {
+    expect(taskKind({ taskId: "t", kind: "form", emailMessageId: "m1" })).toBe("form");
   });
 });

@@ -184,7 +184,9 @@ export const SCREENS: Screen[] = [
   { name: "support", path: "/support", ready: heading(/support/i) },
   { name: "forms", path: "/forms", ready: heading(/^forms$/i) },
   { name: "form-instances", path: "/forms/instances", ready: heading(/form instances/i) },
-  { name: "form-inbox", path: "/forms/inbox", ready: heading(/form inbox/i) },
+  // Name (and therefore the baseline filename) intentionally unchanged — the page was renamed
+  // "Inbox" when it grew email tasks, but renaming the screen would orphan its baselines.
+  { name: "form-inbox", path: "/forms/inbox", ready: heading(/^inbox$/i) },
   // Analytics charts the instance list, so it needs rows to draw anything but its empty state.
   {
     name: "analytics",

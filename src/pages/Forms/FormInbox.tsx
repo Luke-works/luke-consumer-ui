@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
-import { Columns2, Inbox as InboxIcon, LayoutList } from "lucide-react";
+import { Columns2, FileText, Inbox as InboxIcon, LayoutList, Mail } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import DataTable, { type ManualTable } from "../../components/tables/DataTable";
@@ -8,14 +8,29 @@ import { Modal } from "../../components/ui/modal";
 import { useAuth } from "../../context/AuthContext";
 import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import TaskAttachments from "../../components/documents/TaskAttachments";
-import { completeTask, getInbox, INBOX_PAGE_MAX, type InboxTask } from "../../lib/formInboxApi";
+import {
+  completeTask, getInbox, INBOX_PAGE_MAX, taskKind, type InboxTask, type InboxTaskKind,
+} from "../../lib/formInboxApi";
+import { getInboundEmail, type InboundEmail } from "../../lib/emailIntakeApi";
+import EmailMessageView from "../../components/email/EmailMessageView";
 import { getInstance, type InstanceView } from "../../lib/formInstancesApi";
 import { listForms } from "../../lib/formsApi";
 import { isAbortError } from "../../lib/abort";
 
-/** A form definition in the split view's master list, with its open tasks (may be empty —
- *  every form the tenant has is listed, not only those with tasks). */
-type FormGroup = { code: string; name: string; tasks: InboxTask[] };
+/**
+ * One source in the split view's master list, with its open tasks.
+ *
+ * A source is a form definition OR an inbound email box — the inbox is the tenant's whole work
+ * queue, not only its submissions. Forms are listed even with zero tasks (this page is where an
+ * author looks for them); email boxes are derived from the tasks themselves, because a box with
+ * nothing waiting is inbox noise and is managed on the Email page instead.
+ */
+type InboxGroup = { key: string; kind: InboxTaskKind; code: string; name: string; tasks: InboxTask[] };
+
+/** The source group a task belongs to. Kept beside the group builder so the two can't drift. */
+function groupKeyOf(t: InboxTask): string {
+  return taskKind(t) === "email" ? `email:${t.emailBox ?? ""}` : `form:${t.definitionCode ?? ""}`;
+}
 
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "—");
 const who = (a?: string | null) => (a ? a.replace(/^workos:/, "") : null);
@@ -55,6 +70,8 @@ export default function FormInbox() {
   );
   const [selected, setSelected] = useState<InboxTask | null>(null);
   const [view, setView] = useState<InstanceView | null>(null);
+  /** The received email behind an EMAIL task. Mutually exclusive with `view`. */
+  const [emailView, setEmailView] = useState<InboundEmail | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
   // Task ids we've completed but the server list may still return for a beat
@@ -65,12 +82,19 @@ export default function FormInbox() {
   const sortField = sortCol ? SORT_FIELD[sortCol.id] : undefined;
   const sortOrder = sortCol && sortField ? (sortCol.desc ? "desc" : "asc") : undefined;
 
+  // One place to drop the selection AND both content panes. Split across call sites, it is
+  // exactly the kind of thing that leaves a stale email body under a newly-selected form task.
+  const clearSelection = () => {
+    setSelected(null);
+    setView(null);
+    setEmailView(null);
+  };
+
   const setViewMode = (m: ViewMode) => {
     setMode(m);
     localStorage.setItem(VIEW_KEY, m);
     // Leaving table mode closes the modal; entering it closes the split preview.
-    setSelected(null);
-    setView(null);
+    clearSelection();
   };
 
   useEffect(() => {
@@ -121,15 +145,25 @@ export default function FormInbox() {
     return () => { active = false; };
   }, [tenant]);
 
+  // Load whatever the task is ABOUT. Branching on kind is the fix for the original defect:
+  // every task used to be fetched as a form submission, so an email task asked the form API for
+  // "email-inbox-<id>", got nothing back, and opened blank.
   const openTask = async (task: InboxTask) => {
     setSelected(task);
     setView(null);
-    if (!tenant || !task.instanceId) return;
+    setEmailView(null);
+    if (!tenant) return;
+
+    const kind = taskKind(task);
+    const id = kind === "email" ? task.emailMessageId : task.instanceId;
+    if (!id) return;
+
     setViewLoading(true);
     try {
-      setView(await getInstance(tenant, task.instanceId));
+      if (kind === "email") setEmailView(await getInboundEmail(tenant, id));
+      else setView(await getInstance(tenant, id));
     } catch {
-      /* show task without the submission */
+      /* show the task without its content rather than failing the whole pane */
     } finally {
       setViewLoading(false);
     }
@@ -142,7 +176,7 @@ export default function FormInbox() {
     if (mode !== "split") return;
     if (selected && tasks.some((t) => t.taskId === selected.taskId)) return;
     if (tasks.length > 0) void openTask(tasks[0]!); // length > 0 checked
-    else { setSelected(null); setView(null); }
+    else clearSelection();
     // openTask is stable enough here; selecting sets `selected` so this won't loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, tasks, selected]);
@@ -165,8 +199,7 @@ export default function FormInbox() {
         const pos = Math.max(0, tasks.findIndex((t) => t.taskId === completedId));
         void openTask(remaining[Math.min(pos, remaining.length - 1)]!); // remaining.length > 0, index clamped in-bounds
       } else {
-        setSelected(null);
-        setView(null);
+        clearSelection();
       }
       setReloadKey((k) => k + 1); // reconcile with the server
     } catch (e) {
@@ -221,12 +254,12 @@ export default function FormInbox() {
 
   return (
     <>
-      <PageMeta title="Form Inbox | Lukeflow" description="Tasks waiting on you." />
+      <PageMeta title="Inbox | Lukeflow" description="Work waiting on you." />
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Form Inbox</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Tasks from form submissions that are waiting to be reviewed.</p>
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Inbox</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Everything waiting on you — form submissions to review and email to triage.</p>
         </div>
         <ViewToggle mode={mode} onChange={setViewMode} />
       </div>
@@ -256,6 +289,7 @@ export default function FormInbox() {
           selected={selected}
           onSelect={(t) => void openTask(t)}
           view={view}
+          emailView={emailView}
           viewLoading={viewLoading}
           completing={completing}
           onComplete={complete}
@@ -265,18 +299,18 @@ export default function FormInbox() {
       {/* Table mode opens each task in a modal. */}
       <Modal
         isOpen={mode === "table" && !!selected}
-        onClose={() => { setSelected(null); setView(null); }}
+        onClose={() => clearSelection()}
         className="mx-4 flex max-h-[90vh] w-full max-w-[680px] flex-col overflow-hidden"
       contentClassName="min-h-0 flex-1 overflow-y-auto"
       >
         {selected ? (
           <div className="p-6 sm:p-8">
             <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">{selected.name ?? "Task"}</h2>
-            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Review the submission, then complete the task.</p>
-            <ReviewBody view={view} viewLoading={viewLoading} tenant={tenant} task={selected} />
+            <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">Review it, then complete the task.</p>
+            <ReviewBody view={view} emailView={emailView} viewLoading={viewLoading} tenant={tenant} task={selected} />
             <div className="mt-6 flex items-center gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
               <Button size="sm" onClick={complete} disabled={completing}>{completing ? "Completing…" : "Complete task"}</Button>
-              <Button size="sm" variant="outline" onClick={() => { setSelected(null); setView(null); }}>Cancel</Button>
+              <Button size="sm" variant="outline" onClick={() => clearSelection()}>Cancel</Button>
             </div>
           </div>
         ) : null}
@@ -313,7 +347,7 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 // ── Master/detail: form definitions (with nested tasks) │ submission ────────
 function SplitInbox({
   tenant, tasks, formNames, total, search, onSearchChange,
-  selected, onSelect, view, viewLoading, completing, onComplete,
+  selected, onSelect, view, emailView, viewLoading, completing, onComplete,
 }: {
   tenant: string | null;
   tasks: InboxTask[];
@@ -324,6 +358,7 @@ function SplitInbox({
   selected: InboxTask | null;
   onSelect: (t: InboxTask) => void;
   view: InstanceView | null;
+  emailView: InboundEmail | null;
   viewLoading: boolean;
   completing: boolean;
   onComplete: () => void;
@@ -346,27 +381,49 @@ function SplitInbox({
 
   // Every form the tenant has (from formNames) PLUS any form a task references, each with its
   // open tasks — so forms with zero tasks still appear. Tasks with no form → "Ungrouped".
-  const groups = useMemo<FormGroup[]>(() => {
-    const byCode = new Map<string, InboxTask[]>();
+  const groups = useMemo<InboxGroup[]>(() => {
+    const formTasks = new Map<string, InboxTask[]>();
+    const emailTasks = new Map<string, InboxTask[]>();
+    const push = (m: Map<string, InboxTask[]>, k: string, t: InboxTask) => {
+      const arr = m.get(k);
+      if (arr) arr.push(t); else m.set(k, [t]);
+    };
     for (const t of tasks) {
-      const c = t.definitionCode ?? "";
-      const arr = byCode.get(c);
-      if (arr) arr.push(t); else byCode.set(c, [t]);
+      if (taskKind(t) === "email") push(emailTasks, t.emailBox ?? "", t);
+      else push(formTasks, t.definitionCode ?? "", t);
     }
-    const codes = new Set<string>([...Object.keys(formNames), ...byCode.keys()].filter((c) => c !== ""));
-    const list: FormGroup[] = [...codes]
-      .map((code) => ({ code, name: formNames[code] || code, tasks: byCode.get(code) ?? [] }))
+
+    const codes = new Set<string>([...Object.keys(formNames), ...formTasks.keys()].filter((c) => c !== ""));
+    const forms: InboxGroup[] = [...codes]
+      .map((code) => ({
+        key: `form:${code}`, kind: "form" as const, code,
+        name: formNames[code] || code, tasks: formTasks.get(code) ?? [],
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    if (byCode.has("")) list.push({ code: "", name: "Ungrouped", tasks: byCode.get("")! });
+
+    const emails: InboxGroup[] = [...emailTasks.keys()]
+      .sort((a, b) => a.localeCompare(b))
+      .map((box) => ({
+        key: `email:${box}`, kind: "email" as const, code: box,
+        name: box || "Inbound email", tasks: emailTasks.get(box)!,
+      }));
+
+    // Email first. It is the time-sensitive queue, and putting it after an alphabetical list of
+    // every form is how a "unified" inbox quietly stays a forms inbox.
+    const list: InboxGroup[] = [...emails, ...forms];
+    if (formTasks.has("")) {
+      list.push({ key: "form:", kind: "form", code: "", name: "Ungrouped", tasks: formTasks.get("")! });
+    }
     return list;
   }, [tasks, formNames]);
 
   // The form whose tasks fill the lower section: the user's pick, else the selected task's
   // form, else the first form that has any tasks.
-  const [activeForm, setActiveForm] = useState<string | null>(null);
+  const [activeSource, setActiveSource] = useState<string | null>(null);
   const firstWithTasks = groups.find((g) => g.tasks.length > 0);
-  const activeCode = activeForm ?? selected?.definitionCode ?? firstWithTasks?.code ?? groups[0]?.code ?? null;
-  const activeGroup = groups.find((g) => g.code === (activeCode ?? " ")) ?? null;
+  const activeKey = activeSource ?? (selected ? groupKeyOf(selected) : null)
+    ?? firstWithTasks?.key ?? groups[0]?.key ?? null;
+  const activeGroup = groups.find((g) => g.key === activeKey) ?? null;
   const activeTasks = activeGroup?.tasks ?? [];
 
   const truncated = total > tasks.length; // more open tasks than we loaded for grouping
@@ -377,26 +434,36 @@ function SplitInbox({
       <div className="flex max-h-[72vh] min-h-[60vh] overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         {/* Section 1 — form definitions (name + id). Click one to load its tasks on the right. */}
         <div className="flex w-[150px] shrink-0 flex-col border-r border-gray-200 dark:border-gray-800">
-          <div className="border-b border-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">Forms</div>
+          <div className="border-b border-gray-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">Sources</div>
           <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
             {groups.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">No forms yet.</p>
+              <p className="py-8 text-center text-sm text-gray-400">Nothing yet.</p>
             ) : (
               groups.map((g) => {
-                const on = g.code === activeCode;
+                const on = g.key === activeKey;
                 return (
                   <button
-                    key={g.code || "ungrouped"}
+                    key={g.key}
                     type="button"
-                    onClick={() => setActiveForm(g.code)}
+                    onClick={() => setActiveSource(g.key)}
                     aria-pressed={on}
+                    title={g.name}
                     className={`flex w-full items-center gap-1.5 px-2.5 py-2 text-left transition ${
                       on ? "bg-brand-50 dark:bg-brand-500/10" : "hover:bg-gray-50 dark:hover:bg-white/[0.03]"
                     }`}
                   >
+                    {/* An icon, not a text label: at 150px the two source kinds must be
+                        distinguishable without spending horizontal space the name needs. */}
+                    {g.kind === "email" ? (
+                      <Mail className="size-3.5 shrink-0 text-gray-400" aria-hidden />
+                    ) : (
+                      <FileText className="size-3.5 shrink-0 text-gray-400" aria-hidden />
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className={`block truncate text-sm font-medium ${on ? "text-brand-700 dark:text-brand-300" : "text-gray-800 dark:text-gray-200"}`}>{g.name}</span>
-                      <span className="block truncate font-mono text-[11px] text-gray-400">{g.code || "—"}</span>
+                      <span className="block truncate font-mono text-[11px] text-gray-400">
+                        {g.kind === "email" ? "Inbound email" : g.code || "—"}
+                      </span>
                     </span>
                     <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs ${
                       g.tasks.length ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300" : "bg-gray-100 text-gray-400 dark:bg-white/10"
@@ -424,7 +491,7 @@ function SplitInbox({
           </div>
           <div className="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800">
             {activeTasks.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">{search ? "No matches." : "No open tasks for this form."}</p>
+              <p className="py-8 text-center text-sm text-gray-400">{search ? "No matches." : "No open tasks here."}</p>
             ) : (
               activeTasks.map((t) => {
                 const active = selected?.taskId === t.taskId;
@@ -466,7 +533,7 @@ function SplitInbox({
               <Button size="sm" onClick={onComplete} disabled={completing}>{completing ? "Completing…" : "Complete task"}</Button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              <ReviewBody view={view} viewLoading={viewLoading} tenant={tenant} task={selected} />
+              <ReviewBody view={view} emailView={emailView} viewLoading={viewLoading} tenant={tenant} task={selected} />
             </div>
           </>
         ) : (
@@ -474,7 +541,7 @@ function SplitInbox({
             <span className="flex size-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-white/10">
               <InboxIcon className="size-6" />
             </span>
-            <p className="mt-3 text-sm text-gray-400">Select a task to review its submission.</p>
+            <p className="mt-3 text-sm text-gray-400">Select a task to review it.</p>
           </div>
         )}
       </div>
@@ -485,13 +552,28 @@ function SplitInbox({
 // Shared submission view used by both the modal and the reading pane. Renders the read-only submission
 // plus its classified Attachments section (Task vs Process) for the selected task.
 function ReviewBody({
-  view, viewLoading, tenant, task,
+  view, emailView, viewLoading, tenant, task,
 }: {
   view: InstanceView | null;
+  emailView: InboundEmail | null;
   viewLoading: boolean;
   tenant: string | null;
   task: InboxTask | null;
 }) {
+  const kind = task ? taskKind(task) : "form";
+
+  if (kind === "email") {
+    if (viewLoading) return <p className="py-8 text-center text-sm text-gray-400">Loading message…</p>;
+    if (emailView) return <EmailMessageView email={emailView} from={task?.emailFrom} />;
+    // Reached when intake stored the envelope but not the body — i.e. mail received before this
+    // feature shipped. Say so, rather than showing an empty pane that reads like a bug.
+    return (
+      <p className="py-6 text-center text-sm text-gray-400">
+        This message was received before its content was stored, so there is nothing to show.
+      </p>
+    );
+  }
+
   // The form instance id — from the loaded submission if present, else the inbox task. Attachments
   // render off this independently of whether the submission view itself loaded.
   const ownerEntityId = view?.instance.id ?? task?.instanceId ?? null;

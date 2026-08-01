@@ -181,7 +181,7 @@ const STATES: State[] = [
     name: "form-inbox-empty",
     path: "/forms/inbox",
     setup: async (page) => {
-      await expect(page.getByRole("heading", { name: /form inbox/i }).first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: /^inbox$/i }).first()).toBeVisible();
     },
   },
   {
