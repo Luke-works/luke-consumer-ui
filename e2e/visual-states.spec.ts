@@ -85,6 +85,21 @@ const STATES: State[] = [
     },
   },
   {
+    // The desktop sidebar defaults to COLLAPSED (SidebarContext: useState(false)), so it renders as
+    // icons in every other shot and no baseline contained a single navigation LABEL. Renaming a nav
+    // item was therefore pixel-free on desktop — the primary navigation of the product was the one
+    // surface the visual suite could not see. Expanding it here covers that.
+    name: "desktop-nav-expanded",
+    path: "/dashboard",
+    viewports: [LAPTOP], // the lock control is lg-only; below that the sidebar is the drawer above
+    setup: async (page) => {
+      // Click the lock, not hover: a hover-held state is not reliably captured in a screenshot.
+      await page.getByRole("button", { name: "Lock sidebar open" }).click();
+      await expect(page.getByRole("link", { name: /^inbox$/i })).toBeVisible();
+      await expect(page.getByRole("link", { name: /forms/i }).first()).toBeVisible();
+    },
+  },
+  {
     name: "fill-validation-errors",
     path: "/forms/CONTACT/fill",
     opts: { routes: formRoutes },
