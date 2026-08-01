@@ -95,8 +95,16 @@ const STATES: State[] = [
     setup: async (page) => {
       // Click the lock, not hover: a hover-held state is not reliably captured in a screenshot.
       await page.getByRole("button", { name: "Lock sidebar open" }).click();
-      await expect(page.getByRole("link", { name: /^inbox$/i })).toBeVisible();
-      await expect(page.getByRole("link", { name: /forms/i }).first()).toBeVisible();
+
+      const inbox = page.getByRole("link", { name: /^inbox$/i });
+      // toBeInViewport, NOT toBeVisible. Sub-menus live in an overflow-hidden container animated
+      // to height 0, and toBeVisible is not clipping-aware: the clipped link still reports a
+      // 24x40 box and passes, so an assertion written that way verifies nothing. Measured, not
+      // assumed — toBeVisible() returned true here while the item was invisible.
+      await expect(inbox).not.toBeInViewport();
+      await page.getByRole("button", { name: /^forms$/i }).click();
+      // Open the sub-menu so the shot actually CONTAINS the nav labels it exists to protect.
+      await expect(inbox).toBeInViewport();
     },
   },
   {
