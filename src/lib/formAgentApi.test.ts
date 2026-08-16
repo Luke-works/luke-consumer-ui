@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { generateSchema, normalizeAgentSchema, AgentCancelledError, type BuilderSchemaLike } from "./formAgentApi";
+import { setCurrentTier } from "./planTier";
 
 const EMPTY: BuilderSchemaLike = { entities: {}, root: [] };
 
@@ -18,6 +19,7 @@ describe("formAgentApi (#40)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+    setCurrentTier(null); // reset the module-level tier cache between tests
   });
 
   it("retries a 502 cold start (with backoff) then returns the parsed result", async () => {
@@ -82,6 +84,26 @@ describe("formAgentApi (#40)", () => {
     expect(url).toBe("https://agents.test/agents/form/chat");
     expect(init.headers["X-Tenant-Id"]).toBe("tenant-acme");
     expect(JSON.parse(init.body)).not.toHaveProperty("user_id");
+  });
+
+  it("attaches X-Tenant-Tier when a plan tier is cached (sizes the AI token budget)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { schema: EMPTY, title: "x", brain: "b" }));
+    vi.stubGlobal("fetch", fetchMock);
+    setCurrentTier("PRO");
+
+    await generateSchema("hi", EMPTY, "T", "tenant-acme");
+
+    expect(fetchMock.mock.calls[0][1].headers["X-Tenant-Tier"]).toBe("PRO");
+  });
+
+  it("omits X-Tenant-Tier when the tier is unknown (agents fall back to the flat cap)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { schema: EMPTY, title: "x", brain: "b" }));
+    vi.stubGlobal("fetch", fetchMock);
+    setCurrentTier(null);
+
+    await generateSchema("hi", EMPTY, "T", "tenant-acme");
+
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty("X-Tenant-Tier");
   });
 
   it("fails fast (no public fallback) when VITE_FORM_AGENT_URL is unset (#32)", async () => {
