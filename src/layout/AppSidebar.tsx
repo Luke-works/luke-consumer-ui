@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { ChevronDownIcon, GridIcon, HorizontaLDots, ListIcon, LockIcon, MailIcon, PhoneIcon } from "../icons";
-import { BarChart3, FileText, Inbox, Link2, Mail, MailPlus, PenLine, Workflow } from "lucide-react";
+import { BarChart3, CreditCard, FileText, Inbox, Link2, Mail, MailPlus, PenLine, Workflow } from "lucide-react";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { ANALYTICS_ENABLED, canRead, EMAIL, FORMS, PHONE, SIGNATURES, WORKFLOW } from "../lib/capabilities";
@@ -81,6 +81,7 @@ const AppSidebar: React.FC = () => {
   });
   if (session) {
     items.push({ icon: <LockIcon />, name: "Access", path: "/access" });
+    items.push({ icon: <CreditCard className="size-5" />, name: "Plans", path: "/plans" });
   }
 
   const [openSubmenu, setOpenSubmenu] = useState<{

@@ -17,6 +17,7 @@ import Profile from "./pages/Account/Profile";
 import Settings from "./pages/Account/Settings";
 import Support from "./pages/Support/Support";
 import AccessManagement from "./pages/Access/AccessManagement";
+import Plans from "./pages/Plans/Plans";
 
 // Code-split the form designer (@lukeflow/form-builder) to its own route chunk.
 const FormBuilderPage = lazy(() => import("./pages/Forms/FormBuilderPage"));
@@ -161,6 +162,7 @@ export default function App() {
               <Route path="/account/profile" element={<Profile />} />
               <Route path="/account/settings" element={<Settings />} />
               <Route path="/access" element={<AccessManagement />} />
+              <Route path="/plans" element={<Plans />} />
               <Route path="/support" element={<Support />} />
 
               {/* Forms — gated behind the FORMS capability (read to view, write to edit). */}
