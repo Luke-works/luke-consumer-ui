@@ -15,6 +15,8 @@ import type {
   WorkosUser,
 } from "../lib/authApi";
 import { setObservabilityContext } from "../lib/observability";
+import { getMyPlan } from "../lib/planApi";
+import { setCurrentTier } from "../lib/planTier";
 
 type SignUpInput = {
   email: string;
@@ -154,6 +156,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Tag error reports with the active tenant/user for multi-tenant triage (#23).
     setObservabilityContext({ tenant: session?.tenant, userId: session?.userId });
   }, [session]);
+
+  // Cache the tenant's plan tier so agent-egress clients can send X-Tenant-Tier, which luke-agents
+  // uses to size the tenant's daily AI token budget by plan. Best-effort and keyed only on the
+  // tenant (not every session refresh): a failure just leaves the tier unknown, and agents fall
+  // back to their flat cap. Cleared when there is no tenant (sign-out / pre-provision).
+  const activeTenant = session?.tenant ?? null;
+  useEffect(() => {
+    if (!activeTenant) {
+      setCurrentTier(null);
+      return;
+    }
+    let live = true;
+    getMyPlan(activeTenant)
+      .then((p) => { if (live) setCurrentTier(p.plan); })
+      .catch(() => { if (live) setCurrentTier(null); });
+    return () => { live = false; };
+  }, [activeTenant]);
 
   const refreshSession = useCallback(async (opts?: { fresh?: boolean }) => {
     setSession(await api.getSession(sessionRef.current?.tenant ?? undefined, opts));

@@ -12,6 +12,7 @@
 // to a public host. Calls are tenant-scoped (X-Tenant-Id) and carry no client user id.
 
 import type { StepTypeDescriptor, WorkflowDoc } from "@lukeflow/workflow-core";
+import { getCurrentTier } from "./planTier";
 
 /** Resolve the agents base URL, or throw if it isn't configured (no public fallback). */
 function agentBase(): string {
@@ -86,6 +87,8 @@ async function postWithRetry<T>(path: string, body: unknown, tenant?: string, si
   const base = agentBase(); // throws (no public fallback) if unconfigured
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (tenant) headers["X-Tenant-Id"] = tenant; // tenant-scoped egress
+  const tier = getCurrentTier();
+  if (tier) headers["X-Tenant-Tier"] = tier; // sizes the tenant's AI token budget by plan
   const deadline = Date.now() + TOTAL_DEADLINE_MS;
 
   for (let attempt = 1; ; attempt++) {
