@@ -3,6 +3,7 @@ import { Check, Minus } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import { useAuth } from "../../context/AuthContext";
 import { getMyPlan, type TenantPlan } from "../../lib/planApi";
+import { getMyUsage, type TenantUsage, type UsageMetric } from "../../lib/usageApi";
 
 /**
  * Plans & billing. Shows the tenant's CURRENT plan + entitlements (resolved server-side by
@@ -54,6 +55,7 @@ export default function Plans() {
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
   const [plan, setPlan] = useState<TenantPlan | null>(null);
+  const [usage, setUsage] = useState<TenantUsage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,8 +63,9 @@ export default function Plans() {
     if (!tenant) { setLoading(false); return; }
     let live = true;
     setLoading(true);
-    getMyPlan(tenant)
-      .then((p) => { if (live) { setPlan(p); setError(null); } })
+    // Usage is best-effort — a usage hiccup must not hide the plan.
+    Promise.all([getMyPlan(tenant), getMyUsage(tenant).catch(() => null)])
+      .then(([p, u]) => { if (live) { setPlan(p); setUsage(u); setError(null); } })
       .catch(() => { if (live) setError("Couldn't load your plan."); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
@@ -111,6 +114,20 @@ export default function Plans() {
             <p className="text-sm text-gray-500 dark:text-gray-400">No active tenant.</p>
           )}
         </div>
+
+        {/* Usage this month — from /api/usage (best-effort) */}
+        {usage && (
+          <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90">Usage this month</h2>
+              <span className="text-xs text-gray-400">{usage.period}</span>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <UsageBar label="Submissions" metric={usage.usage.submissions} />
+              <UsageBar label="Emails" metric={usage.usage.emails} />
+            </div>
+          </div>
+        )}
 
         {/* Tier comparison */}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -207,6 +224,29 @@ export default function Plans() {
 /** A number from the API, or "Unlimited" for null (Enterprise). */
 function fmt(n: number | null): string {
   return n == null ? "Unlimited" : n.toLocaleString();
+}
+
+function UsageBar({ label, metric }: { label: string; metric: UsageMetric }) {
+  const { used, limit } = metric;
+  const unlimited = limit == null;
+  const pct = unlimited || limit === 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
+  const atCap = !unlimited && pct >= 100;
+  const barColor = atCap ? "bg-error-500" : "bg-brand-500";
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-sm">
+        <span className="text-gray-600 dark:text-gray-300">{label}</span>
+        <span className="font-medium text-gray-800 dark:text-white/90">
+          {used.toLocaleString()}
+          {unlimited ? "" : ` / ${limit.toLocaleString()}`}
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+        {!unlimited && <div className={`h-2 rounded-full ${barColor}`} style={{ width: `${pct}%` }} />}
+      </div>
+      {atCap && <p className="mt-1 text-xs text-error-600 dark:text-error-400">Limit reached — upgrade to keep going.</p>}
+    </div>
+  );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
