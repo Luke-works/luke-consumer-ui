@@ -54,6 +54,26 @@ function contactHref(tier: Tier): string {
   return `mailto:sales@lukeflow.com?subject=${encodeURIComponent(subject)}`;
 }
 
+/** Show an "approaching your limit" cue at/above this percentage of a metric's monthly allotment. */
+const NEAR_CAP_PCT = 80;
+
+/** The single most-utilized metered dimension that is at/near its cap (≥ {@link NEAR_CAP_PCT}),
+ *  or null when everything has headroom. Drives the one nudge shown above the usage bars. */
+function worstUsage(u: TenantUsage["usage"]): { label: string; pct: number } | null {
+  const rows: { label: string; m?: UsageMetric }[] = [
+    { label: "Submissions", m: u.submissions },
+    { label: "Emails", m: u.emails },
+    { label: "Storage", m: u.storage },
+  ];
+  let worst: { label: string; pct: number } | null = null;
+  for (const { label, m } of rows) {
+    if (!m || m.limit == null || m.limit === 0) continue; // unlimited / not metered → no cue
+    const pct = Math.round((m.used / m.limit) * 100);
+    if (pct >= NEAR_CAP_PCT && (!worst || pct > worst.pct)) worst = { label, pct };
+  }
+  return worst;
+}
+
 export default function Plans() {
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
@@ -149,6 +169,16 @@ export default function Plans() {
               <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90">Usage this month</h2>
               <span className="text-xs text-gray-400">{usage.period}</span>
             </div>
+            {(() => {
+              const nudge = worstUsage(usage.usage);
+              return nudge ? (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                  {nudge.pct >= 100
+                    ? `You've reached your ${nudge.label} limit this month — upgrade to keep going.`
+                    : `You're approaching your ${nudge.label} limit (${nudge.pct}%) — consider upgrading.`}
+                </div>
+              ) : null;
+            })()}
             <div className="grid gap-5 sm:grid-cols-2">
               <UsageBar label="Submissions" metric={usage.usage.submissions} />
               <UsageBar label="Emails" metric={usage.usage.emails} />
@@ -283,7 +313,8 @@ function UsageBar({
   const unlimited = limit == null;
   const pct = unlimited || limit === 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
   const atCap = !unlimited && pct >= 100;
-  const barColor = atCap ? "bg-error-500" : "bg-brand-500";
+  const near = !unlimited && !atCap && pct >= NEAR_CAP_PCT;
+  const barColor = atCap ? "bg-error-500" : near ? "bg-amber-400" : "bg-brand-500";
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
@@ -297,6 +328,7 @@ function UsageBar({
         {!unlimited && <div className={`h-2 rounded-full ${barColor}`} style={{ width: `${pct}%` }} />}
       </div>
       {atCap && <p className="mt-1 text-xs text-error-600 dark:text-error-400">Limit reached — upgrade to keep going.</p>}
+      {near && <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Approaching your limit ({pct}%).</p>}
     </div>
   );
 }
