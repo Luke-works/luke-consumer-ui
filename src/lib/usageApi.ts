@@ -15,6 +15,9 @@ export type TenantUsage = {
   usage: {
     submissions: UsageMetric;
     emails: UsageMetric;
+    /** Storage is a live gauge, not a monthly count — `used`/`limit` are in BYTES. Optional so an
+     *  older engine that predates the gauge still parses. */
+    storage?: UsageMetric;
   };
 };
 

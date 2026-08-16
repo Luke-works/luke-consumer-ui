@@ -152,6 +152,9 @@ export default function Plans() {
             <div className="grid gap-5 sm:grid-cols-2">
               <UsageBar label="Submissions" metric={usage.usage.submissions} />
               <UsageBar label="Emails" metric={usage.usage.emails} />
+              {usage.usage.storage && (
+                <UsageBar label="Storage" metric={usage.usage.storage} format={formatBytes} />
+              )}
             </div>
           </div>
         )}
@@ -266,7 +269,16 @@ function fmt(n: number | null): string {
   return n == null ? "Unlimited" : n.toLocaleString();
 }
 
-function UsageBar({ label, metric }: { label: string; metric: UsageMetric }) {
+function UsageBar({
+  label,
+  metric,
+  format = (n: number) => n.toLocaleString(),
+}: {
+  label: string;
+  metric: UsageMetric;
+  /** Render `used`/`limit` values — defaults to a thousands-grouped integer; storage passes bytes→GB. */
+  format?: (n: number) => string;
+}) {
   const { used, limit } = metric;
   const unlimited = limit == null;
   const pct = unlimited || limit === 0 ? 0 : Math.min(100, Math.round((used / limit) * 100));
@@ -277,8 +289,8 @@ function UsageBar({ label, metric }: { label: string; metric: UsageMetric }) {
       <div className="mb-1 flex items-center justify-between text-sm">
         <span className="text-gray-600 dark:text-gray-300">{label}</span>
         <span className="font-medium text-gray-800 dark:text-white/90">
-          {used.toLocaleString()}
-          {unlimited ? "" : ` / ${limit.toLocaleString()}`}
+          {format(used)}
+          {unlimited ? "" : ` / ${format(limit)}`}
         </span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
@@ -287,6 +299,13 @@ function UsageBar({ label, metric }: { label: string; metric: UsageMetric }) {
       {atCap && <p className="mt-1 text-xs text-error-600 dark:text-error-400">Limit reached — upgrade to keep going.</p>}
     </div>
   );
+}
+
+/** Bytes → a compact decimal-unit string (KB/MB/GB, matching the engine's 1e9-per-GB limit). */
+function formatBytes(n: number): string {
+  if (n < 1_000_000) return `${(n / 1_000).toLocaleString(undefined, { maximumFractionDigits: 0 })} KB`;
+  if (n < 1_000_000_000) return `${(n / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
+  return `${(n / 1_000_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 })} GB`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
