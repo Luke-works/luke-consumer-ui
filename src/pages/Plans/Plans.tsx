@@ -4,13 +4,16 @@ import PageMeta from "../../components/common/PageMeta";
 import { useAuth } from "../../context/AuthContext";
 import { getMyPlan, type TenantPlan } from "../../lib/planApi";
 import { getMyUsage, type TenantUsage, type UsageMetric } from "../../lib/usageApi";
+import { getBillingConfig, startCheckout, type BillingConfig } from "../../lib/billingApi";
 
 /**
  * Plans & billing. Shows the tenant's CURRENT plan + entitlements (resolved server-side by
- * core-engine `GET /api/plan`, fail-closed to Free) and a comparison of all tiers.
+ * core-engine `GET /api/plan`, fail-closed to Free), a comparison of all tiers, and — when Stripe is
+ * wired (`GET /api/billing/config`) — a real Upgrade button that opens Stripe Checkout for a
+ * purchasable tier. Where billing is not configured, the CTA falls back to a sales contact link.
  *
  * The comparison table mirrors core-engine `PlanCatalog` (the SSOT); keep the two in sync when
- * pricing changes. Checkout is Phase 2 — for now upgrade CTAs open a contact link.
+ * pricing changes.
  */
 
 type Tier = {
@@ -56,22 +59,46 @@ export default function Plans() {
   const tenant = session?.tenant ?? null;
   const [plan, setPlan] = useState<TenantPlan | null>(null);
   const [usage, setUsage] = useState<TenantUsage | null>(null);
+  const [billing, setBilling] = useState<BillingConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busyTier, setBusyTier] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tenant) { setLoading(false); return; }
     let live = true;
     setLoading(true);
-    // Usage is best-effort — a usage hiccup must not hide the plan.
-    Promise.all([getMyPlan(tenant), getMyUsage(tenant).catch(() => null)])
-      .then(([p, u]) => { if (live) { setPlan(p); setUsage(u); setError(null); } })
+    // Usage + billing config are best-effort — neither must hide the plan itself.
+    Promise.all([
+      getMyPlan(tenant),
+      getMyUsage(tenant).catch(() => null),
+      getBillingConfig(tenant).catch(() => null),
+    ])
+      .then(([p, u, b]) => { if (live) { setPlan(p); setUsage(u); setBilling(b); setError(null); } })
       .catch(() => { if (live) setError("Couldn't load your plan."); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [tenant]);
 
   const currentCode = plan?.plan ?? "FREE";
+
+  // A tier is buyable in-app only when Stripe is wired and lists it (FREE/ENTERPRISE never are).
+  const canCheckout = (code: string): boolean =>
+    !!tenant && !!billing?.enabled && billing.purchasableTiers.includes(code);
+
+  async function upgrade(code: string) {
+    if (!tenant || busyTier) return;
+    setBusyTier(code);
+    setCheckoutError(null);
+    try {
+      const { url } = await startCheckout(tenant, code);
+      window.location.assign(url); // hand off to Stripe's hosted checkout
+    } catch {
+      setBusyTier(null);
+      setCheckoutError("Couldn't start checkout. Please try again.");
+    }
+  }
 
   return (
     <>
@@ -194,6 +221,15 @@ export default function Plans() {
                     >
                       Current plan
                     </button>
+                  ) : canCheckout(tier.code) ? (
+                    <button
+                      type="button"
+                      onClick={() => upgrade(tier.code)}
+                      disabled={busyTier !== null}
+                      className="block w-full rounded-lg bg-brand-500 py-2 text-center text-sm font-medium text-white hover:bg-brand-600"
+                    >
+                      {busyTier === tier.code ? "Redirecting…" : `Upgrade to ${tier.name}`}
+                    </button>
                   ) : (
                     <a
                       href={contactHref(tier)}
@@ -211,6 +247,10 @@ export default function Plans() {
             );
           })}
         </div>
+
+        {checkoutError && (
+          <p className="mt-4 text-sm text-error-600 dark:text-error-400">{checkoutError}</p>
+        )}
 
         <p className="mt-6 text-xs text-gray-400 dark:text-gray-500">
           Usage above a plan's included allotment is metered. Voice minutes are billed per-minute on every plan.
