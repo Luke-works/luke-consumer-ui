@@ -6,6 +6,17 @@ import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import TracePanel, { pidOf } from "./TracePanel";
 import { listVersions, type FormArtifact } from "../../lib/formsApi";
 import { getInstance, STATE_LABEL, type FormInstance, type InstanceState } from "../../lib/formInstancesApi";
+import { getSubmissionPayment, stripeDashboardUrl, type SubmissionPayment } from "../../lib/paymentsApi";
+import { formatMoney, schemaTakesPayment } from "../../lib/formPayments";
+
+const PAYMENT_STATUS_LABEL: Record<SubmissionPayment["status"], string> = {
+  requires_payment: "Waiting for payment",
+  processing: "Processing",
+  succeeded: "Paid",
+  canceled: "Cancelled — not paid",
+  unresolved: "Unresolved — check Stripe",
+  failed: "Failed — not paid",
+};
 
 /** How a submission reached us, in words rather than the stored enum. Mirrors SubmissionSource
  *  (core-engine) and the wording printed on the submission PDF, so the two agree. */
@@ -24,6 +35,7 @@ export const STATE_BADGE: Record<InstanceState, string> = {
   PROCESSED: "bg-success-50 text-success-600 dark:bg-success-500/15",
   EXPIRED: "bg-gray-100 text-gray-400 dark:bg-white/10",
   CANCELLED: "bg-error-50 text-error-500 dark:bg-error-500/15",
+  AWAITING_PAYMENT: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
 };
 
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "—");
@@ -43,7 +55,22 @@ function schemaFields(schemaStr: string): Record<string, FieldMeta> {
   }
 }
 
-function fmtValue(v: unknown): string {
+/** A payment field's stored charge record, in words ("Paid $45.00"). */
+function fmtPayment(v: unknown): string {
+  const r = (v && typeof v === "object" ? v : {}) as { status?: unknown; amountMinor?: unknown; currency?: unknown };
+  const amount = typeof r.amountMinor === "number" && r.amountMinor > 0 && typeof r.currency === "string" && r.currency
+    ? formatMoney(r.amountMinor, r.currency)
+    : "";
+  switch (r.status) {
+    case "paid": return `Paid ${amount}`.trim();
+    case "pending": return `Payment pending ${amount}`.trim();
+    case "failed": return "Not paid";
+    default: return "Not paid";
+  }
+}
+
+function fmtValue(v: unknown, type?: string): string {
+  if (type === "payment") return fmtPayment(v);
   if (v == null || v === "") return "—";
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (Array.isArray(v)) return v.length ? v.map((x) => (x && typeof x === "object" ? JSON.stringify(x) : String(x))).join(", ") : "—";
@@ -107,6 +134,19 @@ export default function InstanceDetail({
   const data = instance.data ?? {};
   const entries = Object.entries(data);
   const pid = pidOf(instance);
+
+  // The charge behind a payment form, from the payments module (never a secret).
+  const [payment, setPayment] = useState<SubmissionPayment | null>(null);
+  const takesPayment = useMemo(() => schemaTakesPayment(schema), [schema]);
+  useEffect(() => {
+    if (!takesPayment) { setPayment(null); return; }
+    let active = true;
+    getSubmissionPayment(tenant, instance.id)
+      .then((p) => { if (active) setPayment(p); })
+      .catch(() => { if (active) setPayment(null); });
+    return () => { active = false; };
+  }, [tenant, instance.id, takesPayment]);
+  const dashboard = payment ? stripeDashboardUrl(payment) : null;
   const processLabel = pid ? "started" : instance.context?.processStartStatus === "FAILED" ? "failed" : "—";
 
   return (
@@ -175,6 +215,39 @@ export default function InstanceDetail({
         </div>
       )}
 
+      {payment && (
+        <div className="mb-5 rounded-xl border border-gray-100 px-4 dark:border-gray-800">
+          <p className="border-b border-gray-100 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800">
+            Payment
+          </p>
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            <MetaRow label="Status">{PAYMENT_STATUS_LABEL[payment.status] ?? payment.status}</MetaRow>
+            <MetaRow label="Amount">
+              {formatMoney(payment.amountMinor, payment.currency)}
+              {payment.quantity != null ? ` · ${payment.quantity} × ${formatMoney(Math.round(payment.amountMinor / payment.quantity), payment.currency)}` : ""}
+            </MetaRow>
+            {payment.amountRefunded > 0 && (
+              <MetaRow label="Refunded">{formatMoney(payment.amountRefunded, payment.currency)}</MetaRow>
+            )}
+            {payment.disputed && <MetaRow label="Dispute">Disputed by the payer — see Stripe</MetaRow>}
+            {payment.paidAt && <MetaRow label="Paid">{new Date(payment.paidAt).toLocaleString()}</MetaRow>}
+            {payment.lastErrorCode && payment.status !== "succeeded" && (
+              <MetaRow label="Last problem"><span className="font-mono text-xs">{payment.lastErrorCode}</span></MetaRow>
+            )}
+            {dashboard && (
+              <MetaRow label="Stripe">
+                <a href={dashboard} target="_blank" rel="noreferrer" className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                  View in Stripe{payment.livemode ? "" : " (test mode)"}
+                </a>
+              </MetaRow>
+            )}
+          </div>
+          <p className="pb-3 pt-2 text-[11px] text-gray-400">
+            Paid into your own Stripe account. Refunds and disputes are handled in Stripe.
+          </p>
+        </div>
+      )}
+
       {/* Submitted data + version toggle */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Submitted data</h3>
@@ -206,7 +279,7 @@ export default function InstanceDetail({
                   <span className="block truncate text-sm font-medium text-gray-700 dark:text-gray-300">{meta?.label ?? key}</span>
                   <span className="block truncate font-mono text-[11px] text-gray-400">{key}{!meta ? " · not in this version" : ""}</span>
                 </dt>
-                <dd className="col-span-2 break-words text-sm text-gray-800 dark:text-gray-200">{fmtValue(value)}</dd>
+                <dd className="col-span-2 break-words text-sm text-gray-800 dark:text-gray-200">{fmtValue(value, meta?.type)}</dd>
               </div>
             );
           })}

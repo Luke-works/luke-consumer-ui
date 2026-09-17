@@ -19,7 +19,8 @@ import BuilderMobileNotice from "../../components/common/BuilderMobileNotice";
 import "@lukeflow/form-react/styles.css";
 import "@lukeflow/form-builder/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
-import { readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
+import { hasPayment, readSubmitMessage, validateSchema, type FormSchema } from "@lukeflow/form-core";
+import { getPaymentsStatus, type PaymentsStatus } from "../../lib/paymentsApi";
 import {
   CONSENT_DEFAULT_TEXT,
   readAttachmentsEnabled,
@@ -91,6 +92,12 @@ export default function FormBuilderPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [saved, setSaved] = useState(true);
   const [saveError, setSaveError] = useState(false);
+  // Why the last publish was refused, in the server's words (e.g. a payment form before Stripe is set up).
+  const [publishError, setPublishError] = useState<string | null>(null);
+  // Whether this workspace can take payments — decides if the builder offers the Payment field, and
+  // whether a form that already has one can go live. Null until loaded; a failed load hides the field.
+  const [payments, setPayments] = useState<PaymentsStatus | null>(null);
+  const [paymentsLoaded, setPaymentsLoaded] = useState(false);
   const [busy, setBusy] = useState<null | "checkin" | "publish" | "undo">(null);
   const [status, setStatus] = useState<FormStatus>("draft");
   const [version, setVersion] = useState(0);
@@ -252,6 +259,22 @@ export default function FormBuilderPage() {
     setLockedByOther(null);
   };
 
+  useEffect(() => {
+    if (!tenant) return;
+    let live = true;
+    getPaymentsStatus(tenant)
+      .then((p) => { if (live) setPayments(p); })
+      .catch(() => { if (live) setPayments(null); })
+      .finally(() => { if (live) setPaymentsLoaded(true); });
+    return () => { live = false; };
+  }, [tenant]);
+  // Not offered where it could never work (payments off, or not on this plan). Stable reference: the
+  // builder only re-reads the palette when this changes.
+  const hiddenFields = useMemo(
+    () => (paymentsLoaded && payments?.enabled && payments.planAllows ? [] : ["payment"]),
+    [paymentsLoaded, payments?.enabled, payments?.planAllows],
+  );
+
   const initialSchema = useMemo(() => (form ? parseSchema(form.schema) : EMPTY), [form]);
 
   // Blocking (error-severity) schema problems, from the SAME form-core validator the
@@ -259,6 +282,10 @@ export default function FormBuilderPage() {
   // disabled here. liveSchema mirrors the builder's working schema (set on load + onChange).
   const blocking = useMemo(
     () => validateSchema((liveSchema as unknown as FormSchema | null) ?? initialSchema).filter((d) => d.severity === "error"),
+    [liveSchema, initialSchema],
+  );
+  const takesPayment = useMemo(
+    () => hasPayment((liveSchema as unknown as FormSchema | null) ?? initialSchema),
     [liveSchema, initialSchema],
   );
 
@@ -442,6 +469,7 @@ export default function FormBuilderPage() {
   const onPublish = () => runExclusive(async () => {
     if (!tenant || !id || version < 1 || !latestSignedOff || publishedVersion === version) return; // signed-off + not already live
     setBusy("publish");
+    setPublishError(null);
     try {
       await publishVersion(tenant, id, version);
       setStatus("published");
@@ -456,6 +484,7 @@ export default function FormBuilderPage() {
     } catch (e) {
       console.error("Publish failed", e);
       setSaveError(true);
+      setPublishError(e instanceof Error && e.message ? e.message : "Couldn't publish this version.");
     } finally {
       setBusy(null);
     }
@@ -700,6 +729,35 @@ export default function FormBuilderPage() {
         </div>
       )}
 
+      {publishError && (
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-lg border border-error-500 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+          <span>{publishError}</span>
+          <button type="button" onClick={() => setPublishError(null)} className="shrink-0 font-medium underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+      {takesPayment && paymentsLoaded && !payments?.ready && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400">
+          <span>
+            {payments && payments.enabled && !payments.planAllows
+              ? "This form takes a payment, which needs a paid plan. It can't be published until then."
+              : payments && payments.enabled
+                ? "This form takes a payment. Connect a Stripe account that can accept payments before publishing it."
+                : "This form takes a payment, but payments aren't available here, so it can't be published."}
+          </span>
+          {payments?.enabled ? (
+            <button
+              type="button"
+              onClick={() => void leaveDesigner(payments.planAllows ? "/forms/payments" : "/plans")}
+              className="shrink-0 rounded-lg border border-amber-400 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+            >
+              {payments.planAllows ? "Set up payments" : "See plans"}
+            </button>
+          ) : null}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -811,6 +869,7 @@ export default function FormBuilderPage() {
           initialSchema={initialSchema}
           onChange={handleChange}
           attributeEditors={editors}
+          hiddenFields={hiddenFields}
           settings="modal"
           hidePreview /* Preview lives in the top bar (works in view-only too) */
           formName={form.name} /* file stem for the Data view's "Generate template" download */

@@ -10,6 +10,8 @@ import { createAuthedMinionClient } from "../../lib/minionsApi";
 import AttachmentsButton from "../../components/documents/AttachmentsButton";
 import FormConsentGate, { focusConsent } from "../../components/formBuilder/FormConsentGate";
 import { readConsent, readSubmitMessage } from "../../lib/formSchema";
+import { schemaTakesPayment } from "../../lib/formPayments";
+import { getFieldContract } from "../../lib/formsApi";
 import {
   createInstance,
   isOpen,
@@ -37,6 +39,9 @@ export default function FormFill() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  // The published version takes a payment: it can only be submitted through its own link, so no
+  // instance is created here (it could never be submitted, and would linger as "Created").
+  const [paymentOnly, setPaymentOnly] = useState(false);
   const [saveError, setSaveError] = useState(false);
   // Consent (opt-in per form). The in-app door is gated too: whoever ticks the box is the person the
   // record will name, so exempting staff would make the evidence inconsistent across doors.
@@ -68,8 +73,17 @@ export default function FormFill() {
   useEffect(() => {
     if (!tenant || !code || created.current) return;
     created.current = true;
-    createInstance(tenant, { definitionCode: code })
-      .then((v) => { setView(v); setLoading(false); })
+    getFieldContract(tenant, code, "published")
+      .then((c) => c.takesPayment)
+      .catch(() => false) // can't tell: creating the instance reports any real problem
+      .then((takes) => {
+        if (takes) {
+          setPaymentOnly(true);
+          setLoading(false);
+          return;
+        }
+        return createInstance(tenant, { definitionCode: code }).then((v) => { setView(v); setLoading(false); });
+      })
       .catch((e: unknown) => { setError(messageFor(e)); setLoading(false); });
   }, [tenant, code]);
 
@@ -94,6 +108,7 @@ export default function FormFill() {
   );
   // The agreement this instance's PINNED version published — the same setting the server enforces.
   const consent = useMemo(() => readConsent(view?.schema), [view?.schema]);
+  const takesPayment = useMemo(() => schemaTakesPayment(view?.schema), [view?.schema]);
 
   const handleChange = (data: Record<string, unknown>) => {
     if (!tenant || !instance || !open) return;
@@ -146,6 +161,16 @@ export default function FormFill() {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
           {loading ? (
             <p className="py-10 text-center text-sm text-gray-400">Preparing the form…</p>
+          ) : paymentOnly ? (
+            <div className="py-10 text-center">
+              {/* Taking a card here would mean staff keying in someone else's card details; the server
+                  refuses it too. */}
+              <p className="mx-auto max-w-md text-sm text-gray-600 dark:text-gray-300">
+                This form takes a payment, so the person paying has to fill it in themselves. Share its link
+                or embed it on your site instead.
+              </p>
+              <Button size="sm" variant="outline" onClick={() => navigate("/forms")} className="mt-4">Back to forms</Button>
+            </div>
           ) : error ? (
             <div className="py-10 text-center">
               <p className="text-sm font-medium text-error-500">{error}</p>
@@ -178,7 +203,15 @@ export default function FormFill() {
                   )}
                 </div>
               </div>
-              {consent.enabled ? (
+              {takesPayment ? (
+                // Taking a card here would mean staff keying in someone else's card details. The server
+                // refuses it too; this says why before anyone fills the form in.
+                <p className="mb-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                  This form takes a payment, so the person paying has to fill it in themselves. Share its
+                  link or embed it on your site instead.
+                </p>
+              ) : null}
+              {consent.enabled && !takesPayment ? (
                 <FormConsentGate
                   text={consent.text}
                   agreed={consentAgreed}
@@ -196,6 +229,7 @@ export default function FormFill() {
                     onChange={handleChange}
                     onSubmit={handleSubmit}
                     submitting={submitting}
+                    readOnly={takesPayment}
                   />
                 </MinionProvider>
               ) : (
@@ -205,6 +239,7 @@ export default function FormFill() {
                   onChange={handleChange}
                   onSubmit={handleSubmit}
                   submitting={submitting}
+                  readOnly={takesPayment}
                 />
               )}
             </>

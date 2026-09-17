@@ -11,7 +11,9 @@ const seg = (s: string) => encodeURIComponent(s);
 // ── Lifecycle states (mirror FormInstanceStates on the backend) ──────────────
 export type InstanceState =
   | "CREATED" | "SENT" | "OPENED" | "IN_PROGRESS"
-  | "SUBMITTED" | "PROCESSED" | "EXPIRED" | "CANCELLED";
+  | "SUBMITTED" | "PROCESSED" | "EXPIRED" | "CANCELLED"
+  /** Submitted to a form that takes a payment, and not paid yet — not a received submission. */
+  | "AWAITING_PAYMENT";
 
 /** States in which the instance can still be opened/edited/submitted. */
 export const OPEN_STATES: ReadonlySet<InstanceState> = new Set([
@@ -305,4 +307,5 @@ export const STATE_LABEL: Record<InstanceState, string> = {
   PROCESSED: "Processed",
   EXPIRED: "Expired",
   CANCELLED: "Cancelled",
+  AWAITING_PAYMENT: "Awaiting payment",
 };

@@ -23,27 +23,28 @@ type Tier = {
   tagline: string;
   limits: { subs: string; ai: string; emails: string; storage: string; seats: string };
   caps: string;
-  features: { removableBranding: boolean; sso: boolean; voice: boolean; selfHost: boolean; attachments: boolean };
+  features: { removableBranding: boolean; sso: boolean; voice: boolean; selfHost: boolean; attachments: boolean; payments: boolean };
 };
 
 const TIERS: Tier[] = [
   { code: "FREE", name: "Free", priceLabel: "$0", tagline: "Get started",
     limits: { subs: "100", ai: "10", emails: "60", storage: "0.5 GB", seats: "1" }, caps: "Forms",
-    features: { removableBranding: false, sso: false, voice: false, selfHost: false, attachments: false } },
+    features: { removableBranding: false, sso: false, voice: false, selfHost: false, attachments: false, payments: false } },
   { code: "PRO", name: "Pro", priceLabel: "$39", tagline: "For small teams",
     limits: { subs: "2,000", ai: "500", emails: "2,000", storage: "5 GB", seats: "3" }, caps: "Forms · Email",
-    features: { removableBranding: true, sso: false, voice: false, selfHost: false, attachments: true } },
+    features: { removableBranding: true, sso: false, voice: false, selfHost: false, attachments: true, payments: true } },
   { code: "BUSINESS", name: "Business", priceLabel: "$149", tagline: "For growing teams",
     limits: { subs: "15,000", ai: "2,000", emails: "15,000", storage: "25 GB", seats: "10" }, caps: "Forms · Email · Signatures · Calendars",
-    features: { removableBranding: true, sso: true, voice: false, selfHost: false, attachments: true } },
+    features: { removableBranding: true, sso: true, voice: false, selfHost: false, attachments: true, payments: true } },
   { code: "ENTERPRISE", name: "Enterprise", priceLabel: "Custom", tagline: "Compliance & scale",
     limits: { subs: "Unlimited", ai: "Unlimited", emails: "Unlimited", storage: "Unlimited", seats: "Unlimited" }, caps: "Everything",
-    features: { removableBranding: true, sso: true, voice: true, selfHost: true, attachments: true } },
+    features: { removableBranding: true, sso: true, voice: true, selfHost: true, attachments: true, payments: true } },
 ];
 
 const FEATURE_ROWS: { key: keyof Tier["features"]; label: string }[] = [
   { key: "removableBranding", label: "Remove Lukeflow branding" },
   { key: "attachments", label: "File attachments" },
+  { key: "payments", label: "Take payments on forms (your Stripe)" },
   { key: "sso", label: "SSO / SCIM" },
   { key: "voice", label: "Voice (Phone)" },
   { key: "selfHost", label: "Self-hosting" },

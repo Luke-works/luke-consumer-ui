@@ -193,6 +193,12 @@ interface FormBuilderProps {
     /** Extra palette entries for custom field types (paired with renderer `components`). */
     extraFields?: ReadonlyArray<PaletteItem>;
     /**
+     * Built-in field types to leave out of the palette — e.g. `"payment"` for a workspace that can't
+     * take payments yet. Only ADDING is affected: an existing field of a hidden type still renders
+     * on the canvas and can still be edited or deleted.
+     */
+    hiddenFields?: ReadonlyArray<string>;
+    /**
      * Custom field components by `type`, forwarded to BOTH the engine-backed canvas previews and
      * the live preview's {@link FormRenderer} — so a custom field added via
      * {@link FormBuilderProps.extraFields} renders with its real control everywhere in the builder,

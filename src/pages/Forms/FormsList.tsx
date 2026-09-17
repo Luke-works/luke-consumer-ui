@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { createColumnHelper } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, ClipboardList, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardList, CreditCard, FileText } from "lucide-react";
 import DataTable from "../../components/tables/DataTable";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
 import InstancesPanel from "./InstancesPanel";
@@ -77,6 +77,9 @@ export default function FormsList() {
   const [kind, setKind] = useState<FormKind>("INBOUND");
   const [creating, setCreating] = useState(false);
   const [historyForm, setHistoryForm] = useState<StoredForm | null>(null);
+  // A refused publish from the history modal (e.g. a paid form before Stripe is connected) — shown IN the
+  // modal, which covers the page, and cleared on the next attempt and whenever the modal opens or closes.
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [historyVersions, setHistoryVersions] = useState<FormArtifact[]>([]);
   const [previewSchema, setPreviewSchema] = useState<string | null>(null);
   const [showTrash, setShowTrash] = useState(false);
@@ -111,6 +114,7 @@ export default function FormsList() {
 
   // Load checked-in versions whenever the history modal opens for a form.
   useEffect(() => {
+    setPublishError(null);
     if (!historyForm || !tenant) { setHistoryVersions([]); return; }
     let active = true;
     listVersions(tenant, historyForm.id)
@@ -319,7 +323,14 @@ export default function FormsList() {
               : "You have read-only access to forms. Ask an org owner for edit access."}
           </p>
         </div>
-        <FormsViewToggle view={view} onChange={switchView} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Tooltip content="Take card payments on your forms with your own Stripe account.">
+            <Button size="sm" variant="outline" startIcon={<CreditCard className="size-4" />} onClick={() => navigate("/forms/payments")}>
+              Payments
+            </Button>
+          </Tooltip>
+          <FormsViewToggle view={view} onChange={switchView} />
+        </div>
       </div>
 
       {error && (
@@ -475,6 +486,11 @@ export default function FormsList() {
         <div className="p-6">
           <h2 className="mb-1 text-lg font-semibold text-gray-800 dark:text-white/90">Version history</h2>
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">{historyForm?.name}</p>
+          {publishError ? (
+            <p role="alert" className="mb-4 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
+              {publishError}
+            </p>
+          ) : null}
           <ul className="space-y-2">
             {historyVersions.length === 0 && (
               <li className="py-2 text-sm text-gray-400">No checked-in versions yet.</li>
@@ -497,7 +513,14 @@ export default function FormsList() {
                     {canEdit && !isLive && signedOff && (
                       <Button size="sm" variant="outline" onClick={async () => {
                         if (!tenant || !historyForm) return;
-                        await publishVersion(tenant, historyForm.id, art.version);
+                        setPublishError(null);
+                        try {
+                          await publishVersion(tenant, historyForm.id, art.version);
+                        } catch (e) {
+                          // e.g. a form that takes a payment, published before Stripe is connected
+                          setPublishError(e instanceof Error && e.message ? e.message : "Couldn't publish this version.");
+                          return;
+                        }
                         await refresh();
                         setHistoryForm({ ...historyForm, publishedVersion: art.version, status: "published" });
                       }}>Publish</Button>

@@ -47,7 +47,7 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-import { useState as useState11, useEffect as useEffect7, useRef as useRef8, useCallback as useCallback2, useMemo as useMemo2 } from "react";
+import { useState as useState11, useEffect as useEffect8, useRef as useRef9, useCallback as useCallback2, useMemo as useMemo4 } from "react";
 import {
   createDefaultFieldTypeRegistry,
   submitButtonId,
@@ -93,6 +93,16 @@ function useMinionData(entity, scope) {
   }, [client, key]);
   return state;
 }
+
+// src/render/controls/PaymentField.tsx
+import { useEffect as useEffect2, useMemo as useMemo3, useRef as useRef2 } from "react";
+import {
+  coercePaymentValue,
+  currencyOf,
+  readPaymentAttributes,
+  resolvePaymentAmount,
+  toMajorString
+} from "@lukeflow/form-core";
 
 // src/i18n.tsx
 import { createContext as createContext2, useContext as useContext2, useMemo } from "react";
@@ -184,19 +194,241 @@ function useTranslate() {
   return useContext2(LocaleContext).t;
 }
 
-// src/theme.tsx
-import { createContext as createContext3, useContext as useContext3 } from "react";
+// src/payments.tsx
+import { createContext as createContext3, useContext as useContext3, useMemo as useMemo2, useSyncExternalStore } from "react";
 import { jsx as jsx3 } from "react/jsx-runtime";
-var FormThemeContext = createContext3({});
+var NOT_READY = "The payment form hasn't finished loading. Please wait a moment and try again.";
+var UNAVAILABLE = "Card payments aren't available right now. Please try again later.";
+function createPaymentSession(processor) {
+  let state = { phase: "loading", complete: false, error: null };
+  let mount = null;
+  const listeners = /* @__PURE__ */ new Set();
+  const set = (patch) => {
+    state = { ...state, ...patch };
+    for (const l of [...listeners]) l();
+  };
+  const message = (err, fallback) => err instanceof Error && err.message ? err.message : typeof err === "string" && err ? err : fallback;
+  const unavailable = () => state.phase === "unavailable";
+  const finish = (patch) => set(unavailable() ? { phase: "unavailable", error: UNAVAILABLE } : patch);
+  return {
+    processor,
+    getState: () => state,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    async validate() {
+      if (!mount || state.phase === "unavailable") {
+        const msg = state.phase === "unavailable" ? UNAVAILABLE : NOT_READY;
+        set({ error: msg });
+        return msg;
+      }
+      set({ phase: "validating", error: null });
+      try {
+        const err = await mount.validate();
+        finish({ phase: "ready", error: err });
+        return unavailable() ? UNAVAILABLE : err;
+      } catch (e) {
+        const msg = message(e, "Check your payment details and try again.");
+        finish({ phase: "ready", error: msg });
+        return unavailable() ? UNAVAILABLE : msg;
+      }
+    },
+    async confirm(clientSecret, amount) {
+      if (!mount || state.phase === "unavailable") {
+        const msg = state.phase === "unavailable" ? UNAVAILABLE : NOT_READY;
+        set({ error: msg });
+        return { status: "failed", message: msg };
+      }
+      set({ phase: "confirming", error: null });
+      try {
+        const result = await mount.confirm(clientSecret, amount);
+        if (result.status === "failed") finish({ phase: "ready", error: result.message });
+        else set({ phase: result.status, error: null });
+        return result;
+      } catch (e) {
+        const msg = message(e, "The payment didn't go through. Please try again.");
+        finish({ phase: "ready", error: msg });
+        return { status: "failed", message: msg };
+      }
+    },
+    setError(error) {
+      set({ error });
+    },
+    _attach(m) {
+      mount = m;
+      const stale = state.error === NOT_READY || state.error === UNAVAILABLE;
+      set(stale ? { phase: "ready", error: null } : { phase: "ready" });
+      return () => {
+        if (mount === m) {
+          mount = null;
+          set({ phase: "loading", complete: false });
+        }
+      };
+    },
+    _setPhase(phase, error) {
+      set(error === void 0 ? { phase } : { phase, error });
+    },
+    _setComplete(complete) {
+      if (complete !== state.complete) set({ complete });
+    }
+  };
+}
+var PaymentsContext = createContext3(null);
+function PaymentsProvider({ session, pricingSchema = null, children }) {
+  const value = useMemo2(() => ({ session, pricingSchema }), [session, pricingSchema]);
+  return /* @__PURE__ */ jsx3(PaymentsContext.Provider, { value, children });
+}
+function usePaymentSession() {
+  return useContext3(PaymentsContext)?.session ?? null;
+}
+function usePaymentPricingSchema() {
+  return useContext3(PaymentsContext)?.pricingSchema ?? null;
+}
+var IDLE2 = { phase: "unavailable", complete: false, error: null };
+var noop = () => () => {
+};
+function usePaymentState(session) {
+  return useSyncExternalStore(
+    session ? session.subscribe : noop,
+    () => session ? session.getState() : IDLE2,
+    () => session ? session.getState() : IDLE2
+  );
+}
+var PAYMENT_UNAVAILABLE_MESSAGE = UNAVAILABLE;
+
+// src/render/controls/PaymentField.tsx
+import { Fragment, jsx as jsx4, jsxs } from "react/jsx-runtime";
+function provisionalAmount(entity, currency) {
+  const cfg = readPaymentAttributes(entity);
+  const positive = (n) => typeof n === "number" && Number.isSafeInteger(n) && n > 0 ? n : 0;
+  if (cfg.amountMode === "entered") return positive(cfg.minAmountMinor) || currency.minimumMinor;
+  return positive(cfg.amountMinor) || currency.minimumMinor;
+}
+function PaymentField({ a11y, entity, schema, scope, value, readOnly, t }) {
+  const { formatNumber, locale } = useLocale();
+  const session = usePaymentSession();
+  const pricingSchema = usePaymentPricingSchema() ?? schema;
+  const state = usePaymentState(readOnly ? null : session);
+  const cfg = readPaymentAttributes(entity);
+  const currency = currencyOf(cfg.currency);
+  const resolution = useMemo3(() => resolvePaymentAmount(pricingSchema, scope), [pricingSchema, scope]);
+  const money = (minor, c) => formatNumber(Number(toMajorString(minor, c)), {
+    style: "currency",
+    currency: c.code,
+    minimumFractionDigits: c.exponent,
+    maximumFractionDigits: c.exponent
+  });
+  const fill = (template, amount) => t(template, { amount }).replace("{amount}", amount);
+  let summary;
+  if (!currency) summary = t("Payment isn't set up yet.");
+  else if (resolution.ok) summary = fill("Total: {amount}", money(resolution.amountMinor, currency));
+  else if (cfg.amountMode === "perUnit" && typeof cfg.amountMinor === "number" && cfg.amountMinor > 0)
+    summary = fill("{amount} each", money(cfg.amountMinor, currency));
+  else if (cfg.amountMode === "entered") summary = t("Enter the amount you'd like to pay.");
+  else summary = t("Payment isn't set up yet.");
+  const amountMinor = currency ? resolution.ok ? resolution.amountMinor : provisionalAmount(entity, currency) : 0;
+  const boxRef = useRef2(null);
+  const mountRef = useRef2(null);
+  const amountRef = useRef2(amountMinor);
+  amountRef.current = amountMinor;
+  const code = currency?.code ?? null;
+  useEffect2(() => {
+    const box = boxRef.current;
+    if (!session || readOnly || !code || !box) return;
+    let cancelled = false;
+    let detach = null;
+    let mounted = null;
+    const abort = new AbortController();
+    session._setPhase("loading");
+    session.processor.mount({
+      container: box,
+      amountMinor: amountRef.current,
+      currency: code,
+      locale,
+      onChange: ({ complete }) => session._setComplete(complete),
+      onLoadError: () => {
+        if (!cancelled) session._setPhase("unavailable", PAYMENT_UNAVAILABLE_MESSAGE);
+      },
+      signal: abort.signal
+    }).then((m) => {
+      if (cancelled) {
+        m.destroy();
+        return;
+      }
+      mounted = m;
+      mountRef.current = m;
+      detach = session._attach(m);
+    }).catch(() => {
+      if (!cancelled) session._setPhase("unavailable", PAYMENT_UNAVAILABLE_MESSAGE);
+    });
+    return () => {
+      cancelled = true;
+      abort.abort();
+      mountRef.current = null;
+      detach?.();
+      mounted?.destroy();
+    };
+  }, [session, readOnly, code, locale]);
+  const phase = state.phase;
+  useEffect2(() => {
+    if (!code || phase !== "ready") return;
+    void Promise.resolve(mountRef.current?.update({ amountMinor, currency: code })).catch(() => {
+    });
+  }, [amountMinor, code, phase]);
+  const errId = state.error ? `${a11y.id}-payment-error` : void 0;
+  const describedBy = [a11y["aria-describedby"], errId].filter(Boolean).join(" ") || void 0;
+  const recorded = coercePaymentValue(value);
+  const recordedCurrency = currencyOf(recorded.currency);
+  const charged = recordedCurrency && recorded.amountMinor > 0 ? money(recorded.amountMinor, recordedCurrency) : "";
+  let body;
+  if (readOnly) {
+    const text = recorded.status === "paid" ? fill("Paid {amount}", charged) : recorded.status === "pending" ? t("Payment pending") : recorded.status === "failed" ? t("Payment failed") : t("Not paid");
+    body = /* @__PURE__ */ jsx4("p", { className: "lf-payment-status", "data-status": recorded.status, children: text.trim() });
+  } else if (!session && recorded.status === "paid") {
+    body = /* @__PURE__ */ jsx4("p", { className: "lf-payment-status", "data-status": "paid", children: fill("Paid {amount}", charged).trim() });
+  } else if (!session) {
+    body = /* @__PURE__ */ jsx4("p", { className: "lf-payment-note", children: t("Card details are collected securely when this form is live.") });
+  } else {
+    body = /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx4("div", { ref: boxRef, className: "lf-payment-element", "data-phase": phase }),
+      phase === "loading" && /* @__PURE__ */ jsx4("p", { className: "lf-payment-note", "aria-live": "polite", children: t("Loading secure payment form\u2026") }),
+      (phase === "confirming" || phase === "validating") && /* @__PURE__ */ jsx4("p", { className: "lf-payment-note", "aria-live": "polite", children: t("Processing payment\u2026") })
+    ] });
+  }
+  return /* @__PURE__ */ jsxs(
+    "div",
+    {
+      id: a11y.id,
+      role: "group",
+      className: "lf-payment",
+      "aria-labelledby": `${a11y.id}-label`,
+      "aria-describedby": describedBy,
+      "aria-busy": phase === "loading" || phase === "confirming" || phase === "validating" || void 0,
+      "data-phase": readOnly ? "readonly" : session ? phase : "preview",
+      tabIndex: -1,
+      children: [
+        /* @__PURE__ */ jsx4("p", { className: "lf-payment-summary", children: summary }),
+        body,
+        state.error && /* @__PURE__ */ jsx4("p", { id: errId, role: "alert", className: "lf-error", children: t(state.error) })
+      ]
+    }
+  );
+}
+
+// src/theme.tsx
+import { createContext as createContext4, useContext as useContext4 } from "react";
+import { jsx as jsx5 } from "react/jsx-runtime";
+var FormThemeContext = createContext4({});
 function FormThemeProvider({
   theme,
   colorScheme,
   children
 }) {
-  return /* @__PURE__ */ jsx3(FormThemeContext.Provider, { value: { theme, colorScheme }, children });
+  return /* @__PURE__ */ jsx5(FormThemeContext.Provider, { value: { theme, colorScheme }, children });
 }
 function useFormTheme() {
-  return useContext3(FormThemeContext);
+  return useContext4(FormThemeContext);
 }
 function dataThemeAttr(scheme) {
   return scheme === "light" || scheme === "dark" ? scheme : void 0;
@@ -208,7 +440,7 @@ function usePopoverTheme() {
 
 // src/errorBoundary.tsx
 import { Component } from "react";
-import { jsx as jsx4 } from "react/jsx-runtime";
+import { jsx as jsx6 } from "react/jsx-runtime";
 var FormErrorBoundary = class extends Component {
   constructor() {
     super(...arguments);
@@ -222,7 +454,7 @@ var FormErrorBoundary = class extends Component {
   }
   render() {
     if (this.state.error) {
-      return this.props.fallback ?? /* @__PURE__ */ jsx4("div", { role: "alert", className: "lf-error lf-form-error", children: "Something went wrong displaying this form." });
+      return this.props.fallback ?? /* @__PURE__ */ jsx6("div", { role: "alert", className: "lf-error lf-form-error", children: "Something went wrong displaying this form." });
     }
     return this.props.children;
   }
@@ -416,25 +648,25 @@ function fileDescriptors(list) {
 
 // src/render/controls/icons.tsx
 import "react";
-import { jsx as jsx5, jsxs } from "react/jsx-runtime";
+import { jsx as jsx7, jsxs as jsxs2 } from "react/jsx-runtime";
 function XGlyph() {
-  return /* @__PURE__ */ jsx5("svg", { className: "lf-x", viewBox: "0 0 24 24", width: "12", height: "12", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ jsx5("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
+  return /* @__PURE__ */ jsx7("svg", { className: "lf-x", viewBox: "0 0 24 24", width: "12", height: "12", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ jsx7("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
 }
 function CalendarGlyph() {
-  return /* @__PURE__ */ jsxs("svg", { className: "lf-cal-icon", viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true", focusable: "false", children: [
-    /* @__PURE__ */ jsx5("rect", { x: "3", y: "4.5", width: "18", height: "16", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
-    /* @__PURE__ */ jsx5("path", { d: "M3 9h18M8 2.5v4M16 2.5v4", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
+  return /* @__PURE__ */ jsxs2("svg", { className: "lf-cal-icon", viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true", focusable: "false", children: [
+    /* @__PURE__ */ jsx7("rect", { x: "3", y: "4.5", width: "18", height: "16", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
+    /* @__PURE__ */ jsx7("path", { d: "M3 9h18M8 2.5v4M16 2.5v4", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
   ] });
 }
 
 // src/render/controls/Tooltip.tsx
-import { useState as useState3, useEffect as useEffect2, useLayoutEffect, useRef as useRef2 } from "react";
+import { useState as useState3, useEffect as useEffect3, useLayoutEffect, useRef as useRef3 } from "react";
 import { createPortal } from "react-dom";
-import { jsx as jsx6, jsxs as jsxs2 } from "react/jsx-runtime";
+import { jsx as jsx8, jsxs as jsxs3 } from "react/jsx-runtime";
 function Tooltip({ text }) {
-  const ref = useRef2(null);
+  const ref = useRef3(null);
   const [anchor, setAnchor] = useState3(null);
-  useEffect2(() => {
+  useEffect3(() => {
     if (!anchor) return;
     const win = ref.current?.ownerDocument?.defaultView;
     if (!win) return;
@@ -454,13 +686,13 @@ function Tooltip({ text }) {
     setAnchor({ cx: r.left + r.width / 2, top: r.top, bottom: r.bottom });
   };
   const hide = () => setAnchor(null);
-  return /* @__PURE__ */ jsxs2("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
-    /* @__PURE__ */ jsx6("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
-    anchor && /* @__PURE__ */ jsx6(TooltipBubble, { text, anchor, doc: ref.current?.ownerDocument ?? null })
+  return /* @__PURE__ */ jsxs3("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
+    /* @__PURE__ */ jsx8("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
+    anchor && /* @__PURE__ */ jsx8(TooltipBubble, { text, anchor, doc: ref.current?.ownerDocument ?? null })
   ] });
 }
 function TooltipBubble({ text, anchor, doc }) {
-  const ref = useRef2(null);
+  const ref = useRef3(null);
   const [box, setBox] = useState3(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -490,7 +722,7 @@ function TooltipBubble({ text, anchor, doc }) {
   const target = doc?.body ?? (typeof document !== "undefined" ? document.body : null);
   if (!target) return null;
   return createPortal(
-    /* @__PURE__ */ jsxs2(
+    /* @__PURE__ */ jsxs3(
       "span",
       {
         ref,
@@ -500,7 +732,7 @@ function TooltipBubble({ text, anchor, doc }) {
         style: { ...themeStyle, position: "fixed", left: box?.left ?? anchor.cx, top: box?.top ?? anchor.top, visibility: box ? "visible" : "hidden" },
         children: [
           text,
-          /* @__PURE__ */ jsx6("span", { className: "lf-tooltip-arrow", style: { left: box?.arrow ?? 0 } })
+          /* @__PURE__ */ jsx8("span", { className: "lf-tooltip-arrow", style: { left: box?.arrow ?? 0 } })
         ]
       }
     ),
@@ -509,7 +741,7 @@ function TooltipBubble({ text, anchor, doc }) {
 }
 
 // src/render/controls/Select.tsx
-import { useState as useState5, useEffect as useEffect3, useRef as useRef3 } from "react";
+import { useState as useState5, useEffect as useEffect4, useRef as useRef4 } from "react";
 import { createPortal as createPortal2 } from "react-dom";
 import {
   readDataSource as readDataSource2,
@@ -562,7 +794,7 @@ function popoverTarget(anchorRef) {
 }
 
 // src/render/controls/Select.tsx
-import { jsx as jsx7, jsxs as jsxs3 } from "react/jsx-runtime";
+import { jsx as jsx9, jsxs as jsxs4 } from "react/jsx-runtime";
 function SearchSelect({
   a11y,
   entity,
@@ -582,13 +814,13 @@ function SearchSelect({
   const [loading, setLoading] = useState5(false);
   const [selectedLabel, setSelectedLabel] = useState5("");
   const [active, setActive] = useState5(-1);
-  const timer = useRef3(null);
-  const blurTimer = useRef3(null);
+  const timer = useRef4(null);
+  const blurTimer = useRef4(null);
   const clearBlur = () => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  useEffect3(() => () => clearBlur(), []);
+  useEffect4(() => () => clearBlur(), []);
   const choose = (o) => {
     clearBlur();
     setValue(o.value);
@@ -598,10 +830,10 @@ function SearchSelect({
     setActive(-1);
   };
   const optionId = (i) => `${a11y.id}-opt-${i}`;
-  useEffect3(() => {
+  useEffect4(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
-  useEffect3(() => {
+  useEffect4(() => {
     if (!client || !ds || !open) return;
     if (timer.current) clearTimeout(timer.current);
     const controller = new AbortController();
@@ -621,7 +853,7 @@ function SearchSelect({
   }, [query, open, client]);
   const display = open ? query : selectedLabel || asText(value);
   const listId = `${a11y.id}-listbox`;
-  const wrapRef = useRef3(null);
+  const wrapRef = useRef4(null);
   const popStyle = useAnchoredPosition(wrapRef, open && (loading || options2.length > 0));
   const { dataTheme, themeStyle } = usePopoverTheme();
   const onKeyDown = (e) => {
@@ -643,8 +875,8 @@ function SearchSelect({
       setActive(-1);
     }
   };
-  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", ref: wrapRef, children: [
-    /* @__PURE__ */ jsx7(
+  return /* @__PURE__ */ jsxs4("div", { className: "lf-search-select", ref: wrapRef, children: [
+    /* @__PURE__ */ jsx9(
       "input",
       {
         ...a11y,
@@ -673,9 +905,9 @@ function SearchSelect({
       }
     ),
     open && (loading || options2.length > 0) && popoverTarget(wrapRef) && createPortal2(
-      /* @__PURE__ */ jsxs3("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: [
-        loading && /* @__PURE__ */ jsx7("li", { className: "lf-search-loading", children: "Searching\u2026" }),
-        options2.map((o, i) => /* @__PURE__ */ jsx7(
+      /* @__PURE__ */ jsxs4("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: [
+        loading && /* @__PURE__ */ jsx9("li", { className: "lf-search-loading", children: "Searching\u2026" }),
+        options2.map((o, i) => /* @__PURE__ */ jsx9(
           "li",
           {
             id: optionId(i),
@@ -708,7 +940,7 @@ function SearchableSelect({
   const [query, setQuery] = useState5("");
   const [open, setOpen] = useState5(false);
   const [active, setActive] = useState5(-1);
-  const blurTimer = useRef3(null);
+  const blurTimer = useRef4(null);
   const selected = options2.find((o) => o.value === asText(value));
   const q = query.trim().toLowerCase();
   const filtered = q ? options2.filter((o) => t(o.label).toLowerCase().includes(q) || o.value.toLowerCase().includes(q)) : options2;
@@ -718,8 +950,8 @@ function SearchableSelect({
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  useEffect3(() => () => clearBlur(), []);
-  useEffect3(() => {
+  useEffect4(() => () => clearBlur(), []);
+  useEffect4(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
   const choose = (o) => {
@@ -750,11 +982,11 @@ function SearchableSelect({
   };
   const display = open ? query : selected ? t(selected.label) : asText(value);
   const showClear = !disabled && !required && asText(value) !== "" && !open;
-  const wrapRef = useRef3(null);
+  const wrapRef = useRef4(null);
   const popStyle = useAnchoredPosition(wrapRef, open && filtered.length > 0);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  return /* @__PURE__ */ jsxs3("div", { className: "lf-search-select", ref: wrapRef, children: [
-    /* @__PURE__ */ jsx7(
+  return /* @__PURE__ */ jsxs4("div", { className: "lf-search-select", ref: wrapRef, children: [
+    /* @__PURE__ */ jsx9(
       "input",
       {
         ...a11y,
@@ -781,9 +1013,9 @@ function SearchableSelect({
         }
       }
     ),
-    showClear && /* @__PURE__ */ jsx7("button", { type: "button", className: "lf-search-clear", "aria-label": "Clear", onMouseDown: (e) => e.preventDefault(), onClick: () => setValue(""), children: /* @__PURE__ */ jsx7(XGlyph, {}) }),
+    showClear && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-search-clear", "aria-label": "Clear", onMouseDown: (e) => e.preventDefault(), onClick: () => setValue(""), children: /* @__PURE__ */ jsx9(XGlyph, {}) }),
     open && filtered.length > 0 && popoverTarget(wrapRef) && createPortal2(
-      /* @__PURE__ */ jsx7("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: filtered.map((o, i) => /* @__PURE__ */ jsx7(
+      /* @__PURE__ */ jsx9("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: filtered.map((o, i) => /* @__PURE__ */ jsx9(
         "li",
         {
           id: optionId(i),
@@ -806,7 +1038,7 @@ function SearchableSelect({
 // src/render/controls/inputs.tsx
 import { useState as useState6 } from "react";
 import "@lukeflow/form-core";
-import { jsx as jsx8, jsxs as jsxs4 } from "react/jsx-runtime";
+import { jsx as jsx10, jsxs as jsxs5 } from "react/jsx-runtime";
 function TextControl({
   type,
   a11y,
@@ -819,11 +1051,11 @@ function TextControl({
   const v = asText(value);
   const handle = (raw) => onChange(mask ? applyMask(raw, mask) : raw);
   const showClear = clearable && v !== "";
-  const input = /* @__PURE__ */ jsx8("input", { type, ...a11y, ...extra, value: v, onChange: (e) => handle(e.target.value) });
+  const input = /* @__PURE__ */ jsx10("input", { type, ...a11y, ...extra, value: v, onChange: (e) => handle(e.target.value) });
   if (!clearable) return input;
-  return /* @__PURE__ */ jsxs4("span", { className: "lf-input-wrap", children: [
+  return /* @__PURE__ */ jsxs5("span", { className: "lf-input-wrap", children: [
     input,
-    showClear && /* @__PURE__ */ jsx8("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ jsx8(XGlyph, {}) })
+    showClear && /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ jsx10(XGlyph, {}) })
   ] });
 }
 function TagsInput({
@@ -840,12 +1072,12 @@ function TagsInput({
     if (t && !tags.includes(t)) onChange([...tags, t]);
     setDraft("");
   };
-  return /* @__PURE__ */ jsxs4("div", { className: "lf-tags", children: [
-    tags.map((t) => /* @__PURE__ */ jsxs4("span", { className: "lf-tag", children: [
+  return /* @__PURE__ */ jsxs5("div", { className: "lf-tags", children: [
+    tags.map((t) => /* @__PURE__ */ jsxs5("span", { className: "lf-tag", children: [
       t,
-      /* @__PURE__ */ jsx8("button", { type: "button", "aria-label": `Remove ${t}`, disabled, onClick: () => onChange(tags.filter((x) => x !== t)), children: /* @__PURE__ */ jsx8(XGlyph, {}) })
+      /* @__PURE__ */ jsx10("button", { type: "button", "aria-label": `Remove ${t}`, disabled, onClick: () => onChange(tags.filter((x) => x !== t)), children: /* @__PURE__ */ jsx10(XGlyph, {}) })
     ] }, t)),
-    /* @__PURE__ */ jsx8(
+    /* @__PURE__ */ jsx10(
       "input",
       {
         ...a11y,
@@ -893,9 +1125,9 @@ function NumberInput({
       });
     }
   }
-  return /* @__PURE__ */ jsxs4("span", { className: "lf-number", children: [
-    prefix && /* @__PURE__ */ jsx8("span", { className: "lf-affix lf-prefix", children: prefix }),
-    /* @__PURE__ */ jsx8(
+  return /* @__PURE__ */ jsxs5("span", { className: "lf-number", children: [
+    prefix && /* @__PURE__ */ jsx10("span", { className: "lf-affix lf-prefix", children: prefix }),
+    /* @__PURE__ */ jsx10(
       "input",
       {
         type: "text",
@@ -911,7 +1143,7 @@ function NumberInput({
         onChange: (e) => onChange(e.target.value)
       }
     ),
-    suffix && /* @__PURE__ */ jsx8("span", { className: "lf-affix lf-suffix", children: suffix })
+    suffix && /* @__PURE__ */ jsx10("span", { className: "lf-affix lf-suffix", children: suffix })
   ] });
 }
 function FileField({
@@ -954,8 +1186,8 @@ function FileField({
       onChange(fileDescriptors(list));
     }
   };
-  return /* @__PURE__ */ jsxs4("div", { className: "lf-file", children: [
-    /* @__PURE__ */ jsx8(
+  return /* @__PURE__ */ jsxs5("div", { className: "lf-file", children: [
+    /* @__PURE__ */ jsx10(
       "input",
       {
         ...a11y,
@@ -966,15 +1198,15 @@ function FileField({
         onChange: (e) => handle(e.target.files)
       }
     ),
-    uploading && /* @__PURE__ */ jsx8("span", { className: "lf-file-uploading", children: "Uploading\u2026" }),
-    error && /* @__PURE__ */ jsx8("p", { role: "alert", className: "lf-error", children: error }),
-    files.length > 0 && /* @__PURE__ */ jsx8("ul", { className: "lf-file-list", children: files.map((f, i) => /* @__PURE__ */ jsx8("li", { children: typeof f.url === "string" && /^(https?:|mailto:)/i.test(f.url.trim()) ? /* @__PURE__ */ jsx8("a", { href: f.url, target: "_blank", rel: "noreferrer", children: f.name ?? "file" }) : f.name ?? "file" }, i)) })
+    uploading && /* @__PURE__ */ jsx10("span", { className: "lf-file-uploading", children: "Uploading\u2026" }),
+    error && /* @__PURE__ */ jsx10("p", { role: "alert", className: "lf-error", children: error }),
+    files.length > 0 && /* @__PURE__ */ jsx10("ul", { className: "lf-file-list", children: files.map((f, i) => /* @__PURE__ */ jsx10("li", { children: typeof f.url === "string" && /^(https?:|mailto:)/i.test(f.url.trim()) ? /* @__PURE__ */ jsx10("a", { href: f.url, target: "_blank", rel: "noreferrer", children: f.name ?? "file" }) : f.name ?? "file" }, i)) })
   ] });
 }
 
 // src/render/controls/SignatureField.tsx
-import { useState as useState7, useEffect as useEffect4, useRef as useRef4 } from "react";
-import { jsx as jsx9, jsxs as jsxs5 } from "react/jsx-runtime";
+import { useState as useState7, useEffect as useEffect5, useRef as useRef5 } from "react";
+import { jsx as jsx11, jsxs as jsxs6 } from "react/jsx-runtime";
 function SignatureField({
   a11y,
   value,
@@ -983,9 +1215,9 @@ function SignatureField({
   penColor,
   allowType
 }) {
-  const canvasRef = useRef4(null);
-  const drawing = useRef4(false);
-  const painted = useRef4("");
+  const canvasRef = useRef5(null);
+  const drawing = useRef5(false);
+  const painted = useRef5("");
   const dataUrl = typeof value === "string" ? value : "";
   const [hasInk, setHasInk] = useState7(Boolean(dataUrl));
   const [mode, setMode] = useState7("draw");
@@ -1009,7 +1241,7 @@ function SignatureField({
     setHasInk(Boolean(trimmed));
     onChange(trimmed ? canvas.toDataURL("image/png") : "");
   };
-  useEffect4(() => {
+  useEffect5(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -1076,9 +1308,9 @@ function SignatureField({
     painted.current = url;
     onChange(url);
   };
-  const onUpRef = useRef4(onUp);
+  const onUpRef = useRef5(onUp);
   onUpRef.current = onUp;
-  useEffect4(() => {
+  useEffect5(() => {
     const up = () => {
       if (drawing.current) onUpRef.current();
     };
@@ -1099,8 +1331,8 @@ function SignatureField({
     if (next === mode) return;
     setMode(next);
   };
-  const typedTimer = useRef4(null);
-  useEffect4(() => () => {
+  const typedTimer = useRef5(null);
+  useEffect5(() => () => {
     if (typedTimer.current) clearTimeout(typedTimer.current);
   }, []);
   const onTypedChange = (name) => {
@@ -1115,13 +1347,13 @@ function SignatureField({
     }
     drawTyped(typed);
   };
-  return /* @__PURE__ */ jsxs5("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
-    allowType && /* @__PURE__ */ jsxs5("div", { className: "lf-signature-modes", role: "group", "aria-label": "Signature mode", children: [
-      /* @__PURE__ */ jsx9("button", { type: "button", "aria-pressed": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
-      /* @__PURE__ */ jsx9("button", { type: "button", "aria-pressed": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
+  return /* @__PURE__ */ jsxs6("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
+    allowType && /* @__PURE__ */ jsxs6("div", { className: "lf-signature-modes", role: "group", "aria-label": "Signature mode", children: [
+      /* @__PURE__ */ jsx11("button", { type: "button", "aria-pressed": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
+      /* @__PURE__ */ jsx11("button", { type: "button", "aria-pressed": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
     ] }),
-    /* @__PURE__ */ jsxs5("div", { className: "lf-signature-padwrap", children: [
-      /* @__PURE__ */ jsx9(
+    /* @__PURE__ */ jsxs6("div", { className: "lf-signature-padwrap", children: [
+      /* @__PURE__ */ jsx11(
         "canvas",
         {
           id: a11y.id,
@@ -1140,9 +1372,9 @@ function SignatureField({
           onPointerCancel: onUp
         }
       ),
-      !hasInk && /* @__PURE__ */ jsx9("span", { className: "lf-signature-hint", "aria-hidden": "true", children: disabled ? "" : mode === "type" ? "Type your name below" : "Sign here" })
+      !hasInk && /* @__PURE__ */ jsx11("span", { className: "lf-signature-hint", "aria-hidden": "true", children: disabled ? "" : mode === "type" ? "Type your name below" : "Sign here" })
     ] }),
-    allowType && mode === "type" && /* @__PURE__ */ jsx9(
+    allowType && mode === "type" && /* @__PURE__ */ jsx11(
       "input",
       {
         type: "text",
@@ -1156,14 +1388,14 @@ function SignatureField({
         onBlur: flushTyped
       }
     ),
-    !disabled && hasInk && /* @__PURE__ */ jsx9("button", { type: "button", className: "lf-signature-clear", onClick: clear, children: "Clear" })
+    !disabled && hasInk && /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-signature-clear", onClick: clear, children: "Clear" })
   ] });
 }
 
 // src/render/controls/DateField.tsx
-import { useState as useState8, useEffect as useEffect5, useRef as useRef5 } from "react";
+import { useState as useState8, useEffect as useEffect6, useRef as useRef6 } from "react";
 import { createPortal as createPortal3 } from "react-dom";
-import { jsx as jsx10, jsxs as jsxs6 } from "react/jsx-runtime";
+import { jsx as jsx12, jsxs as jsxs7 } from "react/jsx-runtime";
 var pad = (n) => String(n).padStart(2, "0");
 var daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
 function parseDate(value) {
@@ -1239,13 +1471,13 @@ function DateField({
   })();
   const [view, setView] = useState8(date ?? today);
   const [focused, setFocused] = useState8(date ?? today);
-  const wrapRef = useRef5(null);
-  const inputRef = useRef5(null);
-  const gridRef = useRef5(null);
-  const popRef = useRef5(null);
+  const wrapRef = useRef6(null);
+  const inputRef = useRef6(null);
+  const gridRef = useRef6(null);
+  const popRef = useRef6(null);
   const popStyle = useAnchoredPosition(wrapRef, open && hasCal);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  useEffect5(() => {
+  useEffect6(() => {
     if (!open) return;
     const onDown = (e) => {
       const t = e.target;
@@ -1254,13 +1486,13 @@ function DateField({
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
-  useEffect5(() => {
+  useEffect6(() => {
     if (!open) return;
     const base = parseDate(typeof value === "string" ? value : "") ?? today;
     setView(base);
     setFocused(base);
   }, [open]);
-  useEffect5(() => {
+  useEffect6(() => {
     if (!open || !hasCal) return;
     gridRef.current?.querySelector('[data-focused="true"]')?.focus();
   }, [open, focused, view, hasCal]);
@@ -1342,9 +1574,9 @@ function DateField({
   };
   const cells = hasCal ? monthMatrix(view.y, view.m) : [];
   const showClear = clearable && !disabled && raw !== "";
-  return /* @__PURE__ */ jsxs6("div", { className: "lf-datefield", ref: wrapRef, children: [
-    /* @__PURE__ */ jsxs6("div", { className: "lf-datefield-input", children: [
-      /* @__PURE__ */ jsx10(
+  return /* @__PURE__ */ jsxs7("div", { className: "lf-datefield", ref: wrapRef, children: [
+    /* @__PURE__ */ jsxs7("div", { className: "lf-datefield-input", children: [
+      /* @__PURE__ */ jsx12(
         "input",
         {
           ...a11y,
@@ -1366,8 +1598,8 @@ function DateField({
           }
         }
       ),
-      showClear && /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-datefield-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ jsx10(XGlyph, {}) }),
-      hasCal && /* @__PURE__ */ jsx10(
+      showClear && /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-datefield-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ jsx12(XGlyph, {}) }),
+      hasCal && /* @__PURE__ */ jsx12(
         "button",
         {
           type: "button",
@@ -1377,12 +1609,12 @@ function DateField({
           "aria-expanded": open,
           disabled,
           onClick: () => open ? closeToInput() : openCal(),
-          children: /* @__PURE__ */ jsx10(CalendarGlyph, {})
+          children: /* @__PURE__ */ jsx12(CalendarGlyph, {})
         }
       )
     ] }),
-    hasTime && /* @__PURE__ */ jsxs6("span", { className: "lf-datefield-time", title: kind === "datetime" && !date ? "Pick a date first" : void 0, children: [
-      /* @__PURE__ */ jsxs6(
+    hasTime && /* @__PURE__ */ jsxs7("span", { className: "lf-datefield-time", title: kind === "datetime" && !date ? "Pick a date first" : void 0, children: [
+      /* @__PURE__ */ jsxs7(
         "select",
         {
           "aria-label": "Hour",
@@ -1393,13 +1625,13 @@ function DateField({
             setTimePart(+e.target.value, time?.min ?? 0);
           },
           children: [
-            /* @__PURE__ */ jsx10("option", { value: "" }),
-            Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ jsx10("option", { value: h, children: pad(h) }, h))
+            /* @__PURE__ */ jsx12("option", { value: "" }),
+            Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ jsx12("option", { value: h, children: pad(h) }, h))
           ]
         }
       ),
-      /* @__PURE__ */ jsx10("span", { "aria-hidden": "true", children: ":" }),
-      /* @__PURE__ */ jsxs6(
+      /* @__PURE__ */ jsx12("span", { "aria-hidden": "true", children: ":" }),
+      /* @__PURE__ */ jsxs7(
         "select",
         {
           "aria-label": "Minute",
@@ -1410,27 +1642,27 @@ function DateField({
             setTimePart(time?.h ?? 0, +e.target.value);
           },
           children: [
-            /* @__PURE__ */ jsx10("option", { value: "" }),
-            Array.from({ length: Math.ceil(60 / minStep) }, (_, i) => i * minStep).map((min) => /* @__PURE__ */ jsx10("option", { value: min, children: pad(min) }, min))
+            /* @__PURE__ */ jsx12("option", { value: "" }),
+            Array.from({ length: Math.ceil(60 / minStep) }, (_, i) => i * minStep).map((min) => /* @__PURE__ */ jsx12("option", { value: min, children: pad(min) }, min))
           ]
         }
       )
     ] }),
     open && hasCal && popoverTarget(wrapRef) && createPortal3(
-      /* @__PURE__ */ jsxs6("div", { ref: popRef, className: "lf-pop lf-datefield-pop", "data-theme": dataTheme, role: "dialog", "aria-label": "Choose date", style: { ...themeStyle, ...popStyle ?? {} }, children: [
-        /* @__PURE__ */ jsxs6("div", { className: "lf-cal-head", children: [
-          /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
-          /* @__PURE__ */ jsx10("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m, locale) }),
-          /* @__PURE__ */ jsx10("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
+      /* @__PURE__ */ jsxs7("div", { ref: popRef, className: "lf-pop lf-datefield-pop", "data-theme": dataTheme, role: "dialog", "aria-label": "Choose date", style: { ...themeStyle, ...popStyle ?? {} }, children: [
+        /* @__PURE__ */ jsxs7("div", { className: "lf-cal-head", children: [
+          /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
+          /* @__PURE__ */ jsx12("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m, locale) }),
+          /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
         ] }),
-        /* @__PURE__ */ jsxs6("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
-          /* @__PURE__ */ jsx10("div", { className: "lf-cal-row", role: "row", children: weekdays.map((w, i) => /* @__PURE__ */ jsx10("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w.long, children: w.narrow }, i)) }),
-          Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ jsx10("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
+        /* @__PURE__ */ jsxs7("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
+          /* @__PURE__ */ jsx12("div", { className: "lf-cal-row", role: "row", children: weekdays.map((w, i) => /* @__PURE__ */ jsx12("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w.long, children: w.narrow }, i)) }),
+          Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ jsx12("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
             const inMonth = c.m === view.m;
             const isSel = date != null && sameDay(c, date);
             const isFocused = sameDay(c, focused);
             const isToday = sameDay(c, today);
-            return /* @__PURE__ */ jsx10(
+            return /* @__PURE__ */ jsx12(
               "button",
               {
                 type: "button",
@@ -1455,7 +1687,7 @@ function DateField({
 }
 
 // src/render/controls/richControls.tsx
-import { useEffect as useEffect6, useRef as useRef6, useState as useState9 } from "react";
+import { useEffect as useEffect7, useRef as useRef7, useState as useState9 } from "react";
 import { createPortal as createPortal4 } from "react-dom";
 import {
   ADDRESS_REQUIRED_PARTS,
@@ -1463,7 +1695,7 @@ import {
   resolveMinionParams as resolveMinionParams3,
   toAddressSuggestions
 } from "@lukeflow/form-core";
-import { jsx as jsx11, jsxs as jsxs7 } from "react/jsx-runtime";
+import { jsx as jsx13, jsxs as jsxs8 } from "react/jsx-runtime";
 function RatingField({
   a11y,
   value,
@@ -1473,7 +1705,7 @@ function RatingField({
 }) {
   const cap = Math.max(1, Math.floor(max) || 5);
   const current = Math.min(cap, Math.max(0, Math.floor(Number(value) || 0)));
-  const groupRef = useRef6(null);
+  const groupRef = useRef7(null);
   const focusStar = (n) => groupRef.current?.querySelectorAll("button")[Math.max(1, n) - 1]?.focus();
   const set = (n) => !disabled && onChange(n === current ? 0 : n);
   const onKey = (e) => {
@@ -1490,9 +1722,9 @@ function RatingField({
       focusStar(next);
     }
   };
-  return /* @__PURE__ */ jsx11("div", { ref: groupRef, className: "lf-rating", role: "radiogroup", "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-required": a11y["aria-required"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: Array.from({ length: cap }, (_, i) => i + 1).map((n) => {
+  return /* @__PURE__ */ jsx13("div", { ref: groupRef, className: "lf-rating", role: "radiogroup", "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-required": a11y["aria-required"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: Array.from({ length: cap }, (_, i) => i + 1).map((n) => {
     const filled = n <= current;
-    return /* @__PURE__ */ jsx11(
+    return /* @__PURE__ */ jsx13(
       "button",
       {
         type: "button",
@@ -1504,7 +1736,7 @@ function RatingField({
         tabIndex: n === (current || 1) ? 0 : -1,
         onClick: () => set(n),
         onKeyDown: onKey,
-        children: /* @__PURE__ */ jsx11("span", { "aria-hidden": "true", children: filled ? "\u2605" : "\u2606" })
+        children: /* @__PURE__ */ jsx13("span", { "aria-hidden": "true", children: filled ? "\u2605" : "\u2606" })
       },
       n
     );
@@ -1533,14 +1765,14 @@ function RankingField({
     onChange(next);
     setAnnounce(`${byValue.get(order[i])?.label ?? order[i]} moved to position ${j + 1} of ${order.length}`);
   };
-  return /* @__PURE__ */ jsxs7("ol", { className: "lf-ranking", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
-    /* @__PURE__ */ jsx11("li", { className: "lf-sr-only", "aria-live": "polite", children: announce }),
-    order.map((v, i) => /* @__PURE__ */ jsxs7("li", { className: "lf-rank-item", children: [
-      /* @__PURE__ */ jsx11("span", { className: "lf-rank-pos", "aria-hidden": "true", children: i + 1 }),
-      /* @__PURE__ */ jsx11("span", { className: "lf-rank-label", children: byValue.get(v)?.label ?? v }),
-      /* @__PURE__ */ jsxs7("span", { className: "lf-rank-controls", children: [
-        /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === 0, "aria-label": `Move ${byValue.get(v)?.label ?? v} up`, onClick: () => move(i, -1), children: "\u2191" }),
-        /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === order.length - 1, "aria-label": `Move ${byValue.get(v)?.label ?? v} down`, onClick: () => move(i, 1), children: "\u2193" })
+  return /* @__PURE__ */ jsxs8("ol", { className: "lf-ranking", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
+    /* @__PURE__ */ jsx13("li", { className: "lf-sr-only", "aria-live": "polite", children: announce }),
+    order.map((v, i) => /* @__PURE__ */ jsxs8("li", { className: "lf-rank-item", children: [
+      /* @__PURE__ */ jsx13("span", { className: "lf-rank-pos", "aria-hidden": "true", children: i + 1 }),
+      /* @__PURE__ */ jsx13("span", { className: "lf-rank-label", children: byValue.get(v)?.label ?? v }),
+      /* @__PURE__ */ jsxs8("span", { className: "lf-rank-controls", children: [
+        /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === 0, "aria-label": `Move ${byValue.get(v)?.label ?? v} up`, onClick: () => move(i, -1), children: "\u2191" }),
+        /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === order.length - 1, "aria-label": `Move ${byValue.get(v)?.label ?? v} down`, onClick: () => move(i, 1), children: "\u2193" })
       ] })
     ] }, v))
   ] });
@@ -1568,14 +1800,14 @@ function MatrixField({
     }
   };
   const checked = (rowV, colV) => multiple ? asArray(data[rowV]).map(String).includes(colV) : asText(data[rowV]) === colV;
-  return /* @__PURE__ */ jsxs7("table", { className: "lf-matrix", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
-    /* @__PURE__ */ jsx11("thead", { children: /* @__PURE__ */ jsxs7("tr", { children: [
-      /* @__PURE__ */ jsx11("td", { className: "lf-matrix-corner" }),
-      cols.map((c) => /* @__PURE__ */ jsx11("th", { scope: "col", className: "lf-matrix-col", children: c.label }, c.value))
+  return /* @__PURE__ */ jsxs8("table", { className: "lf-matrix", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
+    /* @__PURE__ */ jsx13("thead", { children: /* @__PURE__ */ jsxs8("tr", { children: [
+      /* @__PURE__ */ jsx13("td", { className: "lf-matrix-corner" }),
+      cols.map((c) => /* @__PURE__ */ jsx13("th", { scope: "col", className: "lf-matrix-col", children: c.label }, c.value))
     ] }) }),
-    /* @__PURE__ */ jsx11("tbody", { children: rows.map((r) => /* @__PURE__ */ jsxs7("tr", { role: multiple ? "group" : "radiogroup", "aria-label": r.label, children: [
-      /* @__PURE__ */ jsx11("th", { scope: "row", className: "lf-matrix-row", children: r.label }),
-      cols.map((c) => /* @__PURE__ */ jsx11("td", { className: "lf-matrix-cell", children: /* @__PURE__ */ jsx11(
+    /* @__PURE__ */ jsx13("tbody", { children: rows.map((r) => /* @__PURE__ */ jsxs8("tr", { role: multiple ? "group" : "radiogroup", "aria-label": r.label, children: [
+      /* @__PURE__ */ jsx13("th", { scope: "row", className: "lf-matrix-row", children: r.label }),
+      cols.map((c) => /* @__PURE__ */ jsx13("td", { className: "lf-matrix-cell", children: /* @__PURE__ */ jsx13(
         "input",
         {
           type: multiple ? "checkbox" : "radio",
@@ -1678,12 +1910,12 @@ function AddressBlockField({
     const emptyRequired = partRequired && blockInvalid && asText(data[key]) === "";
     const invalid = emptyRequired || isPostal && postalInvalid;
     const errId = invalid ? `${inputId}-error` : void 0;
-    return /* @__PURE__ */ jsxs7("div", { className: `lf-address-part lf-address-${key}`, children: [
-      /* @__PURE__ */ jsxs7("label", { htmlFor: inputId, className: "lf-address-label", children: [
+    return /* @__PURE__ */ jsxs8("div", { className: `lf-address-part lf-address-${key}`, children: [
+      /* @__PURE__ */ jsxs8("label", { htmlFor: inputId, className: "lf-address-label", children: [
         labelFor(key),
-        partRequired && /* @__PURE__ */ jsx11("span", { "aria-hidden": "true", children: " *" })
+        partRequired && /* @__PURE__ */ jsx13("span", { "aria-hidden": "true", children: " *" })
       ] }),
-      /* @__PURE__ */ jsx11(
+      /* @__PURE__ */ jsx13(
         "input",
         {
           id: inputId,
@@ -1698,12 +1930,12 @@ function AddressBlockField({
           onChange: (e) => setPart(key, e.target.value)
         }
       ),
-      invalid && /* @__PURE__ */ jsx11("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: emptyRequired ? `${labelFor(key)} is required.` : `Enter a valid ${cfg.postalLabel.toLowerCase()}${cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : ""}.` })
+      invalid && /* @__PURE__ */ jsx13("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: emptyRequired ? `${labelFor(key)} is required.` : `Enter a valid ${cfg.postalLabel.toLowerCase()}${cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : ""}.` })
     ] }, key);
   };
-  return /* @__PURE__ */ jsxs7("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? manual ? "manual" : showRest ? "filled" : "search" : "manual", children: [
-    provider && /* @__PURE__ */ jsxs7("label", { className: "lf-address-toggle", children: [
-      /* @__PURE__ */ jsx11(
+  return /* @__PURE__ */ jsxs8("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? manual ? "manual" : showRest ? "filled" : "search" : "manual", children: [
+    provider && /* @__PURE__ */ jsxs8("label", { className: "lf-address-toggle", children: [
+      /* @__PURE__ */ jsx13(
         "input",
         {
           type: "checkbox",
@@ -1714,10 +1946,10 @@ function AddressBlockField({
           onChange: (e) => setManual(e.target.checked)
         }
       ),
-      /* @__PURE__ */ jsx11("span", { className: "lf-address-toggle-track", "aria-hidden": "true", children: /* @__PURE__ */ jsx11("span", { className: "lf-address-toggle-thumb" }) }),
-      /* @__PURE__ */ jsx11("span", { className: "lf-address-toggle-text", children: "Enter address manually" })
+      /* @__PURE__ */ jsx13("span", { className: "lf-address-toggle-track", "aria-hidden": "true", children: /* @__PURE__ */ jsx13("span", { className: "lf-address-toggle-thumb" }) }),
+      /* @__PURE__ */ jsx13("span", { className: "lf-address-toggle-text", children: "Enter address manually" })
     ] }),
-    useAutocomplete && entity ? /* @__PURE__ */ jsx11(
+    useAutocomplete && entity ? /* @__PURE__ */ jsx13(
       AddressLine1Autocomplete,
       {
         a11y,
@@ -1735,15 +1967,15 @@ function AddressBlockField({
   ] });
 }
 function AddressSpinner() {
-  return /* @__PURE__ */ jsxs7("svg", { className: "lf-spinner", width: "15", height: "15", viewBox: "0 0 24 24", "aria-hidden": "true", children: [
-    /* @__PURE__ */ jsx11("circle", { cx: "12", cy: "12", r: "9", fill: "none", stroke: "currentColor", strokeOpacity: "0.25", strokeWidth: "3" }),
-    /* @__PURE__ */ jsx11("path", { d: "M21 12a9 9 0 0 0-9-9", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", children: /* @__PURE__ */ jsx11("animateTransform", { attributeName: "transform", type: "rotate", from: "0 12 12", to: "360 12 12", dur: "0.7s", repeatCount: "indefinite" }) })
+  return /* @__PURE__ */ jsxs8("svg", { className: "lf-spinner", width: "15", height: "15", viewBox: "0 0 24 24", "aria-hidden": "true", children: [
+    /* @__PURE__ */ jsx13("circle", { cx: "12", cy: "12", r: "9", fill: "none", stroke: "currentColor", strokeOpacity: "0.25", strokeWidth: "3" }),
+    /* @__PURE__ */ jsx13("path", { d: "M21 12a9 9 0 0 0-9-9", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", children: /* @__PURE__ */ jsx13("animateTransform", { attributeName: "transform", type: "rotate", from: "0 12 12", to: "360 12 12", dur: "0.7s", repeatCount: "indefinite" }) })
   ] });
 }
 function AddressPin() {
-  return /* @__PURE__ */ jsxs7("svg", { className: "lf-address-pin", width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ jsx11("path", { d: "M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" }),
-    /* @__PURE__ */ jsx11("circle", { cx: "12", cy: "11", r: "2" })
+  return /* @__PURE__ */ jsxs8("svg", { className: "lf-address-pin", width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ jsx13("path", { d: "M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" }),
+    /* @__PURE__ */ jsx13("circle", { cx: "12", cy: "11", r: "2" })
   ] });
 }
 function AddressLine1Autocomplete({
@@ -1766,20 +1998,20 @@ function AddressLine1Autocomplete({
   const [loading, setLoading] = useState9(false);
   const [searched, setSearched] = useState9(false);
   const [active, setActive] = useState9(-1);
-  const timer = useRef6(null);
-  const blurTimer = useRef6(null);
+  const timer = useRef7(null);
+  const blurTimer = useRef7(null);
   const clearBlur = () => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  useEffect6(() => () => clearBlur(), []);
+  useEffect7(() => () => clearBlur(), []);
   const inputId = `${a11y.id}-streetAddress`;
   const listId = `${a11y.id}-addr-listbox`;
   const optionId = (i) => `${a11y.id}-addr-opt-${i}`;
-  useEffect6(() => {
+  useEffect7(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
-  useEffect6(() => {
+  useEffect7(() => {
     if (!client || !ds || !open || value.trim() === "") {
       setSuggestions([]);
       setSearched(false);
@@ -1830,16 +2062,16 @@ function AddressLine1Autocomplete({
       setActive(-1);
     }
   };
-  const wrapRef = useRef6(null);
+  const wrapRef = useRef7(null);
   const dropdownOpen = !!client && open && value.trim() !== "" && (loading || suggestions.length > 0 || searched);
   const popStyle = useAnchoredPosition(wrapRef, dropdownOpen);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  return /* @__PURE__ */ jsxs7("div", { className: "lf-address-part lf-address-streetAddress", ref: wrapRef, children: [
-    /* @__PURE__ */ jsxs7("label", { htmlFor: inputId, className: "lf-address-label", children: [
+  return /* @__PURE__ */ jsxs8("div", { className: "lf-address-part lf-address-streetAddress", ref: wrapRef, children: [
+    /* @__PURE__ */ jsxs8("label", { htmlFor: inputId, className: "lf-address-label", children: [
       "Street address",
-      required && /* @__PURE__ */ jsx11("span", { "aria-hidden": "true", children: " *" })
+      required && /* @__PURE__ */ jsx13("span", { "aria-hidden": "true", children: " *" })
     ] }),
-    /* @__PURE__ */ jsx11(
+    /* @__PURE__ */ jsx13(
       "input",
       {
         id: inputId,
@@ -1872,12 +2104,12 @@ function AddressLine1Autocomplete({
         }
       }
     ),
-    invalid && /* @__PURE__ */ jsx11("p", { id: `${inputId}-error`, className: "lf-address-error lf-error", role: "alert", children: "Street address is required." }),
+    invalid && /* @__PURE__ */ jsx13("p", { id: `${inputId}-error`, className: "lf-address-error lf-error", role: "alert", children: "Street address is required." }),
     dropdownOpen && popoverTarget(wrapRef) && createPortal4(
-      /* @__PURE__ */ jsx11("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list lf-address-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: loading ? /* @__PURE__ */ jsxs7("li", { className: "lf-search-loading", "aria-live": "polite", children: [
-        /* @__PURE__ */ jsx11(AddressSpinner, {}),
-        /* @__PURE__ */ jsx11("span", { children: "Searching addresses\u2026" })
-      ] }) : suggestions.length > 0 ? suggestions.map((s, i) => /* @__PURE__ */ jsxs7(
+      /* @__PURE__ */ jsx13("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list lf-address-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: loading ? /* @__PURE__ */ jsxs8("li", { className: "lf-search-loading", "aria-live": "polite", children: [
+        /* @__PURE__ */ jsx13(AddressSpinner, {}),
+        /* @__PURE__ */ jsx13("span", { children: "Searching addresses\u2026" })
+      ] }) : suggestions.length > 0 ? suggestions.map((s, i) => /* @__PURE__ */ jsxs8(
         "li",
         {
           id: optionId(i),
@@ -1889,12 +2121,12 @@ function AddressLine1Autocomplete({
             choose(s);
           },
           children: [
-            /* @__PURE__ */ jsx11(AddressPin, {}),
-            /* @__PURE__ */ jsx11("span", { className: "lf-address-option-label", children: s.label })
+            /* @__PURE__ */ jsx13(AddressPin, {}),
+            /* @__PURE__ */ jsx13("span", { className: "lf-address-option-label", children: s.label })
           ]
         },
         s.id ?? s.label
-      )) : /* @__PURE__ */ jsx11("li", { className: "lf-search-empty", children: "No matching addresses" }) }),
+      )) : /* @__PURE__ */ jsx13("li", { className: "lf-search-empty", children: "No matching addresses" }) }),
       popoverTarget(wrapRef)
     )
   ] });
@@ -1913,12 +2145,12 @@ function RichTextField({
   onChange,
   sanitizeHtml = defaultSanitizeHtml
 }) {
-  const ref = useRef6(null);
-  const initial = useRef6(sanitizeHtml(asText(value)));
+  const ref = useRef7(null);
+  const initial = useRef7(sanitizeHtml(asText(value)));
   const emit = () => {
     if (ref.current) onChange(sanitizeHtml(ref.current.innerHTML));
   };
-  useEffect6(() => {
+  useEffect7(() => {
     const el = ref.current;
     if (!el) return;
     const incoming = sanitizeHtml(asText(value));
@@ -1930,9 +2162,9 @@ function RichTextField({
     document.execCommand(cmd, false);
     emit();
   };
-  return /* @__PURE__ */ jsxs7("div", { className: "lf-richtext", children: [
-    /* @__PURE__ */ jsx11("div", { className: "lf-rt-toolbar", role: "toolbar", "aria-label": "Text formatting", "aria-controls": a11y.id, children: RT_COMMANDS.map((c) => /* @__PURE__ */ jsx11("button", { type: "button", className: "lf-rt-btn", "aria-label": c.label, title: c.label, disabled, onMouseDown: (e) => e.preventDefault(), onClick: () => exec(c.cmd), children: /* @__PURE__ */ jsx11("span", { "aria-hidden": "true", children: c.icon }) }, c.cmd)) }),
-    /* @__PURE__ */ jsx11(
+  return /* @__PURE__ */ jsxs8("div", { className: "lf-richtext", children: [
+    /* @__PURE__ */ jsx13("div", { className: "lf-rt-toolbar", role: "toolbar", "aria-label": "Text formatting", "aria-controls": a11y.id, children: RT_COMMANDS.map((c) => /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-rt-btn", "aria-label": c.label, title: c.label, disabled, onMouseDown: (e) => e.preventDefault(), onClick: () => exec(c.cmd), children: /* @__PURE__ */ jsx13("span", { "aria-hidden": "true", children: c.icon }) }, c.cmd)) }),
+    /* @__PURE__ */ jsx13(
       "div",
       {
         ref,
@@ -1956,12 +2188,12 @@ function RichTextField({
 }
 
 // src/render/containers.tsx
-import { useRef as useRef7, useState as useState10 } from "react";
+import { useRef as useRef8, useState as useState10 } from "react";
 import {
   evaluateVisibility,
   evaluateRequired
 } from "@lukeflow/form-core";
-import { jsx as jsx12, jsxs as jsxs8 } from "react/jsx-runtime";
+import { jsx as jsx14, jsxs as jsxs9 } from "react/jsx-runtime";
 function Group({
   entity,
   fs,
@@ -1975,7 +2207,7 @@ function Group({
   const desc = labelText(a, "description");
   const descId = desc ? `${entity.id}-desc` : void 0;
   const cls = ["lf-field", "lf-group", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
-  return /* @__PURE__ */ jsxs8(
+  return /* @__PURE__ */ jsxs9(
     "fieldset",
     {
       className: cls,
@@ -1985,15 +2217,15 @@ function Group({
       "aria-invalid": error || asyncMsg ? true : void 0,
       "aria-describedby": descId,
       children: [
-        /* @__PURE__ */ jsxs8("legend", { className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
+        /* @__PURE__ */ jsxs9("legend", { className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
           ctx.t(labelText(a) ?? fs.key),
-          fs.isRequired && /* @__PURE__ */ jsx12("span", { "aria-hidden": "true", children: " *" }),
-          /* @__PURE__ */ jsx12(Tooltip, { text: tooltipText(a) })
+          fs.isRequired && /* @__PURE__ */ jsx14("span", { "aria-hidden": "true", children: " *" }),
+          /* @__PURE__ */ jsx14(Tooltip, { text: tooltipText(a) })
         ] }),
         children,
-        desc && /* @__PURE__ */ jsx12("p", { id: descId, className: "lf-desc", children: ctx.t(desc) }),
-        error && /* @__PURE__ */ jsx12("p", { role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
-        !error && asyncMsg && /* @__PURE__ */ jsx12("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
+        desc && /* @__PURE__ */ jsx14("p", { id: descId, className: "lf-desc", children: ctx.t(desc) }),
+        error && /* @__PURE__ */ jsx14("p", { role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
+        !error && asyncMsg && /* @__PURE__ */ jsx14("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
       ]
     }
   );
@@ -2020,23 +2252,23 @@ function GridField({
   const start = paged ? safePage * pageSize : 0;
   const visibleRows = paged ? rows.slice(start, start + pageSize) : rows;
   const replace = (next) => ctx.form.setValues({ [key]: next }, { markTouched: true });
-  return /* @__PURE__ */ jsxs8("div", { className: "lf-grid", "data-type": entity.type, children: [
-    /* @__PURE__ */ jsx12("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
-    /* @__PURE__ */ jsxs8("table", { children: [
-      /* @__PURE__ */ jsx12("thead", { children: /* @__PURE__ */ jsxs8("tr", { children: [
-        cells.map((c) => /* @__PURE__ */ jsx12("th", { scope: "col", children: labelText(c.attributes) ?? cellKey(c) }, c.id)),
-        !disabled && /* @__PURE__ */ jsx12("th", {})
+  return /* @__PURE__ */ jsxs9("div", { className: "lf-grid", "data-type": entity.type, children: [
+    /* @__PURE__ */ jsx14("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
+    /* @__PURE__ */ jsxs9("table", { children: [
+      /* @__PURE__ */ jsx14("thead", { children: /* @__PURE__ */ jsxs9("tr", { children: [
+        cells.map((c) => /* @__PURE__ */ jsx14("th", { scope: "col", children: labelText(c.attributes) ?? cellKey(c) }, c.id)),
+        !disabled && /* @__PURE__ */ jsx14("th", {})
       ] }) }),
-      /* @__PURE__ */ jsx12("tbody", { children: visibleRows.map((row, j) => {
+      /* @__PURE__ */ jsx14("tbody", { children: visibleRows.map((row, j) => {
         const i = start + j;
-        return /* @__PURE__ */ jsxs8("tr", { children: [
+        return /* @__PURE__ */ jsxs9("tr", { children: [
           cells.map((c) => {
             const ck = cellKey(c);
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
             const visible = evaluateVisibility(c.attributes, { ...top, ...row }, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator });
             const required = evaluateRequired(c.attributes, { ...top, ...row });
-            return /* @__PURE__ */ jsx12("td", { children: visible && /* @__PURE__ */ jsx12(
+            return /* @__PURE__ */ jsx14("td", { children: visible && /* @__PURE__ */ jsx14(
               GridCell,
               {
                 type: c.type,
@@ -2052,20 +2284,20 @@ function GridField({
               }
             ) }, c.id);
           }),
-          !disabled && /* @__PURE__ */ jsx12("td", { children: /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-row-remove", onClick: () => replace(rows.filter((_, k) => k !== i)), children: "Remove" }) })
+          !disabled && /* @__PURE__ */ jsx14("td", { children: /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-row-remove", onClick: () => replace(rows.filter((_, k) => k !== i)), children: "Remove" }) })
         ] }, i);
       }) }),
-      hasAggregates && /* @__PURE__ */ jsx12("tfoot", { children: /* @__PURE__ */ jsxs8("tr", { className: "lf-grid-aggregates", children: [
+      hasAggregates && /* @__PURE__ */ jsx14("tfoot", { children: /* @__PURE__ */ jsxs9("tr", { className: "lf-grid-aggregates", children: [
         cells.map((c) => {
           const kind = c.attributes?.aggregate;
-          return /* @__PURE__ */ jsx12("td", { children: typeof kind === "string" ? aggregate(rows, cellKey(c), kind) : "" }, c.id);
+          return /* @__PURE__ */ jsx14("td", { children: typeof kind === "string" ? aggregate(rows, cellKey(c), kind) : "" }, c.id);
         }),
-        !disabled && /* @__PURE__ */ jsx12("td", {})
+        !disabled && /* @__PURE__ */ jsx14("td", {})
       ] }) })
     ] }),
-    paged && /* @__PURE__ */ jsxs8("div", { className: "lf-grid-pager", children: [
-      /* @__PURE__ */ jsx12("button", { type: "button", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: "Prev" }),
-      /* @__PURE__ */ jsxs8("span", { className: "lf-grid-page", children: [
+    paged && /* @__PURE__ */ jsxs9("div", { className: "lf-grid-pager", children: [
+      /* @__PURE__ */ jsx14("button", { type: "button", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: "Prev" }),
+      /* @__PURE__ */ jsxs9("span", { className: "lf-grid-page", children: [
         "Rows ",
         start + 1,
         "\u2013",
@@ -2073,10 +2305,10 @@ function GridField({
         " of ",
         rows.length
       ] }),
-      /* @__PURE__ */ jsx12("button", { type: "button", disabled: safePage >= pageCount - 1, onClick: () => setPage(safePage + 1), children: "Next" })
+      /* @__PURE__ */ jsx14("button", { type: "button", disabled: safePage >= pageCount - 1, onClick: () => setPage(safePage + 1), children: "Next" })
     ] }),
-    !disabled && /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-row-add", onClick: () => replace([...rows, {}]), children: "Add row" }),
-    error && /* @__PURE__ */ jsx12("p", { role: "alert", className: "lf-error", children: error.message })
+    !disabled && /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-row-add", onClick: () => replace([...rows, {}]), children: "Add row" }),
+    error && /* @__PURE__ */ jsx14("p", { role: "alert", className: "lf-error", children: error.message })
   ] });
 }
 function GridCell({
@@ -2095,7 +2327,7 @@ function GridCell({
   const ariaRequired = required || void 0;
   const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"], "aria-required": ariaRequired, ...noAutofill(id ?? "") };
   if (type === "checkbox") {
-    return /* @__PURE__ */ jsx12("input", { type: "checkbox", ...rest, "aria-required": ariaRequired, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
+    return /* @__PURE__ */ jsx14("input", { type: "checkbox", ...rest, "aria-required": ariaRequired, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
   }
   if (type === "selectBoxes") {
     const selected = new Set((Array.isArray(value) ? value : []).map(String));
@@ -2105,31 +2337,31 @@ function GridCell({
       else next.delete(v);
       onChange([...next]);
     };
-    return /* @__PURE__ */ jsx12("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], "aria-required": ariaRequired, children: opts.map((o) => /* @__PURE__ */ jsxs8("label", { className: "lf-cell-check", children: [
-      /* @__PURE__ */ jsx12("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
+    return /* @__PURE__ */ jsx14("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], "aria-required": ariaRequired, children: opts.map((o) => /* @__PURE__ */ jsxs9("label", { className: "lf-cell-check", children: [
+      /* @__PURE__ */ jsx14("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
       " ",
       o.label
     ] }, o.value)) });
   }
   if (type === "select" || type === "radio") {
-    return /* @__PURE__ */ jsxs8("select", { ...rest, "aria-required": ariaRequired, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
-      /* @__PURE__ */ jsx12("option", { value: "" }),
-      opts.map((o) => /* @__PURE__ */ jsx12("option", { value: o.value, children: o.label }, o.value))
+    return /* @__PURE__ */ jsxs9("select", { ...rest, "aria-required": ariaRequired, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
+      /* @__PURE__ */ jsx14("option", { value: "" }),
+      opts.map((o) => /* @__PURE__ */ jsx14("option", { value: o.value, children: o.label }, o.value))
     ] });
   }
   if (type === "file") {
     const fileEntity = entity ?? { id: id ?? "", type: "file", attributes: a };
-    return /* @__PURE__ */ jsx12(FileField, { a11y, multiple: Boolean(a.multiple), value, disabled, onChange, entity: fileEntity, scope: scope ?? {} });
+    return /* @__PURE__ */ jsx14(FileField, { a11y, multiple: Boolean(a.multiple), value, disabled, onChange, entity: fileEntity, scope: scope ?? {} });
   }
   if (type === "signature") {
-    return /* @__PURE__ */ jsx12(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+    return /* @__PURE__ */ jsx14(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
   }
   if (type === "textarea") {
-    return /* @__PURE__ */ jsx12("textarea", { ...rest, ...noAutofill(id ?? ""), "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
+    return /* @__PURE__ */ jsx14("textarea", { ...rest, ...noAutofill(id ?? ""), "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
   }
   const mask = typeof a.inputMask === "string" ? a.inputMask : "";
   const numeric = type === "number" || type === "currency";
-  return /* @__PURE__ */ jsx12(
+  return /* @__PURE__ */ jsx14(
     "input",
     {
       type: mask || numeric ? "text" : inputType(type),
@@ -2143,27 +2375,41 @@ function GridCell({
     }
   );
 }
-function Static({ entity, sanitizeHtml = defaultSanitizeHtml }) {
+function Static({
+  entity,
+  sanitizeHtml = defaultSanitizeHtml,
+  submitting = false
+}) {
   const a = entity.attributes ?? {};
   if (entity.type === "heading") {
     const text2 = labelText(a) ?? labelText(a, "content");
     if (!text2) return null;
     const size = typeof a.headingSize === "string" && /^h[1-6]$/.test(a.headingSize) ? a.headingSize : "h3";
     const Tag = size;
-    return /* @__PURE__ */ jsx12(Tag, { className: `lf-heading lf-heading--${size}`, children: text2 });
+    return /* @__PURE__ */ jsx14(Tag, { className: `lf-heading lf-heading--${size}`, children: text2 });
   }
-  if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ jsx12("hr", { className: "lf-divider" });
+  if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ jsx14("hr", { className: "lf-divider" });
   if (entity.type === "button") {
     const action = a.buttonAction === "reset" ? "reset" : a.buttonAction === "button" ? "button" : "submit";
-    return /* @__PURE__ */ jsx12("button", { type: action, className: "lf-button", "data-action": action, children: labelText(a) ?? "Submit" });
+    return /* @__PURE__ */ jsx14(
+      "button",
+      {
+        type: action,
+        className: "lf-button",
+        "data-action": action,
+        disabled: action === "submit" && submitting ? true : void 0,
+        "aria-busy": action === "submit" && submitting ? true : void 0,
+        children: labelText(a) ?? "Submit"
+      }
+    );
   }
   if (entity.type === "content" || entity.type === "html" || entity.type === "htmlElement") {
     const html = typeof a.content === "string" ? a.content : "";
-    return /* @__PURE__ */ jsx12("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: sanitizeHtml(html) } });
+    return /* @__PURE__ */ jsx14("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: sanitizeHtml(html) } });
   }
   const text = labelText(a) ?? labelText(a, "content") ?? "";
   if (!text) return null;
-  return /* @__PURE__ */ jsx12("div", { className: "lf-static", "data-type": entity.type, children: text });
+  return /* @__PURE__ */ jsx14("div", { className: "lf-static", "data-type": entity.type, children: text });
 }
 var PANEL_THEMES = /* @__PURE__ */ new Set(["default", "primary", "secondary", "info", "success", "warning", "danger"]);
 function PanelBox({ entity, schema, ctx, Render }) {
@@ -2175,12 +2421,12 @@ function PanelBox({ entity, schema, ctx, Render }) {
   const title = labelText(a);
   const bodyId = `${entity.id}-panel-body`;
   const Wrapper = entity.type === "fieldset" ? "fieldset" : "section";
-  return /* @__PURE__ */ jsxs8(Wrapper, { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
-    collapsible ? /* @__PURE__ */ jsxs8("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
-      /* @__PURE__ */ jsx12("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
-      /* @__PURE__ */ jsx12("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
-    ] }) : title && /* @__PURE__ */ jsx12("div", { className: "lf-panel-head", children: /* @__PURE__ */ jsx12("span", { className: "lf-panel-title", children: ctx.t(title) }) }),
-    /* @__PURE__ */ jsx12("div", { id: bodyId, className: "lf-container-children lf-panel-body", hidden: !open, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx12(Render, { id: cid, schema, ctx }, cid)) })
+  return /* @__PURE__ */ jsxs9(Wrapper, { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
+    collapsible ? /* @__PURE__ */ jsxs9("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
+      /* @__PURE__ */ jsx14("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
+      /* @__PURE__ */ jsx14("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
+    ] }) : title && /* @__PURE__ */ jsx14("div", { className: "lf-panel-head", children: /* @__PURE__ */ jsx14("span", { className: "lf-panel-title", children: ctx.t(title) }) }),
+    /* @__PURE__ */ jsx14("div", { id: bodyId, className: "lf-container-children lf-panel-body", hidden: !open, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx14(Render, { id: cid, schema, ctx }, cid)) })
   ] });
 }
 function TabsContainer({ entity, schema, ctx, Render }) {
@@ -2189,14 +2435,14 @@ function TabsContainer({ entity, schema, ctx, Render }) {
   const [active, setActive] = useState10(0);
   const [focusIdx, setFocusIdx] = useState10(0);
   const [revealErrors, setRevealErrors] = useState10(false);
-  const navRef = useRef7(null);
+  const navRef = useRef8(null);
   const idx = Math.min(active, Math.max(0, children.length - 1));
   const vertical = Boolean(a.verticalTabs);
   const navigation = Boolean(a.navigation);
   const validateBeforeNext = Boolean(a.validateBeforeNext);
   const rootClass = `lf-container lf-tabs${vertical ? " lf-tabs--vertical" : ""}`;
   if (children.length === 0)
-    return /* @__PURE__ */ jsx12("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ jsx12("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
+    return /* @__PURE__ */ jsx14("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ jsx14("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
   const tabId = (i) => `${entity.id}-tab-${i}`;
   const panelId = (i) => `${entity.id}-panel-${i}`;
   const tabLabel = (cid, i) => {
@@ -2237,10 +2483,10 @@ function TabsContainer({ entity, schema, ctx, Render }) {
   const renderTab = (cid) => {
     const child = schema.entities[cid];
     const isContainer = child ? Boolean(ctx.reg.get(child.type)?.isContainer) : false;
-    return isContainer ? (child.children ?? []).map((gid) => /* @__PURE__ */ jsx12(Render, { id: gid, schema, ctx: tabCtx }, gid)) : /* @__PURE__ */ jsx12(Render, { id: cid, schema, ctx: tabCtx });
+    return isContainer ? (child.children ?? []).map((gid) => /* @__PURE__ */ jsx14(Render, { id: gid, schema, ctx: tabCtx }, gid)) : /* @__PURE__ */ jsx14(Render, { id: cid, schema, ctx: tabCtx });
   };
-  return /* @__PURE__ */ jsxs8("div", { className: rootClass, "data-type": "tabs", children: [
-    /* @__PURE__ */ jsx12("div", { className: "lf-tabs-nav", role: "tablist", "aria-orientation": vertical ? "vertical" : void 0, ref: navRef, children: children.map((cid, i) => /* @__PURE__ */ jsx12(
+  return /* @__PURE__ */ jsxs9("div", { className: rootClass, "data-type": "tabs", children: [
+    /* @__PURE__ */ jsx14("div", { className: "lf-tabs-nav", role: "tablist", "aria-orientation": vertical ? "vertical" : void 0, ref: navRef, children: children.map((cid, i) => /* @__PURE__ */ jsx14(
       "button",
       {
         type: "button",
@@ -2256,15 +2502,15 @@ function TabsContainer({ entity, schema, ctx, Render }) {
       },
       cid
     )) }),
-    children.map((cid, i) => /* @__PURE__ */ jsx12("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: renderTab(cid) }, cid)),
-    navigation && /* @__PURE__ */ jsxs8("div", { className: "lf-tabs-foot", children: [
-      /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-tabs-prev", disabled: idx === 0, onClick: () => go(idx - 1), children: ctx.t("Previous") }),
-      /* @__PURE__ */ jsxs8("span", { className: "lf-tabs-progress", "aria-live": "polite", children: [
+    children.map((cid, i) => /* @__PURE__ */ jsx14("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: renderTab(cid) }, cid)),
+    navigation && /* @__PURE__ */ jsxs9("div", { className: "lf-tabs-foot", children: [
+      /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-tabs-prev", disabled: idx === 0, onClick: () => go(idx - 1), children: ctx.t("Previous") }),
+      /* @__PURE__ */ jsxs9("span", { className: "lf-tabs-progress", "aria-live": "polite", children: [
         idx + 1,
         " / ",
         children.length
       ] }),
-      /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-tabs-next", disabled: idx >= children.length - 1, onClick: () => go(idx + 1), children: ctx.t("Next") })
+      /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-tabs-next", disabled: idx >= children.length - 1, onClick: () => go(idx + 1), children: ctx.t("Next") })
     ] })
   ] });
 }
@@ -2275,11 +2521,11 @@ function TableGrid({ entity, schema, ctx, Render }) {
   const children = entity.children ?? [];
   const rows = Math.max(minRows, Math.ceil(children.length / cols), 1);
   const title = labelText(a);
-  return /* @__PURE__ */ jsxs8("table", { className: "lf-table", "data-type": "table", children: [
-    title && /* @__PURE__ */ jsx12("caption", { className: "lf-container-label", children: ctx.t(title) }),
-    /* @__PURE__ */ jsx12("tbody", { children: Array.from({ length: rows }).map((_, r) => /* @__PURE__ */ jsx12("tr", { children: Array.from({ length: cols }).map((_2, c) => {
+  return /* @__PURE__ */ jsxs9("table", { className: "lf-table", "data-type": "table", children: [
+    title && /* @__PURE__ */ jsx14("caption", { className: "lf-container-label", children: ctx.t(title) }),
+    /* @__PURE__ */ jsx14("tbody", { children: Array.from({ length: rows }).map((_, r) => /* @__PURE__ */ jsx14("tr", { children: Array.from({ length: cols }).map((_2, c) => {
       const cid = children[r * cols + c];
-      return /* @__PURE__ */ jsx12("td", { children: cid ? /* @__PURE__ */ jsx12(Render, { id: cid, schema, ctx }) : null }, c);
+      return /* @__PURE__ */ jsx14("td", { children: cid ? /* @__PURE__ */ jsx14(Render, { id: cid, schema, ctx }) : null }, c);
     }) }, r)) })
   ] });
 }
@@ -2321,28 +2567,28 @@ function EditGridField({
     const v = row?.[cellKey(c)];
     return v == null || v === "" ? null : `${labelText(c.attributes) ?? cellKey(c)}: ${asText(v)}`;
   }).filter(Boolean).join(" \xB7 ");
-  return /* @__PURE__ */ jsxs8("div", { className: "lf-edit-grid", "data-type": "editGrid", children: [
-    /* @__PURE__ */ jsx12("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
-    rows.length > 0 && /* @__PURE__ */ jsx12("ul", { className: "lf-eg-rows", children: rows.map((row, i) => /* @__PURE__ */ jsxs8("li", { className: "lf-eg-row", children: [
-      /* @__PURE__ */ jsx12("span", { className: "lf-eg-summary", children: summary(row) || /* @__PURE__ */ jsx12("em", { className: "lf-eg-empty", children: "Empty row" }) }),
-      !disabled && !editing && /* @__PURE__ */ jsxs8("span", { className: "lf-eg-row-actions", children: [
-        /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-eg-edit", onClick: () => startEdit(i), children: ctx.t("Edit") }),
-        /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-eg-remove", onClick: () => removeRow(i), children: ctx.t("Remove") })
+  return /* @__PURE__ */ jsxs9("div", { className: "lf-edit-grid", "data-type": "editGrid", children: [
+    /* @__PURE__ */ jsx14("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
+    rows.length > 0 && /* @__PURE__ */ jsx14("ul", { className: "lf-eg-rows", children: rows.map((row, i) => /* @__PURE__ */ jsxs9("li", { className: "lf-eg-row", children: [
+      /* @__PURE__ */ jsx14("span", { className: "lf-eg-summary", children: summary(row) || /* @__PURE__ */ jsx14("em", { className: "lf-eg-empty", children: "Empty row" }) }),
+      !disabled && !editing && /* @__PURE__ */ jsxs9("span", { className: "lf-eg-row-actions", children: [
+        /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-eg-edit", onClick: () => startEdit(i), children: ctx.t("Edit") }),
+        /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-eg-remove", onClick: () => removeRow(i), children: ctx.t("Remove") })
       ] })
     ] }, i)) }),
-    editing && /* @__PURE__ */ jsxs8("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
+    editing && /* @__PURE__ */ jsxs9("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
       cells.map((c) => {
         const ck = cellKey(c);
         const rowScope = { ...top, ...editing.draft };
         if (!evaluateVisibility(c.attributes, rowScope, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator })) return null;
         const label = labelText(c.attributes) ?? ck;
         const required = evaluateRequired(c.attributes, rowScope);
-        return /* @__PURE__ */ jsxs8("label", { className: "lf-eg-cell", children: [
-          /* @__PURE__ */ jsxs8("span", { className: "lf-eg-cell-label", children: [
+        return /* @__PURE__ */ jsxs9("label", { className: "lf-eg-cell", children: [
+          /* @__PURE__ */ jsxs9("span", { className: "lf-eg-cell-label", children: [
             ctx.t(label),
-            required && /* @__PURE__ */ jsx12("span", { "aria-hidden": "true", children: " *" })
+            required && /* @__PURE__ */ jsx14("span", { "aria-hidden": "true", children: " *" })
           ] }),
-          /* @__PURE__ */ jsx12(
+          /* @__PURE__ */ jsx14(
             GridCell,
             {
               type: c.type,
@@ -2359,21 +2605,21 @@ function EditGridField({
           )
         ] }, c.id);
       }),
-      /* @__PURE__ */ jsxs8("div", { className: "lf-eg-editor-actions", children: [
-        /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-eg-cancel", onClick: () => setEditing(null), children: ctx.t("Cancel") }),
-        /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-eg-save", onClick: commitDraft, children: ctx.t("Save") })
+      /* @__PURE__ */ jsxs9("div", { className: "lf-eg-editor-actions", children: [
+        /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-eg-cancel", onClick: () => setEditing(null), children: ctx.t("Cancel") }),
+        /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-eg-save", onClick: commitDraft, children: ctx.t("Save") })
       ] })
     ] }),
-    !disabled && !editing && /* @__PURE__ */ jsx12("button", { type: "button", className: "lf-row-add", onClick: startAdd, children: ctx.t("Add another") }),
-    error && /* @__PURE__ */ jsx12("p", { role: "alert", className: "lf-error", children: error.message })
+    !disabled && !editing && /* @__PURE__ */ jsx14("button", { type: "button", className: "lf-row-add", onClick: startAdd, children: ctx.t("Add another") }),
+    error && /* @__PURE__ */ jsx14("p", { role: "alert", className: "lf-error", children: error.message })
   ] });
 }
 
 // src/FormRenderer.tsx
-import { Fragment, jsx as jsx13, jsxs as jsxs9 } from "react/jsx-runtime";
+import { Fragment as Fragment2, jsx as jsx15, jsxs as jsxs10 } from "react/jsx-runtime";
 function FormRenderer(props) {
-  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
-  const authorSubmitId = useMemo2(() => submitButtonId(schema), [schema]);
+  const { schema, initialValues, onSubmit, onChange, readOnly = false, submitting = false, registry, components, restore, onAutosave, autosaveDelay = 800, beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
+  const authorSubmitId = useMemo4(() => submitButtonId(schema), [schema]);
   const submitLabel = props.submitLabel !== void 0 ? props.submitLabel : authorSubmitId ? null : "Submit";
   const formClass = ["lf-form", virtualize && "lf-virtualized", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore, allowJs, jsEvaluator };
@@ -2381,6 +2627,7 @@ function FormRenderer(props) {
   const [submitted, setSubmitted] = useState11(false);
   const client = useMinionClient();
   const [asyncErrors, setAsyncErrors] = useState11({});
+  const validatingRef = useRef9(false);
   const [revealed, setRevealed] = useState11(() => /* @__PURE__ */ new Set());
   const validateField = form.validate;
   const reveal = useCallback2(
@@ -2390,9 +2637,9 @@ function FormRenderer(props) {
     },
     [validateField]
   );
-  const onAutosaveRef = useRef8(onAutosave);
+  const onAutosaveRef = useRef9(onAutosave);
   onAutosaveRef.current = onAutosave;
-  const autosaveTimer = useRef8(null);
+  const autosaveTimer = useRef9(null);
   const flushAutosave = () => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = null;
@@ -2403,7 +2650,7 @@ function FormRenderer(props) {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(flushAutosave, autosaveDelay);
   };
-  useEffect7(() => () => {
+  useEffect8(() => () => {
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
       onAutosaveRef.current?.(form.engine.serialize());
@@ -2436,11 +2683,11 @@ function FormRenderer(props) {
       focusFirstError(report.errorKeys);
     }
   }, [form, onResult, onEvent, onSubmit, focusFirstError]);
-  useEffect7(() => {
+  useEffect8(() => {
     if (autoSubmitSignal) submitProgrammatic();
   }, [autoSubmitSignal]);
   const playbackSignal = playback?.signal;
-  useEffect7(() => {
+  useEffect8(() => {
     if (!playback || !playbackSignal) return;
     let cancelled = false;
     const speed = playback.speed ?? 80;
@@ -2466,9 +2713,10 @@ function FormRenderer(props) {
   const dataTheme = dataThemeAttr(resolvedScheme);
   const sanitize = sanitizeHtml ?? defaultSanitizeHtml;
   const slotOnAuthorButton = authorSubmitId && !readOnly ? beforeSubmit : void 0;
-  const ctx = { form, reg, readOnly, showErrors: submitted, revealed, reveal, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: slotOnAuthorButton, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
+  const ctx = { form, schema, submitting, reg, readOnly, showErrors: submitted, revealed, reveal, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: slotOnAuthorButton, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting || validatingRef.current) return;
     setSubmitted(true);
     const sync = form.validate();
     onResult?.({ ok: sync.ok, errorCount: sync.errorKeys.length, errorKeys: sync.errorKeys });
@@ -2477,7 +2725,13 @@ function FormRenderer(props) {
       focusFirstError(sync.errorKeys);
       return;
     }
-    const errs = await runAsyncValidations(schema, form, client);
+    validatingRef.current = true;
+    let errs;
+    try {
+      errs = await runAsyncValidations(schema, form, client);
+    } finally {
+      validatingRef.current = false;
+    }
     setAsyncErrors(errs);
     if (Object.keys(errs).length === 0) {
       const data = form.collect();
@@ -2500,7 +2754,7 @@ function FormRenderer(props) {
     }
   };
   const pages = wizardPages(schema);
-  const content = pages ? /* @__PURE__ */ jsx13(
+  const content = pages ? /* @__PURE__ */ jsx15(
     FormWizardView,
     {
       pages,
@@ -2509,6 +2763,7 @@ function FormRenderer(props) {
       reg,
       components: comps,
       readOnly,
+      submitting,
       submitLabel,
       beforeSubmit,
       authorSubmitId,
@@ -2522,14 +2777,14 @@ function FormRenderer(props) {
       onResult,
       onEvent
     }
-  ) : /* @__PURE__ */ jsxs9("form", { noValidate: true, dir, "data-theme": dataTheme, className: formClass, style: mergedTheme, onSubmit: handleSubmit, children: [
-    schema.root.map((id) => /* @__PURE__ */ jsx13(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
-    submitLabel !== null && !readOnly && /* @__PURE__ */ jsxs9(Fragment, { children: [
+  ) : /* @__PURE__ */ jsxs10("form", { noValidate: true, dir, "data-theme": dataTheme, className: formClass, style: mergedTheme, onSubmit: handleSubmit, children: [
+    schema.root.map((id) => /* @__PURE__ */ jsx15(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
+    submitLabel !== null && !readOnly && /* @__PURE__ */ jsxs10(Fragment2, { children: [
       !authorSubmitId && beforeSubmit,
-      /* @__PURE__ */ jsx13("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
+      /* @__PURE__ */ jsx15("button", { type: "submit", className: "lf-submit", disabled: submitting, "aria-busy": submitting || void 0, children: t(submitLabel) })
     ] })
   ] });
-  return /* @__PURE__ */ jsx13(FormErrorBoundary, { fallback: errorFallback, onError: (error) => onEvent?.({ type: "error", error }), children: /* @__PURE__ */ jsx13(FormThemeProvider, { theme: mergedTokens, colorScheme: resolvedScheme, children: content }) });
+  return /* @__PURE__ */ jsx15(FormErrorBoundary, { fallback: errorFallback, onError: (error) => onEvent?.({ type: "error", error }), children: /* @__PURE__ */ jsx15(FormThemeProvider, { theme: mergedTokens, colorScheme: resolvedScheme, children: content }) });
 }
 function FormWizardView({
   pages,
@@ -2538,6 +2793,7 @@ function FormWizardView({
   reg,
   components,
   readOnly,
+  submitting,
   submitLabel,
   beforeSubmit,
   authorSubmitId,
@@ -2563,20 +2819,20 @@ function FormWizardView({
     [validateField]
   );
   const { t, dir } = useLocale();
-  const pageRef = useRef8(null);
-  const firstRender = useRef8(true);
+  const pageRef = useRef9(null);
+  const firstRender = useRef9(true);
   const visible = pages.filter((id) => form.state.fields[id]?.isVisible !== false);
   const safeIndex = Math.min(index, Math.max(0, visible.length - 1));
   const currentId = visible[safeIndex];
   const isLast = safeIndex >= visible.length - 1;
-  useEffect7(() => {
+  useEffect8(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
     pageRef.current?.focus();
   }, [safeIndex]);
-  const ctx = { form, reg, readOnly, showErrors, revealed, reveal, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: authorSubmitId && !readOnly ? beforeSubmit : void 0, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
+  const ctx = { form, schema, submitting, reg, readOnly, showErrors, revealed, reveal, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: authorSubmitId && !readOnly ? beforeSubmit : void 0, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const next = () => {
     if (!currentId) return;
     if (keysValid(form, pageFieldKeys(schema, currentId, form))) {
@@ -2592,6 +2848,7 @@ function FormWizardView({
   };
   const submit = (e) => {
     e.preventDefault();
+    if (submitting) return;
     const report = form.validate();
     onResult?.({ ok: report.ok, errorCount: report.errorKeys.length, errorKeys: report.errorKeys });
     if (report.ok) {
@@ -2604,15 +2861,15 @@ function FormWizardView({
       onEvent?.({ type: "invalid", errorKeys: report.errorKeys });
     }
   };
-  return /* @__PURE__ */ jsxs9("form", { noValidate: true, dir, "data-theme": dataTheme, className, style: theme, onSubmit: submit, children: [
-    /* @__PURE__ */ jsx13("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ jsx13("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
-    /* @__PURE__ */ jsx13("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ jsx13(RenderEntity, { id: currentId, schema, ctx }) }),
+  return /* @__PURE__ */ jsxs10("form", { noValidate: true, dir, "data-theme": dataTheme, className, style: theme, onSubmit: submit, children: [
+    /* @__PURE__ */ jsx15("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ jsx15("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
+    /* @__PURE__ */ jsx15("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ jsx15(RenderEntity, { id: currentId, schema, ctx }) }),
     isLast && submitLabel !== null && !readOnly && !authorSubmitId ? beforeSubmit : null,
-    /* @__PURE__ */ jsxs9("div", { className: "lf-wizard-nav", children: [
-      /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
-      !isLast && /* @__PURE__ */ jsx13("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
-      isLast && submitLabel !== null && !readOnly && /* @__PURE__ */ jsx13("button", { type: "submit", className: "lf-submit", children: t(submitLabel) }),
-      /* @__PURE__ */ jsxs9("span", { className: "lf-wizard-progress", children: [
+    /* @__PURE__ */ jsxs10("div", { className: "lf-wizard-nav", children: [
+      /* @__PURE__ */ jsx15("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
+      !isLast && /* @__PURE__ */ jsx15("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
+      isLast && submitLabel !== null && !readOnly && /* @__PURE__ */ jsx15("button", { type: "submit", className: "lf-submit", disabled: submitting, "aria-busy": submitting || void 0, children: t(submitLabel) }),
+      /* @__PURE__ */ jsxs10("span", { className: "lf-wizard-progress", children: [
         t("Step"),
         " ",
         safeIndex + 1,
@@ -2628,7 +2885,7 @@ function RenderEntity(props) {
   const node = RenderEntityNode(props);
   const { id, ctx } = props;
   if (node !== null && ctx.beforeSubmit && ctx.beforeSubmitAnchorId === id) {
-    return /* @__PURE__ */ jsxs9(Fragment, { children: [
+    return /* @__PURE__ */ jsxs10(Fragment2, { children: [
       ctx.beforeSubmit,
       node
     ] });
@@ -2643,13 +2900,13 @@ function RenderEntityNode({ id, schema, ctx }) {
   if (entity.type === "array" || entity.type === "map") return null;
   const ft = ctx.reg.get(entity.type);
   if (ft?.isGrid)
-    return entity.type === "editGrid" ? /* @__PURE__ */ jsx13(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ jsx13(GridField, { entity, fs, ctx, schema });
-  if (ft?.isStatic) return /* @__PURE__ */ jsx13(Static, { entity, sanitizeHtml: ctx.sanitizeHtml });
+    return entity.type === "editGrid" ? /* @__PURE__ */ jsx15(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ jsx15(GridField, { entity, fs, ctx, schema });
+  if (ft?.isStatic) return /* @__PURE__ */ jsx15(Static, { entity, sanitizeHtml: ctx.sanitizeHtml, submitting: ctx.submitting });
   if (ft?.isContainer) {
-    if (entity.type === "tabs") return /* @__PURE__ */ jsx13(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
+    if (entity.type === "tabs") return /* @__PURE__ */ jsx15(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
     if (entity.type === "panel" || entity.type === "well" || entity.type === "fieldset")
-      return /* @__PURE__ */ jsx13(PanelBox, { entity, schema, ctx, Render: RenderEntity });
-    if (entity.type === "table") return /* @__PURE__ */ jsx13(TableGrid, { entity, schema, ctx, Render: RenderEntity });
+      return /* @__PURE__ */ jsx15(PanelBox, { entity, schema, ctx, Render: RenderEntity });
+    if (entity.type === "table") return /* @__PURE__ */ jsx15(TableGrid, { entity, schema, ctx, Render: RenderEntity });
     let cols;
     if (entity.type === "columns") {
       const raw = Number(entity.attributes?.numColumns);
@@ -2659,13 +2916,13 @@ function RenderEntityNode({ id, schema, ctx }) {
     }
     const childStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : void 0;
     const bordered = Boolean(entity.attributes?.borders);
-    return /* @__PURE__ */ jsxs9("div", { className: `lf-container${bordered ? " lf-container--bordered" : ""}`, "data-type": entity.type, children: [
-      labelText(entity.attributes) && /* @__PURE__ */ jsx13("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
-      /* @__PURE__ */ jsx13("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx13(RenderEntity, { id: cid, schema, ctx }, cid)) })
+    return /* @__PURE__ */ jsxs10("div", { className: `lf-container${bordered ? " lf-container--bordered" : ""}`, "data-type": entity.type, children: [
+      labelText(entity.attributes) && /* @__PURE__ */ jsx15("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
+      /* @__PURE__ */ jsx15("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ jsx15(RenderEntity, { id: cid, schema, ctx }, cid)) })
     ] });
   }
   if (!fs) return null;
-  return /* @__PURE__ */ jsx13(Field, { entity, fs, ctx });
+  return /* @__PURE__ */ jsx15(Field, { entity, fs, ctx });
 }
 function Field({ entity, fs, ctx }) {
   const a = entity.attributes ?? {};
@@ -2709,8 +2966,8 @@ function Field({ entity, fs, ctx }) {
   if (typeof a.max === "number") numProps.max = a.max;
   const Custom = ctx.components[entity.type];
   if (!Custom && entity.type === "radio") {
-    return /* @__PURE__ */ jsx13(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs9("label", { className: "lf-option", children: [
-      /* @__PURE__ */ jsx13(
+    return /* @__PURE__ */ jsx15(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs10("label", { className: "lf-option", children: [
+      /* @__PURE__ */ jsx15(
         "input",
         {
           type: "radio",
@@ -2727,8 +2984,8 @@ function Field({ entity, fs, ctx }) {
   }
   if (!Custom && entity.type === "selectBoxes") {
     const selected = new Set((Array.isArray(fs.value) ? fs.value : []).map(String));
-    return /* @__PURE__ */ jsx13(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs9("label", { className: "lf-option", children: [
-      /* @__PURE__ */ jsx13(
+    return /* @__PURE__ */ jsx15(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs10("label", { className: "lf-option", children: [
+      /* @__PURE__ */ jsx15(
         "input",
         {
           type: "checkbox",
@@ -2749,14 +3006,14 @@ function Field({ entity, fs, ctx }) {
   }
   let control;
   if (Custom) {
-    control = /* @__PURE__ */ jsx13(Custom, { entity, field: fs, value: fs.value, setValue: set, disabled, error: error?.message ?? null, id });
+    control = /* @__PURE__ */ jsx15(Custom, { entity, field: fs, value: fs.value, setValue: set, disabled, error: error?.message ?? null, id });
   } else
     switch (entity.type) {
       case "checkbox":
-        control = /* @__PURE__ */ jsx13("input", { type: "checkbox", ...a11y, checked: Boolean(fs.value), onChange: (e) => set(e.target.checked) });
+        control = /* @__PURE__ */ jsx15("input", { type: "checkbox", ...a11y, checked: Boolean(fs.value), onChange: (e) => set(e.target.checked) });
         break;
       case "textarea":
-        control = /* @__PURE__ */ jsx13(
+        control = /* @__PURE__ */ jsx15(
           "textarea",
           {
             ...a11y,
@@ -2772,15 +3029,15 @@ function Field({ entity, fs, ctx }) {
         control = a.searchable && readDataSource4(a) ? (
           // Searchable + Minion-backed → server-side type-ahead (re-queries as you type),
           // so a value beyond the first page is still findable (unlike a static filter).
-          /* @__PURE__ */ jsx13(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
-        ) : a.searchable ? /* @__PURE__ */ jsx13(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ jsxs9("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
-          fs.isRequired ? /* @__PURE__ */ jsx13("option", { value: "", disabled: true, hidden: true, children: ph ?? "Select\u2026" }) : /* @__PURE__ */ jsx13("option", { value: "", children: ph ?? "" }),
-          fieldOptions.map((o) => /* @__PURE__ */ jsx13("option", { value: o.value, children: ctx.t(o.label) }, o.value))
+          /* @__PURE__ */ jsx15(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
+        ) : a.searchable ? /* @__PURE__ */ jsx15(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ jsxs10("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
+          fs.isRequired ? /* @__PURE__ */ jsx15("option", { value: "", disabled: true, hidden: true, children: ph ?? "Select\u2026" }) : /* @__PURE__ */ jsx15("option", { value: "", children: ph ?? "" }),
+          fieldOptions.map((o) => /* @__PURE__ */ jsx15("option", { value: o.value, children: ctx.t(o.label) }, o.value))
         ] });
         break;
       case "number":
       case "currency":
-        control = /* @__PURE__ */ jsx13(
+        control = /* @__PURE__ */ jsx15(
           NumberInput,
           {
             a11y,
@@ -2796,37 +3053,40 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "searchSelect":
-        control = /* @__PURE__ */ jsx13(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph });
+        control = /* @__PURE__ */ jsx15(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph });
         break;
       case "tags":
       case "tagsField":
-        control = /* @__PURE__ */ jsx13(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set, placeholder: ph });
+        control = /* @__PURE__ */ jsx15(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set, placeholder: ph });
         break;
       case "file":
-        control = /* @__PURE__ */ jsx13(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
+        control = /* @__PURE__ */ jsx15(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
         break;
       case "signature":
-        control = /* @__PURE__ */ jsx13(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+        control = /* @__PURE__ */ jsx15(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
         break;
       case "rating":
-        control = /* @__PURE__ */ jsx13(RatingField, { a11y, value: fs.value, max: typeof a.max === "number" ? a.max : 5, disabled, onChange: set });
+        control = /* @__PURE__ */ jsx15(RatingField, { a11y, value: fs.value, max: typeof a.max === "number" ? a.max : 5, disabled, onChange: set });
         break;
       case "ranking":
-        control = /* @__PURE__ */ jsx13(RankingField, { a11y, entity, value: fs.value, disabled, onChange: set });
+        control = /* @__PURE__ */ jsx15(RankingField, { a11y, entity, value: fs.value, disabled, onChange: set });
         break;
       case "matrix":
-        control = /* @__PURE__ */ jsx13(MatrixField, { a11y, entity, value: fs.value, disabled, onChange: set });
+        control = /* @__PURE__ */ jsx15(MatrixField, { a11y, entity, value: fs.value, disabled, onChange: set });
         break;
       case "addressBlock":
-        control = /* @__PURE__ */ jsx13(AddressBlockField, { a11y, entity, value: fs.value, scope: ctx.scope, disabled, onChange: set });
+        control = /* @__PURE__ */ jsx15(AddressBlockField, { a11y, entity, value: fs.value, scope: ctx.scope, disabled, onChange: set });
+        break;
+      case "payment":
+        control = /* @__PURE__ */ jsx15(PaymentField, { a11y, entity, schema: ctx.schema, scope: ctx.scope, value: fs.value, readOnly: ctx.readOnly, t: ctx.t });
         break;
       case "richText":
-        control = /* @__PURE__ */ jsx13(RichTextField, { a11y, value: fs.value, disabled, onChange: set, sanitizeHtml: ctx.sanitizeHtml });
+        control = /* @__PURE__ */ jsx15(RichTextField, { a11y, value: fs.value, disabled, onChange: set, sanitizeHtml: ctx.sanitizeHtml });
         break;
       case "day":
       case "datetime":
       case "time":
-        control = a.nativeInput ? /* @__PURE__ */ jsx13(TextControl, { type: inputType(entity.type), a11y, extra: inputProps, mask: typeof a.inputMask === "string" ? a.inputMask : "", clearable: Boolean(a.clearable) && !disabled, value: fs.value, onChange: set }) : /* @__PURE__ */ jsx13(
+        control = a.nativeInput ? /* @__PURE__ */ jsx15(TextControl, { type: inputType(entity.type), a11y, extra: inputProps, mask: typeof a.inputMask === "string" ? a.inputMask : "", clearable: Boolean(a.clearable) && !disabled, value: fs.value, onChange: set }) : /* @__PURE__ */ jsx15(
           DateField,
           {
             a11y,
@@ -2840,7 +3100,7 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       default:
-        control = /* @__PURE__ */ jsx13(
+        control = /* @__PURE__ */ jsx15(
           TextControl,
           {
             type: inputType(entity.type),
@@ -2856,21 +3116,21 @@ function Field({ entity, fs, ctx }) {
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
   const hideLabel = Boolean(a.hideLabel);
   const fieldClass = ["lf-field", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
-  return /* @__PURE__ */ jsxs9("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
-    /* @__PURE__ */ jsxs9("label", { htmlFor: id, id: `${id}-label`, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
+  return /* @__PURE__ */ jsxs10("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
+    /* @__PURE__ */ jsxs10("label", { htmlFor: id, id: `${id}-label`, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
       ctx.t(labelText(a) ?? key),
-      fs.isRequired && /* @__PURE__ */ jsx13("span", { "aria-hidden": "true", children: " *" }),
-      /* @__PURE__ */ jsx13(Tooltip, { text: tooltipText(a) })
+      fs.isRequired && /* @__PURE__ */ jsx15("span", { "aria-hidden": "true", children: " *" }),
+      /* @__PURE__ */ jsx15(Tooltip, { text: tooltipText(a) })
     ] }),
     control,
-    (Boolean(a.showCharCount) || Boolean(a.showWordCount)) && /* @__PURE__ */ jsxs9("p", { className: "lf-count", "aria-live": "off", children: [
+    (Boolean(a.showCharCount) || Boolean(a.showWordCount)) && /* @__PURE__ */ jsxs10("p", { className: "lf-count", "aria-live": "off", children: [
       a.showCharCount ? `${asText(fs.value).length} characters` : "",
       a.showCharCount && a.showWordCount ? " \xB7 " : "",
       a.showWordCount ? `${wordCount(asText(fs.value))} words` : ""
     ] }),
-    descId && /* @__PURE__ */ jsx13("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
-    error && /* @__PURE__ */ jsx13("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
-    !error && ctx.asyncErrors[key] && /* @__PURE__ */ jsx13("p", { id: asyncErrId, role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
+    descId && /* @__PURE__ */ jsx15("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
+    error && /* @__PURE__ */ jsx15("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
+    !error && ctx.asyncErrors[key] && /* @__PURE__ */ jsx15("p", { id: asyncErrId, role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
   ] });
 }
 async function runAsyncValidations(schema, form, client) {
@@ -2911,7 +3171,9 @@ export {
   FormThemeProvider,
   LocaleProvider,
   MinionProvider,
+  PaymentsProvider,
   VERSION,
+  createPaymentSession,
   dataThemeAttr,
   defaultSanitizeHtml,
   getLocaleDirection,
@@ -2923,6 +3185,8 @@ export {
   useLocale,
   useMinionClient,
   useMinionData,
+  usePaymentSession,
+  usePaymentState,
   usePopoverTheme,
   useTranslate
 };

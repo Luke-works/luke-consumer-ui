@@ -1,13 +1,13 @@
 {
-  "vendoredAt": "2026-07-31T22:11:40.963Z",
+  "vendoredAt": "2026-09-17T07:13:27.178Z",
   "packages": {
     "form-core": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "193b099bc0aadee47f4b0b8d50a43159cb51beb318cd903ebab2eb84bdb7cc30",
-        "dist/index.d.cts": "e0b00dc20d9f71972d07f82f58688a4864ff07109afc4b3cbde82a8a9d7f85bd",
-        "dist/index.d.ts": "e0b00dc20d9f71972d07f82f58688a4864ff07109afc4b3cbde82a8a9d7f85bd",
-        "dist/index.js": "82ed52d5c13d357298a8878915b2f0df65c229785ea0281c757b32c2f1d8bf39",
+        "dist/index.cjs": "6e425dda158fe5e6e2c582fedd1b7c1c676ca26641141cae3eb504d3c49389f6",
+        "dist/index.d.cts": "de28e99ed8df233380d6cff9e647a958154b6039eaa4bb7f34ff9933ad8f0062",
+        "dist/index.d.ts": "de28e99ed8df233380d6cff9e647a958154b6039eaa4bb7f34ff9933ad8f0062",
+        "dist/index.js": "502e7b97188fbdfb934b3456dbbc5346db115684cc8692e5cbc1adf7cb0661a7",
         "dist/quickjs.cjs": "690881833d0bacccc4f61c68ce34caa19a700264b61e730495dfce1b7b21ac0d",
         "dist/quickjs.d.cts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
         "dist/quickjs.d.ts": "6ccb1961680da5d04d35b939a0643c4bc8e5700e664d8c8696b70e91f836df20",
@@ -17,21 +17,25 @@
     "form-react": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "211e30520e40eb39cc4b2c663ae8970f480c7a12b5f38be6111aa6959d49060b",
-        "dist/index.d.cts": "a848728a5707990e08db7a7c1192f58228cdae95699e6a47d107adb5a79c17c4",
-        "dist/index.d.ts": "a848728a5707990e08db7a7c1192f58228cdae95699e6a47d107adb5a79c17c4",
-        "dist/index.js": "34f4bbe73ee0b573acdc9404c5ac4a816242cb8042b362224d816abf4b0f1aa4",
-        "styles.css": "56b95c63272441e8ce12b146ac32124a9e9b382e84760d0e1b44ca51db680920"
+        "dist/index.cjs": "1fdec9a2548042224ceaa8e8f38ac6851b06723fe7f96f1c4e493673695e3e7b",
+        "dist/index.d.cts": "3f546ab0278bbd1a51469074cd2ca40c0f50c4e887771edc80c6cc30e94e5f90",
+        "dist/index.d.ts": "3f546ab0278bbd1a51469074cd2ca40c0f50c4e887771edc80c6cc30e94e5f90",
+        "dist/index.js": "e34477fbe37a7fafa3632449a1de8b1b101d59ae0a514bf3ccc0f1686aa34abd",
+        "dist/stripe.cjs": "021b3ef88bdcd62ec10ad3f97af5e07ac3b3a62f528ed82d522a30bc9f9e2459",
+        "dist/stripe.d.cts": "cf65712647d0953f548b788d3ce33485ad6943c89bf7e333d53c8eea6c76d26f",
+        "dist/stripe.d.ts": "cf65712647d0953f548b788d3ce33485ad6943c89bf7e333d53c8eea6c76d26f",
+        "dist/stripe.js": "53a7f587eb8e62ee8b4b030014a07d650b763679a8f301d32ef5d5383a94d257",
+        "styles.css": "5ebb2e959764b3bfd8bffc7ed4508b7ccdbccbf6d764007e77dc9cc87b61332e"
       }
     },
     "form-builder": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "0ece96f3528bda8bf201afd2880521e26c70d3c374ba0bf3d1b61e58d1cbc873",
-        "dist/index.d.cts": "64659e3d20051832096f7c03e618c107e8e9519bd427951160dff1bed0bce09f",
-        "dist/index.d.ts": "64659e3d20051832096f7c03e618c107e8e9519bd427951160dff1bed0bce09f",
-        "dist/index.js": "9ee12d3738d0ec7bcccead75ffc676a0caf35270c0153420484269849914895d",
-        "styles.css": "5c8a07686e5db9a6919479b5a955fcff3be9e62c484341de24bb7a6d21aa47ec"
+        "dist/index.cjs": "a0b5d18c86742212d9813422fd4e037297e3816d4b6dd1ff594cdd23889b2e06",
+        "dist/index.d.cts": "5d613ffacfb8531535e96f49ec0c5bb5005b1e892567642f35b4be3974131460",
+        "dist/index.d.ts": "5d613ffacfb8531535e96f49ec0c5bb5005b1e892567642f35b4be3974131460",
+        "dist/index.js": "012d85f75b8e828dab0c836632b555624a17c170600a81459907dc45ea52da23",
+        "styles.css": "ae683264dce403cc1c53fb43c879f793cdad95a449e5ecee2a776806d73b69cd"
       }
     },
     "form-embed": {

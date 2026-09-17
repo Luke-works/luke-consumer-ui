@@ -245,15 +245,591 @@ function repairSchema(schema) {
   return { schema: repaired, removed };
 }
 
+// src/payments/currencies.ts
+var ZERO_DECIMAL = ["BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF"];
+var THREE_DECIMAL = ["BHD", "JOD", "KWD", "OMR", "TND"];
+var MINIMUMS = {
+  USD: 50,
+  EUR: 50,
+  GBP: 30,
+  AUD: 50,
+  CAD: 50,
+  CHF: 50,
+  NZD: 50,
+  SGD: 50,
+  DKK: 250,
+  NOK: 300,
+  SEK: 300,
+  PLN: 200,
+  RON: 200,
+  BGN: 100,
+  CZK: 1500,
+  HUF: 17500,
+  HKD: 400,
+  MXN: 1e3,
+  BRL: 50,
+  INR: 50,
+  AED: 200,
+  MYR: 200,
+  JPY: 50
+};
+var TWO_DECIMAL_EXTRA = ["ZAR", "ILS", "TRY", "THB", "PHP", "IDR", "SAR", "QAR", "KES", "NGN"];
+function build() {
+  const m = /* @__PURE__ */ new Map();
+  const put = (code, exponent) => {
+    const fallback = exponent === 0 ? 50 : exponent === 3 ? 500 : 50;
+    m.set(code, { code, exponent, minimumMinor: MINIMUMS[code] ?? fallback });
+  };
+  for (const c of ZERO_DECIMAL) put(c, 0);
+  for (const c of THREE_DECIMAL) put(c, 3);
+  for (const c of Object.keys(MINIMUMS)) if (!m.has(c)) put(c, 2);
+  for (const c of TWO_DECIMAL_EXTRA) if (!m.has(c)) put(c, 2);
+  return m;
+}
+var CURRENCIES = build();
+var CURRENCY_CODES = [...CURRENCIES.keys()].sort();
+function currencyOf(raw) {
+  if (typeof raw !== "string") return null;
+  return CURRENCIES.get(raw.trim().toUpperCase()) ?? null;
+}
+function toMinorUnits(amountMajor, currency) {
+  let n;
+  if (typeof amountMajor === "number") {
+    n = amountMajor;
+  } else if (typeof amountMajor === "string") {
+    const trimmed = amountMajor.trim();
+    if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return null;
+    n = Number(trimmed);
+  } else {
+    return null;
+  }
+  if (!Number.isFinite(n)) return null;
+  const fixed = n.toFixed(currency.exponent);
+  const minor = Number(fixed.replace(".", ""));
+  return Number.isSafeInteger(minor) ? minor : null;
+}
+function toMajorString(amountMinor, currency) {
+  const sign = amountMinor < 0 ? "-" : "";
+  const digits = String(Math.abs(Math.trunc(amountMinor))).padStart(currency.exponent + 1, "0");
+  if (currency.exponent === 0) return sign + digits;
+  const cut = digits.length - currency.exponent;
+  return `${sign}${digits.slice(0, cut)}.${digits.slice(cut)}`;
+}
+function isChargeableAmount(amountMinor, currency) {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return false;
+  return currency.exponent === 3 ? amountMinor % 10 === 0 : true;
+}
+
+// src/payments/payment.ts
+var PAYMENT_TYPE = "payment";
+var PAYMENT_AMOUNT_MODES = ["fixed", "perUnit", "entered"];
+var DEFAULT_MAX_QUANTITY = 100;
+var MAX_CHARGE_MINOR = 99999999;
+var QUANTITY_SOURCE_TYPES = ["number"];
+var AMOUNT_SOURCE_TYPES = ["number", "currency"];
+function emptyPaymentValue() {
+  return { status: "unpaid", amountMinor: 0, currency: "", intentId: "" };
+}
+var STATUSES = /* @__PURE__ */ new Set(["unpaid", "pending", "paid", "failed"]);
+function coercePaymentValue(raw) {
+  const v = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const status = typeof v.status === "string" && STATUSES.has(v.status) ? v.status : "unpaid";
+  const amt = typeof v.amountMinor === "number" && Number.isSafeInteger(v.amountMinor) && v.amountMinor >= 0 ? v.amountMinor : 0;
+  const cur = currencyOf(v.currency)?.code ?? "";
+  const intentId = typeof v.intentId === "string" ? v.intentId : "";
+  return { status, amountMinor: amt, currency: cur, intentId };
+}
+var isMode = (v) => v === "fixed" || v === "perUnit" || v === "entered";
+function readPaymentAttributes(entity) {
+  const at = entity?.attributes ?? {};
+  const out = {};
+  if (isMode(at.amountMode)) out.amountMode = at.amountMode;
+  for (const k of ["amountMinor", "maxQuantity", "minAmountMinor", "maxAmountMinor"]) {
+    if (typeof at[k] === "number") out[k] = at[k];
+  }
+  for (const k of ["quantityFrom", "amountFrom", "currency", "chargeDescription"]) {
+    if (typeof at[k] === "string") out[k] = at[k];
+  }
+  return out;
+}
+function entityMap(schema) {
+  const raw = schema?.entities;
+  const out = {};
+  if (Array.isArray(raw)) {
+    raw.forEach((e, i) => {
+      if (e && typeof e === "object" && !Array.isArray(e)) out[String(i)] = e;
+    });
+    return out;
+  }
+  if (!raw || typeof raw !== "object") return out;
+  for (const [id, e] of Object.entries(raw)) {
+    if (e && typeof e === "object" && !Array.isArray(e)) out[id] = e;
+  }
+  return out;
+}
+function refKey(entry) {
+  if (typeof entry === "string") return entry;
+  if (typeof entry === "number") return Number.isSafeInteger(entry) && entry >= 0 ? String(entry) : null;
+  if (typeof entry === "boolean") return String(entry);
+  return null;
+}
+var refKeys = (list) => Array.isArray(list) ? list.map(refKey).filter((k) => k !== null) : [];
+function reachableIds(schema) {
+  const entities = entityMap(schema);
+  const seen = /* @__PURE__ */ new Set();
+  const visit = (id) => {
+    if (seen.has(id) || !entities[id]) return;
+    seen.add(id);
+    for (const c of refKeys(entities[id].children)) visit(c);
+  };
+  for (const id of refKeys(schema?.root)) visit(id);
+  return seen;
+}
+var sortedIds = (entities) => Object.keys(entities).sort();
+function findPaymentFields(schema) {
+  const entities = entityMap(schema);
+  return sortedIds(entities).filter((id) => entities[id]?.type === PAYMENT_TYPE).map((id) => ({ id, entity: entities[id] }));
+}
+function hasPayment(schema) {
+  return findPaymentFields(schema).length > 0;
+}
+var DYNAMIC_ACTIONS = /* @__PURE__ */ new Set(["show", "hide", "require", "optional", "enable", "disable", "setValue"]);
+var nonBlank = (v) => typeof v === "string" && v.trim() !== "";
+function isConditionallyControlled(entity) {
+  const a = entity?.attributes ?? {};
+  if (Boolean(a.hidden) || Boolean(a.disabled) || a.persistent === false) return true;
+  if (nonBlank(a.customConditional) || nonBlank(a.customConditionalJs)) return true;
+  if (nonBlank(a.calculateValue) || nonBlank(a.calculateValueJs)) return true;
+  const cond = a.conditional;
+  if (cond && typeof cond === "object" && !Array.isArray(cond) && Object.keys(cond).length > 0) return true;
+  if (Array.isArray(a.logic)) {
+    for (const rule of a.logic) {
+      const action = rule && typeof rule === "object" ? rule.action : void 0;
+      if (typeof action === "string" && DYNAMIC_ACTIONS.has(action)) return true;
+    }
+  }
+  return false;
+}
+function parentMap(entities) {
+  const parents = /* @__PURE__ */ new Map();
+  for (const id of sortedIds(entities)) {
+    for (const c of refKeys(entities[id]?.children)) if (!parents.has(c)) parents.set(c, id);
+  }
+  return parents;
+}
+function selfAndAncestorIds(schema, id) {
+  const entities = entityMap(schema);
+  const parents = parentMap(entities);
+  const out = [];
+  let cur = id;
+  while (cur !== void 0 && !out.includes(cur)) {
+    if (!entities[cur]) break;
+    out.push(cur);
+    cur = parents.get(cur);
+  }
+  return out;
+}
+function selfAndAncestors(schema, id) {
+  const entities = entityMap(schema);
+  return selfAndAncestorIds(schema, id).map((k) => entities[k]);
+}
+var GRID_TYPES = /* @__PURE__ */ new Set(["dataGrid", "editGrid"]);
+function isInsideGrid(schema, id) {
+  return selfAndAncestors(schema, id).slice(1).some((e) => GRID_TYPES.has(e.type));
+}
+function sourceCurrencyOf(entity) {
+  const a = entity.attributes ?? {};
+  const raw = typeof a.currency === "string" ? a.currency : typeof a.currencyCode === "string" ? a.currencyCode : "USD";
+  return currencyOf(raw)?.code ?? null;
+}
+function findFieldByKey(schema, key) {
+  const entities = entityMap(schema);
+  for (const id of sortedIds(entities)) {
+    const e = entities[id];
+    if (e && typeof e.attributes?.key === "string" && e.attributes.key === key) return { id, entity: e };
+  }
+  return null;
+}
+function paymentFieldProblem(schema, id) {
+  const chain = selfAndAncestors(schema, id);
+  const self = chain[0];
+  if (!self) return null;
+  if (!reachableIds(schema).has(id)) return "unreachable";
+  if (isInsideGrid(schema, id)) return "in-grid";
+  const attrs = self.attributes ?? {};
+  if (attrs.persistent === false) return "excluded";
+  const selfConditional = isConditionallyControlled({ ...self, attributes: { ...attrs, persistent: void 0 } });
+  if (selfConditional || chain.slice(1).some(isConditionallyControlled)) return "conditional";
+  return null;
+}
+function wizardPageIds(schema) {
+  const entities = entityMap(schema);
+  const rawRoot = Array.isArray(schema.root) ? schema.root : [];
+  const root = rawRoot.map(refKey);
+  const first = root[0];
+  if (root.length === 1 && typeof first === "string") {
+    const only = entities[first];
+    if (only?.type === "wizard") {
+      const pages2 = refKeys(only.children).filter((c) => entities[c]?.type === "page");
+      if (pages2.length) return pages2;
+    }
+  }
+  const pages = root.filter((id) => id !== null && entities[id]?.type === "page");
+  return pages.length > 0 && pages.length === root.length ? pages : null;
+}
+function isSubmitButtonEntity(entity) {
+  if (!entity || entity.type !== "button") return false;
+  const action = entity.attributes?.buttonAction;
+  return action !== "reset" && action !== "button";
+}
+function reachableSubmitButtonIds(schema) {
+  const entities = entityMap(schema);
+  return [...reachableIds(schema)].filter((id) => isSubmitButtonEntity(entities[id])).sort();
+}
+function amountSourceProblem(schema, key, allowedTypes, currency) {
+  if (!key) return "missing";
+  const found = findFieldByKey(schema, key);
+  if (!found) return "missing";
+  if (!allowedTypes.includes(found.entity.type)) return "wrong-type";
+  if (!reachableIds(schema).has(found.id)) return "unreachable";
+  if (isInsideGrid(schema, found.id)) return "in-grid";
+  if (selfAndAncestors(schema, found.id).some(isConditionallyControlled)) return "conditional";
+  if (currency !== void 0) {
+    if (found.entity.type === "currency" && sourceCurrencyOf(found.entity) !== currency) return "currency-mismatch";
+    const places = found.entity.attributes?.decimalLimit;
+    const exponent = currencyOf(currency)?.exponent;
+    if (typeof places === "number" && exponent !== void 0 && places > exponent) return "too-precise";
+  }
+  return null;
+}
+var DECIMAL_RE = /^-?\d+(\.\d+)?$/;
+function answerNumber(raw) {
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (!DECIMAL_RE.test(t)) return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+var answerOf = (answers, key) => Object.prototype.hasOwnProperty.call(answers, key) ? answers[key] : void 0;
+var isBlankAnswer = (raw) => raw === void 0 || raw === null || raw === "";
+var withinCharge = (amountMinor, currency) => isChargeableAmount(amountMinor, currency) && amountMinor <= MAX_CHARGE_MINOR;
+var positiveInt = (v) => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+function resolvePaymentAmount(schema, data = {}) {
+  const fields = findPaymentFields(schema);
+  if (fields.length === 0 || !schema) return { ok: false, reason: "no-payment-field" };
+  if (fields.length > 1) return { ok: false, reason: "multiple-payment-fields", entityId: fields[0].id };
+  const { id: entityId, entity } = fields[0];
+  if (paymentFieldProblem(schema, entityId)) return { ok: false, reason: "payment-field-conditional", entityId };
+  const cfg = readPaymentAttributes(entity);
+  const answers = data && typeof data === "object" ? data : {};
+  const currencyInfo = currencyOf(cfg.currency);
+  if (!currencyInfo) return { ok: false, reason: "unsupported-currency", entityId };
+  const mode = cfg.amountMode;
+  if (!mode) return { ok: false, reason: "invalid-mode", entityId };
+  let amountMinor;
+  let quantity;
+  if (mode === "fixed" || mode === "perUnit") {
+    if (!positiveInt(cfg.amountMinor)) return { ok: false, reason: "missing-amount", entityId };
+    amountMinor = cfg.amountMinor;
+    if (mode === "perUnit") {
+      if (!cfg.quantityFrom) return { ok: false, reason: "missing-amount-source", entityId };
+      if (amountSourceProblem(schema, cfg.quantityFrom, QUANTITY_SOURCE_TYPES)) {
+        return { ok: false, reason: "ineligible-amount-source", entityId };
+      }
+      const raw = answerOf(answers, cfg.quantityFrom);
+      if (isBlankAnswer(raw)) return { ok: false, reason: "amount-source-empty", entityId };
+      const q = answerNumber(raw);
+      if (q === null) return { ok: false, reason: "amount-not-numeric", entityId };
+      if (!Number.isInteger(q)) return { ok: false, reason: "quantity-not-whole", entityId };
+      const maxQ = positiveInt(cfg.maxQuantity) ? cfg.maxQuantity : DEFAULT_MAX_QUANTITY;
+      if (q < 1 || q > maxQ) return { ok: false, reason: "quantity-out-of-range", entityId };
+      quantity = q;
+      amountMinor = amountMinor * q;
+    }
+  } else {
+    if (!cfg.amountFrom) return { ok: false, reason: "missing-amount-source", entityId };
+    if (amountSourceProblem(schema, cfg.amountFrom, AMOUNT_SOURCE_TYPES, currencyInfo.code)) {
+      return { ok: false, reason: "ineligible-amount-source", entityId };
+    }
+    if (!positiveInt(cfg.maxAmountMinor)) return { ok: false, reason: "missing-amount", entityId };
+    const raw = answerOf(answers, cfg.amountFrom);
+    if (isBlankAnswer(raw)) return { ok: false, reason: "amount-source-empty", entityId };
+    const major = answerNumber(raw);
+    const minor = major === null ? null : toMinorUnits(major, currencyInfo);
+    if (minor === null) return { ok: false, reason: "amount-not-numeric", entityId };
+    const min = positiveInt(cfg.minAmountMinor) ? cfg.minAmountMinor : currencyInfo.minimumMinor;
+    if (minor < min) return { ok: false, reason: "amount-below-minimum", entityId };
+    if (minor > cfg.maxAmountMinor) return { ok: false, reason: "amount-above-maximum", entityId };
+    amountMinor = minor;
+  }
+  if (!withinCharge(amountMinor, currencyInfo)) return { ok: false, reason: "amount-not-chargeable", entityId };
+  const key = typeof entity.attributes?.key === "string" && entity.attributes.key !== "" ? entity.attributes.key : entityId;
+  return {
+    ok: true,
+    entityId,
+    key,
+    amountMinor,
+    currency: currencyInfo.code,
+    currencyInfo,
+    description: cfg.chargeDescription ?? "",
+    mode,
+    ...quantity !== void 0 ? { quantity } : {}
+  };
+}
+function describePaymentFailure(reason) {
+  switch (reason) {
+    case "amount-source-empty":
+      return "Enter the amount or quantity to pay for.";
+    case "amount-not-numeric":
+      return "The amount or quantity must be a number.";
+    case "quantity-not-whole":
+      return "The quantity must be a whole number.";
+    case "quantity-out-of-range":
+      return "That quantity isn't available.";
+    case "amount-below-minimum":
+      return "That amount is below the minimum.";
+    case "amount-above-maximum":
+      return "That amount is above the maximum.";
+    case "amount-not-chargeable":
+      return "That amount can't be charged.";
+    default:
+      return "This form's payment isn't set up correctly. Please contact the form owner.";
+  }
+}
+
+// src/payments/diagnostics.ts
+function diag(code, severity, message, context, entityId) {
+  return { code, severity, entityId, context, message };
+}
+var positiveInt2 = (v) => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+var money = (minor, c) => `${toMajorString(minor, c)} ${c.code}`;
+function sourceDiagnostic(schema, id, key, role, allowed, currency) {
+  const attr = role === "quantity" ? "quantityFrom" : "amountFrom";
+  const kinds = role === "quantity" ? "a Number field" : "a Number or Currency field";
+  const problem = amountSourceProblem(schema, key, allowed, currency?.code);
+  let message = null;
+  switch (problem) {
+    case "missing":
+      message = key ? `The payment ${role} reads field "${key}", which doesn't exist. Choose ${kinds}.` : `Choose the field that holds the ${role} to charge for \u2014 ${kinds}.`;
+      break;
+    case "wrong-type":
+      message = `The payment ${role} must come from ${kinds}; "${key}" isn't one.`;
+      break;
+    case "unreachable":
+      message = `The payment ${role} field "${key}" isn't placed on the form, so nobody can fill it in. Add it to the form or choose another field.`;
+      break;
+    case "in-grid":
+      message = `The payment ${role} can't come from a field inside a repeating grid \u2014 every row would have its own value. Use a field outside the grid.`;
+      break;
+    case "conditional":
+      message = `The payment ${role} field "${key}" is hidden, disabled, calculated or shown conditionally. The server can't recompute that, so the respondent could send any value. Use a plain field the respondent fills in.`;
+      break;
+    case "currency-mismatch": {
+      const source = key ? findFieldByKey(schema, key) : null;
+      const shown = source ? sourceCurrencyOf(source.entity) : null;
+      message = `The payment amount field "${key}" shows ${shown ?? "an unsupported currency"}, but the payment is charged in ${currency?.code}. Set that field's currency to ${currency?.code}.`;
+      break;
+    }
+    case "too-precise":
+      message = `The payment amount field "${key}" allows more decimal places than ${currency?.code} can charge (${currency?.exponent}), so a typed amount would be rounded. Set its decimal places to ${currency?.exponent} or fewer.`;
+      break;
+    default: {
+      const source = key ? findFieldByKey(schema, key) : null;
+      if (source?.entity.attributes?.required !== true) {
+        message = `Make the payment ${role} field "${key}" required, so a respondent can't submit without it.`;
+      }
+    }
+  }
+  return message ? diag("payment-amount-source", "error", message, { [attr]: key ?? null, problem: problem ?? "optional" }, id) : null;
+}
+function paymentDiagnostics(schema) {
+  const out = [];
+  const payments = findPaymentFields(schema);
+  if (payments.length > 1) {
+    for (const { id } of payments) {
+      out.push(
+        diag(
+          "payment-multiple",
+          "error",
+          `This form has ${payments.length} payment fields, so the amount to charge is ambiguous. Keep exactly one.`,
+          { count: payments.length },
+          id
+        )
+      );
+    }
+  }
+  for (const { id, entity } of payments) {
+    const cfg = readPaymentAttributes(entity);
+    const currency = currencyOf(cfg.currency);
+    if (!currency) {
+      out.push(
+        diag(
+          "payment-currency",
+          "error",
+          cfg.currency ? `Currency "${cfg.currency}" isn't supported for payments. Choose a supported currency.` : "This payment field has no currency. Choose one \u2014 there is no safe default.",
+          { currency: cfg.currency ?? null },
+          id
+        )
+      );
+    }
+    const amountError = (message, context = {}) => out.push(diag("payment-amount", "error", message, context, id));
+    const attrs = entity.attributes ?? {};
+    if (!reachableIds(schema).has(id)) {
+      out.push(
+        diag(
+          "payment-unreachable",
+          "error",
+          "This payment field isn't placed on the form (nothing contains it), so no one could pay. Add it to the form or delete it.",
+          {},
+          id
+        )
+      );
+    }
+    const present = (k) => Object.prototype.hasOwnProperty.call(attrs, k) && attrs[k] !== void 0;
+    const mode = cfg.amountMode;
+    if (mode === "fixed" || mode === "perUnit") {
+      const what = mode === "fixed" ? "amount" : "price per unit";
+      const amt = cfg.amountMinor;
+      if (!positiveInt2(amt)) {
+        amountError(`Set the ${what} to a positive amount.`, { amountMinor: amt ?? null });
+      } else if (currency && !isChargeableAmount(amt, currency)) {
+        amountError(`${money(amt, currency)} can't be charged \u2014 amounts in ${currency.code} must be a multiple of 10 minor units.`, {
+          amountMinor: amt
+        });
+      } else if (amt > MAX_CHARGE_MINOR) {
+        amountError(`The ${what} is larger than a single payment can be.`, { amountMinor: amt, max: MAX_CHARGE_MINOR });
+      } else if (currency && amt < currency.minimumMinor) {
+        out.push(
+          diag(
+            "payment-below-minimum",
+            "warning",
+            `${money(amt, currency)} is below the usual minimum charge of about ${money(currency.minimumMinor, currency)}; the payment provider may reject it.`,
+            { amountMinor: amt, minimumMinor: currency.minimumMinor, currency: currency.code },
+            id
+          )
+        );
+      }
+      if (mode === "perUnit") {
+        const d = sourceDiagnostic(schema, id, cfg.quantityFrom, "quantity", QUANTITY_SOURCE_TYPES);
+        if (d) out.push(d);
+        if (present("maxQuantity") && !positiveInt2(attrs.maxQuantity)) {
+          amountError("The maximum quantity must be a whole number of at least 1.", { maxQuantity: attrs.maxQuantity });
+        } else if (positiveInt2(amt)) {
+          const maxQ = cfg.maxQuantity ?? DEFAULT_MAX_QUANTITY;
+          if (amt * maxQ > MAX_CHARGE_MINOR) {
+            amountError(
+              `At the maximum quantity (${maxQ}) the total is larger than a single payment can be. Lower the price or the maximum quantity.`,
+              { amountMinor: amt, maxQuantity: maxQ, max: MAX_CHARGE_MINOR }
+            );
+          }
+        }
+      }
+    } else if (mode === "entered") {
+      const d = sourceDiagnostic(schema, id, cfg.amountFrom, "amount", AMOUNT_SOURCE_TYPES, currency ?? void 0);
+      if (d) out.push(d);
+      const max = cfg.maxAmountMinor;
+      const min = cfg.minAmountMinor;
+      if (!positiveInt2(max)) {
+        amountError("Set a maximum amount a respondent can pay \u2014 it stops a typo from becoming a large charge.", {
+          maxAmountMinor: max ?? null
+        });
+      } else if (max > MAX_CHARGE_MINOR) {
+        amountError("The maximum amount is larger than a single payment can be.", { maxAmountMinor: max, max: MAX_CHARGE_MINOR });
+      }
+      if (present("minAmountMinor") && !positiveInt2(attrs.minAmountMinor)) {
+        amountError("The minimum amount must be a positive amount.", { minAmountMinor: attrs.minAmountMinor });
+      } else if (positiveInt2(min) && positiveInt2(max) && min > max) {
+        amountError("The minimum amount is larger than the maximum.", { minAmountMinor: min, maxAmountMinor: max });
+      } else if (!present("minAmountMinor") && positiveInt2(max) && currency && max < currency.minimumMinor) {
+        amountError(
+          `The maximum amount is below the smallest amount this form accepts (${money(currency.minimumMinor, currency)}). Raise the maximum, or set a lower minimum.`,
+          { maxAmountMinor: max, minimumMinor: currency.minimumMinor }
+        );
+      }
+    } else {
+      amountError("Choose how this payment is priced: a fixed amount, a price per unit, or an amount the respondent enters.", {
+        amountMode: entity.attributes?.amountMode ?? null
+      });
+    }
+    if (isInsideGrid(schema, id)) {
+      out.push(
+        diag(
+          "payment-in-grid",
+          "error",
+          "A payment field can't live inside a repeating grid \u2014 that would imply one charge per row, but a submission takes a single payment. Move it outside the grid.",
+          {},
+          id
+        )
+      );
+    }
+    if (attrs.persistent === false) {
+      out.push(
+        diag(
+          "payment-excluded",
+          "error",
+          'This payment field is excluded from the submission, so the record of what was charged would be discarded. Clear "Exclude from submission".',
+          {},
+          id
+        )
+      );
+    }
+    const self = { ...entity, attributes: { ...attrs, persistent: void 0 } };
+    const conditional = isConditionallyControlled(self) || selfAndAncestors(schema, id).slice(1).some(isConditionallyControlled);
+    if (conditional) {
+      out.push(
+        diag(
+          "payment-conditional",
+          "error",
+          "A payment field can't be hidden, disabled, calculated or shown conditionally (or sit in a container that is) \u2014 the server couldn't tell whether a payment was due. Remove the condition.",
+          {},
+          id
+        )
+      );
+    }
+    const pages = wizardPageIds(schema);
+    if (pages) {
+      const last = pages[pages.length - 1];
+      const onLast = last !== void 0 && selfAndAncestorIds(schema, id).includes(last);
+      if (!onLast) {
+        out.push(
+          diag(
+            "payment-wizard-page",
+            "error",
+            "In a multi-page form the payment field must be on the last page, where the form is submitted. Move it there.",
+            { page: last ?? null },
+            id
+          )
+        );
+      }
+      const strays = last === void 0 ? [] : reachableSubmitButtonIds(schema).filter((b) => !selfAndAncestorIds(schema, b).includes(last));
+      if (strays.length) {
+        out.push(
+          diag(
+            "payment-wizard-page",
+            "error",
+            'In a multi-page form that takes a payment, submit buttons must be on the last page, where the card form is. Move the button there, or set its action to "Button".',
+            { page: last ?? null, buttons: strays },
+            id
+          )
+        );
+      }
+    }
+  }
+  return out;
+}
+
 // src/schema/validate.ts
 var RESERVED2 = new Set(RESERVED_KEYS);
-function diag(code, severity, message, context = {}, entityId) {
+function diag2(code, severity, message, context = {}, entityId) {
   return entityId === void 0 ? { code, severity, context, message } : { code, severity, entityId, context, message };
 }
 function validateSchema(schema) {
   const out = [];
   if (!schema || typeof schema !== "object" || typeof schema.entities !== "object" || schema.entities === null || !Array.isArray(schema.root)) {
-    out.push(diag("malformed-schema", "error", "Schema is missing entities or root."));
+    out.push(diag2("malformed-schema", "error", "Schema is missing entities or root."));
     return out;
   }
   const entities = schema.entities;
@@ -261,7 +837,7 @@ function validateSchema(schema) {
   for (const id of root) {
     if (!entities[id]) {
       out.push(
-        diag("dangling-root", "error", `Root references unknown entity "${id}".`, { id }, id)
+        diag2("dangling-root", "error", `Root references unknown entity "${id}".`, { id }, id)
       );
     }
   }
@@ -270,7 +846,7 @@ function validateSchema(schema) {
       const child = entities[cid];
       if (!child) {
         out.push(
-          diag(
+          diag2(
             "dangling-child",
             "error",
             `Container "${id}" references unknown child "${cid}".`,
@@ -280,7 +856,7 @@ function validateSchema(schema) {
         );
       } else if (child.parentId !== void 0 && child.parentId !== null && child.parentId !== id) {
         out.push(
-          diag(
+          diag2(
             "parent-mismatch",
             "warning",
             `Entity "${cid}" is a child of "${id}" but its parentId is "${child.parentId}".`,
@@ -308,11 +884,11 @@ function validateSchema(schema) {
     onStack.delete(id);
   };
   for (const id of root) walk(id);
-  if (cycle) out.push(diag("cycle", "error", "The schema contains a container cycle."));
+  if (cycle) out.push(diag2("cycle", "error", "The schema contains a container cycle."));
   for (const id of Object.keys(entities)) {
     if (!reachable.has(id)) {
       out.push(
-        diag(
+        diag2(
           "orphan",
           "warning",
           `Entity "${id}" is not reachable from the form root.`,
@@ -325,7 +901,7 @@ function validateSchema(schema) {
   for (const { id, key } of collectKeys(schema)) {
     if (typeof key === "string" && RESERVED2.has(key)) {
       out.push(
-        diag(
+        diag2(
           "reserved-key",
           "error",
           `Key "${key}" is a reserved word \u2014 it would shadow the expression engine.`,
@@ -335,7 +911,7 @@ function validateSchema(schema) {
       );
     } else if (!KEY_RE.test(key)) {
       out.push(
-        diag(
+        diag2(
           "invalid-key",
           "error",
           `Key "${key}" isn't a valid identifier \u2014 logic and calculations can't reference it.`,
@@ -352,7 +928,7 @@ function validateSchema(schema) {
     const hasValueSource = logic.some((r) => r.action === "enable" || r.action === "setValue") || at.calculateValue != null || at.calculateValueJs != null || at.customDefaultValue != null || at.defaultValue !== void 0 || at.defaultChecked === true;
     if (hasValueSource) continue;
     out.push(
-      diag(
+      diag2(
         "disabled-required",
         "warning",
         `Field "${keyOf(id, e)}" is both disabled and required, but nothing supplies a value \u2014 it can never be filled. Enable it with a logic rule (or give it a calculated/default value), or clear one of the two.`,
@@ -365,7 +941,7 @@ function validateSchema(schema) {
     const at = e.attributes;
     if (!at || at.required !== true || at.persistent !== false) continue;
     out.push(
-      diag(
+      diag2(
         "required-excluded",
         "warning",
         `Field "${keyOf(id, e)}" is required but excluded from submission \u2014 a respondent must fill it, yet its value is dropped and never saved. Clear "Exclude from submission", or make the field optional.`,
@@ -377,7 +953,7 @@ function validateSchema(schema) {
   const rootPages = root.filter((id) => entities[id]?.type === "page").length;
   if (rootPages > 0 && rootPages < root.length) {
     out.push(
-      diag(
+      diag2(
         "partial-wizard",
         "warning",
         "Pages become wizard steps only when EVERY top-level item is a Page. Mixed with other fields, a Page renders as a plain container \u2014 move the other fields into Pages (or remove the Page) to get a multi-step wizard.",
@@ -385,10 +961,11 @@ function validateSchema(schema) {
       )
     );
   }
+  out.push(...paymentDiagnostics(schema));
   for (const id of duplicateKeyIds(schema)) {
     const e = entities[id];
     out.push(
-      diag(
+      diag2(
         "duplicate-key",
         "error",
         `Key "${keyOf(id, e)}" is used by more than one field \u2014 their answers would collide.`,
@@ -2123,6 +2700,16 @@ function objectType(name) {
     compare: (a, b) => deepSameValue(a, b)
   };
 }
+function paymentType() {
+  return {
+    name: PAYMENT_TYPE,
+    valueType: "object",
+    coerce: (v) => coercePaymentValue(v),
+    empty: () => emptyPaymentValue(),
+    // Structural, like objectType — a reference compare would churn every settle pass.
+    compare: (a, b) => deepSameValue(a, b)
+  };
+}
 function noneType(name, kind) {
   return {
     name,
@@ -2152,7 +2739,7 @@ var STRING_TYPES = [
 var DATE_TYPES2 = ["day", "datetime"];
 var NUMBER_TYPES = ["number", "currency", "rating"];
 var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField", "array", "ranking"];
-var GRID_TYPES = ["dataGrid", "editGrid"];
+var GRID_TYPES2 = ["dataGrid", "editGrid"];
 var CONTAINER_TYPES = ["panel", "columns", "fieldset", "well", "table", "tabs", "container", "wizard", "page"];
 var STATIC_TYPES = ["button", "heading", "content", "htmlElement", "html", "divider", "hr"];
 function createDefaultFieldTypeRegistry() {
@@ -2167,7 +2754,8 @@ function createDefaultFieldTypeRegistry() {
   add(objectType("map"));
   add(objectType("matrix"));
   add(objectType("addressBlock"));
-  for (const name of GRID_TYPES) add(gridType(name));
+  add(paymentType());
+  for (const name of GRID_TYPES2) add(gridType(name));
   for (const name of CONTAINER_TYPES) add(noneType(name, "container"));
   for (const name of STATIC_TYPES) add(noneType(name, "static"));
   return map;
@@ -2955,6 +3543,7 @@ var ACCEPTS = {
   map: "Key\u2013value map",
   matrix: "Survey grid",
   addressBlock: "Structured address",
+  payment: "Payment",
   dataGrid: "Repeating rows",
   editGrid: "Repeating rows"
 };
@@ -2965,6 +3554,12 @@ var ADDRESS_PARTS = [
   { key: "region", label: "State / region" },
   { key: "postalCode", label: "Postal code" },
   { key: "country", label: "Country" }
+];
+var PAYMENT_PARTS = [
+  { key: "status", label: "Status (unpaid / pending / paid / failed)", valueType: "string", example: "unpaid" },
+  { key: "amountMinor", label: "Amount charged, in minor units (4999 = 49.99)", valueType: "number", example: 0 },
+  { key: "currency", label: "ISO-4217 currency", valueType: "string", example: "" },
+  { key: "intentId", label: "Payment intent id", valueType: "string", example: "" }
 ];
 function acceptsFor(fieldType) {
   return ACCEPTS[fieldType] ?? fieldType.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
@@ -3082,6 +3677,20 @@ function deriveDataContract(schema, registry) {
     let children;
     if (isGrid) {
       children = walk(e.children);
+    } else if (e.type === PAYMENT_TYPE) {
+      children = PAYMENT_PARTS.map((p) => ({
+        key: p.key,
+        entityId: `${id}.${p.key}`,
+        fieldType: p.valueType === "number" ? "number" : "textField",
+        label: p.label,
+        valueType: p.valueType,
+        typeLabel: p.valueType,
+        accepts: p.valueType === "number" ? "Number" : "Text",
+        constraints: [],
+        conditional: false,
+        excluded: false,
+        example: p.example
+      }));
     } else if (e.type === "addressBlock") {
       children = ADDRESS_PARTS.map((p) => ({
         key: p.key,
@@ -3141,6 +3750,10 @@ function buildFormTemplate(schema, registry, options) {
     if (f.excluded) continue;
     if (include && !include.has(f.key)) continue;
     if (f.typeLabel === "row[]") {
+      skipped.push(f.key);
+      continue;
+    }
+    if (f.fieldType === PAYMENT_TYPE) {
       skipped.push(f.key);
       continue;
     }
@@ -3357,36 +3970,49 @@ function clampIndex(index, length) {
 var VERSION = "0.1.0-alpha.0";
 
 exports.ADDRESS_REQUIRED_PARTS = ADDRESS_REQUIRED_PARTS;
+exports.AMOUNT_SOURCE_TYPES = AMOUNT_SOURCE_TYPES;
 exports.BUILTIN_RULES = BUILTIN_RULES;
+exports.CURRENCIES = CURRENCIES;
+exports.CURRENCY_CODES = CURRENCY_CODES;
 exports.CURRENT_SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
 exports.DEFAULT_MAX_PASSES = DEFAULT_MAX_PASSES;
+exports.DEFAULT_MAX_QUANTITY = DEFAULT_MAX_QUANTITY;
 exports.DEFAULT_MESSAGES = DEFAULT_MESSAGES;
 exports.KEY_RE = KEY_RE;
 exports.KEY_REGEX_SOURCE = KEY_REGEX_SOURCE;
 exports.LOGIC_ACTIONS = LOGIC_ACTIONS;
+exports.MAX_CHARGE_MINOR = MAX_CHARGE_MINOR;
+exports.PAYMENT_AMOUNT_MODES = PAYMENT_AMOUNT_MODES;
+exports.PAYMENT_TYPE = PAYMENT_TYPE;
+exports.QUANTITY_SOURCE_TYPES = QUANTITY_SOURCE_TYPES;
 exports.RESERVED_KEYS = RESERVED_KEYS;
 exports.VERSION = VERSION;
 exports.ValidatorRegistry = ValidatorRegistry;
+exports.amountSourceProblem = amountSourceProblem;
 exports.buildDependencyGraph = buildDependencyGraph;
 exports.buildEvalModel = buildEvalModel;
 exports.buildFieldValidators = buildFieldValidators;
 exports.buildFormTemplate = buildFormTemplate;
 exports.camelCaseKeys = camelCaseKeys;
+exports.coercePaymentValue = coercePaymentValue;
 exports.collectKeys = collectKeys;
 exports.createDefaultFieldTypeRegistry = createDefaultFieldTypeRegistry;
 exports.createDefaultRegistry = createDefaultRegistry;
 exports.createEntity = createEntity;
 exports.createFormEngine = createFormEngine;
+exports.currencyOf = currencyOf;
 exports.customValidationValidator = customValidationValidator;
 exports.defaultFieldTypeRegistry = defaultFieldTypeRegistry;
 exports.defaultIdGen = defaultIdGen;
 exports.defaultRegistry = defaultRegistry;
 exports.defaultSameValue = defaultSameValue;
 exports.deriveDataContract = deriveDataContract;
+exports.describePaymentFailure = describePaymentFailure;
 exports.downstreamClosure = downstreamClosure;
 exports.duplicate = duplicate;
 exports.duplicateKeyIds = duplicateKeyIds;
 exports.emailRule = emailRule;
+exports.emptyPaymentValue = emptyPaymentValue;
 exports.evaluate = evaluate2;
 exports.evaluateCompiled = evaluateCompiled;
 exports.evaluateExpression = evaluateExpression;
@@ -3397,12 +4023,17 @@ exports.evaluateVisibility = evaluateVisibility;
 exports.expressionVariables = expressionVariables;
 exports.extractDataRefs = extractDataRefs;
 exports.fail = fail;
+exports.findFieldByKey = findFieldByKey;
+exports.findPaymentFields = findPaymentFields;
 exports.getPath = getPath;
 exports.hasBlockingProblems = hasBlockingProblems;
 exports.hasHostileIdentifier = hasHostileIdentifier;
+exports.hasPayment = hasPayment;
 exports.insert = insert;
 exports.interpolate = interpolate;
 exports.isAutoKey = isAutoKey;
+exports.isChargeableAmount = isChargeableAmount;
+exports.isConditionallyControlled = isConditionallyControlled;
 exports.isEmptyValue = isEmptyValue;
 exports.isKeyed = isKeyed;
 exports.isValidKey = isValidKey;
@@ -3434,9 +4065,12 @@ exports.optionRule = optionRule;
 exports.orderedIds = orderedIds;
 exports.parseExpression = parseExpression;
 exports.patternRule = patternRule;
+exports.paymentFieldProblem = paymentFieldProblem;
+exports.reachableIds = reachableIds;
 exports.readAsyncValidation = readAsyncValidation;
 exports.readAttachmentsEnabled = readAttachmentsEnabled;
 exports.readDataSource = readDataSource;
+exports.readPaymentAttributes = readPaymentAttributes;
 exports.readSaveSubmissionAsPdf = readSaveSubmissionAsPdf;
 exports.readSettings = readSettings;
 exports.readSubmitMessage = readSubmitMessage;
@@ -3447,14 +4081,18 @@ exports.reorder = reorder;
 exports.repairSchema = repairSchema;
 exports.requiredRule = requiredRule;
 exports.resolveMinionParams = resolveMinionParams;
+exports.resolvePaymentAmount = resolvePaymentAmount;
 exports.runAsyncValidation = runAsyncValidation;
 exports.sanitizeKey = sanitizeKey;
 exports.seedFields = seedFields;
 exports.setSettings = setSettings;
+exports.sourceCurrencyOf = sourceCurrencyOf;
 exports.sourcePriority = sourcePriority;
 exports.submitButtonId = submitButtonId;
 exports.toAddressSuggestions = toAddressSuggestions;
 exports.toCamelKey = toCamelKey;
+exports.toMajorString = toMajorString;
+exports.toMinorUnits = toMinorUnits;
 exports.toOptions = toOptions;
 exports.toPrintableHtml = toPrintableHtml;
 exports.typeRule = typeRule;

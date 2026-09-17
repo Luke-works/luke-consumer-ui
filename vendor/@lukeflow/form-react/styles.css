@@ -708,6 +708,31 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
   cursor: pointer;
 }
 
+/* ── Payment ─────────────────────────────────────────────────────────────────────
+   A bordered box holding the charge summary and the processor's card UI (an iframe the processor
+   injects into .lf-payment-element, which therefore must be a plain full-width block). The group
+   is focusable (tabindex -1) so a failed submit can move focus to it; the ring is for that. */
+.lf-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--lf-space);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg);
+}
+.lf-payment:focus-visible { outline: 2px solid var(--lf-primary); outline-offset: 2px; }
+.lf-payment-summary { margin: 0; font-weight: 600; }
+.lf-payment-element { display: block; width: 100%; min-width: 0; }
+.lf-payment-element[data-phase="loading"] { min-height: 0; }
+.lf-payment-note { margin: 0; color: var(--lf-muted); font-size: 13px; }
+.lf-payment-status { margin: 0; }
+.lf-payment-status[data-status="paid"] { color: var(--lf-text); }
+.lf-payment-status[data-status="failed"] { color: var(--lf-error); }
+.lf-payment > .lf-error { margin: 0; }
+
 /* ── Signature pad ─────────────────────────────────────────────────────────── */
 .lf-signature { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 /* Draw / Type mode toggle (shown when allowType). */

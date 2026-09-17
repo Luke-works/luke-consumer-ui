@@ -208,6 +208,24 @@ export const SCREENS: Screen[] = [
     },
     ready: heading(/analytics/i),
   },
+  // Forms → Payments, with a connected account that can take payments (the populated state).
+  {
+    name: "form-payments",
+    path: "/forms/payments",
+    opts: {
+      routes: {
+        "/api/payments/account": ok({
+          enabled: true, livemode: false, planAllows: true, canManage: true, ready: true,
+          account: {
+            accountId: "acct_1Example", status: "CONNECTED", livemode: false, chargesEnabled: true,
+            detailsSubmitted: true, displayName: "Ada's Tickets", defaultCurrency: "USD", country: "US",
+            connectedAt: "2026-06-01T00:00:00", modeMismatch: false,
+          },
+        }),
+      },
+    },
+    ready: heading(/^payments$/i),
+  },
   { name: "form-builder", path: `/forms/${FORM_ID}`, opts: { routes: formRoutes } },
   { name: "form-responses", path: "/forms/CONTACT/responses", opts: { routes: formRoutes }, ready: heading(/responses/i) },
   { name: "form-fill", path: "/forms/CONTACT/fill", opts: { routes: formRoutes } },
