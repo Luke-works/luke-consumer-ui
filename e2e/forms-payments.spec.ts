@@ -221,7 +221,8 @@ test.describe("forms — taking a payment on the public embed", () => {
     const submits: Record<string, unknown>[] = [];
     const stripeRequests: string[] = [];
     page.on("request", (r) => {
-      if (new URL(r.url()).hostname.endsWith("stripe.com")) stripeRequests.push(r.url());
+      const host = new URL(r.url()).hostname;
+      if (host === "stripe.com" || host.endsWith(".stripe.com")) stripeRequests.push(r.url());
     });
     await stubBackend(page, {
       loggedOut: true,
