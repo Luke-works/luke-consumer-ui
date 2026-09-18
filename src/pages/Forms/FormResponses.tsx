@@ -28,6 +28,7 @@ const STATE_BADGE: Record<InstanceState, string> = {
   PROCESSED: "bg-success-50 text-success-600 dark:bg-success-500/15",
   EXPIRED: "bg-gray-100 text-gray-400 dark:bg-white/10",
   CANCELLED: "bg-error-50 text-error-500 dark:bg-error-500/15",
+  AWAITING_PAYMENT: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
 };
 
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString() : "—");

@@ -130,6 +130,12 @@ interface FormRendererProps {
     initialValues?: FormData;
     /** Called with the collected payload on a VALID submit. */
     onSubmit?: (data: FormData) => void;
+    /**
+     * An asynchronous submit (a network call, a payment) is in flight. While true, submitting again
+     * is refused and every submit button — ours and an author-placed one — is disabled and marked
+     * `aria-busy`. The host sets it when its `onSubmit` work starts and clears it when that ends.
+     */
+    submitting?: boolean;
     /** Called after every field change with the current payload + engine state. */
     onChange?: (data: FormData, state: EngineState) => void;
     /** Render read-only (all controls disabled, no submit). */
@@ -294,6 +300,108 @@ interface MinionDataState {
  */
 declare function useMinionData(entity: SchemaEntity, scope: Readonly<Record<string, unknown>>): MinionDataState;
 
+/** An amount in integer minor units with its uppercase ISO-4217 code. */
+interface PaymentAmount {
+    amountMinor: number;
+    currency: string;
+}
+/** What a processor needs to mount its payment UI. */
+interface PaymentMountOptions extends PaymentAmount {
+    /** The element the processor renders into. Owned by the field; do not remove it. */
+    container: HTMLElement;
+    /** BCP-47 locale for the processor's own strings. */
+    locale?: string;
+    /** Called as the payer types, with whether the details are complete. */
+    onChange?: (state: {
+        complete: boolean;
+    }) => void;
+    /**
+     * Called if the processor's UI fails to load AFTER `mount` resolved (a blocked iframe, a network
+     * drop). The session then reports `unavailable`, so the host doesn't submit into a dead card form.
+     */
+    onLoadError?: (message: string) => void;
+    /**
+     * Aborted when the field no longer wants this mount (it unmounted before the mount resolved). The
+     * processor should remove whatever it already put in the container and reject.
+     */
+    signal?: AbortSignal;
+}
+/** How a confirmation ended. `processing` means the processor will settle it later. */
+type PaymentConfirmResult = {
+    status: "succeeded" | "processing";
+} | {
+    status: "failed";
+    message: string;
+};
+/** A mounted processor UI. */
+interface PaymentMount {
+    /** Keep the processor's displayed amount in step with the form. */
+    update(amount: PaymentAmount): void | Promise<void>;
+    /** Check the collected details WITHOUT charging. Resolves to a payer-facing message, or `null`. */
+    validate(): Promise<string | null>;
+    /** Confirm the server-created charge. `amount` is the SERVER's figure. */
+    confirm(clientSecret: string, amount: PaymentAmount): Promise<PaymentConfirmResult>;
+    /** Tear the UI down. Called when the field unmounts. */
+    destroy(): void;
+}
+/** A payment processor adapter. */
+interface PaymentProcessor {
+    mount(options: PaymentMountOptions): Promise<PaymentMount>;
+}
+/** Where a session is in its lifecycle. */
+type PaymentPhase = "loading" | "ready" | "unavailable" | "validating" | "confirming" | "succeeded" | "processing";
+/** A snapshot for rendering. */
+interface PaymentSessionState {
+    phase: PaymentPhase;
+    /** Whether the payer has completed the processor's fields. */
+    complete: boolean;
+    /** A payer-facing message to show on the payment field, or `null`. */
+    error: string | null;
+}
+/** The host's handle on a form's payment. Create one per rendered form. */
+interface PaymentSession {
+    readonly processor: PaymentProcessor;
+    getState(): PaymentSessionState;
+    subscribe(listener: () => void): () => void;
+    /**
+     * Validate the payer's details before the host submits. Resolves to a payer-facing message
+     * (also shown on the field), or `null` when it is safe to submit.
+     */
+    validate(): Promise<string | null>;
+    /**
+     * Confirm the server-created charge. Never throws: a processor failure resolves to
+     * `{ status: "failed" }` and the message is shown on the field.
+     */
+    confirm(clientSecret: string, amount: PaymentAmount): Promise<PaymentConfirmResult>;
+    /** Show (or clear) a message on the payment field — e.g. the server refused the amount. */
+    setError(message: string | null): void;
+    /** @internal Used by the payment field. */
+    _attach(mount: PaymentMount): () => void;
+    /** @internal Used by the payment field. */
+    _setPhase(phase: PaymentPhase, error?: string | null): void;
+    /** @internal Used by the payment field. */
+    _setComplete(complete: boolean): void;
+}
+/** Create a {@link PaymentSession} around a processor. */
+declare function createPaymentSession(processor: PaymentProcessor): PaymentSession;
+/** Props for {@link PaymentsProvider}. */
+interface PaymentsProviderProps {
+    session: PaymentSession;
+    /**
+     * The schema the SERVER prices with, when it differs from the one being rendered — e.g. a host that
+     * locks or hides fields for this viewer before rendering. The payment field's preview uses it so it
+     * shows the figure that will actually be charged. Defaults to the rendered schema.
+     */
+    pricingSchema?: FormSchema | null;
+    children: ReactNode;
+}
+/** Provide a {@link PaymentSession} to the payment field below it. */
+declare function PaymentsProvider({ session, pricingSchema, children }: PaymentsProviderProps): react.JSX.Element;
+/** The session from the nearest {@link PaymentsProvider}, or `null` (preview / read-only hosts). */
+declare function usePaymentSession(): PaymentSession | null;
+/** Subscribe to a session's state; the idle snapshot when there is none. */
+declare function usePaymentState(session: PaymentSession | null): PaymentSessionState;
+
 /** Translate a source string to the active locale (optionally interpolating ICU-style params). */
 type TranslateFn = (text: string, params?: Record<string, unknown>) => string;
 /** Resolved writing direction. */
@@ -376,4 +484,4 @@ declare function printSubmission(schema: FormSchema, data: FormData, options?: P
  */
 declare const VERSION = "0.1.0-alpha.0";
 
-export { type ColorScheme, type Direction, type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, type FormTheme, FormThemeProvider, type FormTokenName, type LocaleInfo, LocaleProvider, type MinionDataState, MinionProvider, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, dataThemeAttr, defaultSanitizeHtml, getLocaleDirection, isAutofillSuppressed, printSubmission, setAutofillSuppression, useFormEngine, useFormTheme, useLocale, useMinionClient, useMinionData, usePopoverTheme, useTranslate };
+export { type ColorScheme, type Direction, type FieldComponent, type FieldComponentProps, FormErrorBoundary, type FormErrorBoundaryProps, FormRenderer, type FormRendererProps, type FormTelemetryEvent, type FormTheme, FormThemeProvider, type FormTokenName, type LocaleInfo, LocaleProvider, type MinionDataState, MinionProvider, type PaymentAmount, type PaymentConfirmResult, type PaymentMount, type PaymentMountOptions, type PaymentPhase, type PaymentProcessor, type PaymentSession, type PaymentSessionState, PaymentsProvider, type PaymentsProviderProps, type SanitizeHtmlFn, type TranslateFn, type UseFormEngineResult, VERSION, createPaymentSession, dataThemeAttr, defaultSanitizeHtml, getLocaleDirection, isAutofillSuppressed, printSubmission, setAutofillSuppression, useFormEngine, useFormTheme, useLocale, useMinionClient, useMinionData, usePaymentSession, usePaymentState, usePopoverTheme, useTranslate };

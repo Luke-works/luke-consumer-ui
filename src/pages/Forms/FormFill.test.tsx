@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router";
 import FormFill from "./FormFill";
 import * as api from "../../lib/formInstancesApi";
+import * as formsApi from "../../lib/formsApi";
 
 // Auth + heavy children stubbed so we can drive autosave deterministically.
 vi.mock("../../context/AuthContext", () => ({
@@ -18,6 +19,9 @@ vi.mock("../../components/formBuilder/LukeFormRenderer", () => ({
       fire-change
     </button>
   ),
+}));
+vi.mock("../../lib/formsApi", () => ({
+  getFieldContract: vi.fn().mockResolvedValue({ fields: [], takesPayment: false }),
 }));
 vi.mock("../../lib/formInstancesApi", () => ({
   createInstance: vi.fn(),
@@ -45,6 +49,26 @@ function renderFill() {
     </MemoryRouter>,
   );
 }
+
+describe("FormFill for a form that takes a payment", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("creates no instance and says the payer must use the form's link", async () => {
+    vi.mocked(formsApi.getFieldContract).mockResolvedValueOnce({ fields: [], takesPayment: true });
+    renderFill();
+    expect(await screen.findByText(/the person paying has to fill it in themselves/)).toBeInTheDocument();
+    expect(formsApi.getFieldContract).toHaveBeenCalledWith("t1", "MYFORM", "published");
+    expect(mocked.createInstance).not.toHaveBeenCalled();
+  });
+
+  it("still fills the form when the check can't be made", async () => {
+    vi.mocked(formsApi.getFieldContract).mockRejectedValueOnce(new Error("offline"));
+    mocked.createInstance.mockResolvedValue(openInstance());
+    renderFill();
+    expect(await screen.findByText("fire-change")).toBeInTheDocument();
+    expect(mocked.createInstance).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("FormFill autosave", () => {
   beforeEach(() => vi.clearAllMocks());

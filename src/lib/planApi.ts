@@ -20,6 +20,8 @@ export type PlanFeatureFlags = {
   voice: boolean;
   selfHost: boolean;
   attachments: boolean;
+  /** Collect payments on forms through the workspace's own Stripe account. */
+  payments?: boolean;
 };
 
 /** The tenant's resolved plan, as returned by `GET /api/plan` (core-engine `PlanCatalog.toView()`). */

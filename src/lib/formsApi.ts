@@ -240,8 +240,17 @@ export function sendOutbound(
 /** The field→variable contract for a form's resolved schema (pin: published | latest | draft | v{n}). */
 export type FieldContract = { key: string; type: string; required: boolean; conditional: boolean; disabled?: boolean; label?: string };
 export async function getFields(tenant: string, code: string, pin = "latest"): Promise<FieldContract[]> {
-  const r = await req<{ fields: FieldContract[] }>(tenant, `${BASE}/by-code/${seg(code)}/fields?pin=${pin}`);
-  return asArray<FieldContract>(r.fields);
+  return (await getFieldContract(tenant, code, pin)).fields;
+}
+
+/** {@link getFields}, plus whether that version takes a payment (such a form is only submitted by its link). */
+export async function getFieldContract(
+  tenant: string,
+  code: string,
+  pin = "latest",
+): Promise<{ fields: FieldContract[]; takesPayment: boolean }> {
+  const r = await req<{ fields: FieldContract[]; takesPayment?: boolean }>(tenant, `${BASE}/by-code/${seg(code)}/fields?pin=${pin}`);
+  return { fields: asArray<FieldContract>(r.fields), takesPayment: r.takesPayment === true };
 }
 
 export function saveDraft(tenant: string, id: string, schema: string): Promise<unknown> {

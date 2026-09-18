@@ -15,7 +15,7 @@
  * FormResponses' modal unmounts between records.
  */
 import { useMemo, type ReactNode } from "react";
-import { FormRenderer as LukeRenderer, type FormTheme } from "@lukeflow/form-react";
+import { FormRenderer as LukeRenderer, PaymentsProvider, type FormTheme, type PaymentSession } from "@lukeflow/form-react";
 import type { FormData, FormSchema, JsEvaluator } from "@lukeflow/form-core";
 import "@lukeflow/form-react/styles.css";
 import "../../styles/lukeforms-theme.css"; // token bridge — MUST load after the package CSS
@@ -43,6 +43,9 @@ export default function LukeFormRenderer({
   allowJs = false,
   jsEvaluator,
   beforeSubmit,
+  payments,
+  pricingSchema,
+  submitLabel,
 }: {
   schema: string;
   initialValues?: Record<string, unknown>;
@@ -76,8 +79,19 @@ export default function LukeFormRenderer({
    * where there is no Submit button (`readOnly`), and in a wizard shown only on the last step.
    */
   beforeSubmit?: ReactNode;
+  /**
+   * The payment session for a form that takes a payment (public fill surfaces only). Absent, a payment
+   * field renders its offline box — the builder preview and the read-only views never mount a card form.
+   */
+  payments?: PaymentSession | null;
+  /**
+   * The schema the server prices the payment with, when it differs from `schema` (the respond page
+   * renders a copy with the preparer's fields locked). The payment field previews with it.
+   */
+  pricingSchema?: string;
+  /** Override the Submit button's text (e.g. "Pay $45.00"). */
+  submitLabel?: string;
 }) {
-  void submitting; // the package manages submit state internally; accepted for prop-compat
   // Parse ONCE per schema string. The engine rebuilds whenever the schema OBJECT identity changes
   // (useFormEngine), so parsing inline in the render body handed it a brand-new object on every
   // render — and any re-render of the *host* silently wiped the filler's in-progress answers while
@@ -86,6 +100,7 @@ export default function LukeFormRenderer({
   // to/from the Attachments tab re-renders too. Keying on the string is exact (strings compare by
   // value), so a genuine schema edit — the builder's live preview — still rebuilds.
   const parsed = useMemo(() => parseSchema(schema), [schema]);
+  const pricing = useMemo(() => (pricingSchema ? parseSchema(pricingSchema) : null), [pricingSchema]);
 
   // The form's chosen typeface (Form settings → Font), applied as the renderer's `--lf-font` token.
   // Done HERE, in the one adapter every surface goes through, so the builder preview, the in-app fill,
@@ -97,7 +112,7 @@ export default function LukeFormRenderer({
   // Webfonts are fetched only when a form actually selects one (a no-op for the system stacks).
   ensureFontLoaded(fontId);
 
-  return (
+  const renderer = (
     <LukeRenderer
       theme={theme}
       schema={parsed}
@@ -108,9 +123,18 @@ export default function LukeFormRenderer({
       autoSubmitSignal={autoSubmitSignal}
       playback={playback}
       readOnly={readOnly}
+      submitting={submitting}
+      submitLabel={submitLabel}
       allowJs={allowJs}
       jsEvaluator={jsEvaluator}
       beforeSubmit={beforeSubmit}
     />
+  );
+  return payments ? (
+    <PaymentsProvider session={payments} pricingSchema={pricing}>
+      {renderer}
+    </PaymentsProvider>
+  ) : (
+    renderer
   );
 }

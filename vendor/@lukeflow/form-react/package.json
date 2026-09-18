@@ -18,6 +18,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./stripe": {
+      "types": "./dist/stripe.d.ts",
+      "import": "./dist/stripe.js",
+      "require": "./dist/stripe.cjs"
+    },
     "./styles.css": "./styles.css"
   },
   "dependencies": {

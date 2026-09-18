@@ -22,6 +22,7 @@ import Plans from "./pages/Plans/Plans";
 // Code-split the form designer (@lukeflow/form-builder) to its own route chunk.
 const FormBuilderPage = lazy(() => import("./pages/Forms/FormBuilderPage"));
 const FormFill = lazy(() => import("./pages/Forms/FormFill"));
+const PaymentsSettings = lazy(() => import("./pages/Forms/PaymentsSettings"));
 const FormPreview = lazy(() => import("./pages/Forms/FormPreview"));
 const FormResponses = lazy(() => import("./pages/Forms/FormResponses"));
 const FormEmbed = lazy(() => import("./pages/Forms/FormEmbed"));
@@ -195,6 +196,16 @@ export default function App() {
                   element={
                     <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading…</div>}>
                       <FormInbox />
+                    </Suspense>
+                  }
+                />
+                {/* Payments — the Stripe account this workspace's forms charge into. Also where Stripe
+                    Connect returns the owner after connecting (?code=&state=). */}
+                <Route
+                  path="/forms/payments"
+                  element={
+                    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center text-sm text-gray-400">Loading…</div>}>
+                      <PaymentsSettings />
                     </Suspense>
                   }
                 />

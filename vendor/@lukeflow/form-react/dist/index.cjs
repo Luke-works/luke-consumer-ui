@@ -28,14 +28,16 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
-var index_exports = {};
-__export(index_exports, {
+var src_exports = {};
+__export(src_exports, {
   FormErrorBoundary: () => FormErrorBoundary,
   FormRenderer: () => FormRenderer,
   FormThemeProvider: () => FormThemeProvider,
   LocaleProvider: () => LocaleProvider,
   MinionProvider: () => MinionProvider,
+  PaymentsProvider: () => PaymentsProvider,
   VERSION: () => VERSION,
+  createPaymentSession: () => createPaymentSession,
   dataThemeAttr: () => dataThemeAttr,
   defaultSanitizeHtml: () => defaultSanitizeHtml,
   getLocaleDirection: () => getLocaleDirection,
@@ -47,10 +49,12 @@ __export(index_exports, {
   useLocale: () => useLocale,
   useMinionClient: () => useMinionClient,
   useMinionData: () => useMinionData,
+  usePaymentSession: () => usePaymentSession,
+  usePaymentState: () => usePaymentState,
   usePopoverTheme: () => usePopoverTheme,
   useTranslate: () => useTranslate
 });
-module.exports = __toCommonJS(index_exports);
+module.exports = __toCommonJS(src_exports);
 
 // src/useFormEngine.ts
 var import_react = require("react");
@@ -99,8 +103,8 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-var import_react15 = require("react");
-var import_form_core8 = require("@lukeflow/form-core");
+var import_react17 = require("react");
+var import_form_core9 = require("@lukeflow/form-core");
 
 // src/minions.tsx
 var import_react2 = require("react");
@@ -135,6 +139,10 @@ function useMinionData(entity, scope) {
   }, [client, key]);
   return state;
 }
+
+// src/render/controls/PaymentField.tsx
+var import_react5 = require("react");
+var import_form_core3 = require("@lukeflow/form-core");
 
 // src/i18n.tsx
 var import_react3 = require("react");
@@ -226,19 +234,241 @@ function useTranslate() {
   return (0, import_react3.useContext)(LocaleContext).t;
 }
 
-// src/theme.tsx
+// src/payments.tsx
 var import_react4 = require("react");
 var import_jsx_runtime3 = require("react/jsx-runtime");
-var FormThemeContext = (0, import_react4.createContext)({});
+var NOT_READY = "The payment form hasn't finished loading. Please wait a moment and try again.";
+var UNAVAILABLE = "Card payments aren't available right now. Please try again later.";
+function createPaymentSession(processor) {
+  let state = { phase: "loading", complete: false, error: null };
+  let mount = null;
+  const listeners = /* @__PURE__ */ new Set();
+  const set = (patch) => {
+    state = { ...state, ...patch };
+    for (const l of [...listeners]) l();
+  };
+  const message = (err, fallback) => err instanceof Error && err.message ? err.message : typeof err === "string" && err ? err : fallback;
+  const unavailable = () => state.phase === "unavailable";
+  const finish = (patch) => set(unavailable() ? { phase: "unavailable", error: UNAVAILABLE } : patch);
+  return {
+    processor,
+    getState: () => state,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    async validate() {
+      if (!mount || state.phase === "unavailable") {
+        const msg = state.phase === "unavailable" ? UNAVAILABLE : NOT_READY;
+        set({ error: msg });
+        return msg;
+      }
+      set({ phase: "validating", error: null });
+      try {
+        const err = await mount.validate();
+        finish({ phase: "ready", error: err });
+        return unavailable() ? UNAVAILABLE : err;
+      } catch (e) {
+        const msg = message(e, "Check your payment details and try again.");
+        finish({ phase: "ready", error: msg });
+        return unavailable() ? UNAVAILABLE : msg;
+      }
+    },
+    async confirm(clientSecret, amount) {
+      if (!mount || state.phase === "unavailable") {
+        const msg = state.phase === "unavailable" ? UNAVAILABLE : NOT_READY;
+        set({ error: msg });
+        return { status: "failed", message: msg };
+      }
+      set({ phase: "confirming", error: null });
+      try {
+        const result = await mount.confirm(clientSecret, amount);
+        if (result.status === "failed") finish({ phase: "ready", error: result.message });
+        else set({ phase: result.status, error: null });
+        return result;
+      } catch (e) {
+        const msg = message(e, "The payment didn't go through. Please try again.");
+        finish({ phase: "ready", error: msg });
+        return { status: "failed", message: msg };
+      }
+    },
+    setError(error) {
+      set({ error });
+    },
+    _attach(m) {
+      mount = m;
+      const stale = state.error === NOT_READY || state.error === UNAVAILABLE;
+      set(stale ? { phase: "ready", error: null } : { phase: "ready" });
+      return () => {
+        if (mount === m) {
+          mount = null;
+          set({ phase: "loading", complete: false });
+        }
+      };
+    },
+    _setPhase(phase, error) {
+      set(error === void 0 ? { phase } : { phase, error });
+    },
+    _setComplete(complete) {
+      if (complete !== state.complete) set({ complete });
+    }
+  };
+}
+var PaymentsContext = (0, import_react4.createContext)(null);
+function PaymentsProvider({ session, pricingSchema = null, children }) {
+  const value = (0, import_react4.useMemo)(() => ({ session, pricingSchema }), [session, pricingSchema]);
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(PaymentsContext.Provider, { value, children });
+}
+function usePaymentSession() {
+  return (0, import_react4.useContext)(PaymentsContext)?.session ?? null;
+}
+function usePaymentPricingSchema() {
+  return (0, import_react4.useContext)(PaymentsContext)?.pricingSchema ?? null;
+}
+var IDLE2 = { phase: "unavailable", complete: false, error: null };
+var noop = () => () => {
+};
+function usePaymentState(session) {
+  return (0, import_react4.useSyncExternalStore)(
+    session ? session.subscribe : noop,
+    () => session ? session.getState() : IDLE2,
+    () => session ? session.getState() : IDLE2
+  );
+}
+var PAYMENT_UNAVAILABLE_MESSAGE = UNAVAILABLE;
+
+// src/render/controls/PaymentField.tsx
+var import_jsx_runtime4 = require("react/jsx-runtime");
+function provisionalAmount(entity, currency) {
+  const cfg = (0, import_form_core3.readPaymentAttributes)(entity);
+  const positive = (n) => typeof n === "number" && Number.isSafeInteger(n) && n > 0 ? n : 0;
+  if (cfg.amountMode === "entered") return positive(cfg.minAmountMinor) || currency.minimumMinor;
+  return positive(cfg.amountMinor) || currency.minimumMinor;
+}
+function PaymentField({ a11y, entity, schema, scope, value, readOnly, t }) {
+  const { formatNumber, locale } = useLocale();
+  const session = usePaymentSession();
+  const pricingSchema = usePaymentPricingSchema() ?? schema;
+  const state = usePaymentState(readOnly ? null : session);
+  const cfg = (0, import_form_core3.readPaymentAttributes)(entity);
+  const currency = (0, import_form_core3.currencyOf)(cfg.currency);
+  const resolution = (0, import_react5.useMemo)(() => (0, import_form_core3.resolvePaymentAmount)(pricingSchema, scope), [pricingSchema, scope]);
+  const money = (minor, c) => formatNumber(Number((0, import_form_core3.toMajorString)(minor, c)), {
+    style: "currency",
+    currency: c.code,
+    minimumFractionDigits: c.exponent,
+    maximumFractionDigits: c.exponent
+  });
+  const fill = (template, amount) => t(template, { amount }).replace("{amount}", amount);
+  let summary;
+  if (!currency) summary = t("Payment isn't set up yet.");
+  else if (resolution.ok) summary = fill("Total: {amount}", money(resolution.amountMinor, currency));
+  else if (cfg.amountMode === "perUnit" && typeof cfg.amountMinor === "number" && cfg.amountMinor > 0)
+    summary = fill("{amount} each", money(cfg.amountMinor, currency));
+  else if (cfg.amountMode === "entered") summary = t("Enter the amount you'd like to pay.");
+  else summary = t("Payment isn't set up yet.");
+  const amountMinor = currency ? resolution.ok ? resolution.amountMinor : provisionalAmount(entity, currency) : 0;
+  const boxRef = (0, import_react5.useRef)(null);
+  const mountRef = (0, import_react5.useRef)(null);
+  const amountRef = (0, import_react5.useRef)(amountMinor);
+  amountRef.current = amountMinor;
+  const code = currency?.code ?? null;
+  (0, import_react5.useEffect)(() => {
+    const box = boxRef.current;
+    if (!session || readOnly || !code || !box) return;
+    let cancelled = false;
+    let detach = null;
+    let mounted = null;
+    const abort = new AbortController();
+    session._setPhase("loading");
+    session.processor.mount({
+      container: box,
+      amountMinor: amountRef.current,
+      currency: code,
+      locale,
+      onChange: ({ complete }) => session._setComplete(complete),
+      onLoadError: () => {
+        if (!cancelled) session._setPhase("unavailable", PAYMENT_UNAVAILABLE_MESSAGE);
+      },
+      signal: abort.signal
+    }).then((m) => {
+      if (cancelled) {
+        m.destroy();
+        return;
+      }
+      mounted = m;
+      mountRef.current = m;
+      detach = session._attach(m);
+    }).catch(() => {
+      if (!cancelled) session._setPhase("unavailable", PAYMENT_UNAVAILABLE_MESSAGE);
+    });
+    return () => {
+      cancelled = true;
+      abort.abort();
+      mountRef.current = null;
+      detach?.();
+      mounted?.destroy();
+    };
+  }, [session, readOnly, code, locale]);
+  const phase = state.phase;
+  (0, import_react5.useEffect)(() => {
+    if (!code || phase !== "ready") return;
+    void Promise.resolve(mountRef.current?.update({ amountMinor, currency: code })).catch(() => {
+    });
+  }, [amountMinor, code, phase]);
+  const errId = state.error ? `${a11y.id}-payment-error` : void 0;
+  const describedBy = [a11y["aria-describedby"], errId].filter(Boolean).join(" ") || void 0;
+  const recorded = (0, import_form_core3.coercePaymentValue)(value);
+  const recordedCurrency = (0, import_form_core3.currencyOf)(recorded.currency);
+  const charged = recordedCurrency && recorded.amountMinor > 0 ? money(recorded.amountMinor, recordedCurrency) : "";
+  let body;
+  if (readOnly) {
+    const text = recorded.status === "paid" ? fill("Paid {amount}", charged) : recorded.status === "pending" ? t("Payment pending") : recorded.status === "failed" ? t("Payment failed") : t("Not paid");
+    body = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "lf-payment-status", "data-status": recorded.status, children: text.trim() });
+  } else if (!session && recorded.status === "paid") {
+    body = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "lf-payment-status", "data-status": "paid", children: fill("Paid {amount}", charged).trim() });
+  } else if (!session) {
+    body = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "lf-payment-note", children: t("Card details are collected securely when this form is live.") });
+  } else {
+    body = /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { ref: boxRef, className: "lf-payment-element", "data-phase": phase }),
+      phase === "loading" && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "lf-payment-note", "aria-live": "polite", children: t("Loading secure payment form\u2026") }),
+      (phase === "confirming" || phase === "validating") && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "lf-payment-note", "aria-live": "polite", children: t("Processing payment\u2026") })
+    ] });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+    "div",
+    {
+      id: a11y.id,
+      role: "group",
+      className: "lf-payment",
+      "aria-labelledby": `${a11y.id}-label`,
+      "aria-describedby": describedBy,
+      "aria-busy": phase === "loading" || phase === "confirming" || phase === "validating" || void 0,
+      "data-phase": readOnly ? "readonly" : session ? phase : "preview",
+      tabIndex: -1,
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: "lf-payment-summary", children: summary }),
+        body,
+        state.error && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { id: errId, role: "alert", className: "lf-error", children: t(state.error) })
+      ]
+    }
+  );
+}
+
+// src/theme.tsx
+var import_react6 = require("react");
+var import_jsx_runtime5 = require("react/jsx-runtime");
+var FormThemeContext = (0, import_react6.createContext)({});
 function FormThemeProvider({
   theme,
   colorScheme,
   children
 }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(FormThemeContext.Provider, { value: { theme, colorScheme }, children });
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(FormThemeContext.Provider, { value: { theme, colorScheme }, children });
 }
 function useFormTheme() {
-  return (0, import_react4.useContext)(FormThemeContext);
+  return (0, import_react6.useContext)(FormThemeContext);
 }
 function dataThemeAttr(scheme) {
   return scheme === "light" || scheme === "dark" ? scheme : void 0;
@@ -249,9 +479,9 @@ function usePopoverTheme() {
 }
 
 // src/errorBoundary.tsx
-var import_react5 = require("react");
-var import_jsx_runtime4 = require("react/jsx-runtime");
-var FormErrorBoundary = class extends import_react5.Component {
+var import_react7 = require("react");
+var import_jsx_runtime6 = require("react/jsx-runtime");
+var FormErrorBoundary = class extends import_react7.Component {
   constructor() {
     super(...arguments);
     this.state = { error: null };
@@ -264,7 +494,7 @@ var FormErrorBoundary = class extends import_react5.Component {
   }
   render() {
     if (this.state.error) {
-      return this.props.fallback ?? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { role: "alert", className: "lf-error lf-form-error", children: "Something went wrong displaying this form." });
+      return this.props.fallback ?? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { role: "alert", className: "lf-error lf-form-error", children: "Something went wrong displaying this form." });
     }
     return this.props.children;
   }
@@ -301,7 +531,7 @@ var defaultSanitizeHtml = (dirty) => {
 };
 
 // src/render/helpers.ts
-var import_form_core3 = require("@lukeflow/form-core");
+var import_form_core4 = require("@lukeflow/form-core");
 var autofillSuppressed = true;
 function setAutofillSuppression(enabled) {
   autofillSuppressed = enabled !== false;
@@ -457,26 +687,26 @@ function fileDescriptors(list) {
 }
 
 // src/render/controls/icons.tsx
-var import_react6 = require("react");
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_react8 = require("react");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 function XGlyph() {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("svg", { className: "lf-x", viewBox: "0 0 24 24", width: "12", height: "12", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("svg", { className: "lf-x", viewBox: "0 0 24 24", width: "12", height: "12", "aria-hidden": "true", focusable: "false", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M18 6L6 18M6 6l12 12", fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round" }) });
 }
 function CalendarGlyph() {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { className: "lf-cal-icon", viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true", focusable: "false", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("rect", { x: "3", y: "4.5", width: "18", height: "16", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { d: "M3 9h18M8 2.5v4M16 2.5v4", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("svg", { className: "lf-cal-icon", viewBox: "0 0 24 24", width: "16", height: "16", "aria-hidden": "true", focusable: "false", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("rect", { x: "3", y: "4.5", width: "18", height: "16", rx: "2", fill: "none", stroke: "currentColor", strokeWidth: "2" }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("path", { d: "M3 9h18M8 2.5v4M16 2.5v4", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" })
   ] });
 }
 
 // src/render/controls/Tooltip.tsx
-var import_react7 = require("react");
+var import_react9 = require("react");
 var import_react_dom = require("react-dom");
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function Tooltip({ text }) {
-  const ref = (0, import_react7.useRef)(null);
-  const [anchor, setAnchor] = (0, import_react7.useState)(null);
-  (0, import_react7.useEffect)(() => {
+  const ref = (0, import_react9.useRef)(null);
+  const [anchor, setAnchor] = (0, import_react9.useState)(null);
+  (0, import_react9.useEffect)(() => {
     if (!anchor) return;
     const win = ref.current?.ownerDocument?.defaultView;
     if (!win) return;
@@ -496,15 +726,15 @@ function Tooltip({ text }) {
     setAnchor({ cx: r.left + r.width / 2, top: r.top, bottom: r.bottom });
   };
   const hide = () => setAnchor(null);
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
-    anchor && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TooltipBubble, { text, anchor, doc: ref.current?.ownerDocument ?? null })
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { ref, className: "lf-tooltip", tabIndex: 0, role: "img", "aria-label": `Help: ${text}`, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
+    anchor && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(TooltipBubble, { text, anchor, doc: ref.current?.ownerDocument ?? null })
   ] });
 }
 function TooltipBubble({ text, anchor, doc }) {
-  const ref = (0, import_react7.useRef)(null);
-  const [box, setBox] = (0, import_react7.useState)(null);
-  (0, import_react7.useLayoutEffect)(() => {
+  const ref = (0, import_react9.useRef)(null);
+  const [box, setBox] = (0, import_react9.useState)(null);
+  (0, import_react9.useLayoutEffect)(() => {
     const el = ref.current;
     const win = el?.ownerDocument?.defaultView;
     if (!el || !win) return;
@@ -532,7 +762,7 @@ function TooltipBubble({ text, anchor, doc }) {
   const target = doc?.body ?? (typeof document !== "undefined" ? document.body : null);
   if (!target) return null;
   return (0, import_react_dom.createPortal)(
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
       "span",
       {
         ref,
@@ -542,7 +772,7 @@ function TooltipBubble({ text, anchor, doc }) {
         style: { ...themeStyle, position: "fixed", left: box?.left ?? anchor.cx, top: box?.top ?? anchor.top, visibility: box ? "visible" : "hidden" },
         children: [
           text,
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "lf-tooltip-arrow", style: { left: box?.arrow ?? 0 } })
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "lf-tooltip-arrow", style: { left: box?.arrow ?? 0 } })
         ]
       }
     ),
@@ -551,15 +781,15 @@ function TooltipBubble({ text, anchor, doc }) {
 }
 
 // src/render/controls/Select.tsx
-var import_react9 = require("react");
+var import_react11 = require("react");
 var import_react_dom2 = require("react-dom");
-var import_form_core4 = require("@lukeflow/form-core");
+var import_form_core5 = require("@lukeflow/form-core");
 
 // src/render/usePopover.ts
-var import_react8 = require("react");
+var import_react10 = require("react");
 function useAnchoredPosition(anchorRef, open) {
-  const [style, setStyle] = (0, import_react8.useState)(null);
-  (0, import_react8.useLayoutEffect)(() => {
+  const [style, setStyle] = (0, import_react10.useState)(null);
+  (0, import_react10.useLayoutEffect)(() => {
     if (!open) {
       setStyle(null);
       return;
@@ -600,7 +830,7 @@ function popoverTarget(anchorRef) {
 }
 
 // src/render/controls/Select.tsx
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function SearchSelect({
   a11y,
   entity,
@@ -611,22 +841,22 @@ function SearchSelect({
   placeholder
 }) {
   const client = useMinionClient();
-  const ds = (0, import_form_core4.readDataSource)(entity.attributes);
+  const ds = (0, import_form_core5.readDataSource)(entity.attributes);
   const dsRaw = entity.attributes?.dataSource;
   const searchParam = typeof dsRaw?.searchParam === "string" ? dsRaw.searchParam : "q";
-  const [query, setQuery] = (0, import_react9.useState)("");
-  const [open, setOpen] = (0, import_react9.useState)(false);
-  const [options2, setOptions] = (0, import_react9.useState)([]);
-  const [loading, setLoading] = (0, import_react9.useState)(false);
-  const [selectedLabel, setSelectedLabel] = (0, import_react9.useState)("");
-  const [active, setActive] = (0, import_react9.useState)(-1);
-  const timer = (0, import_react9.useRef)(null);
-  const blurTimer = (0, import_react9.useRef)(null);
+  const [query, setQuery] = (0, import_react11.useState)("");
+  const [open, setOpen] = (0, import_react11.useState)(false);
+  const [options2, setOptions] = (0, import_react11.useState)([]);
+  const [loading, setLoading] = (0, import_react11.useState)(false);
+  const [selectedLabel, setSelectedLabel] = (0, import_react11.useState)("");
+  const [active, setActive] = (0, import_react11.useState)(-1);
+  const timer = (0, import_react11.useRef)(null);
+  const blurTimer = (0, import_react11.useRef)(null);
   const clearBlur = () => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  (0, import_react9.useEffect)(() => () => clearBlur(), []);
+  (0, import_react11.useEffect)(() => () => clearBlur(), []);
   const choose = (o) => {
     clearBlur();
     setValue(o.value);
@@ -636,17 +866,17 @@ function SearchSelect({
     setActive(-1);
   };
   const optionId = (i) => `${a11y.id}-opt-${i}`;
-  (0, import_react9.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
-  (0, import_react9.useEffect)(() => {
+  (0, import_react11.useEffect)(() => {
     if (!client || !ds || !open) return;
     if (timer.current) clearTimeout(timer.current);
     const controller = new AbortController();
     timer.current = setTimeout(() => {
       setLoading(true);
-      client.request(ds.minion, { ...(0, import_form_core4.resolveMinionParams)(ds, scope), [searchParam]: query }, controller.signal).then((res) => {
-        if (!controller.signal.aborted) setOptions((0, import_form_core4.toOptions)(res, ds));
+      client.request(ds.minion, { ...(0, import_form_core5.resolveMinionParams)(ds, scope), [searchParam]: query }, controller.signal).then((res) => {
+        if (!controller.signal.aborted) setOptions((0, import_form_core5.toOptions)(res, ds));
       }).catch(() => {
       }).finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -659,7 +889,7 @@ function SearchSelect({
   }, [query, open, client]);
   const display = open ? query : selectedLabel || asText(value);
   const listId = `${a11y.id}-listbox`;
-  const wrapRef = (0, import_react9.useRef)(null);
+  const wrapRef = (0, import_react11.useRef)(null);
   const popStyle = useAnchoredPosition(wrapRef, open && (loading || options2.length > 0));
   const { dataTheme, themeStyle } = usePopoverTheme();
   const onKeyDown = (e) => {
@@ -681,8 +911,8 @@ function SearchSelect({
       setActive(-1);
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "lf-search-select", ref: wrapRef, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-search-select", ref: wrapRef, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
       "input",
       {
         ...a11y,
@@ -711,9 +941,9 @@ function SearchSelect({
       }
     ),
     open && (loading || options2.length > 0) && popoverTarget(wrapRef) && (0, import_react_dom2.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: [
-        loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("li", { className: "lf-search-loading", children: "Searching\u2026" }),
-        options2.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: [
+        loading && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("li", { className: "lf-search-loading", children: "Searching\u2026" }),
+        options2.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "li",
           {
             id: optionId(i),
@@ -743,10 +973,10 @@ function SearchableSelect({
   disabled,
   t
 }) {
-  const [query, setQuery] = (0, import_react9.useState)("");
-  const [open, setOpen] = (0, import_react9.useState)(false);
-  const [active, setActive] = (0, import_react9.useState)(-1);
-  const blurTimer = (0, import_react9.useRef)(null);
+  const [query, setQuery] = (0, import_react11.useState)("");
+  const [open, setOpen] = (0, import_react11.useState)(false);
+  const [active, setActive] = (0, import_react11.useState)(-1);
+  const blurTimer = (0, import_react11.useRef)(null);
   const selected = options2.find((o) => o.value === asText(value));
   const q = query.trim().toLowerCase();
   const filtered = q ? options2.filter((o) => t(o.label).toLowerCase().includes(q) || o.value.toLowerCase().includes(q)) : options2;
@@ -756,8 +986,8 @@ function SearchableSelect({
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  (0, import_react9.useEffect)(() => () => clearBlur(), []);
-  (0, import_react9.useEffect)(() => {
+  (0, import_react11.useEffect)(() => () => clearBlur(), []);
+  (0, import_react11.useEffect)(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
   const choose = (o) => {
@@ -788,11 +1018,11 @@ function SearchableSelect({
   };
   const display = open ? query : selected ? t(selected.label) : asText(value);
   const showClear = !disabled && !required && asText(value) !== "" && !open;
-  const wrapRef = (0, import_react9.useRef)(null);
+  const wrapRef = (0, import_react11.useRef)(null);
   const popStyle = useAnchoredPosition(wrapRef, open && filtered.length > 0);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "lf-search-select", ref: wrapRef, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-search-select", ref: wrapRef, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
       "input",
       {
         ...a11y,
@@ -819,9 +1049,9 @@ function SearchableSelect({
         }
       }
     ),
-    showClear && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: "lf-search-clear", "aria-label": "Clear", onMouseDown: (e) => e.preventDefault(), onClick: () => setValue(""), children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(XGlyph, {}) }),
+    showClear && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-search-clear", "aria-label": "Clear", onMouseDown: (e) => e.preventDefault(), onClick: () => setValue(""), children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(XGlyph, {}) }),
     open && filtered.length > 0 && popoverTarget(wrapRef) && (0, import_react_dom2.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: filtered.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: filtered.map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
         "li",
         {
           id: optionId(i),
@@ -842,9 +1072,9 @@ function SearchableSelect({
 }
 
 // src/render/controls/inputs.tsx
-var import_react10 = require("react");
-var import_form_core5 = require("@lukeflow/form-core");
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_react12 = require("react");
+var import_form_core6 = require("@lukeflow/form-core");
+var import_jsx_runtime10 = require("react/jsx-runtime");
 function TextControl({
   type,
   a11y,
@@ -857,11 +1087,11 @@ function TextControl({
   const v = asText(value);
   const handle = (raw) => onChange(mask ? applyMask(raw, mask) : raw);
   const showClear = clearable && v !== "";
-  const input = /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("input", { type, ...a11y, ...extra, value: v, onChange: (e) => handle(e.target.value) });
+  const input = /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type, ...a11y, ...extra, value: v, onChange: (e) => handle(e.target.value) });
   if (!clearable) return input;
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "lf-input-wrap", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "lf-input-wrap", children: [
     input,
-    showClear && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(XGlyph, {}) })
+    showClear && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "lf-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(XGlyph, {}) })
   ] });
 }
 function TagsInput({
@@ -871,19 +1101,19 @@ function TagsInput({
   onChange,
   placeholder
 }) {
-  const [draft, setDraft] = (0, import_react10.useState)("");
+  const [draft, setDraft] = (0, import_react12.useState)("");
   const tags = value.map(String);
   const add = (raw) => {
     const t = raw.trim();
     if (t && !tags.includes(t)) onChange([...tags, t]);
     setDraft("");
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "lf-tags", children: [
-    tags.map((t) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "lf-tag", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-tags", children: [
+    tags.map((t) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "lf-tag", children: [
       t,
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "button", "aria-label": `Remove ${t}`, disabled, onClick: () => onChange(tags.filter((x) => x !== t)), children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(XGlyph, {}) })
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", "aria-label": `Remove ${t}`, disabled, onClick: () => onChange(tags.filter((x) => x !== t)), children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(XGlyph, {}) })
     ] }, t)),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       "input",
       {
         ...a11y,
@@ -916,7 +1146,7 @@ function NumberInput({
   onChange
 }) {
   const { formatNumber } = useLocale();
-  const [focused, setFocused] = (0, import_react10.useState)(false);
+  const [focused, setFocused] = (0, import_react12.useState)(false);
   const raw = asText(value);
   let display = raw;
   if (!focused && raw !== "") {
@@ -931,9 +1161,9 @@ function NumberInput({
       });
     }
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "lf-number", children: [
-    prefix && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "lf-affix lf-prefix", children: prefix }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "lf-number", children: [
+    prefix && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "lf-affix lf-prefix", children: prefix }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       "input",
       {
         type: "text",
@@ -949,7 +1179,7 @@ function NumberInput({
         onChange: (e) => onChange(e.target.value)
       }
     ),
-    suffix && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "lf-affix lf-suffix", children: suffix })
+    suffix && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "lf-affix lf-suffix", children: suffix })
   ] });
 }
 function FileField({
@@ -964,8 +1194,8 @@ function FileField({
   const client = useMinionClient();
   const storage = entity.attributes?.storage;
   const uploadMinion = typeof storage?.minion === "string" ? storage.minion : void 0;
-  const [uploading, setUploading] = (0, import_react10.useState)(false);
-  const [error, setError] = (0, import_react10.useState)(null);
+  const [uploading, setUploading] = (0, import_react12.useState)(false);
+  const [error, setError] = (0, import_react12.useState)(null);
   const files = Array.isArray(value) ? value : [];
   const handle = async (list) => {
     if (!list || list.length === 0) return;
@@ -992,8 +1222,8 @@ function FileField({
       onChange(fileDescriptors(list));
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "lf-file", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-file", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       "input",
       {
         ...a11y,
@@ -1004,15 +1234,15 @@ function FileField({
         onChange: (e) => handle(e.target.files)
       }
     ),
-    uploading && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "lf-file-uploading", children: "Uploading\u2026" }),
-    error && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { role: "alert", className: "lf-error", children: error }),
-    files.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("ul", { className: "lf-file-list", children: files.map((f, i) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: typeof f.url === "string" && /^(https?:|mailto:)/i.test(f.url.trim()) ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("a", { href: f.url, target: "_blank", rel: "noreferrer", children: f.name ?? "file" }) : f.name ?? "file" }, i)) })
+    uploading && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "lf-file-uploading", children: "Uploading\u2026" }),
+    error && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { role: "alert", className: "lf-error", children: error }),
+    files.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("ul", { className: "lf-file-list", children: files.map((f, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("li", { children: typeof f.url === "string" && /^(https?:|mailto:)/i.test(f.url.trim()) ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("a", { href: f.url, target: "_blank", rel: "noreferrer", children: f.name ?? "file" }) : f.name ?? "file" }, i)) })
   ] });
 }
 
 // src/render/controls/SignatureField.tsx
-var import_react11 = require("react");
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_react13 = require("react");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function SignatureField({
   a11y,
   value,
@@ -1021,13 +1251,13 @@ function SignatureField({
   penColor,
   allowType
 }) {
-  const canvasRef = (0, import_react11.useRef)(null);
-  const drawing = (0, import_react11.useRef)(false);
-  const painted = (0, import_react11.useRef)("");
+  const canvasRef = (0, import_react13.useRef)(null);
+  const drawing = (0, import_react13.useRef)(false);
+  const painted = (0, import_react13.useRef)("");
   const dataUrl = typeof value === "string" ? value : "";
-  const [hasInk, setHasInk] = (0, import_react11.useState)(Boolean(dataUrl));
-  const [mode, setMode] = (0, import_react11.useState)("draw");
-  const [typed, setTyped] = (0, import_react11.useState)("");
+  const [hasInk, setHasInk] = (0, import_react13.useState)(Boolean(dataUrl));
+  const [mode, setMode] = (0, import_react13.useState)("draw");
+  const [typed, setTyped] = (0, import_react13.useState)("");
   const color = penColor || "#111827";
   const context = () => canvasRef.current?.getContext("2d") ?? null;
   const drawTyped = (name) => {
@@ -1047,7 +1277,7 @@ function SignatureField({
     setHasInk(Boolean(trimmed));
     onChange(trimmed ? canvas.toDataURL("image/png") : "");
   };
-  (0, import_react11.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -1114,9 +1344,9 @@ function SignatureField({
     painted.current = url;
     onChange(url);
   };
-  const onUpRef = (0, import_react11.useRef)(onUp);
+  const onUpRef = (0, import_react13.useRef)(onUp);
   onUpRef.current = onUp;
-  (0, import_react11.useEffect)(() => {
+  (0, import_react13.useEffect)(() => {
     const up = () => {
       if (drawing.current) onUpRef.current();
     };
@@ -1137,8 +1367,8 @@ function SignatureField({
     if (next === mode) return;
     setMode(next);
   };
-  const typedTimer = (0, import_react11.useRef)(null);
-  (0, import_react11.useEffect)(() => () => {
+  const typedTimer = (0, import_react13.useRef)(null);
+  (0, import_react13.useEffect)(() => () => {
     if (typedTimer.current) clearTimeout(typedTimer.current);
   }, []);
   const onTypedChange = (name) => {
@@ -1153,13 +1383,13 @@ function SignatureField({
     }
     drawTyped(typed);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
-    allowType && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-signature-modes", role: "group", "aria-label": "Signature mode", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", "aria-pressed": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", "aria-pressed": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-signature", "data-disabled": disabled || void 0, children: [
+    allowType && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-signature-modes", role: "group", "aria-label": "Signature mode", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", "aria-pressed": mode === "draw", className: `lf-signature-mode${mode === "draw" ? " is-active" : ""}`, onClick: () => switchMode("draw"), disabled, children: "Draw" }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", "aria-pressed": mode === "type", className: `lf-signature-mode${mode === "type" ? " is-active" : ""}`, onClick: () => switchMode("type"), disabled, children: "Type" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "lf-signature-padwrap", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-signature-padwrap", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
         "canvas",
         {
           id: a11y.id,
@@ -1178,9 +1408,9 @@ function SignatureField({
           onPointerCancel: onUp
         }
       ),
-      !hasInk && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "lf-signature-hint", "aria-hidden": "true", children: disabled ? "" : mode === "type" ? "Type your name below" : "Sign here" })
+      !hasInk && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-signature-hint", "aria-hidden": "true", children: disabled ? "" : mode === "type" ? "Type your name below" : "Sign here" })
     ] }),
-    allowType && mode === "type" && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    allowType && mode === "type" && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       "input",
       {
         type: "text",
@@ -1194,14 +1424,14 @@ function SignatureField({
         onBlur: flushTyped
       }
     ),
-    !disabled && hasInk && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "lf-signature-clear", onClick: clear, children: "Clear" })
+    !disabled && hasInk && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "lf-signature-clear", onClick: clear, children: "Clear" })
   ] });
 }
 
 // src/render/controls/DateField.tsx
-var import_react12 = require("react");
+var import_react14 = require("react");
 var import_react_dom3 = require("react-dom");
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 var pad = (n) => String(n).padStart(2, "0");
 var daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
 function parseDate(value) {
@@ -1270,20 +1500,20 @@ function DateField({
   const hasTime = kind === "datetime" || kind === "time";
   const minStep = Math.max(1, Math.floor(minuteStep) || 1);
   const timeDisabled = disabled || kind === "datetime" && !date;
-  const [open, setOpen] = (0, import_react12.useState)(false);
+  const [open, setOpen] = (0, import_react14.useState)(false);
   const today = (() => {
     const n = /* @__PURE__ */ new Date();
     return { y: n.getFullYear(), m: n.getMonth(), d: n.getDate() };
   })();
-  const [view, setView] = (0, import_react12.useState)(date ?? today);
-  const [focused, setFocused] = (0, import_react12.useState)(date ?? today);
-  const wrapRef = (0, import_react12.useRef)(null);
-  const inputRef = (0, import_react12.useRef)(null);
-  const gridRef = (0, import_react12.useRef)(null);
-  const popRef = (0, import_react12.useRef)(null);
+  const [view, setView] = (0, import_react14.useState)(date ?? today);
+  const [focused, setFocused] = (0, import_react14.useState)(date ?? today);
+  const wrapRef = (0, import_react14.useRef)(null);
+  const inputRef = (0, import_react14.useRef)(null);
+  const gridRef = (0, import_react14.useRef)(null);
+  const popRef = (0, import_react14.useRef)(null);
   const popStyle = useAnchoredPosition(wrapRef, open && hasCal);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  (0, import_react12.useEffect)(() => {
+  (0, import_react14.useEffect)(() => {
     if (!open) return;
     const onDown = (e) => {
       const t = e.target;
@@ -1292,13 +1522,13 @@ function DateField({
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
-  (0, import_react12.useEffect)(() => {
+  (0, import_react14.useEffect)(() => {
     if (!open) return;
     const base = parseDate(typeof value === "string" ? value : "") ?? today;
     setView(base);
     setFocused(base);
   }, [open]);
-  (0, import_react12.useEffect)(() => {
+  (0, import_react14.useEffect)(() => {
     if (!open || !hasCal) return;
     gridRef.current?.querySelector('[data-focused="true"]')?.focus();
   }, [open, focused, view, hasCal]);
@@ -1380,9 +1610,9 @@ function DateField({
   };
   const cells = hasCal ? monthMatrix(view.y, view.m) : [];
   const showClear = clearable && !disabled && raw !== "";
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-datefield", ref: wrapRef, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-datefield-input", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-datefield", ref: wrapRef, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-datefield-input", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
         "input",
         {
           ...a11y,
@@ -1404,8 +1634,8 @@ function DateField({
           }
         }
       ),
-      showClear && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "lf-datefield-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(XGlyph, {}) }),
-      hasCal && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+      showClear && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-datefield-clear", "aria-label": "Clear", onClick: () => onChange(""), children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(XGlyph, {}) }),
+      hasCal && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
         "button",
         {
           type: "button",
@@ -1415,12 +1645,12 @@ function DateField({
           "aria-expanded": open,
           disabled,
           onClick: () => open ? closeToInput() : openCal(),
-          children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(CalendarGlyph, {})
+          children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CalendarGlyph, {})
         }
       )
     ] }),
-    hasTime && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "lf-datefield-time", title: kind === "datetime" && !date ? "Pick a date first" : void 0, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+    hasTime && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "lf-datefield-time", title: kind === "datetime" && !date ? "Pick a date first" : void 0, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
         "select",
         {
           "aria-label": "Hour",
@@ -1431,13 +1661,13 @@ function DateField({
             setTimePart(+e.target.value, time?.min ?? 0);
           },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: "" }),
-            Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: h, children: pad(h) }, h))
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: "" }),
+            Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: h, children: pad(h) }, h))
           ]
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { "aria-hidden": "true", children: ":" }),
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "aria-hidden": "true", children: ":" }),
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
         "select",
         {
           "aria-label": "Minute",
@@ -1448,27 +1678,27 @@ function DateField({
             setTimePart(time?.h ?? 0, +e.target.value);
           },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: "" }),
-            Array.from({ length: Math.ceil(60 / minStep) }, (_, i) => i * minStep).map((min) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("option", { value: min, children: pad(min) }, min))
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: "" }),
+            Array.from({ length: Math.ceil(60 / minStep) }, (_, i) => i * minStep).map((min) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: min, children: pad(min) }, min))
           ]
         }
       )
     ] }),
     open && hasCal && popoverTarget(wrapRef) && (0, import_react_dom3.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { ref: popRef, className: "lf-pop lf-datefield-pop", "data-theme": dataTheme, role: "dialog", "aria-label": "Choose date", style: { ...themeStyle, ...popStyle ?? {} }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-cal-head", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m, locale) }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { ref: popRef, className: "lf-pop lf-datefield-pop", "data-theme": dataTheme, role: "dialog", "aria-label": "Choose date", style: { ...themeStyle, ...popStyle ?? {} }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-cal-head", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Previous month", onClick: () => shiftMonth(-1), children: "\u2039" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "lf-cal-title", "aria-live": "polite", children: monthLabel(view.y, view.m, locale) }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-cal-nav", "aria-label": "Next month", onClick: () => shiftMonth(1), children: "\u203A" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-cal-row", role: "row", children: weekdays.map((w, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w.long, children: w.narrow }, i)) }),
-          Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-cal-grid", role: "grid", ref: gridRef, onKeyDown: onGridKey, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-cal-row", role: "row", children: weekdays.map((w, i) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { role: "columnheader", className: "lf-cal-wd", "aria-label": w.long, children: w.narrow }, i)) }),
+          Array.from({ length: 6 }, (_, week) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-cal-row", role: "row", children: cells.slice(week * 7, week * 7 + 7).map((c) => {
             const inMonth = c.m === view.m;
             const isSel = date != null && sameDay(c, date);
             const isFocused = sameDay(c, focused);
             const isToday = sameDay(c, today);
-            return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+            return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               "button",
               {
                 type: "button",
@@ -1493,10 +1723,10 @@ function DateField({
 }
 
 // src/render/controls/richControls.tsx
-var import_react13 = require("react");
+var import_react15 = require("react");
 var import_react_dom4 = require("react-dom");
-var import_form_core6 = require("@lukeflow/form-core");
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_form_core7 = require("@lukeflow/form-core");
+var import_jsx_runtime13 = require("react/jsx-runtime");
 function RatingField({
   a11y,
   value,
@@ -1506,7 +1736,7 @@ function RatingField({
 }) {
   const cap = Math.max(1, Math.floor(max) || 5);
   const current = Math.min(cap, Math.max(0, Math.floor(Number(value) || 0)));
-  const groupRef = (0, import_react13.useRef)(null);
+  const groupRef = (0, import_react15.useRef)(null);
   const focusStar = (n) => groupRef.current?.querySelectorAll("button")[Math.max(1, n) - 1]?.focus();
   const set = (n) => !disabled && onChange(n === current ? 0 : n);
   const onKey = (e) => {
@@ -1523,9 +1753,9 @@ function RatingField({
       focusStar(next);
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { ref: groupRef, className: "lf-rating", role: "radiogroup", "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-required": a11y["aria-required"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: Array.from({ length: cap }, (_, i) => i + 1).map((n) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { ref: groupRef, className: "lf-rating", role: "radiogroup", "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-required": a11y["aria-required"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, children: Array.from({ length: cap }, (_, i) => i + 1).map((n) => {
     const filled = n <= current;
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "button",
       {
         type: "button",
@@ -1537,7 +1767,7 @@ function RatingField({
         tabIndex: n === (current || 1) ? 0 : -1,
         onClick: () => set(n),
         onKeyDown: onKey,
-        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { "aria-hidden": "true", children: filled ? "\u2605" : "\u2606" })
+        children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { "aria-hidden": "true", children: filled ? "\u2605" : "\u2606" })
       },
       n
     );
@@ -1556,7 +1786,7 @@ function RankingField({
   const seen = /* @__PURE__ */ new Set();
   const seeded = asArray(value).map(String).filter((v) => byValue.has(v) && !seen.has(v) && (seen.add(v), true));
   const order = [...seeded, ...optionValues.filter((v) => !seen.has(v))];
-  const [announce, setAnnounce] = (0, import_react13.useState)("");
+  const [announce, setAnnounce] = (0, import_react15.useState)("");
   const move = (i, delta) => {
     if (disabled) return;
     const j = i + delta;
@@ -1566,14 +1796,14 @@ function RankingField({
     onChange(next);
     setAnnounce(`${byValue.get(order[i])?.label ?? order[i]} moved to position ${j + 1} of ${order.length}`);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("ol", { className: "lf-ranking", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("li", { className: "lf-sr-only", "aria-live": "polite", children: announce }),
-    order.map((v, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("li", { className: "lf-rank-item", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-rank-pos", "aria-hidden": "true", children: i + 1 }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-rank-label", children: byValue.get(v)?.label ?? v }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "lf-rank-controls", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === 0, "aria-label": `Move ${byValue.get(v)?.label ?? v} up`, onClick: () => move(i, -1), children: "\u2191" }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === order.length - 1, "aria-label": `Move ${byValue.get(v)?.label ?? v} down`, onClick: () => move(i, 1), children: "\u2193" })
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("ol", { className: "lf-ranking", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("li", { className: "lf-sr-only", "aria-live": "polite", children: announce }),
+    order.map((v, i) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("li", { className: "lf-rank-item", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-rank-pos", "aria-hidden": "true", children: i + 1 }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-rank-label", children: byValue.get(v)?.label ?? v }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "lf-rank-controls", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === 0, "aria-label": `Move ${byValue.get(v)?.label ?? v} up`, onClick: () => move(i, -1), children: "\u2191" }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-rank-btn", disabled: disabled || i === order.length - 1, "aria-label": `Move ${byValue.get(v)?.label ?? v} down`, onClick: () => move(i, 1), children: "\u2193" })
       ] })
     ] }, v))
   ] });
@@ -1601,14 +1831,14 @@ function MatrixField({
     }
   };
   const checked = (rowV, colV) => multiple ? asArray(data[rowV]).map(String).includes(colV) : asText(data[rowV]) === colV;
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("table", { className: "lf-matrix", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("tr", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { className: "lf-matrix-corner" }),
-      cols.map((c) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { scope: "col", className: "lf-matrix-col", children: c.label }, c.value))
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("table", { className: "lf-matrix", id: a11y.id, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("tr", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("td", { className: "lf-matrix-corner" }),
+      cols.map((c) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("th", { scope: "col", className: "lf-matrix-col", children: c.label }, c.value))
     ] }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("tbody", { children: rows.map((r) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("tr", { role: multiple ? "group" : "radiogroup", "aria-label": r.label, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { scope: "row", className: "lf-matrix-row", children: r.label }),
-      cols.map((c) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { className: "lf-matrix-cell", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("tbody", { children: rows.map((r) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("tr", { role: multiple ? "group" : "radiogroup", "aria-label": r.label, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("th", { scope: "row", className: "lf-matrix-row", children: r.label }),
+      cols.map((c) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("td", { className: "lf-matrix-cell", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
         "input",
         {
           type: multiple ? "checkbox" : "radio",
@@ -1630,7 +1860,7 @@ var ADDRESS_PARTS = [
   { key: "postalCode", label: "Postal code" },
   { key: "country", label: "Country" }
 ];
-var ADDRESS_REQUIRED = new Set(import_form_core6.ADDRESS_REQUIRED_PARTS);
+var ADDRESS_REQUIRED = new Set(import_form_core7.ADDRESS_REQUIRED_PARTS);
 var DEFAULT_COUNTRY_CONFIG = { regionLabel: "State / Province", postalLabel: "Postal code" };
 var COUNTRY_ADDRESS_CONFIG = {
   US: { regionLabel: "State", postalLabel: "ZIP code", postalPattern: /^\d{5}(-\d{4})?$/, postalExample: "12345" },
@@ -1693,12 +1923,12 @@ function AddressBlockField({
     if (typeof addr.lng === "number") next.lng = addr.lng;
     onChange(next);
   };
-  const provider = entity ? (0, import_form_core6.readDataSource)(entity.attributes) : null;
+  const provider = entity ? (0, import_form_core7.readDataSource)(entity.attributes) : null;
   const cfg = addressConfigFor(data.countryCode, data.country);
   const postal = asText(data.postalCode);
   const postalInvalid = postal !== "" && cfg.postalPattern != null && !cfg.postalPattern.test(postal);
   const labelFor = (key) => key === "region" ? cfg.regionLabel : key === "postalCode" ? cfg.postalLabel : ADDRESS_PARTS.find((p) => p.key === key).label;
-  const [manual, setManual] = (0, import_react13.useState)(false);
+  const [manual, setManual] = (0, import_react15.useState)(false);
   const useAutocomplete = !!provider && !manual;
   const hasStructured = ["steNumber", "city", "region", "postalCode", "country"].some((k) => asText(data[k]) !== "");
   const showRest = !useAutocomplete || hasStructured;
@@ -1711,12 +1941,12 @@ function AddressBlockField({
     const emptyRequired = partRequired && blockInvalid && asText(data[key]) === "";
     const invalid = emptyRequired || isPostal && postalInvalid;
     const errId = invalid ? `${inputId}-error` : void 0;
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: `lf-address-part lf-address-${key}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { htmlFor: inputId, className: "lf-address-label", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-address-part lf-address-${key}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { htmlFor: inputId, className: "lf-address-label", children: [
         labelFor(key),
-        partRequired && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { "aria-hidden": "true", children: " *" })
+        partRequired && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { "aria-hidden": "true", children: " *" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
         "input",
         {
           id: inputId,
@@ -1731,12 +1961,12 @@ function AddressBlockField({
           onChange: (e) => setPart(key, e.target.value)
         }
       ),
-      invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: emptyRequired ? `${labelFor(key)} is required.` : `Enter a valid ${cfg.postalLabel.toLowerCase()}${cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : ""}.` })
+      invalid && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { id: errId, className: "lf-address-error lf-error", role: "alert", children: emptyRequired ? `${labelFor(key)} is required.` : `Enter a valid ${cfg.postalLabel.toLowerCase()}${cfg.postalExample ? ` (e.g. ${cfg.postalExample})` : ""}.` })
     ] }, key);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? manual ? "manual" : showRest ? "filled" : "search" : "manual", children: [
-    provider && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { className: "lf-address-toggle", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-address", role: "group", tabIndex: -1, "aria-labelledby": `${a11y.id}-label`, "aria-describedby": a11y["aria-describedby"], "aria-invalid": a11y["aria-invalid"], id: a11y.id, "data-mode": provider ? manual ? "manual" : showRest ? "filled" : "search" : "manual", children: [
+    provider && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "lf-address-toggle", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
         "input",
         {
           type: "checkbox",
@@ -1747,10 +1977,10 @@ function AddressBlockField({
           onChange: (e) => setManual(e.target.checked)
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-toggle-track", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-toggle-thumb" }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-toggle-text", children: "Enter address manually" })
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-address-toggle-track", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-address-toggle-thumb" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-address-toggle-text", children: "Enter address manually" })
     ] }),
-    useAutocomplete && entity ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    useAutocomplete && entity ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       AddressLine1Autocomplete,
       {
         a11y,
@@ -1768,15 +1998,15 @@ function AddressBlockField({
   ] });
 }
 function AddressSpinner() {
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("svg", { className: "lf-spinner", width: "15", height: "15", viewBox: "0 0 24 24", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "12", r: "9", fill: "none", stroke: "currentColor", strokeOpacity: "0.25", strokeWidth: "3" }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M21 12a9 9 0 0 0-9-9", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("animateTransform", { attributeName: "transform", type: "rotate", from: "0 12 12", to: "360 12 12", dur: "0.7s", repeatCount: "indefinite" }) })
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("svg", { className: "lf-spinner", width: "15", height: "15", viewBox: "0 0 24 24", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("circle", { cx: "12", cy: "12", r: "9", fill: "none", stroke: "currentColor", strokeOpacity: "0.25", strokeWidth: "3" }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M21 12a9 9 0 0 0-9-9", fill: "none", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("animateTransform", { attributeName: "transform", type: "rotate", from: "0 12 12", to: "360 12 12", dur: "0.7s", repeatCount: "indefinite" }) })
   ] });
 }
 function AddressPin() {
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("svg", { className: "lf-address-pin", width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("path", { d: "M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { cx: "12", cy: "11", r: "2" })
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("svg", { className: "lf-address-pin", width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("path", { d: "M12 21s-6-5.686-6-10a6 6 0 1 1 12 0c0 4.314-6 10-6 10z" }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("circle", { cx: "12", cy: "11", r: "2" })
   ] });
 }
 function AddressLine1Autocomplete({
@@ -1791,28 +2021,28 @@ function AddressLine1Autocomplete({
   onPick
 }) {
   const client = useMinionClient();
-  const ds = (0, import_form_core6.readDataSource)(entity.attributes);
+  const ds = (0, import_form_core7.readDataSource)(entity.attributes);
   const dsRaw = entity.attributes?.dataSource;
   const searchParam = typeof dsRaw?.searchParam === "string" ? dsRaw.searchParam : "q";
-  const [open, setOpen] = (0, import_react13.useState)(false);
-  const [suggestions, setSuggestions] = (0, import_react13.useState)([]);
-  const [loading, setLoading] = (0, import_react13.useState)(false);
-  const [searched, setSearched] = (0, import_react13.useState)(false);
-  const [active, setActive] = (0, import_react13.useState)(-1);
-  const timer = (0, import_react13.useRef)(null);
-  const blurTimer = (0, import_react13.useRef)(null);
+  const [open, setOpen] = (0, import_react15.useState)(false);
+  const [suggestions, setSuggestions] = (0, import_react15.useState)([]);
+  const [loading, setLoading] = (0, import_react15.useState)(false);
+  const [searched, setSearched] = (0, import_react15.useState)(false);
+  const [active, setActive] = (0, import_react15.useState)(-1);
+  const timer = (0, import_react15.useRef)(null);
+  const blurTimer = (0, import_react15.useRef)(null);
   const clearBlur = () => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = null;
   };
-  (0, import_react13.useEffect)(() => () => clearBlur(), []);
+  (0, import_react15.useEffect)(() => () => clearBlur(), []);
   const inputId = `${a11y.id}-streetAddress`;
   const listId = `${a11y.id}-addr-listbox`;
   const optionId = (i) => `${a11y.id}-addr-opt-${i}`;
-  (0, import_react13.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     if (open && active >= 0) scrollOptionIntoView(optionId(active));
   }, [active, open]);
-  (0, import_react13.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     if (!client || !ds || !open || value.trim() === "") {
       setSuggestions([]);
       setSearched(false);
@@ -1822,9 +2052,9 @@ function AddressLine1Autocomplete({
     const controller = new AbortController();
     timer.current = setTimeout(() => {
       setLoading(true);
-      client.request(ds.minion, { ...(0, import_form_core6.resolveMinionParams)(ds, scope), [searchParam]: value }, controller.signal).then((res) => {
+      client.request(ds.minion, { ...(0, import_form_core7.resolveMinionParams)(ds, scope), [searchParam]: value }, controller.signal).then((res) => {
         if (!controller.signal.aborted) {
-          setSuggestions((0, import_form_core6.toAddressSuggestions)(res, ds));
+          setSuggestions((0, import_form_core7.toAddressSuggestions)(res, ds));
           setSearched(true);
         }
       }).catch(() => {
@@ -1863,16 +2093,16 @@ function AddressLine1Autocomplete({
       setActive(-1);
     }
   };
-  const wrapRef = (0, import_react13.useRef)(null);
+  const wrapRef = (0, import_react15.useRef)(null);
   const dropdownOpen = !!client && open && value.trim() !== "" && (loading || suggestions.length > 0 || searched);
   const popStyle = useAnchoredPosition(wrapRef, dropdownOpen);
   const { dataTheme, themeStyle } = usePopoverTheme();
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-address-part lf-address-streetAddress", ref: wrapRef, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { htmlFor: inputId, className: "lf-address-label", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-address-part lf-address-streetAddress", ref: wrapRef, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { htmlFor: inputId, className: "lf-address-label", children: [
       "Street address",
-      required && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { "aria-hidden": "true", children: " *" })
+      required && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { "aria-hidden": "true", children: " *" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "input",
       {
         id: inputId,
@@ -1905,12 +2135,12 @@ function AddressLine1Autocomplete({
         }
       }
     ),
-    invalid && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { id: `${inputId}-error`, className: "lf-address-error lf-error", role: "alert", children: "Street address is required." }),
+    invalid && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { id: `${inputId}-error`, className: "lf-address-error lf-error", role: "alert", children: "Street address is required." }),
     dropdownOpen && popoverTarget(wrapRef) && (0, import_react_dom4.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list lf-address-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: loading ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("li", { className: "lf-search-loading", "aria-live": "polite", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressSpinner, {}),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Searching addresses\u2026" })
-      ] }) : suggestions.length > 0 ? suggestions.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ul", { id: listId, role: "listbox", className: "lf-pop lf-search-list lf-address-list", "data-theme": dataTheme, style: { ...themeStyle, ...popStyle ?? {} }, children: loading ? /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("li", { className: "lf-search-loading", "aria-live": "polite", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(AddressSpinner, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: "Searching addresses\u2026" })
+      ] }) : suggestions.length > 0 ? suggestions.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
         "li",
         {
           id: optionId(i),
@@ -1922,12 +2152,12 @@ function AddressLine1Autocomplete({
             choose(s);
           },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddressPin, {}),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "lf-address-option-label", children: s.label })
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(AddressPin, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "lf-address-option-label", children: s.label })
           ]
         },
         s.id ?? s.label
-      )) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("li", { className: "lf-search-empty", children: "No matching addresses" }) }),
+      )) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("li", { className: "lf-search-empty", children: "No matching addresses" }) }),
       popoverTarget(wrapRef)
     )
   ] });
@@ -1946,12 +2176,12 @@ function RichTextField({
   onChange,
   sanitizeHtml = defaultSanitizeHtml
 }) {
-  const ref = (0, import_react13.useRef)(null);
-  const initial = (0, import_react13.useRef)(sanitizeHtml(asText(value)));
+  const ref = (0, import_react15.useRef)(null);
+  const initial = (0, import_react15.useRef)(sanitizeHtml(asText(value)));
   const emit = () => {
     if (ref.current) onChange(sanitizeHtml(ref.current.innerHTML));
   };
-  (0, import_react13.useEffect)(() => {
+  (0, import_react15.useEffect)(() => {
     const el = ref.current;
     if (!el) return;
     const incoming = sanitizeHtml(asText(value));
@@ -1963,9 +2193,9 @@ function RichTextField({
     document.execCommand(cmd, false);
     emit();
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lf-richtext", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "lf-rt-toolbar", role: "toolbar", "aria-label": "Text formatting", "aria-controls": a11y.id, children: RT_COMMANDS.map((c) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "lf-rt-btn", "aria-label": c.label, title: c.label, disabled, onMouseDown: (e) => e.preventDefault(), onClick: () => exec(c.cmd), children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { "aria-hidden": "true", children: c.icon }) }, c.cmd)) }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-richtext", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "lf-rt-toolbar", role: "toolbar", "aria-label": "Text formatting", "aria-controls": a11y.id, children: RT_COMMANDS.map((c) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-rt-btn", "aria-label": c.label, title: c.label, disabled, onMouseDown: (e) => e.preventDefault(), onClick: () => exec(c.cmd), children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { "aria-hidden": "true", children: c.icon }) }, c.cmd)) }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "div",
       {
         ref,
@@ -1989,9 +2219,9 @@ function RichTextField({
 }
 
 // src/render/containers.tsx
-var import_react14 = require("react");
-var import_form_core7 = require("@lukeflow/form-core");
-var import_jsx_runtime12 = require("react/jsx-runtime");
+var import_react16 = require("react");
+var import_form_core8 = require("@lukeflow/form-core");
+var import_jsx_runtime14 = require("react/jsx-runtime");
 function Group({
   entity,
   fs,
@@ -2005,7 +2235,7 @@ function Group({
   const desc = labelText(a, "description");
   const descId = desc ? `${entity.id}-desc` : void 0;
   const cls = ["lf-field", "lf-group", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
     "fieldset",
     {
       className: cls,
@@ -2015,15 +2245,15 @@ function Group({
       "aria-invalid": error || asyncMsg ? true : void 0,
       "aria-describedby": descId,
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("legend", { className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("legend", { className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
           ctx.t(labelText(a) ?? fs.key),
-          fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "aria-hidden": "true", children: " *" }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Tooltip, { text: tooltipText(a) })
+          fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { "aria-hidden": "true", children: " *" }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Tooltip, { text: tooltipText(a) })
         ] }),
         children,
-        desc && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { id: descId, className: "lf-desc", children: ctx.t(desc) }),
-        error && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
-        !error && asyncMsg && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
+        desc && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { id: descId, className: "lf-desc", children: ctx.t(desc) }),
+        error && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
+        !error && asyncMsg && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { role: "alert", className: "lf-error lf-error-async", children: ctx.t(asyncMsg) })
       ]
     }
   );
@@ -2034,7 +2264,7 @@ function GridField({
   ctx,
   schema
 }) {
-  const [page, setPage] = (0, import_react14.useState)(0);
+  const [page, setPage] = (0, import_react16.useState)(0);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -2050,23 +2280,23 @@ function GridField({
   const start = paged ? safePage * pageSize : 0;
   const visibleRows = paged ? rows.slice(start, start + pageSize) : rows;
   const replace = (next) => ctx.form.setValues({ [key]: next }, { markTouched: true });
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-grid", "data-type": entity.type, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("table", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("tr", { children: [
-        cells.map((c) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("th", { scope: "col", children: labelText(c.attributes) ?? cellKey(c) }, c.id)),
-        !disabled && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("th", {})
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-grid", "data-type": entity.type, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("table", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("tr", { children: [
+        cells.map((c) => /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("th", { scope: "col", children: labelText(c.attributes) ?? cellKey(c) }, c.id)),
+        !disabled && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("th", {})
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tbody", { children: visibleRows.map((row, j) => {
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("tbody", { children: visibleRows.map((row, j) => {
         const i = start + j;
-        return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("tr", { children: [
+        return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("tr", { children: [
           cells.map((c) => {
             const ck = cellKey(c);
             const path = `${key}[${i}].${ck}`;
             const value = row?.[ck];
-            const visible = (0, import_form_core7.evaluateVisibility)(c.attributes, { ...top, ...row }, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator });
-            const required = (0, import_form_core7.evaluateRequired)(c.attributes, { ...top, ...row });
-            return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("td", { children: visible && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+            const visible = (0, import_form_core8.evaluateVisibility)(c.attributes, { ...top, ...row }, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator });
+            const required = (0, import_form_core8.evaluateRequired)(c.attributes, { ...top, ...row });
+            return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("td", { children: visible && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
               GridCell,
               {
                 type: c.type,
@@ -2082,20 +2312,20 @@ function GridField({
               }
             ) }, c.id);
           }),
-          !disabled && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-row-remove", onClick: () => replace(rows.filter((_, k) => k !== i)), children: "Remove" }) })
+          !disabled && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-row-remove", onClick: () => replace(rows.filter((_, k) => k !== i)), children: "Remove" }) })
         ] }, i);
       }) }),
-      hasAggregates && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tfoot", { children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("tr", { className: "lf-grid-aggregates", children: [
+      hasAggregates && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("tfoot", { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("tr", { className: "lf-grid-aggregates", children: [
         cells.map((c) => {
           const kind = c.attributes?.aggregate;
-          return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("td", { children: typeof kind === "string" ? aggregate(rows, cellKey(c), kind) : "" }, c.id);
+          return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("td", { children: typeof kind === "string" ? aggregate(rows, cellKey(c), kind) : "" }, c.id);
         }),
-        !disabled && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("td", {})
+        !disabled && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("td", {})
       ] }) })
     ] }),
-    paged && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-grid-pager", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: "Prev" }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "lf-grid-page", children: [
+    paged && /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-grid-pager", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", disabled: safePage === 0, onClick: () => setPage(safePage - 1), children: "Prev" }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("span", { className: "lf-grid-page", children: [
         "Rows ",
         start + 1,
         "\u2013",
@@ -2103,10 +2333,10 @@ function GridField({
         " of ",
         rows.length
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", disabled: safePage >= pageCount - 1, onClick: () => setPage(safePage + 1), children: "Next" })
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", disabled: safePage >= pageCount - 1, onClick: () => setPage(safePage + 1), children: "Next" })
     ] }),
-    !disabled && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-row-add", onClick: () => replace([...rows, {}]), children: "Add row" }),
-    error && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error", children: error.message })
+    !disabled && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-row-add", onClick: () => replace([...rows, {}]), children: "Add row" }),
+    error && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { role: "alert", className: "lf-error", children: error.message })
   ] });
 }
 function GridCell({
@@ -2125,7 +2355,7 @@ function GridCell({
   const ariaRequired = required || void 0;
   const a11y = { id: id ?? "", name: id ?? "", disabled, "aria-label": rest["aria-label"], "aria-required": ariaRequired, ...noAutofill(id ?? "") };
   if (type === "checkbox") {
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("input", { type: "checkbox", ...rest, "aria-required": ariaRequired, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("input", { type: "checkbox", ...rest, "aria-required": ariaRequired, checked: Boolean(value), disabled, onChange: (e) => onChange(e.target.checked) });
   }
   if (type === "selectBoxes") {
     const selected = new Set((Array.isArray(value) ? value : []).map(String));
@@ -2135,31 +2365,31 @@ function GridCell({
       else next.delete(v);
       onChange([...next]);
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], "aria-required": ariaRequired, children: opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "lf-cell-check", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-cell-choices", role: "group", "aria-label": rest["aria-label"], "aria-required": ariaRequired, children: opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("label", { className: "lf-cell-check", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("input", { type: "checkbox", checked: selected.has(o.value), disabled, onChange: (e) => toggle(o.value, e.target.checked) }),
       " ",
       o.label
     ] }, o.value)) });
   }
   if (type === "select" || type === "radio") {
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("select", { ...rest, "aria-required": ariaRequired, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: "" }),
-      opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("option", { value: o.value, children: o.label }, o.value))
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("select", { ...rest, "aria-required": ariaRequired, value: asText(value), disabled, onChange: (e) => onChange(e.target.value), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("option", { value: "" }),
+      opts.map((o) => /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("option", { value: o.value, children: o.label }, o.value))
     ] });
   }
   if (type === "file") {
     const fileEntity = entity ?? { id: id ?? "", type: "file", attributes: a };
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(FileField, { a11y, multiple: Boolean(a.multiple), value, disabled, onChange, entity: fileEntity, scope: scope ?? {} });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(FileField, { a11y, multiple: Boolean(a.multiple), value, disabled, onChange, entity: fileEntity, scope: scope ?? {} });
   }
   if (type === "signature") {
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(SignatureField, { a11y, value, disabled, onChange, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
   }
   if (type === "textarea") {
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("textarea", { ...rest, ...noAutofill(id ?? ""), "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("textarea", { ...rest, ...noAutofill(id ?? ""), "aria-required": ariaRequired, rows: 2, value: asText(value), disabled, onChange: (e) => onChange(e.target.value) });
   }
   const mask = typeof a.inputMask === "string" ? a.inputMask : "";
   const numeric = type === "number" || type === "currency";
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
     "input",
     {
       type: mask || numeric ? "text" : inputType(type),
@@ -2173,60 +2403,74 @@ function GridCell({
     }
   );
 }
-function Static({ entity, sanitizeHtml = defaultSanitizeHtml }) {
+function Static({
+  entity,
+  sanitizeHtml = defaultSanitizeHtml,
+  submitting = false
+}) {
   const a = entity.attributes ?? {};
   if (entity.type === "heading") {
     const text2 = labelText(a) ?? labelText(a, "content");
     if (!text2) return null;
     const size = typeof a.headingSize === "string" && /^h[1-6]$/.test(a.headingSize) ? a.headingSize : "h3";
     const Tag = size;
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Tag, { className: `lf-heading lf-heading--${size}`, children: text2 });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Tag, { className: `lf-heading lf-heading--${size}`, children: text2 });
   }
-  if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("hr", { className: "lf-divider" });
+  if (entity.type === "divider" || entity.type === "hr") return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("hr", { className: "lf-divider" });
   if (entity.type === "button") {
     const action = a.buttonAction === "reset" ? "reset" : a.buttonAction === "button" ? "button" : "submit";
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: action, className: "lf-button", "data-action": action, children: labelText(a) ?? "Submit" });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+      "button",
+      {
+        type: action,
+        className: "lf-button",
+        "data-action": action,
+        disabled: action === "submit" && submitting ? true : void 0,
+        "aria-busy": action === "submit" && submitting ? true : void 0,
+        children: labelText(a) ?? "Submit"
+      }
+    );
   }
   if (entity.type === "content" || entity.type === "html" || entity.type === "htmlElement") {
     const html = typeof a.content === "string" ? a.content : "";
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: sanitizeHtml(html) } });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-content", "data-type": entity.type, dangerouslySetInnerHTML: { __html: sanitizeHtml(html) } });
   }
   const text = labelText(a) ?? labelText(a, "content") ?? "";
   if (!text) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-static", "data-type": entity.type, children: text });
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-static", "data-type": entity.type, children: text });
 }
 var PANEL_THEMES = /* @__PURE__ */ new Set(["default", "primary", "secondary", "info", "success", "warning", "danger"]);
 function PanelBox({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const collapsible = Boolean(a.collapsible);
-  const [open, setOpen] = (0, import_react14.useState)(!(collapsible && a.collapsed));
+  const [open, setOpen] = (0, import_react16.useState)(!(collapsible && a.collapsed));
   const raw = typeof a.theme === "string" ? a.theme : "";
   const theme = PANEL_THEMES.has(raw) ? raw : "default";
   const title = labelText(a);
   const bodyId = `${entity.id}-panel-body`;
   const Wrapper = entity.type === "fieldset" ? "fieldset" : "section";
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(Wrapper, { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
-    collapsible ? /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
-    ] }) : title && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-panel-head", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "lf-panel-title", children: ctx.t(title) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { id: bodyId, className: "lf-container-children lf-panel-body", hidden: !open, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Render, { id: cid, schema, ctx }, cid)) })
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(Wrapper, { className: `lf-container lf-panel lf-panel--${theme}`, "data-type": entity.type, "data-collapsed": collapsible && !open ? "" : void 0, children: [
+    collapsible ? /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("button", { type: "button", className: "lf-panel-head", "aria-expanded": open, "aria-controls": bodyId, onClick: () => setOpen((o) => !o), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "lf-panel-caret", "aria-hidden": "true", children: open ? "\u25BE" : "\u25B8" }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "lf-panel-title", children: title ? ctx.t(title) : ctx.t("Panel") })
+    ] }) : title && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-panel-head", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "lf-panel-title", children: ctx.t(title) }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { id: bodyId, className: "lf-container-children lf-panel-body", hidden: !open, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Render, { id: cid, schema, ctx }, cid)) })
   ] });
 }
 function TabsContainer({ entity, schema, ctx, Render }) {
   const a = entity.attributes ?? {};
   const children = entity.children ?? [];
-  const [active, setActive] = (0, import_react14.useState)(0);
-  const [focusIdx, setFocusIdx] = (0, import_react14.useState)(0);
-  const [revealErrors, setRevealErrors] = (0, import_react14.useState)(false);
-  const navRef = (0, import_react14.useRef)(null);
+  const [active, setActive] = (0, import_react16.useState)(0);
+  const [focusIdx, setFocusIdx] = (0, import_react16.useState)(0);
+  const [revealErrors, setRevealErrors] = (0, import_react16.useState)(false);
+  const navRef = (0, import_react16.useRef)(null);
   const idx = Math.min(active, Math.max(0, children.length - 1));
   const vertical = Boolean(a.verticalTabs);
   const navigation = Boolean(a.navigation);
   const validateBeforeNext = Boolean(a.validateBeforeNext);
   const rootClass = `lf-container lf-tabs${vertical ? " lf-tabs--vertical" : ""}`;
   if (children.length === 0)
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: `${rootClass} lf-tabs--empty`, "data-type": "tabs", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { className: "lf-tabs-empty", children: "No tabs yet \u2014 add fields to create tabs." }) });
   const tabId = (i) => `${entity.id}-tab-${i}`;
   const panelId = (i) => `${entity.id}-panel-${i}`;
   const tabLabel = (cid, i) => {
@@ -2267,10 +2511,10 @@ function TabsContainer({ entity, schema, ctx, Render }) {
   const renderTab = (cid) => {
     const child = schema.entities[cid];
     const isContainer = child ? Boolean(ctx.reg.get(child.type)?.isContainer) : false;
-    return isContainer ? (child.children ?? []).map((gid) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Render, { id: gid, schema, ctx: tabCtx }, gid)) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Render, { id: cid, schema, ctx: tabCtx });
+    return isContainer ? (child.children ?? []).map((gid) => /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Render, { id: gid, schema, ctx: tabCtx }, gid)) : /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Render, { id: cid, schema, ctx: tabCtx });
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: rootClass, "data-type": "tabs", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-tabs-nav", role: "tablist", "aria-orientation": vertical ? "vertical" : void 0, ref: navRef, children: children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: rootClass, "data-type": "tabs", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-tabs-nav", role: "tablist", "aria-orientation": vertical ? "vertical" : void 0, ref: navRef, children: children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
       "button",
       {
         type: "button",
@@ -2286,15 +2530,15 @@ function TabsContainer({ entity, schema, ctx, Render }) {
       },
       cid
     )) }),
-    children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: renderTab(cid) }, cid)),
-    navigation && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-tabs-foot", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-tabs-prev", disabled: idx === 0, onClick: () => go(idx - 1), children: ctx.t("Previous") }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "lf-tabs-progress", "aria-live": "polite", children: [
+    children.map((cid, i) => /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { role: "tabpanel", id: panelId(i), "aria-labelledby": tabId(i), hidden: i !== idx, className: "lf-tabpanel", children: renderTab(cid) }, cid)),
+    navigation && /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-tabs-foot", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-tabs-prev", disabled: idx === 0, onClick: () => go(idx - 1), children: ctx.t("Previous") }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("span", { className: "lf-tabs-progress", "aria-live": "polite", children: [
         idx + 1,
         " / ",
         children.length
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-tabs-next", disabled: idx >= children.length - 1, onClick: () => go(idx + 1), children: ctx.t("Next") })
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-tabs-next", disabled: idx >= children.length - 1, onClick: () => go(idx + 1), children: ctx.t("Next") })
     ] })
   ] });
 }
@@ -2305,11 +2549,11 @@ function TableGrid({ entity, schema, ctx, Render }) {
   const children = entity.children ?? [];
   const rows = Math.max(minRows, Math.ceil(children.length / cols), 1);
   const title = labelText(a);
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("table", { className: "lf-table", "data-type": "table", children: [
-    title && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("caption", { className: "lf-container-label", children: ctx.t(title) }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tbody", { children: Array.from({ length: rows }).map((_, r) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("tr", { children: Array.from({ length: cols }).map((_2, c) => {
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("table", { className: "lf-table", "data-type": "table", children: [
+    title && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("caption", { className: "lf-container-label", children: ctx.t(title) }),
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("tbody", { children: Array.from({ length: rows }).map((_, r) => /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("tr", { children: Array.from({ length: cols }).map((_2, c) => {
       const cid = children[r * cols + c];
-      return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("td", { children: cid ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Render, { id: cid, schema, ctx }) : null }, c);
+      return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("td", { children: cid ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Render, { id: cid, schema, ctx }) : null }, c);
     }) }, r)) })
   ] });
 }
@@ -2319,7 +2563,7 @@ function EditGridField({
   ctx,
   schema
 }) {
-  const [editing, setEditing] = (0, import_react14.useState)(null);
+  const [editing, setEditing] = (0, import_react16.useState)(null);
   if (!fs) return null;
   const key = fs.key;
   const rows = Array.isArray(fs.value) ? fs.value : [];
@@ -2351,28 +2595,28 @@ function EditGridField({
     const v = row?.[cellKey(c)];
     return v == null || v === "" ? null : `${labelText(c.attributes) ?? cellKey(c)}: ${asText(v)}`;
   }).filter(Boolean).join(" \xB7 ");
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-edit-grid", "data-type": "editGrid", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
-    rows.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("ul", { className: "lf-eg-rows", children: rows.map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("li", { className: "lf-eg-row", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "lf-eg-summary", children: summary(row) || /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("em", { className: "lf-eg-empty", children: "Empty row" }) }),
-      !disabled && !editing && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "lf-eg-row-actions", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-eg-edit", onClick: () => startEdit(i), children: ctx.t("Edit") }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-eg-remove", onClick: () => removeRow(i), children: ctx.t("Remove") })
+  return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-edit-grid", "data-type": "editGrid", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) ?? key }),
+    rows.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("ul", { className: "lf-eg-rows", children: rows.map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("li", { className: "lf-eg-row", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "lf-eg-summary", children: summary(row) || /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("em", { className: "lf-eg-empty", children: "Empty row" }) }),
+      !disabled && !editing && /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("span", { className: "lf-eg-row-actions", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-eg-edit", onClick: () => startEdit(i), children: ctx.t("Edit") }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-eg-remove", onClick: () => removeRow(i), children: ctx.t("Remove") })
       ] })
     ] }, i)) }),
-    editing && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
+    editing && /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-eg-editor", role: "group", "aria-label": editing.index >= rows.length ? "New row" : `Edit row ${editing.index + 1}`, children: [
       cells.map((c) => {
         const ck = cellKey(c);
         const rowScope = { ...top, ...editing.draft };
-        if (!(0, import_form_core7.evaluateVisibility)(c.attributes, rowScope, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator })) return null;
+        if (!(0, import_form_core8.evaluateVisibility)(c.attributes, rowScope, { allowJs: ctx.allowJs, jsEvaluator: ctx.jsEvaluator })) return null;
         const label = labelText(c.attributes) ?? ck;
-        const required = (0, import_form_core7.evaluateRequired)(c.attributes, rowScope);
-        return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "lf-eg-cell", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "lf-eg-cell-label", children: [
+        const required = (0, import_form_core8.evaluateRequired)(c.attributes, rowScope);
+        return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("label", { className: "lf-eg-cell", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("span", { className: "lf-eg-cell-label", children: [
             ctx.t(label),
-            required && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { "aria-hidden": "true", children: " *" })
+            required && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { "aria-hidden": "true", children: " *" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
             GridCell,
             {
               type: c.type,
@@ -2389,40 +2633,41 @@ function EditGridField({
           )
         ] }, c.id);
       }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "lf-eg-editor-actions", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-eg-cancel", onClick: () => setEditing(null), children: ctx.t("Cancel") }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-eg-save", onClick: commitDraft, children: ctx.t("Save") })
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "lf-eg-editor-actions", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-eg-cancel", onClick: () => setEditing(null), children: ctx.t("Cancel") }),
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-eg-save", onClick: commitDraft, children: ctx.t("Save") })
       ] })
     ] }),
-    !disabled && !editing && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("button", { type: "button", className: "lf-row-add", onClick: startAdd, children: ctx.t("Add another") }),
-    error && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { role: "alert", className: "lf-error", children: error.message })
+    !disabled && !editing && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "lf-row-add", onClick: startAdd, children: ctx.t("Add another") }),
+    error && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { role: "alert", className: "lf-error", children: error.message })
   ] });
 }
 
 // src/FormRenderer.tsx
-var import_jsx_runtime13 = require("react/jsx-runtime");
+var import_jsx_runtime15 = require("react/jsx-runtime");
 function FormRenderer(props) {
-  const { schema, initialValues, onSubmit, onChange, readOnly = false, registry, components, restore, onAutosave, autosaveDelay = 800, beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
-  const authorSubmitId = (0, import_react15.useMemo)(() => (0, import_form_core8.submitButtonId)(schema), [schema]);
+  const { schema, initialValues, onSubmit, onChange, readOnly = false, submitting = false, registry, components, restore, onAutosave, autosaveDelay = 800, beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
+  const authorSubmitId = (0, import_react17.useMemo)(() => (0, import_form_core9.submitButtonId)(schema), [schema]);
   const submitLabel = props.submitLabel !== void 0 ? props.submitLabel : authorSubmitId ? null : "Submit";
   const formClass = ["lf-form", virtualize && "lf-virtualized", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore, allowJs, jsEvaluator };
   const form = useFormEngine(schema, engineOptions);
-  const [submitted, setSubmitted] = (0, import_react15.useState)(false);
+  const [submitted, setSubmitted] = (0, import_react17.useState)(false);
   const client = useMinionClient();
-  const [asyncErrors, setAsyncErrors] = (0, import_react15.useState)({});
-  const [revealed, setRevealed] = (0, import_react15.useState)(() => /* @__PURE__ */ new Set());
+  const [asyncErrors, setAsyncErrors] = (0, import_react17.useState)({});
+  const validatingRef = (0, import_react17.useRef)(false);
+  const [revealed, setRevealed] = (0, import_react17.useState)(() => /* @__PURE__ */ new Set());
   const validateField = form.validate;
-  const reveal = (0, import_react15.useCallback)(
+  const reveal = (0, import_react17.useCallback)(
     (key) => {
       validateField([key]);
       setRevealed((prev) => prev.has(key) ? prev : new Set(prev).add(key));
     },
     [validateField]
   );
-  const onAutosaveRef = (0, import_react15.useRef)(onAutosave);
+  const onAutosaveRef = (0, import_react17.useRef)(onAutosave);
   onAutosaveRef.current = onAutosave;
-  const autosaveTimer = (0, import_react15.useRef)(null);
+  const autosaveTimer = (0, import_react17.useRef)(null);
   const flushAutosave = () => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = null;
@@ -2433,13 +2678,13 @@ function FormRenderer(props) {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(flushAutosave, autosaveDelay);
   };
-  (0, import_react15.useEffect)(() => () => {
+  (0, import_react17.useEffect)(() => () => {
     if (autosaveTimer.current) {
       clearTimeout(autosaveTimer.current);
       onAutosaveRef.current?.(form.engine.serialize());
     }
   }, [form.engine]);
-  const focusFirstError = (0, import_react15.useCallback)(
+  const focusFirstError = (0, import_react17.useCallback)(
     (errorKeys) => {
       if (typeof document === "undefined") return;
       for (const key of errorKeys) {
@@ -2453,7 +2698,7 @@ function FormRenderer(props) {
     },
     [form]
   );
-  const submitProgrammatic = (0, import_react15.useCallback)(() => {
+  const submitProgrammatic = (0, import_react17.useCallback)(() => {
     setSubmitted(true);
     const report = form.validate();
     onResult?.({ ok: report.ok, errorCount: report.errorKeys.length, errorKeys: report.errorKeys });
@@ -2466,11 +2711,11 @@ function FormRenderer(props) {
       focusFirstError(report.errorKeys);
     }
   }, [form, onResult, onEvent, onSubmit, focusFirstError]);
-  (0, import_react15.useEffect)(() => {
+  (0, import_react17.useEffect)(() => {
     if (autoSubmitSignal) submitProgrammatic();
   }, [autoSubmitSignal]);
   const playbackSignal = playback?.signal;
-  (0, import_react15.useEffect)(() => {
+  (0, import_react17.useEffect)(() => {
     if (!playback || !playbackSignal) return;
     let cancelled = false;
     const speed = playback.speed ?? 80;
@@ -2486,7 +2731,7 @@ function FormRenderer(props) {
       cancelled = true;
     };
   }, [playbackSignal]);
-  const reg = registry ?? (0, import_form_core8.createDefaultFieldTypeRegistry)();
+  const reg = registry ?? (0, import_form_core9.createDefaultFieldTypeRegistry)();
   const comps = components ?? {};
   const { t, dir } = useLocale();
   const themeCtx = useFormTheme();
@@ -2496,9 +2741,10 @@ function FormRenderer(props) {
   const dataTheme = dataThemeAttr(resolvedScheme);
   const sanitize = sanitizeHtml ?? defaultSanitizeHtml;
   const slotOnAuthorButton = authorSubmitId && !readOnly ? beforeSubmit : void 0;
-  const ctx = { form, reg, readOnly, showErrors: submitted, revealed, reveal, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: slotOnAuthorButton, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
+  const ctx = { form, schema, submitting, reg, readOnly, showErrors: submitted, revealed, reveal, asyncErrors, components: comps, t, sanitizeHtml: sanitize, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: slotOnAuthorButton, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting || validatingRef.current) return;
     setSubmitted(true);
     const sync = form.validate();
     onResult?.({ ok: sync.ok, errorCount: sync.errorKeys.length, errorKeys: sync.errorKeys });
@@ -2507,7 +2753,13 @@ function FormRenderer(props) {
       focusFirstError(sync.errorKeys);
       return;
     }
-    const errs = await runAsyncValidations(schema, form, client);
+    validatingRef.current = true;
+    let errs;
+    try {
+      errs = await runAsyncValidations(schema, form, client);
+    } finally {
+      validatingRef.current = false;
+    }
     setAsyncErrors(errs);
     if (Object.keys(errs).length === 0) {
       const data = form.collect();
@@ -2530,7 +2782,7 @@ function FormRenderer(props) {
     }
   };
   const pages = wizardPages(schema);
-  const content = pages ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+  const content = pages ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
     FormWizardView,
     {
       pages,
@@ -2539,6 +2791,7 @@ function FormRenderer(props) {
       reg,
       components: comps,
       readOnly,
+      submitting,
       submitLabel,
       beforeSubmit,
       authorSubmitId,
@@ -2552,14 +2805,14 @@ function FormRenderer(props) {
       onResult,
       onEvent
     }
-  ) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { noValidate: true, dir, "data-theme": dataTheme, className: formClass, style: mergedTheme, onSubmit: handleSubmit, children: [
-    schema.root.map((id) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
-    submitLabel !== null && !readOnly && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
+  ) : /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("form", { noValidate: true, dir, "data-theme": dataTheme, className: formClass, style: mergedTheme, onSubmit: handleSubmit, children: [
+    schema.root.map((id) => /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
+    submitLabel !== null && !readOnly && /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(import_jsx_runtime15.Fragment, { children: [
       !authorSubmitId && beforeSubmit,
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "submit", className: "lf-submit", children: t(submitLabel) })
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("button", { type: "submit", className: "lf-submit", disabled: submitting, "aria-busy": submitting || void 0, children: t(submitLabel) })
     ] })
   ] });
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FormErrorBoundary, { fallback: errorFallback, onError: (error) => onEvent?.({ type: "error", error }), children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FormThemeProvider, { theme: mergedTokens, colorScheme: resolvedScheme, children: content }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(FormErrorBoundary, { fallback: errorFallback, onError: (error) => onEvent?.({ type: "error", error }), children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(FormThemeProvider, { theme: mergedTokens, colorScheme: resolvedScheme, children: content }) });
 }
 function FormWizardView({
   pages,
@@ -2568,6 +2821,7 @@ function FormWizardView({
   reg,
   components,
   readOnly,
+  submitting,
   submitLabel,
   beforeSubmit,
   authorSubmitId,
@@ -2581,11 +2835,11 @@ function FormWizardView({
   onResult,
   onEvent
 }) {
-  const [index, setIndex] = (0, import_react15.useState)(0);
-  const [showErrors, setShowErrors] = (0, import_react15.useState)(false);
-  const [revealed, setRevealed] = (0, import_react15.useState)(() => /* @__PURE__ */ new Set());
+  const [index, setIndex] = (0, import_react17.useState)(0);
+  const [showErrors, setShowErrors] = (0, import_react17.useState)(false);
+  const [revealed, setRevealed] = (0, import_react17.useState)(() => /* @__PURE__ */ new Set());
   const validateField = form.validate;
-  const reveal = (0, import_react15.useCallback)(
+  const reveal = (0, import_react17.useCallback)(
     (key) => {
       validateField([key]);
       setRevealed((prev) => prev.has(key) ? prev : new Set(prev).add(key));
@@ -2593,20 +2847,20 @@ function FormWizardView({
     [validateField]
   );
   const { t, dir } = useLocale();
-  const pageRef = (0, import_react15.useRef)(null);
-  const firstRender = (0, import_react15.useRef)(true);
+  const pageRef = (0, import_react17.useRef)(null);
+  const firstRender = (0, import_react17.useRef)(true);
   const visible = pages.filter((id) => form.state.fields[id]?.isVisible !== false);
   const safeIndex = Math.min(index, Math.max(0, visible.length - 1));
   const currentId = visible[safeIndex];
   const isLast = safeIndex >= visible.length - 1;
-  (0, import_react15.useEffect)(() => {
+  (0, import_react17.useEffect)(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
     pageRef.current?.focus();
   }, [safeIndex]);
-  const ctx = { form, reg, readOnly, showErrors, revealed, reveal, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: authorSubmitId && !readOnly ? beforeSubmit : void 0, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
+  const ctx = { form, schema, submitting, reg, readOnly, showErrors, revealed, reveal, asyncErrors: {}, components, t, sanitizeHtml: sanitizeHtml ?? defaultSanitizeHtml, allowJs: allowJs !== false, jsEvaluator, scope: form.getScope(), beforeSubmit: authorSubmitId && !readOnly ? beforeSubmit : void 0, beforeSubmitAnchorId: authorSubmitId ?? void 0 };
   const next = () => {
     if (!currentId) return;
     if (keysValid(form, pageFieldKeys(schema, currentId, form))) {
@@ -2622,6 +2876,7 @@ function FormWizardView({
   };
   const submit = (e) => {
     e.preventDefault();
+    if (submitting) return;
     const report = form.validate();
     onResult?.({ ok: report.ok, errorCount: report.errorKeys.length, errorKeys: report.errorKeys });
     if (report.ok) {
@@ -2634,15 +2889,15 @@ function FormWizardView({
       onEvent?.({ type: "invalid", errorKeys: report.errorKeys });
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { noValidate: true, dir, "data-theme": dataTheme, className, style: theme, onSubmit: submit, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RenderEntity, { id: currentId, schema, ctx }) }),
+  return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("form", { noValidate: true, dir, "data-theme": dataTheme, className, style: theme, onSubmit: submit, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("ol", { className: "lf-wizard-steps", "aria-label": "Steps", children: visible.map((id, i) => /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("li", { className: i === safeIndex ? "is-active" : "", "aria-current": i === safeIndex ? "step" : void 0, children: t(pageLabel(schema, id, i)) }, id)) }),
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { ref: pageRef, tabIndex: -1, className: "lf-wizard-page", role: "group", "aria-label": currentId ? pageLabel(schema, currentId, safeIndex) : "Page", children: currentId && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(RenderEntity, { id: currentId, schema, ctx }) }),
     isLast && submitLabel !== null && !readOnly && !authorSubmitId ? beforeSubmit : null,
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "lf-wizard-nav", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
-      !isLast && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
-      isLast && submitLabel !== null && !readOnly && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "submit", className: "lf-submit", children: t(submitLabel) }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("span", { className: "lf-wizard-progress", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { className: "lf-wizard-nav", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("button", { type: "button", className: "lf-wizard-back", onClick: back, disabled: safeIndex === 0, children: t("Back") }),
+      !isLast && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("button", { type: "button", className: "lf-wizard-next", onClick: next, children: t("Next") }),
+      isLast && submitLabel !== null && !readOnly && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("button", { type: "submit", className: "lf-submit", disabled: submitting, "aria-busy": submitting || void 0, children: t(submitLabel) }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("span", { className: "lf-wizard-progress", children: [
         t("Step"),
         " ",
         safeIndex + 1,
@@ -2658,7 +2913,7 @@ function RenderEntity(props) {
   const node = RenderEntityNode(props);
   const { id, ctx } = props;
   if (node !== null && ctx.beforeSubmit && ctx.beforeSubmitAnchorId === id) {
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(import_jsx_runtime13.Fragment, { children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(import_jsx_runtime15.Fragment, { children: [
       ctx.beforeSubmit,
       node
     ] });
@@ -2673,13 +2928,13 @@ function RenderEntityNode({ id, schema, ctx }) {
   if (entity.type === "array" || entity.type === "map") return null;
   const ft = ctx.reg.get(entity.type);
   if (ft?.isGrid)
-    return entity.type === "editGrid" ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(GridField, { entity, fs, ctx, schema });
-  if (ft?.isStatic) return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Static, { entity, sanitizeHtml: ctx.sanitizeHtml });
+    return entity.type === "editGrid" ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(EditGridField, { entity, fs, ctx, schema }) : /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(GridField, { entity, fs, ctx, schema });
+  if (ft?.isStatic) return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Static, { entity, sanitizeHtml: ctx.sanitizeHtml, submitting: ctx.submitting });
   if (ft?.isContainer) {
-    if (entity.type === "tabs") return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
+    if (entity.type === "tabs") return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(TabsContainer, { entity, schema, ctx, Render: RenderEntity });
     if (entity.type === "panel" || entity.type === "well" || entity.type === "fieldset")
-      return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(PanelBox, { entity, schema, ctx, Render: RenderEntity });
-    if (entity.type === "table") return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(TableGrid, { entity, schema, ctx, Render: RenderEntity });
+      return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(PanelBox, { entity, schema, ctx, Render: RenderEntity });
+    if (entity.type === "table") return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(TableGrid, { entity, schema, ctx, Render: RenderEntity });
     let cols;
     if (entity.type === "columns") {
       const raw = Number(entity.attributes?.numColumns);
@@ -2689,13 +2944,13 @@ function RenderEntityNode({ id, schema, ctx }) {
     }
     const childStyle = cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : void 0;
     const bordered = Boolean(entity.attributes?.borders);
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: `lf-container${bordered ? " lf-container--bordered" : ""}`, "data-type": entity.type, children: [
-      labelText(entity.attributes) && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RenderEntity, { id: cid, schema, ctx }, cid)) })
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { className: `lf-container${bordered ? " lf-container--bordered" : ""}`, "data-type": entity.type, children: [
+      labelText(entity.attributes) && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { className: "lf-container-label", children: labelText(entity.attributes) }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { className: "lf-container-children", style: childStyle, children: (entity.children ?? []).map((cid) => /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(RenderEntity, { id: cid, schema, ctx }, cid)) })
     ] });
   }
   if (!fs) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Field, { entity, fs, ctx });
+  return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Field, { entity, fs, ctx });
 }
 function Field({ entity, fs, ctx }) {
   const a = entity.attributes ?? {};
@@ -2739,8 +2994,8 @@ function Field({ entity, fs, ctx }) {
   if (typeof a.max === "number") numProps.max = a.max;
   const Custom = ctx.components[entity.type];
   if (!Custom && entity.type === "radio") {
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "lf-option", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("label", { className: "lf-option", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
         "input",
         {
           type: "radio",
@@ -2757,8 +3012,8 @@ function Field({ entity, fs, ctx }) {
   }
   if (!Custom && entity.type === "selectBoxes") {
     const selected = new Set((Array.isArray(fs.value) ? fs.value : []).map(String));
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "lf-option", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("label", { className: "lf-option", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
         "input",
         {
           type: "checkbox",
@@ -2779,14 +3034,14 @@ function Field({ entity, fs, ctx }) {
   }
   let control;
   if (Custom) {
-    control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Custom, { entity, field: fs, value: fs.value, setValue: set, disabled, error: error?.message ?? null, id });
+    control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Custom, { entity, field: fs, value: fs.value, setValue: set, disabled, error: error?.message ?? null, id });
   } else
     switch (entity.type) {
       case "checkbox":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("input", { type: "checkbox", ...a11y, checked: Boolean(fs.value), onChange: (e) => set(e.target.checked) });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("input", { type: "checkbox", ...a11y, checked: Boolean(fs.value), onChange: (e) => set(e.target.checked) });
         break;
       case "textarea":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
           "textarea",
           {
             ...a11y,
@@ -2799,18 +3054,18 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "select":
-        control = a.searchable && (0, import_form_core8.readDataSource)(a) ? (
+        control = a.searchable && (0, import_form_core9.readDataSource)(a) ? (
           // Searchable + Minion-backed → server-side type-ahead (re-queries as you type),
           // so a value beyond the first page is still findable (unlike a static filter).
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
-        ) : a.searchable ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
-          fs.isRequired ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: "", disabled: true, hidden: true, children: ph ?? "Select\u2026" }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: "", children: ph ?? "" }),
-          fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("option", { value: o.value, children: ctx.t(o.label) }, o.value))
+          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph })
+        ) : a.searchable ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(SearchableSelect, { a11y, options: fieldOptions, value: fs.value, setValue: set, placeholder: ph, required: fs.isRequired, disabled, t: ctx.t }) : /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("select", { ...a11y, value: asText(fs.value), onChange: (e) => set(e.target.value), children: [
+          fs.isRequired ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("option", { value: "", disabled: true, hidden: true, children: ph ?? "Select\u2026" }) : /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("option", { value: "", children: ph ?? "" }),
+          fieldOptions.map((o) => /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("option", { value: o.value, children: ctx.t(o.label) }, o.value))
         ] });
         break;
       case "number":
       case "currency":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
           NumberInput,
           {
             a11y,
@@ -2826,37 +3081,40 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       case "searchSelect":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(SearchSelect, { a11y, entity, value: fs.value, setValue: set, scope: ctx.scope, disabled, placeholder: ph });
         break;
       case "tags":
       case "tagsField":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set, placeholder: ph });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(TagsInput, { a11y, value: asArray(fs.value), disabled, onChange: set, placeholder: ph });
         break;
       case "file":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(FileField, { a11y, multiple: Boolean(a.multiple), value: fs.value, disabled, onChange: set, entity, scope: ctx.scope });
         break;
       case "signature":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
         break;
       case "rating":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RatingField, { a11y, value: fs.value, max: typeof a.max === "number" ? a.max : 5, disabled, onChange: set });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(RatingField, { a11y, value: fs.value, max: typeof a.max === "number" ? a.max : 5, disabled, onChange: set });
         break;
       case "ranking":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RankingField, { a11y, entity, value: fs.value, disabled, onChange: set });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(RankingField, { a11y, entity, value: fs.value, disabled, onChange: set });
         break;
       case "matrix":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(MatrixField, { a11y, entity, value: fs.value, disabled, onChange: set });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(MatrixField, { a11y, entity, value: fs.value, disabled, onChange: set });
         break;
       case "addressBlock":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(AddressBlockField, { a11y, entity, value: fs.value, scope: ctx.scope, disabled, onChange: set });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(AddressBlockField, { a11y, entity, value: fs.value, scope: ctx.scope, disabled, onChange: set });
+        break;
+      case "payment":
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(PaymentField, { a11y, entity, schema: ctx.schema, scope: ctx.scope, value: fs.value, readOnly: ctx.readOnly, t: ctx.t });
         break;
       case "richText":
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(RichTextField, { a11y, value: fs.value, disabled, onChange: set, sanitizeHtml: ctx.sanitizeHtml });
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(RichTextField, { a11y, value: fs.value, disabled, onChange: set, sanitizeHtml: ctx.sanitizeHtml });
         break;
       case "day":
       case "datetime":
       case "time":
-        control = a.nativeInput ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(TextControl, { type: inputType(entity.type), a11y, extra: inputProps, mask: typeof a.inputMask === "string" ? a.inputMask : "", clearable: Boolean(a.clearable) && !disabled, value: fs.value, onChange: set }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        control = a.nativeInput ? /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(TextControl, { type: inputType(entity.type), a11y, extra: inputProps, mask: typeof a.inputMask === "string" ? a.inputMask : "", clearable: Boolean(a.clearable) && !disabled, value: fs.value, onChange: set }) : /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
           DateField,
           {
             a11y,
@@ -2870,7 +3128,7 @@ function Field({ entity, fs, ctx }) {
         );
         break;
       default:
-        control = /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+        control = /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
           TextControl,
           {
             type: inputType(entity.type),
@@ -2886,21 +3144,21 @@ function Field({ entity, fs, ctx }) {
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
   const hideLabel = Boolean(a.hideLabel);
   const fieldClass = ["lf-field", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
-  return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { htmlFor: id, id: `${id}-label`, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("label", { htmlFor: id, id: `${id}-label`, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
       ctx.t(labelText(a) ?? key),
-      fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { "aria-hidden": "true", children: " *" }),
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Tooltip, { text: tooltipText(a) })
+      fs.isRequired && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { "aria-hidden": "true", children: " *" }),
+      /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(Tooltip, { text: tooltipText(a) })
     ] }),
     control,
-    (Boolean(a.showCharCount) || Boolean(a.showWordCount)) && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("p", { className: "lf-count", "aria-live": "off", children: [
+    (Boolean(a.showCharCount) || Boolean(a.showWordCount)) && /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("p", { className: "lf-count", "aria-live": "off", children: [
       a.showCharCount ? `${asText(fs.value).length} characters` : "",
       a.showCharCount && a.showWordCount ? " \xB7 " : "",
       a.showWordCount ? `${wordCount(asText(fs.value))} words` : ""
     ] }),
-    descId && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
-    error && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
-    !error && ctx.asyncErrors[key] && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { id: asyncErrId, role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
+    descId && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("p", { id: descId, className: "lf-desc", children: ctx.t(labelText(a, "description")) }),
+    error && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("p", { id: errId, role: "alert", className: "lf-error", children: ctx.t(error.message ?? "") }),
+    !error && ctx.asyncErrors[key] && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("p", { id: asyncErrId, role: "alert", className: "lf-error lf-error-async", children: ctx.t(ctx.asyncErrors[key]) })
   ] });
 }
 async function runAsyncValidations(schema, form, client) {
@@ -2909,10 +3167,10 @@ async function runAsyncValidations(schema, form, client) {
   const checks = [];
   for (const [id, fs] of Object.entries(form.state.fields)) {
     if (!fs.isVisible) continue;
-    const av = (0, import_form_core8.readAsyncValidation)(schema.entities[id]?.attributes);
+    const av = (0, import_form_core9.readAsyncValidation)(schema.entities[id]?.attributes);
     if (!av) continue;
     checks.push(
-      (0, import_form_core8.runAsyncValidation)(av, scope, fs.value, client).then((r) => [fs.key, r.valid ? null : r.message ?? "Invalid"]).catch(() => [fs.key, null])
+      (0, import_form_core9.runAsyncValidation)(av, scope, fs.value, client).then((r) => [fs.key, r.valid ? null : r.message ?? "Invalid"]).catch(() => [fs.key, null])
     );
   }
   const errs = {};
@@ -2921,9 +3179,9 @@ async function runAsyncValidations(schema, form, client) {
 }
 
 // src/print.ts
-var import_form_core9 = require("@lukeflow/form-core");
+var import_form_core10 = require("@lukeflow/form-core");
 function printSubmission(schema, data, options2) {
-  const html = (0, import_form_core9.toPrintableHtml)(schema, data, options2);
+  const html = (0, import_form_core10.toPrintableHtml)(schema, data, options2);
   const win = typeof window !== "undefined" ? window.open("", "_blank") : null;
   if (!win) return false;
   win.document.write(html);
@@ -2942,7 +3200,9 @@ var VERSION = "0.1.0-alpha.0";
   FormThemeProvider,
   LocaleProvider,
   MinionProvider,
+  PaymentsProvider,
   VERSION,
+  createPaymentSession,
   dataThemeAttr,
   defaultSanitizeHtml,
   getLocaleDirection,
@@ -2954,6 +3214,8 @@ var VERSION = "0.1.0-alpha.0";
   useLocale,
   useMinionClient,
   useMinionData,
+  usePaymentSession,
+  usePaymentState,
   usePopoverTheme,
   useTranslate
 });

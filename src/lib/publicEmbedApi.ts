@@ -7,6 +7,7 @@
 // failures via observability (#39).
 import { isAbortError } from "./abort";
 import { reportError } from "./reportError";
+import type { PaymentStart, PaymentSync, PublicPaymentConfig } from "./formPayments";
 
 const BASE = (import.meta.env.VITE_AUTH_API_URL || "").replace(/\/$/, "");
 const seg = (s: string) => encodeURIComponent(s);
@@ -33,6 +34,23 @@ export type EmbedForm = {
    *  an environment difference never requires rebuilding and re-vendoring this bundle. The SECRET half
    *  stays in core-engine and is never served. */
   captchaSitekey?: string | null;
+  /** Present only when the form takes a payment: the PUBLIC keys the card form needs and whether the
+   *  form can take a payment right now. The server resolves all of it; no secret is ever included. */
+  payment?: PublicPaymentConfig;
+};
+
+/**
+ * The submit response. A form that takes a payment comes back AWAITING_PAYMENT with the charge to pay —
+ * or, if the charge couldn't be started, `payment: null` and why (`paymentRetryable`: the same
+ * submission can try again with {@link startEmbedPayment}; otherwise it was released).
+ */
+export type EmbedSubmitResult = {
+  ok: boolean;
+  instanceId: string;
+  processStatus?: string;
+  payment?: PaymentStart | null;
+  paymentError?: string | null;
+  paymentRetryable?: boolean;
 };
 
 /** Thrown when the server is rate-limiting (HTTP 429) — callers wait + retry. */
@@ -65,7 +83,13 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-type RetryOpts = { signal?: AbortSignal; label: string; retryOn429?: boolean };
+type RetryOpts = {
+  signal?: AbortSignal;
+  label: string;
+  retryOn429?: boolean;
+  /** Statuses NOT to retry for this call even though they are usually transient. */
+  noRetry?: readonly number[];
+};
 
 /** GET/POST with bounded backoff on transient failures. 4xx (except optionally 429)
  *  are terminal. Aborts propagate as AbortError; terminal failures are reported. */
@@ -84,7 +108,8 @@ async function fetchWithRetry(url: string, init: RequestInit, opts: RetryOpts): 
     lastStatus = res?.status ?? 0;
 
     const is429 = lastStatus === 429;
-    const transient = TRANSIENT.has(lastStatus) || (is429 && opts.retryOn429 !== false);
+    const transient =
+      (TRANSIENT.has(lastStatus) && !opts.noRetry?.includes(lastStatus)) || (is429 && opts.retryOn429 !== false);
     if (transient && attempt < MAX_ATTEMPTS) {
       await sleep(backoff(attempt), opts.signal);
       continue;
@@ -96,11 +121,26 @@ async function fetchWithRetry(url: string, init: RequestInit, opts: RetryOpts): 
     });
     if (is429) throw new EmbedRateLimitedError();
     if (lastStatus === 404) throw new Error("This form link is invalid or no longer available.");
+    // A refusal the filler can act on ("That quantity isn't available.", the consent statement), or a
+    // server failure it explained: the server writes these for people, so show them rather than a code.
+    // (A proxy's HTML error page has no JSON message and falls through to the generic text.)
+    const serverMessage = res ? await readMessage(res) : null;
+    if (serverMessage && lastStatus >= 400) throw new Error(serverMessage);
     throw new Error(
       lastStatus === 0
         ? "Couldn’t reach the form. Check your connection and try again."
         : `Couldn’t load the form (HTTP ${lastStatus}).`,
     );
+  }
+}
+
+/** The `message` of an ApiError body, if the response has one. Never throws. */
+async function readMessage(res: Response): Promise<string | null> {
+  try {
+    const body = (await res.json()) as { message?: unknown };
+    return typeof body?.message === "string" && body.message.trim() ? body.message.trim() : null;
+  } catch {
+    return null;
   }
 }
 
@@ -116,7 +156,8 @@ export async function submitEmbed(
   consentAgreed?: boolean,
   captchaToken?: string | null,
   signal?: AbortSignal,
-): Promise<{ ok: boolean; instanceId: string }> {
+  version?: number,
+): Promise<EmbedSubmitResult> {
   const res = await fetchWithRetry(
     `${BASE}/api/public/embed/${seg(token)}/submit`,
     {
@@ -128,14 +169,39 @@ export async function submitEmbed(
       // served, so this cannot be used to assert agreement to different terms.
       // captchaToken is the Turnstile challenge response. It proves nothing by itself — core-engine
       // verifies it against Cloudflare — and it is single-use, so a retry needs a fresh one.
+      // version is the schema version this page rendered: a payment form refuses a submission made
+      // against a version that is no longer served (the payer saw a different price).
       body: JSON.stringify({
         data,
         attachmentRef,
         consentAgreed: consentAgreed === true,
         captchaToken: captchaToken ?? null,
+        version: version ?? null,
       }),
     },
-    { signal, label: "submit" },
+    // A 502 may come after the submission was saved; re-sending would spend a fresh submission on a
+    // captcha token that is single-use and already gone, so hand it straight back to the filler.
+    { signal, label: "submit", noRetry: [502] },
   );
+  return res.json();
+}
+
+/** Start (or resume) a saved embed submission's charge — after the first attempt couldn't. Not retried. */
+export async function startEmbedPayment(token: string, instanceId: string, signal?: AbortSignal): Promise<PaymentStart> {
+  const res = await fetch(`${BASE}/api/public/embed/${seg(token)}/payments/${seg(instanceId)}`, { method: "POST", signal });
+  if (!res.ok) throw new Error((await readMessage(res)) ?? `Couldn’t start the payment (HTTP ${res.status}).`);
+  return res.json();
+}
+
+/**
+ * Ask the server to check a submission's charge with Stripe (after the payer confirmed it). Not
+ * retried on 5xx: the caller falls back to Stripe.js's own answer, and the webhook settles it anyway.
+ */
+export async function syncEmbedPayment(token: string, instanceId: string, signal?: AbortSignal): Promise<PaymentSync> {
+  const res = await fetch(`${BASE}/api/public/embed/${seg(token)}/payments/${seg(instanceId)}/sync`, {
+    method: "POST",
+    signal,
+  });
+  if (!res.ok) throw new Error((await readMessage(res)) ?? `Couldn’t check the payment (HTTP ${res.status}).`);
   return res.json();
 }

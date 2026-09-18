@@ -8,8 +8,21 @@ import FormRenderer from "../../components/formBuilder/LukeFormRenderer";
 import FormConsentGate, { focusConsent } from "../../components/formBuilder/FormConsentGate";
 import TurnstileGate from "../../components/formBuilder/TurnstileGate";
 import SubmissionSuccess from "../../components/formBuilder/SubmissionSuccess";
+import PaymentStep from "../../components/formBuilder/PaymentStep";
 import { readAttachmentsEnabled, readConsent, readSubmitMessage } from "../../lib/formSchema";
-import { getEmbedForm, submitEmbed, type EmbedForm } from "../../lib/publicEmbedApi";
+import { getEmbedForm, startEmbedPayment, submitEmbed, syncEmbedPayment, type EmbedForm } from "../../lib/publicEmbedApi";
+import {
+  RESTART_MESSAGE,
+  completePayment,
+  createFormPaymentSession,
+  formatMoney,
+  previewCharge,
+  schemaTakesPayment,
+  type CompletePaymentOptions,
+  type PaymentStart,
+} from "../../lib/formPayments";
+
+const CANT_PAY_NOW = "This payment can't be completed right now. Please try again later.";
 import { linkEmbedDocuments } from "../../lib/publicDocumentsApi";
 import EmbedAttachments from "./EmbedAttachments";
 import { isAbortError } from "../../lib/abort";
@@ -44,6 +57,16 @@ export default function FormEmbedView({ token }: { token?: string }) {
   // single-use and short-lived, so it is state — not something we can capture once and reuse.
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
+  // Payments. The submission is saved and priced by the server FIRST; then the payer pays that charge.
+  // After a decline (or when the amount needs the payer's OK) the charge is kept here and the page
+  // switches to a pay-only step, so paying again never creates a second submission. `start` is null
+  // while the charge couldn't be started yet (the step offers "Try again").
+  const [pendingPayment, setPendingPayment] = useState<
+    { instanceId: string; start: PaymentStart | null; error?: string | null } | null
+  >(null);
+  const [paid, setPaid] = useState<{ status: "succeeded" | "processing"; amount: string } | null>(null);
+  // The answers last submitted — restored if the payer goes back from the pay step to change them.
+  const [draft, setDraft] = useState<Record<string, unknown> | undefined>(undefined);
 
   // The host-page bridge: auto-reports our height and emits ready/submitted/error to the embedding
   // site via @lukeflow/form-embed (a no-op when this page is opened standalone, i.e. not framed).
@@ -77,6 +100,119 @@ export default function FormEmbedView({ token }: { token?: string }) {
     return () => ctl.abort();
   }, [token, reloadKey]);
 
+  const takesPayment = useMemo(() => schemaTakesPayment(form?.schema), [form?.schema]);
+  const payment = form?.payment;
+  const paymentSession = useMemo(
+    () => createFormPaymentSession(takesPayment, payment),
+    // Rebuild only when what the session is made of changes, not on every payload object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [takesPayment, payment?.available, payment?.publishableKey, payment?.accountId, payment?.scriptUrl, payment?.alreadyPaid],
+  );
+
+  const finishPaid = (instanceId: string, status: "succeeded" | "processing", start: PaymentStart) => {
+    setPendingPayment(null);
+    setPaid({ status, amount: formatMoney(start.amountMinor, start.currency) });
+    setDone(true);
+    bridge.current?.submitted(instanceId);
+  };
+
+  // Back from the pay step to the form. The captcha widget was unmounted with the form, so whatever
+  // token it left behind may have expired: ask for a fresh one.
+  const backToForm = (message: string | null) => {
+    paymentSession?.setError(null);
+    setPendingPayment(null);
+    setCaptchaToken(null);
+    setCaptchaReset((n) => n + 1);
+    setError(message);
+  };
+
+  // Pay the charge the server created, then have the server check it with Stripe.
+  const payCharge = async (instanceId: string, start: PaymentStart, options?: CompletePaymentOptions) => {
+    if (!token || !paymentSession) return;
+    const outcome = await completePayment(paymentSession, start, () => syncEmbedPayment(token, instanceId), options);
+    if (outcome === "succeeded" || outcome === "processing") {
+      finishPaid(instanceId, outcome, start);
+      return;
+    }
+    if (outcome === "restart") {
+      // The charge is gone (cancelled); this submission can't be paid any more. Fill in again.
+      backToForm(RESTART_MESSAGE);
+      return;
+    }
+    // retry → the same charge can be paid again; confirm → the payer approves the amount first. Both from
+    // the pay step, whose field already says why.
+    setPendingPayment({ instanceId, start });
+  };
+
+  const payPending = async () => {
+    if (!token || !pendingPayment?.start || !paymentSession) return;
+    const { instanceId, start } = pendingPayment;
+    setSubmitting(true);
+    setError(null);
+    try {
+      // The stored charge may have moved on since it was loaded — paid on a response that never arrived,
+      // or cancelled — so ask first, before the payer is made to re-type a card.
+      const now = await syncEmbedPayment(token, instanceId).catch(() => null);
+      if (now && (now.status === "succeeded" || now.status === "processing")) {
+        finishPaid(instanceId, now.status, start);
+        return;
+      }
+      if (now && now.status !== "requires_payment") {
+        backToForm(RESTART_MESSAGE);
+        return;
+      }
+      if (await paymentSession.validate()) return; // the reason is on the payment field
+      // The pay step shows the server's amount, so no amount check.
+      await payCharge(instanceId, start);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // The charge couldn't be started on submit: try again for the SAME submission.
+  const retryStart = async () => {
+    if (!token || !pendingPayment) return;
+    const { instanceId } = pendingPayment;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const start = await startEmbedPayment(token, instanceId);
+      if (start.status === "succeeded" || start.status === "processing") finishPaid(instanceId, start.status, start);
+      else if (start.status === "requires_payment" && start.clientSecret) setPendingPayment({ instanceId, start });
+      else if (start.status === "requires_payment") {
+        setPendingPayment({ instanceId, start: null, error: CANT_PAY_NOW });
+      } else backToForm(RESTART_MESSAGE);
+    } catch (e) {
+      setPendingPayment({ instanceId, start: null, error: (e as Error).message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Leave the pay step to edit and submit again (a NEW submission). Never walk away from a charge that
+  // actually went through: ask the server first.
+  const changeAnswers = async () => {
+    if (!token || !pendingPayment) return;
+    const { instanceId, start } = pendingPayment;
+    setSubmitting(true);
+    try {
+      if (start) {
+        const now = await syncEmbedPayment(token, instanceId);
+        if (now.status === "succeeded" || now.status === "processing") {
+          finishPaid(instanceId, now.status, start);
+          return;
+        }
+      }
+      backToForm(null);
+    } catch {
+      setError("We couldn't check your payment just now. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // The agreement this VERSION published — read from the served schema, the same setting the server
   // enforces against, so what the filler is asked and what gets recorded cannot diverge.
   const consent = useMemo(() => readConsent(form?.schema), [form?.schema]);
@@ -101,6 +237,16 @@ export default function FormEmbedView({ token }: { token?: string }) {
     setSubmitting(true);
     setError(null);
     try {
+      setDraft(data);
+      // Card details first: a half-typed card is caught here, before anything is submitted.
+      if (paymentSession) {
+        paymentSession.setError(null);
+        if (await paymentSession.validate()) {
+          // The reason is on the payment field — which may be on another tab or scrolled away.
+          setError("Check your payment details below.");
+          return;
+        }
+      }
       // Carry the honeypot value under the agreed key; the engine drops the submission if it's filled.
       // attachmentRef is bound server-side at submit so the formMetaData snapshot captures the uploads.
       const res = await submitEmbed(
@@ -109,9 +255,25 @@ export default function FormEmbedView({ token }: { token?: string }) {
         attachmentRef,
         consentAgreed,
         captchaToken,
+        undefined,
+        form?.version,
       );
       // Belt-and-suspenders: re-bind any attachments to the created instance (idempotent; never blocks).
       if (res.instanceId) void linkEmbedDocuments(token, attachmentRef, res.instanceId);
+      if (res.processStatus === "AWAITING_PAYMENT") {
+        // The Turnstile token was spent on this submission; a later "change my answers" needs a new one.
+        setCaptchaToken(null);
+        setCaptchaReset((n) => n + 1);
+        if (res.payment && paymentSession) {
+          // Charge without asking only if it is exactly what the payment field showed.
+          await payCharge(res.instanceId, res.payment, { expected: previewCharge(form?.schema, data) });
+        } else if (res.paymentRetryable) {
+          setPendingPayment({ instanceId: res.instanceId, start: null, error: res.paymentError });
+        } else {
+          setError(res.paymentError || "The payment couldn't be started. Please try again.");
+        }
+        return;
+      }
       setDone(true);
       bridge.current?.submitted(res.instanceId);
     } catch (e) {
@@ -163,7 +325,16 @@ export default function FormEmbedView({ token }: { token?: string }) {
           {loading ? (
             <p className="py-12 text-center text-sm text-gray-400">Loading…</p>
           ) : done ? (
-            <SubmissionSuccess message={form ? readSubmitMessage(form.schema) : undefined} />
+            <>
+              <SubmissionSuccess message={form ? readSubmitMessage(form.schema) : undefined} />
+              {paid ? (
+                <p className="-mt-6 pb-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  {paid.status === "succeeded"
+                    ? `Payment of ${paid.amount} received.`
+                    : `Your payment of ${paid.amount} is being processed.`}
+                </p>
+              ) : null}
+            </>
           ) : error && !form ? (
             <div className="py-12 text-center">
               <p className="text-sm text-error-500">{error}</p>
@@ -207,7 +378,7 @@ export default function FormEmbedView({ token }: { token?: string }) {
               {/* Attachments live in their own TAB (opt-in per form), not as an inline form field. Both
                   panels stay MOUNTED (toggled with `hidden`) so typed form data and any in-progress upload
                   survive a tab switch. With attachments off, the form renders on its own — no tabs. */}
-              {showAttachments ? (
+              {showAttachments && !pendingPayment ? (
                 <div role="tablist" aria-label="Form sections" className="mb-5 flex gap-1 border-b border-gray-200 dark:border-gray-800">
                   <TabButton id="form" active={tab === "form"} onClick={() => setTab("form")}>
                     Form
@@ -218,8 +389,21 @@ export default function FormEmbedView({ token }: { token?: string }) {
                 </div>
               ) : null}
 
-              <div role="tabpanel" hidden={showAttachments && tab !== "form"}>
-                {/* A bad schema must not blank the host's iframe — degrade to a message. */}
+              <div role="tabpanel" hidden={showAttachments && tab !== "form" && !pendingPayment}>
+                {pendingPayment && paymentSession ? (
+                  <PaymentStep
+                    start={pendingPayment.start}
+                    session={paymentSession}
+                    busy={submitting}
+                    onPay={() => void payPending()}
+                    error={pendingPayment.error}
+                    onRetry={() => void retryStart()}
+                    // Going back leaves this submission unpaid (it is cancelled after a while); submitting
+                    // the form again creates a fresh one at the new price.
+                    onChangeAnswers={() => void changeAnswers()}
+                  />
+                ) : (
+                /* A bad schema must not blank the host's iframe — degrade to a message. */
                 <ErrorBoundary
                   label="form-embed-renderer"
                   fallback={(e) => (
@@ -230,17 +414,18 @@ export default function FormEmbedView({ token }: { token?: string }) {
                 >
                   {minionClient ? (
                     <MinionProvider client={minionClient}>
-                      <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} beforeSubmit={captchaGate} />
+                      <FormRenderer schema={form.schema} initialValues={draft} onSubmit={handleSubmit} submitting={submitting} allowJs={false} beforeSubmit={captchaGate} payments={paymentSession} />
                     </MinionProvider>
                   ) : (
-                    <FormRenderer schema={form.schema} onSubmit={handleSubmit} submitting={submitting} allowJs={false} beforeSubmit={captchaGate} />
+                    <FormRenderer schema={form.schema} initialValues={draft} onSubmit={handleSubmit} submitting={submitting} allowJs={false} beforeSubmit={captchaGate} payments={paymentSession} />
                   )}
                 </ErrorBoundary>
+                )}
               </div>
 
               {/* Token-scoped attachments (uploaded before submit, linked to the instance after). */}
               {showAttachments && token ? (
-                <div role="tabpanel" hidden={tab !== "files"}>
+                <div role="tabpanel" hidden={tab !== "files" || !!pendingPayment}>
                   <EmbedAttachments token={token} processRef={attachmentRef} onCountChange={setAttachmentCount} />
                 </div>
               ) : null}
