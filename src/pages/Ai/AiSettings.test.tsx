@@ -82,6 +82,10 @@ describe("AiSettings — bring your own key", () => {
       "href",
       "https://console.groq.com/keys",
     );
+    // The placeholder shows what this provider's keys look like, so a wrong-provider paste is
+    // obvious before it is submitted. It only renders if the server sends keyPrefix, which
+    // GET /api/ai/provider did not do at first — so the hint silently never appeared.
+    expect(screen.getByLabelText(/API key/i)).toHaveAttribute("placeholder", "gsk_…");
   });
 
   it("cannot submit an empty key", async () => {

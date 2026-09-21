@@ -13,7 +13,6 @@
 // The retry behaviour below is unchanged: it exists for Render free-tier cold starts,
 // which return an HTML wake-up page or a 502/503 for the first few seconds.
 import { getAccessToken } from "./authApi";
-import { getCurrentTier } from "./planTier";
 
 const BASE = (import.meta.env.VITE_AUTH_API_URL || "").replace(/\/$/, "");
 
@@ -41,6 +40,20 @@ const MAX_ATTEMPTS = 3;
 const BACKOFF_BASE_MS = 1_500;
 const BACKOFF_CAP_MS = 8_000;
 const COLD_START_STATUSES = new Set([502, 503]);
+
+/**
+ * The human-readable message out of an error body.
+ *
+ * Two shapes reach us: core-engine's own envelope `{error, message, status, correlationId}`
+ * for anything it decides itself (no provider connected, capability denied, too busy), and
+ * FastAPI's `{detail}` for a body the proxy passes through from the fleet. Reading only
+ * `detail` — which was right when the browser called the fleet directly — silently reduced
+ * every engine-side refusal to a bare HTTP code.
+ */
+function serverMessage(data: { detail?: unknown; message?: unknown } | null): string | undefined {
+  const raw = data?.detail ?? data?.message;
+  return typeof raw === "string" && raw.trim() !== "" ? raw : undefined;
+}
 
 export type AgentTimeouts = {
   /** Per-attempt cap, so a hung request fails fast rather than forever. */
@@ -98,8 +111,11 @@ export async function agentPost<T>(
   // The workspace is proved by this credential, not claimed by the header below.
   if (token) headers.Authorization = `Bearer ${token}`;
   if (tenant) headers["X-Tenant-Id"] = tenant;
-  const tier = getCurrentTier();
-  if (tier) headers["X-Tenant-Tier"] = tier; // sizes the tenant's AI token budget by plan
+  // NOTE: no X-Tenant-Tier. Two reasons, either of which is sufficient:
+  //  1. The gateway's CORS allow-list is Authorization / Content-Type / Accept / X-Tenant-Id,
+  //     so sending anything else fails the preflight and blocks every AI call outright.
+  //  2. It sizes the workspace's daily token cap, which is not a number the browser should get
+  //     to choose. core-engine now sets it on the proxied request from the stored plan.
   const deadline = Date.now() + timeouts.deadlineMs;
 
   for (let attempt = 1; ; attempt++) {
@@ -132,7 +148,7 @@ export async function agentPost<T>(
 
     let status = 0;
     let ok = false;
-    let data: (T & { detail?: string }) | null = null;
+    let data: (T & { detail?: string; message?: string }) | null = null;
     if (res) {
       status = res.status;
       ok = res.ok;
@@ -146,9 +162,7 @@ export async function agentPost<T>(
       if (ok && data !== null) return data as T;
       // No key, or a key the provider refused. Retrying cannot fix either.
       if (status === 402) {
-        throw new AgentProviderRequiredError(
-          typeof data?.detail === "string" ? data.detail : undefined,
-        );
+        throw new AgentProviderRequiredError(serverMessage(data));
       }
     }
 
@@ -163,8 +177,7 @@ export async function agentPost<T>(
           `Couldn't reach the ${label}. ${(networkErr as Error)?.message ?? ""}`.trim(),
         );
       }
-      const detail = data?.detail || `The ${label} is unavailable (HTTP ${status}).`;
-      throw new Error(typeof detail === "string" ? detail : `${label} error`);
+      throw new Error(serverMessage(data) ?? `The ${label} is unavailable (HTTP ${status}).`);
     }
 
     await abortableSleep(delay, signal);

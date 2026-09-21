@@ -110,24 +110,42 @@ describe("formAgentApi (#40)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("attaches X-Tenant-Tier when a plan tier is cached (sizes the AI token budget)", async () => {
+  it("sends only headers the gateway's CORS allow-list accepts", async () => {
+    // The allow-list is Authorization / Content-Type / Accept / X-Tenant-Id. Anything else
+    // makes the preflight fail and blocks EVERY AI call — invisible to a mocked fetch, which
+    // is exactly how X-Tenant-Tier survived here once.
     const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { schema: EMPTY, title: "x", brain: "b" }));
     vi.stubGlobal("fetch", fetchMock);
     setCurrentTier("PRO");
 
     await generateSchema("hi", EMPTY, "T", "tenant-acme");
 
-    expect(fetchMock.mock.calls[0][1].headers["X-Tenant-Tier"]).toBe("PRO");
+    const allowed = new Set(["Authorization", "Content-Type", "Accept", "X-Tenant-Id"]);
+    const sent = Object.keys(fetchMock.mock.calls[0][1].headers);
+    expect(sent.filter((h) => !allowed.has(h))).toEqual([]);
+    // The tier is decided server-side now: it sizes a spend cap, so the browser doesn't pick it.
+    expect(sent).not.toContain("X-Tenant-Tier");
   });
 
-  it("omits X-Tenant-Tier when the tier is unknown (agents fall back to the flat cap)", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { schema: EMPTY, title: "x", brain: "b" }));
+  it("surfaces core-engine's own error message, not just the fleet's", async () => {
+    // Two envelopes reach us: the engine's {error, message, status} for anything it decides
+    // itself, and FastAPI's {detail} for a passed-through fleet body. Reading only `detail`
+    // reduced every engine-side refusal to a bare HTTP code.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonRes(403, { error: "Forbidden", message: "You don't have access to use the assistant here.", status: 403 }));
     vi.stubGlobal("fetch", fetchMock);
-    setCurrentTier(null);
 
-    await generateSchema("hi", EMPTY, "T", "tenant-acme");
+    await expect(generateSchema("hi", EMPTY, "T", "tenant-acme")).rejects.toThrow(
+      /don't have access to use the assistant/,
+    );
+  });
 
-    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty("X-Tenant-Tier");
+  it("still reads the fleet's FastAPI-shaped detail", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(402, { detail: "Your AI provider rejected this key." }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generateSchema("hi", EMPTY, "T", "tenant-acme")).rejects.toThrow(/rejected this key/);
   });
 
 });
