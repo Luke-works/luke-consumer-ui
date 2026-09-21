@@ -6,10 +6,19 @@ import Button from "../../components/ui/button/Button";
 import { updateDraft } from "../../lib/workflowApi";
 import {
   AgentCancelledError,
+  AgentProviderRequiredError,
   generateWorkflow,
 } from "../../lib/workflowAgentApi";
+import { Link } from "react-router";
 
-type Msg = { role: "you" | "ai"; text: string; error?: boolean; suggestions?: string[] };
+type Msg = {
+  role: "you" | "ai";
+  text: string;
+  error?: boolean;
+  /** The workspace has no usable AI provider: offer the fix instead of an error. */
+  connect?: boolean;
+  suggestions?: string[];
+};
 
 const SUGGESTIONS = [
   "Email the customer when the form is submitted",
@@ -81,6 +90,10 @@ export default function WorkflowAiAssistPanel({
     } catch (e) {
       if (e instanceof AgentCancelledError) {
         setMessages((m) => [...m, { role: "ai", text: "Stopped." }]);
+      } else if (e instanceof AgentProviderRequiredError) {
+        // Not a failure: nobody has connected a provider, or the provider refused the key.
+        // An error banner would leave the user with nothing they can act on.
+        setMessages((m) => [...m, { role: "ai", error: true, connect: true, text: (e as Error).message }]);
       } else {
         setMessages((m) => [...m, { role: "ai", error: true, text: (e as Error).message }]);
       }
@@ -141,6 +154,11 @@ export default function WorkflowAiAssistPanel({
                 }`}
               >
                 {m.error ? `⚠ ${m.text}` : m.text}
+                {m.connect ? (
+                  <Link to="/ai" className="mt-2 block font-medium underline">
+                    Connect your AI provider
+                  </Link>
+                ) : null}
               </div>
               {m.role === "ai" && !m.error && m.suggestions && m.suggestions.length > 0 && i === messages.length - 1 && !busy && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
