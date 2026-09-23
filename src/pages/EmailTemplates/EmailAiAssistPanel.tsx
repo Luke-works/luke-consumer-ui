@@ -3,10 +3,18 @@ import LukeBuildsMark from "../../components/branding/LukeBuildsMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { saveDraft } from "../../lib/emailTemplatesApi";
-import { generateEmail, AgentCancelledError } from "../../lib/emailAgentApi";
+import { generateEmail, AgentCancelledError, AgentProviderRequiredError } from "../../lib/emailAgentApi";
+import { Link } from "react-router";
 import { repairEmailDoc, type EmailDoc } from "@lukeflow/email-core";
 
-type Msg = { role: "you" | "ai"; text: string; error?: boolean; suggestions?: string[] };
+type Msg = {
+  role: "you" | "ai";
+  text: string;
+  error?: boolean;
+  /** The workspace has no usable AI provider: offer the fix instead of an error. */
+  connect?: boolean;
+  suggestions?: string[];
+};
 
 const SUGGESTIONS = [
   "Make a welcome email with our logo and a blue Get Started button",
@@ -79,6 +87,10 @@ export default function EmailAiAssistPanel({
       // A user cancel isn't an error — note it quietly instead of a red banner.
       if (e instanceof AgentCancelledError) {
         setMessages((m) => [...m, { role: "ai", text: "Stopped." }]);
+      } else if (e instanceof AgentProviderRequiredError) {
+        // Not a failure: nobody has connected a provider, or the provider refused the key.
+        // An error banner would leave the user with nothing they can act on.
+        setMessages((m) => [...m, { role: "ai", error: true, connect: true, text: (e as Error).message }]);
       } else {
         setMessages((m) => [...m, { role: "ai", error: true, text: (e as Error).message }]);
       }
@@ -141,6 +153,11 @@ export default function EmailAiAssistPanel({
                 }`}
               >
                 {m.error ? `⚠ ${m.text}` : m.text}
+                {m.connect ? (
+                  <Link to="/ai" className="mt-2 block font-medium underline">
+                    Connect your AI provider
+                  </Link>
+                ) : null}
               </div>
               {/* Clickable suggestions under the most recent assistant reply. */}
               {m.role === "ai" && !m.error && m.suggestions && m.suggestions.length > 0 && i === messages.length - 1 && !busy && (
