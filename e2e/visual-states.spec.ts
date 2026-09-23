@@ -105,6 +105,17 @@ const STATES: State[] = [
       await page.getByRole("button", { name: /^forms$/i }).click();
       // Open the sub-menu so the shot actually CONTAINS the nav labels it exists to protect.
       await expect(inbox).toBeInViewport();
+      // Pin the nav's scroll offset. It is an overflow-y-auto container with the scrollbar
+      // hidden (no-scrollbar), so once the items plus an open sub-menu exceed the viewport
+      // height the browser may scroll it to reveal what it just expanded — by an amount that
+      // varies run to run. That made this shot differ from itself by ~4,700 px between two
+      // runs of the SAME commit, which a rebaseline would have turned into a permanently
+      // flaky screen rather than fixed.
+      await page.evaluate(() => {
+        document.querySelectorAll("aside .no-scrollbar").forEach((el) => {
+          (el as HTMLElement).scrollTop = 0;
+        });
+      });
     },
   },
   {
