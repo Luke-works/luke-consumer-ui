@@ -85,26 +85,29 @@ export const SCREENSHOT_OPTIONS = {
 } as const;
 
 /**
- * Pin the one source of nondeterminism these suites have: the sidebar's scroll offset.
+ * Put every scrollable container back to its origin, immediately before a shot.
  *
- * The nav is an `overflow-y-auto` container with the scrollbar hidden (`no-scrollbar`). Once
- * the items exceed the viewport height the browser may scroll it — to reveal an active item,
- * or a sub-menu that was just expanded — by an amount that varies between runs. That made
- * shots differ from THEMSELVES across two runs of the same commit: ~4,700 px on
- * desktop-nav-expanded, ~100 px on a route whose active item sits low in the list.
+ * Browsers scroll things on their own: a sidebar with more items than fit gets scrolled to
+ * reveal the active one; a sub-nav tab strip narrower than its tabs gets scrolled to bring the
+ * selected tab into view. Both containers here hide their scrollbars, so nothing in the picture
+ * says it happened — and the amount varies between runs. Shots therefore differed from
+ * THEMSELVES across two runs of the same commit: ~4,700 px on desktop-nav-expanded (sidebar,
+ * vertical), ~1,200 px on access-candidate-groups-phone (tab strip, horizontal).
  *
- * This is the fix SCREENSHOT_OPTIONS asks for above: find the nondeterminism rather than raise
+ * This is the fix SCREENSHOT_OPTIONS asks for above — find the nondeterminism rather than raise
  * maxDiffPixels, because every pixel added to that budget is a pixel of the product nobody is
- * looking at. Called by both suites immediately before the shot.
+ * looking at. Applied to every container rather than the two we happened to catch, so the next
+ * scrollable thing someone adds is deterministic without having to know about this.
  *
- * It does NOT hide the underlying UX point — that the rail is now full enough at 1280x800 for
- * the last item to sit below a fold with no scrollbar to hint at it. That is a layout question,
- * and a screenshot that cannot reproduce itself is no way to ask it.
+ * It does NOT settle the UX question underneath: at 1280x800 the sidebar rail is now full
+ * enough for the last item to sit below a fold with no scrollbar to hint at it. That is a
+ * layout decision, and a screenshot that cannot reproduce itself is no way to ask it.
  */
-export async function pinNavScroll(page: Page): Promise<void> {
+export async function pinScrollPositions(page: Page): Promise<void> {
   await page.evaluate(() => {
-    document.querySelectorAll("aside .no-scrollbar").forEach((el) => {
-      (el as HTMLElement).scrollTop = 0;
-    });
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    }
   });
 }
