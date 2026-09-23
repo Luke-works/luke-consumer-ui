@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { stubBackend, expectHealthy, expectRendered, expectSettled, forceTheme } from "./support/harness";
 import { SCREENS } from "./support/screens";
-import { SCREENSHOT_OPTIONS, VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
+import { pinNavScroll, SCREENSHOT_OPTIONS, VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
 
 /**
  * VISUAL REGRESSION — a pixel baseline for every screen.
@@ -70,6 +70,7 @@ test.describe("visual", () => {
 
           // Comparison policy (threshold + an ABSOLUTE pixel budget) lives in support/visual.ts,
           // shared with visual-states.spec so the two can never drift apart.
+          await pinNavScroll(page);
           await expect(page).toHaveScreenshot(`${screen.name}-${vp.name}-${theme}.png`, SCREENSHOT_OPTIONS);
         });
         }

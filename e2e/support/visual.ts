@@ -1,3 +1,5 @@
+import type { Page } from "@playwright/test";
+
 /**
  * WHERE AND WHEN THE VISUAL BASELINES RUN — the single rule, shared by `visual.spec.ts` and
  * `visual-states.spec.ts` so the two can never disagree.
@@ -81,3 +83,28 @@ export const SCREENSHOT_OPTIONS = {
    */
   maxDiffPixels: 20,
 } as const;
+
+/**
+ * Pin the one source of nondeterminism these suites have: the sidebar's scroll offset.
+ *
+ * The nav is an `overflow-y-auto` container with the scrollbar hidden (`no-scrollbar`). Once
+ * the items exceed the viewport height the browser may scroll it — to reveal an active item,
+ * or a sub-menu that was just expanded — by an amount that varies between runs. That made
+ * shots differ from THEMSELVES across two runs of the same commit: ~4,700 px on
+ * desktop-nav-expanded, ~100 px on a route whose active item sits low in the list.
+ *
+ * This is the fix SCREENSHOT_OPTIONS asks for above: find the nondeterminism rather than raise
+ * maxDiffPixels, because every pixel added to that budget is a pixel of the product nobody is
+ * looking at. Called by both suites immediately before the shot.
+ *
+ * It does NOT hide the underlying UX point — that the rail is now full enough at 1280x800 for
+ * the last item to sit below a fold with no scrollbar to hint at it. That is a layout question,
+ * and a screenshot that cannot reproduce itself is no way to ask it.
+ */
+export async function pinNavScroll(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    document.querySelectorAll("aside .no-scrollbar").forEach((el) => {
+      (el as HTMLElement).scrollTop = 0;
+    });
+  });
+}

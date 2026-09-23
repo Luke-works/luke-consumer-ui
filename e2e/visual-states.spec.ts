@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stubBackend, expectHealthy, expectSettled, forceTheme, ok, type StubOptions } from "./support/harness";
-import { SCREENSHOT_OPTIONS, VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
+import { pinNavScroll, SCREENSHOT_OPTIONS, VISUAL_ENABLED, VISUAL_SKIP_REASON } from "./support/visual";
 
 /**
  * VISUAL REGRESSION — UI STATES.
@@ -105,17 +105,6 @@ const STATES: State[] = [
       await page.getByRole("button", { name: /^forms$/i }).click();
       // Open the sub-menu so the shot actually CONTAINS the nav labels it exists to protect.
       await expect(inbox).toBeInViewport();
-      // Pin the nav's scroll offset. It is an overflow-y-auto container with the scrollbar
-      // hidden (no-scrollbar), so once the items plus an open sub-menu exceed the viewport
-      // height the browser may scroll it to reveal what it just expanded — by an amount that
-      // varies run to run. That made this shot differ from itself by ~4,700 px between two
-      // runs of the SAME commit, which a rebaseline would have turned into a permanently
-      // flaky screen rather than fixed.
-      await page.evaluate(() => {
-        document.querySelectorAll("aside .no-scrollbar").forEach((el) => {
-          (el as HTMLElement).scrollTop = 0;
-        });
-      });
     },
   },
   {
@@ -320,6 +309,7 @@ test.describe("visual states", () => {
             await page.evaluate(() => document.fonts.ready);
             await expectSettled(page);
 
+            await pinNavScroll(page);
             await expect(page).toHaveScreenshot(`${state.name}-${vp.name}-${theme}.png`, SCREENSHOT_OPTIONS);
           });
         }
