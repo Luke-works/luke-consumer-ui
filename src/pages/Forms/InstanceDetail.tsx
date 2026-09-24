@@ -258,7 +258,9 @@ export default function InstanceDetail({
             <Select
               value={selectedVersion}
               onChange={(e) => setSelectedVersion(Number(e.target.value))}
-              className="h-8 rounded-lg border border-gray-300 bg-transparent px-2 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-300"
+              size="sm"
+              fullWidth={false}
+              className="h-8"
             >
               {versions.map((v) => (
                 <option key={v.version} value={v.version}>v{v.version}{v.version === instance.version ? " (submitted)" : ""}</option>

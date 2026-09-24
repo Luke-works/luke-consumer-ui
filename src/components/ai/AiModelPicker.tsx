@@ -32,6 +32,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   // The live model list costs a round trip to the provider, so it is fetched when someone
   // actually opens the picker rather than on every panel mount.
   const loading = useRef(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (!tenant) return;
@@ -57,7 +58,10 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   }, [tenant, models]);
 
   const choose = async (model: string) => {
-    if (!tenant) return;
+    // A ref, not the `saving` state: the state read here is the one captured when this render's
+    // closure was built, so a second pick in the same tick would sail past it.
+    if (!tenant || savingRef.current) return;
+    savingRef.current = true;
     // A model name only means something to the provider offering it, and a workspace may have
     // several connected — so the provider travels with the choice.
     const owner = (models ?? []).find((m) => m.id === model)?.provider ?? null;
@@ -75,6 +79,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't change the model.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -118,14 +123,13 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   ];
 
   return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
+    <div className={`flex items-center gap-1.5 ${className}`} aria-busy={saving || undefined}>
       <Listbox
         ariaLabel="Model"
         size="sm"
         className="max-w-[220px]"
         value={pref.model ?? ""}
         options={options}
-        disabled={saving}
         placeholder="Workspace default"
         onOpen={() => void loadModels()}
         onChange={(next) => void choose(next)}

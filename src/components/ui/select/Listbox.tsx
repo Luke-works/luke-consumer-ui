@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { twMerge } from "tailwind-merge";
 import { Check, ChevronDown, Search } from "lucide-react";
 
 export type ListboxOption = {
@@ -42,10 +43,14 @@ const BOX: Record<SelectSize, string> = {
   md: "h-11 pl-4 pr-10 text-sm",
 };
 
+/** Room to leave between the popup and the viewport edge. */
+const GUTTER = 24;
+const MAX_POPUP = 320;
+
 /**
  * A dropdown for lists the native one genuinely fails: long, grouped, worth searching.
  *
- * <p>Most selects in this app should NOT be this. A real `<Select>` gives correct mobile
+ * <p>Most selects in this app should NOT be this. A real `<select>` gives correct mobile
  * keyboards, screen-reader behaviour and zoom handling for free, and re-implementing that is how
  * a dropdown ends up looking better and working worse. This exists for the cases where the
  * native popup is actively unhelpful — a provider's model list, say, which arrives grouped, runs
@@ -56,6 +61,21 @@ const BOX: Record<SelectSize, string> = {
  * (arrows, Home/End, Enter, Escape, type-ahead), and a visible focus ring. It renders through a
  * portal because the panels it lives in clip their overflow — the AI assistant panel is
  * `overflow-hidden`, so an in-flow popup would be cut off at the panel edge.
+ *
+ * <p>Two things a native `<select>` does for free that this had to be taught, both found in
+ * review rather than in use:
+ *
+ * <ul>
+ *   <li><b>It can show a value it has no option for.</b> Both call sites fetch their options
+ *       lazily on open, so between mount and that fetch the selected value is not in `options`.
+ *       Deriving the label purely from `options` made a saved model render as "Select…" — the
+ *       control reporting that nothing is pinned when something is. The native version it
+ *       replaced had an explicit fallback for this, with a comment explaining why; the
+ *       conversion dropped it.</li>
+ *   <li><b>Its highlight follows the selection.</b> The active index has to be recomputed when
+ *       the lazily-fetched options arrive, or the highlight sits on entry 0 while
+ *       `aria-selected` sits elsewhere — and Enter then commits the wrong row.</li>
+ * </ul>
  */
 export default function Listbox({
   value,
@@ -71,7 +91,8 @@ export default function Listbox({
   onOpen,
 }: ListboxProps) {
   const reactId = useId();
-  const listId = `${id ?? reactId}-listbox`;
+  const baseId = id ?? reactId;
+  const listId = `${baseId}-listbox`;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -80,10 +101,16 @@ export default function Listbox({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   // Type-ahead state, for jumping to an option by typing when there is no search box.
   const typed = useRef({ text: "", at: 0 });
 
   const selected = options.find((o) => o.value === value);
+  /**
+   * The label for a value we have no option for — see the class note above. Rendered from the
+   * value itself, which for a model id is the same string the option would have shown.
+   */
+  const orphanLabel = value && !selected ? value : null;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,16 +118,27 @@ export default function Listbox({
     return options.filter((o) => `${o.label} ${o.hint ?? ""} ${o.group ?? ""}`.toLowerCase().includes(q));
   }, [options, query]);
 
-  /** Grouped for rendering, preserving the order the caller gave. */
+  /**
+   * Grouped for rendering.
+   *
+   * <p>Keyed by group NAME, not by consecutive runs. A caller's array is not sorted by group —
+   * a provider returns its models in its own order — so a run-based grouping repeats a heading
+   * every time the array interleaves, which produced duplicate React keys and duplicate DOM ids
+   * for the same heading. Order of first appearance is preserved, so the caller still controls
+   * which group comes first.
+   */
   const groups = useMemo(() => {
-    const out: { name: string | undefined; items: ListboxOption[] }[] = [];
+    const byName = new Map<string | undefined, ListboxOption[]>();
     for (const option of visible) {
-      const last = out[out.length - 1];
-      if (last && last.name === option.group) last.items.push(option);
-      else out.push({ name: option.group, items: [option] });
+      const existing = byName.get(option.group);
+      if (existing) existing.push(option);
+      else byName.set(option.group, [option]);
     }
-    return out;
+    return [...byName.entries()].map(([name, items]) => ({ name, items }));
   }, [visible]);
+
+  /** Flat order matching what is rendered, so `active` indexes the same list the eye sees. */
+  const flatOptions = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   const place = useCallback(() => {
     const el = triggerRef.current;
@@ -119,12 +157,38 @@ export default function Listbox({
     };
   }, [open, place]);
 
+  /**
+   * Keep the highlight on the selection.
+   *
+   * <p>Depends on `flatOptions` as well as `open`, because the options arrive AFTER opening —
+   * that is the whole point of `onOpen`. Keyed on `open` alone, this ran against an empty list,
+   * fell back to 0, and never corrected itself.
+   */
   useEffect(() => {
     if (!open) return;
-    setActive(Math.max(0, visible.findIndex((o) => o.value === value)));
-    // Focus the filter when there is one; otherwise the trigger keeps focus and drives the list.
-    if (visible.length > searchAfter) searchRef.current?.focus();
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    const at = flatOptions.findIndex((o) => o.value === value);
+    setActive(at >= 0 ? at : 0);
+  }, [open, flatOptions, value]);
+
+  /**
+   * Focus the filter once it actually exists.
+   *
+   * <p>`rect` is null on the first commit after opening, so the portal — and the input inside it
+   * — is not mounted yet. Keyed on `open` alone this was a no-op on the FIRST open of the
+   * control's life and worked on every one after, which is a horrible thing to debug.
+   */
+  useEffect(() => {
+    if (!open || !rect) return;
+    if (flatOptions.length > searchAfter) searchRef.current?.focus();
+  }, [open, rect, flatOptions.length, searchAfter]);
+
+  /** Keep the active row on screen — the list scrolls, and the highlight must not walk off it. */
+  useEffect(() => {
+    if (!open) return;
+    // getElementById, not a CSS selector: useId produces ids containing colons, which need
+    // escaping in a selector and need nothing here.
+    document.getElementById(optionId(active))?.scrollIntoView?.({ block: "nearest" });
+  }, [active, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -155,17 +219,27 @@ export default function Listbox({
   };
 
   const move = (delta: number) => {
-    if (!visible.length) return;
+    if (!flatOptions.length) return;
     setActive((i) => {
       let next = i;
       // Step over disabled entries rather than landing on something unselectable.
-      for (let step = 0; step < visible.length; step++) {
-        next = (next + delta + visible.length) % visible.length;
-        if (!visible[next]?.disabled) break;
+      for (let step = 0; step < flatOptions.length; step++) {
+        next = (next + delta + flatOptions.length) % flatOptions.length;
+        if (!flatOptions[next]?.disabled) break;
       }
       return next;
     });
   };
+
+  /** First/last SELECTABLE row — Home/End landing on a disabled option is a dead end. */
+  const edge = (from: "start" | "end") => {
+    if (!flatOptions.length) return;
+    const order = from === "start" ? flatOptions.map((_, i) => i) : flatOptions.map((_, i) => flatOptions.length - 1 - i);
+    const hit = order.find((i) => !flatOptions[i]?.disabled);
+    if (hit !== undefined) setActive(hit);
+  };
+
+  const hasFilter = flatOptions.length > searchAfter || query.length > 0;
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (!open) {
@@ -175,6 +249,9 @@ export default function Listbox({
       }
       return;
     }
+    // Whether the keystroke is being typed into the filter field. Home/End belong to the CARET
+    // there, not to the list, so they must not be hijacked.
+    const inFilter = e.target === searchRef.current;
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
@@ -185,40 +262,70 @@ export default function Listbox({
         move(-1);
         break;
       case "Home":
+        if (inFilter) break;
         e.preventDefault();
-        setActive(0);
+        edge("start");
         break;
       case "End":
+        if (inFilter) break;
         e.preventDefault();
-        setActive(visible.length - 1);
+        edge("end");
         break;
       case "Enter":
         e.preventDefault();
-        if (visible[active]) pick(visible[active]);
+        if (flatOptions[active]) pick(flatOptions[active]);
         break;
       case "Escape":
         e.preventDefault();
         close();
         break;
       case "Tab":
-        // Tab commits nothing and moves on, like a native select losing focus.
-        close(false);
+        // Like a native select losing focus: commit nothing and move on. Focus has to come back
+        // to the TRIGGER first — the filter lives in a portal at the end of <body>, so letting
+        // Tab proceed from there walks off the end of the document instead of to the next
+        // control. No preventDefault: the browser then does the moving, from the right place.
+        triggerRef.current?.focus();
+        setOpen(false);
+        setQuery("");
         break;
       default: {
         // Type-ahead, for when there is no filter box to type into.
         if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey) return;
-        if (visible.length > searchAfter) return;
+        if (hasFilter) return;
         const now = Date.now();
         typed.current.text = now - typed.current.at > 700 ? e.key : typed.current.text + e.key;
         typed.current.at = now;
-        const hit = visible.findIndex((o) => o.label.toLowerCase().startsWith(typed.current.text.toLowerCase()));
+        const hit = flatOptions.findIndex((o) => o.label.toLowerCase().startsWith(typed.current.text.toLowerCase()));
         if (hit >= 0) setActive(hit);
       }
     }
   };
 
-  const optionId = (i: number) => `${listId}-opt-${i}`;
-  let flat = -1; // running index across groups, so aria-activedescendant matches `visible`
+  function optionId(i: number) {
+    return `${listId}-opt-${i}`;
+  }
+  /** Ids are derived from POSITION, never from the group's text: a name with a space in it
+   *  ("Groq — may not work") is several IDREF tokens, so `aria-labelledby` silently resolved to
+   *  the wrong heading, or to none at all. */
+  const groupId = (i: number) => `${listId}-grp-${i}`;
+
+  const activeDescendant = open && flatOptions[active] ? optionId(active) : undefined;
+
+  /** Flip above the trigger when there is more room up there. */
+  const geometry = () => {
+    if (!rect) return null;
+    const below = window.innerHeight - rect.bottom - GUTTER;
+    const above = rect.top - GUTTER;
+    const flip = below < 180 && above > below;
+    const height = Math.max(160, Math.min(MAX_POPUP, flip ? above : below));
+    return {
+      height,
+      top: flip ? Math.max(GUTTER, rect.top - 6 - height) : rect.bottom + 6,
+    };
+  };
+  const geo = geometry();
+
+  let flat = -1; // running index across groups, so aria-activedescendant matches `flatOptions`
 
   return (
     <>
@@ -231,21 +338,27 @@ export default function Listbox({
         aria-controls={open ? listId : undefined}
         aria-haspopup="listbox"
         aria-label={ariaLabel}
-        aria-activedescendant={open && visible[active] ? optionId(active) : undefined}
+        aria-activedescendant={hasFilter ? undefined : activeDescendant}
         disabled={disabled}
         onClick={() => (open ? close(false) : openList())}
         onKeyDown={onKeyDown}
-        className={[
+        className={twMerge(
           "relative flex w-full items-center justify-between gap-2 rounded-lg border bg-white text-left font-medium text-gray-800 transition",
           "hover:border-gray-400 focus:border-brand-400 focus:outline-none focus:ring-3 focus:ring-brand-500/10",
           "disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400",
           "border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:hover:border-gray-600",
           BOX[size],
           className,
-        ].join(" ")}
+        )}
       >
         <span className="truncate">
-          {selected ? selected.label : <span className="text-gray-400">{placeholder}</span>}
+          {selected ? (
+            selected.label
+          ) : orphanLabel ? (
+            orphanLabel
+          ) : (
+            <span className="text-gray-400">{placeholder}</span>
+          )}
         </span>
         <ChevronDown
           aria-hidden
@@ -253,24 +366,31 @@ export default function Listbox({
         />
       </button>
 
-      {open && rect
+      {open && rect && geo
         ? createPortal(
             <div
               ref={popupRef}
               style={{
                 position: "fixed",
-                top: Math.min(rect.bottom + 6, window.innerHeight - 24),
+                top: geo.top,
                 left: rect.left,
                 width: Math.max(rect.width, 240),
-                maxHeight: Math.max(160, window.innerHeight - rect.bottom - 24),
+                maxHeight: geo.height,
               }}
-              className="z-[60] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+              className="z-[60] flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
             >
-              {visible.length > searchAfter || query ? (
-                <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+              {hasFilter ? (
+                <div className="flex shrink-0 items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-gray-800">
                   <Search aria-hidden className="size-4 shrink-0 text-gray-400" />
+                  {/* Stays a text field — a second role="combobox" here would mean two of them
+                      in one control. It carries `aria-activedescendant` because that has to sit
+                      on the element with FOCUS, or a screen reader announces nothing as you
+                      arrow through a list you are filtering. */}
                   <input
                     ref={searchRef}
+                    aria-controls={listId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeDescendant}
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
@@ -285,20 +405,20 @@ export default function Listbox({
               ) : null}
 
               <ul
+                ref={listRef}
                 id={listId}
                 role="listbox"
                 aria-label={ariaLabel}
-                className="max-h-[inherit] overflow-y-auto overscroll-contain py-1"
-                style={{ maxHeight: "min(320px, 60vh)" }}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1"
               >
                 {groups.length === 0 ? (
                   <li className="px-3 py-6 text-center text-sm text-gray-400">Nothing matches “{query}”.</li>
                 ) : (
-                  groups.map((group) => (
+                  groups.map((group, gi) => (
                     <li key={group.name ?? "__ungrouped"} role="presentation">
                       {group.name ? (
                         <p
-                          id={`${listId}-grp-${group.name}`}
+                          id={groupId(gi)}
                           className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400"
                         >
                           {group.name}
@@ -307,10 +427,7 @@ export default function Listbox({
                       {/* role="group" so the heading is announced, not merely drawn: a screen
                           reader user otherwise hears a flat list and loses which provider a
                           model belongs to, which is the whole reason it is grouped. */}
-                      <ul
-                        role={group.name ? "group" : "presentation"}
-                        aria-labelledby={group.name ? `${listId}-grp-${group.name}` : undefined}
-                      >
+                      <ul role={group.name ? "group" : "presentation"} aria-labelledby={group.name ? groupId(gi) : undefined}>
                         {group.items.map((option) => {
                           flat += 1;
                           const i = flat;
@@ -332,10 +449,7 @@ export default function Listbox({
                                 isSelected ? "font-medium text-brand-600 dark:text-brand-300" : "text-gray-700 dark:text-gray-200",
                               ].join(" ")}
                             >
-                              <Check
-                                aria-hidden
-                                className={`mt-0.5 size-3.5 shrink-0 ${isSelected ? "" : "invisible"}`}
-                              />
+                              <Check aria-hidden className={`mt-0.5 size-3.5 shrink-0 ${isSelected ? "" : "invisible"}`} />
                               <span className="min-w-0">
                                 <span className="block truncate">{option.label}</span>
                                 {option.hint ? (

@@ -104,7 +104,6 @@ function ReturnedRequestCard({
             id={`redo-level-${request.id}`}
             value={level}
             onChange={(e) => setLevel(e.target.value as AccessRequestLevel)}
-            className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
           >
             {GRANTABLE_LEVELS.map((l) => (
               <option key={l} value={l}>
@@ -361,7 +360,6 @@ export default function ManageMyAccessSection({
                   id="req-cap"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                 >
                   {requestable.map((s) => (
                     <option key={s.code} value={s.code}>
@@ -376,7 +374,6 @@ export default function ManageMyAccessSection({
                   id="req-level"
                   value={level}
                   onChange={(e) => setLevel(e.target.value as AccessRequestLevel)}
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                 >
                   {options.map((l) => (
                     <option key={l} value={l}>

@@ -517,7 +517,7 @@
    .lf-opt-json already use, so one form doesn't have three focus styles. */
 .lf-setting select,
 .lf-param-row select,
-.lf-logic-cond select,
+.lf-logic-cond > select:not(.lf-logic-conn),
 .lf-logic-then select {
   appearance: none;
   -webkit-appearance: none;
@@ -533,14 +533,14 @@
 
 .lf-setting select:hover,
 .lf-param-row select:hover,
-.lf-logic-cond select:hover,
+.lf-logic-cond > select:not(.lf-logic-conn):hover,
 .lf-logic-then select:hover {
   border-color: var(--lf-muted, #6b7280);
 }
 
 .lf-setting select:focus,
 .lf-param-row select:focus,
-.lf-logic-cond select:focus,
+.lf-logic-cond > select:not(.lf-logic-conn):focus,
 .lf-logic-then select:focus {
   outline: none;
   border-color: var(--lf-primary, #2563eb);
@@ -549,7 +549,7 @@
 
 .lf-setting select:disabled,
 .lf-param-row select:disabled,
-.lf-logic-cond select:disabled,
+.lf-logic-cond > select:not(.lf-logic-conn):disabled,
 .lf-logic-then select:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -616,8 +616,18 @@
   font-size: 0.8rem;
   border: 1px solid var(--lf-border, #d9d9d9);
   border-radius: var(--lf-radius, 6px);
-  background: var(--lf-bg, #fff);
+  /* background-COLOR, not the shorthand. `background` resets background-image, and this rule
+     sits after the select polish above — the shorthand silently wiped the chevron off every
+     logic-rule select while leaving it on every other select in the builder. */
+  background-color: var(--lf-bg, #fff);
   color: var(--lf-text, #1a1a1a);
+}
+/* …and the room for it, which the `padding` shorthand above resets in the same way.
+   Not .lf-logic-conn: that is the 66px AND/OR connector, where 24px of chevron gutter eats
+   the word itself. */
+.lf-logic-cond > select:not(.lf-logic-conn),
+.lf-logic-then select {
+  padding-right: 24px;
 }
 .lf-logic-cond > select:not(.lf-logic-conn),
 .lf-logic-cond > input { flex: 1 1 0; min-width: 88px; }

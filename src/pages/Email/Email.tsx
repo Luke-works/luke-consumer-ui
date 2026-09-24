@@ -541,7 +541,7 @@ function EmailBoxes({ tenant, senderDomain }: { tenant: string; senderDomain: st
               id="box-stream"
               value={streamType}
               onChange={(e) => setStreamType(e.target.value)}
-              className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 sm:w-56"
+              wrapperClassName="sm:w-56"
             >
               <option value="Transactional">Transactional</option>
               <option value="Broadcasts">Broadcasts</option>

@@ -403,7 +403,8 @@ export default function FormTestPanel({
                   aria-label="How many datasets to generate"
                   value={genCount}
                   onChange={(e) => setGenCount(Number(e.target.value))}
-                  className="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-300"
+                  size="sm"
+                  fullWidth={false}
                 >
                   {[1, 3, 5].map((n) => <option key={n} value={n}>{n} set{n === 1 ? "" : "s"}</option>)}
                 </Select>

@@ -222,7 +222,6 @@ function ResourceOwners({
             value={pick}
             disabled={busy || candidates.length === 0}
             onChange={(e) => setPick(e.target.value)}
-            className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
           >
             {candidates.length === 0 ? (
               <option value="">Everyone is already an owner</option>

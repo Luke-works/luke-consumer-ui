@@ -303,7 +303,7 @@
 .lf-builder .lf-setting select,
 .lf-builder .lf-settings-minion select,
 .lf-builder .lf-param-row select,
-.lf-builder .lf-logic-cond > select,
+.lf-builder .lf-logic-cond > select:not(.lf-logic-conn),
 .lf-builder .lf-logic-then select {
   appearance: none;
   -webkit-appearance: none;
@@ -318,7 +318,7 @@
 .lf-builder .lf-setting select:hover,
 .lf-builder .lf-settings-minion select:hover,
 .lf-builder .lf-param-row select:hover,
-.lf-builder .lf-logic-cond > select:hover,
+.lf-builder .lf-logic-cond > select:not(.lf-logic-conn):hover,
 .lf-builder .lf-logic-then select:hover {
   border-color: var(--color-gray-400, #98a2b3);
 }

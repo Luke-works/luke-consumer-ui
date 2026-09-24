@@ -1,4 +1,5 @@
 import { forwardRef, type SelectHTMLAttributes } from "react";
+import { twMerge } from "tailwind-merge";
 import { ChevronDown } from "lucide-react";
 
 // Omit the native `size`, which is a NUMBER of visible rows — intersecting it with our
@@ -8,6 +9,15 @@ export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> 
   size?: SelectSize;
   /** Red border + `aria-invalid`, for a field a form has rejected. */
   invalid?: boolean;
+  /**
+   * Fills its container — the common case, and what a select in a labelled field wants.
+   *
+   * <p>Pass `false` for a control that sits in a flex row and should size to its own content;
+   * a full-width wrapper there stretches it across the whole row.
+   */
+  fullWidth?: boolean;
+  /** Layout for the wrapper (width, margin). Appearance belongs on `className`. */
+  wrapperClassName?: string;
 };
 
 export type SelectSize = "sm" | "md";
@@ -25,7 +35,7 @@ const CHEVRON: Record<SelectSize, string> = {
 /**
  * The app's select.
  *
- * <p>Still a real `<Select>` underneath, deliberately. The browser's own popup is the most
+ * <p>Still a real `<select>` underneath, deliberately. The browser's own popup is the most
  * reliable list we can put in front of someone — correct on every mobile keyboard, every screen
  * reader, every zoom level — and re-implementing it buys appearance at the cost of things that
  * currently work for free. What is wrong with the native control is its CLOSED state, which is
@@ -36,20 +46,26 @@ const CHEVRON: Record<SelectSize, string> = {
  * `border-gray-200` beside `border-gray-300`, `bg-white` beside `bg-transparent`, two different
  * focus colours — which is most of why they looked unfinished next to the inputs beside them.
  *
+ * <p>`className` is merged with `twMerge`, not concatenated. Concatenation looks like it works
+ * and does not: two Tailwind classes for the same property have equal specificity, so the winner
+ * is whichever sits later in the generated STYLESHEET, not later in the attribute. A call site
+ * passing `h-8` would silently keep this component's `h-9` — which is exactly what happened
+ * while these call sites still carried their old hand-rolled styles.
+ *
  * <p>Where a list is long or grouped enough that the native popup genuinely fails it, use
  * `Listbox` instead. That one earns its complexity; this one should stay boring.
  */
 const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { size = "md", invalid = false, className = "", disabled, children, ...rest },
+  { size = "md", invalid = false, fullWidth = true, wrapperClassName, className, disabled, children, ...rest },
   ref,
 ) {
   return (
-    <div className="relative w-full">
+    <div className={twMerge("relative", fullWidth ? "w-full" : "inline-block", wrapperClassName)}>
       <select
         ref={ref}
         disabled={disabled}
         aria-invalid={invalid || undefined}
-        className={[
+        className={twMerge(
           "w-full appearance-none rounded-lg border bg-white font-medium text-gray-800 transition",
           "focus:border-brand-400 focus:outline-none focus:ring-3 focus:ring-brand-500/10",
           "disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400",
@@ -59,7 +75,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
             : "border-gray-300 hover:border-gray-400 dark:border-gray-700 dark:hover:border-gray-600",
           BOX[size],
           className,
-        ].join(" ")}
+        )}
         {...rest}
       >
         {children}
@@ -67,9 +83,11 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
       {/* Ours, not the OS one. pointer-events-none so the whole control still opens on click. */}
       <ChevronDown
         aria-hidden
-        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-gray-400 transition ${CHEVRON[size]} ${
-          disabled ? "opacity-40" : ""
-        }`}
+        className={twMerge(
+          "pointer-events-none absolute top-1/2 -translate-y-1/2 text-gray-400 transition",
+          CHEVRON[size],
+          disabled ? "opacity-40" : "",
+        )}
       />
     </div>
   );

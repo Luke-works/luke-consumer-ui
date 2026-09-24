@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CheckCircle2, ChevronRight, CircleAlert, Star } from "lucide-react";
 import Button from "../ui/button/Button";
 import Listbox, { type ListboxOption } from "../ui/select/Listbox";
@@ -47,9 +47,25 @@ export default function AiConnectionRow({
   // a click. Otherwise collapsed — a workspace with four providers is a list to scan, not four
   // stacked forms.
   const [open, setOpen] = useState(invalid);
+  // …and RE-open it if this provider fails later. `useState(invalid)` only reads its argument on
+  // the first render, so a connection that was healthy at mount and then failed a Check kept its
+  // own explanation collapsed — the one case this disclosure exists to reveal. Tracked against
+  // the previous value so it opens on the TRANSITION, leaving someone free to collapse a row
+  // that is still failing.
+  const wasInvalid = useRef(invalid);
+  useEffect(() => {
+    if (invalid && !wasInvalid.current) setOpen(true);
+    wasInvalid.current = invalid;
+  }, [invalid]);
 
+  const pinned = connection.model;
   const modelOptions: ListboxOption[] = [
     { value: "", label: "Provider default", hint: connection.effectiveModel ?? undefined },
+    // A stored choice stays SELECTABLE even when the provider's list has not arrived (it is
+    // fetched on open) or came back without it — the same fallback the native version carried.
+    ...(pinned && !(models ?? []).some((m) => m.id === pinned)
+      ? [{ value: pinned, label: pinned, group: "Current choice" }]
+      : []),
     ...(models ?? []).map((m) => ({
       value: m.id,
       label: m.id,

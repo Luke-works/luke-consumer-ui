@@ -169,7 +169,7 @@ export default function ApproveRequestsSection({ tenant }: { tenant: string }) {
                         onChange={(e) =>
                           setLevels((p) => ({ ...p, [r.id]: e.target.value as AccessRequestLevel }))
                         }
-                        className="h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                        fullWidth={false}
                       >
                         {GRANTABLE_LEVELS.map((l) => (
                           <option key={l} value={l}>

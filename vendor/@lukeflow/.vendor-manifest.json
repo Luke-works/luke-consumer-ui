@@ -1,5 +1,5 @@
 {
-  "vendoredAt": "2026-09-24T21:03:19.160Z",
+  "vendoredAt": "2026-09-24T22:05:51.358Z",
   "packages": {
     "form-core": {
       "version": "0.1.0-alpha.0",
@@ -35,7 +35,7 @@
         "dist/index.d.cts": "5d613ffacfb8531535e96f49ec0c5bb5005b1e892567642f35b4be3974131460",
         "dist/index.d.ts": "5d613ffacfb8531535e96f49ec0c5bb5005b1e892567642f35b4be3974131460",
         "dist/index.js": "012d85f75b8e828dab0c836632b555624a17c170600a81459907dc45ea52da23",
-        "styles.css": "42d1fb317a6dd8b910b8aa2ee997e82deb878b5dfb34406c97876c50471c8777"
+        "styles.css": "e6090acbf3f44636b371936f45de95896f3a258eb9c6e059d610efe57440299f"
       }
     },
     "form-embed": {

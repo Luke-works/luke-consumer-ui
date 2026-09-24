@@ -364,7 +364,6 @@ export default function FormSettingsModal({
                 value={font || "default"}
                 onChange={(e) => onFontChange(e.target.value)}
                 disabled={!editable}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
               >
                 {FORM_FONTS.map((f) => (
                   // Each option is set in its own face so the list previews the choices. (Native option
