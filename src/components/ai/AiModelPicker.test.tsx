@@ -20,6 +20,7 @@ const pref = (over: Partial<api.AiPreference> = {}): api.AiPreference => ({
   enabled: true,
   connected: true,
   provider: "groq",
+  providers: [{ id: "groq", label: "Groq" }],
   workspaceModel: "openai/gpt-oss-120b",
   model: null,
   effectiveModel: "openai/gpt-oss-120b",
@@ -37,7 +38,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     m.getAiPreference.mockResolvedValue(pref());
-    m.listAiModels.mockResolvedValue({ models: [{ id: "llama-3.3-70b-versatile", chat: true }, { id: "openai/gpt-oss-120b", chat: true }] });
+    m.listAiModels.mockResolvedValue({ models: [{ provider: "groq", id: "llama-3.3-70b-versatile", chat: true }, { provider: "groq", id: "openai/gpt-oss-120b", chat: true }] });
   });
 
   it("stays out of the way when this deployment has no AI at all", async () => {
@@ -117,10 +118,10 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     // every turn fails with a provider error nobody can act on.
     m.listAiModels.mockResolvedValue({
       models: [
-        { id: "openai/gpt-oss-120b", chat: true },
-        { id: "qwen/qwen3.8-27b", chat: true },
-        { id: "whisper-large-v3", chat: false },
-        { id: "meta-llama/llama-prompt-guard-2-86m", chat: false },
+        { provider: "groq", id: "openai/gpt-oss-120b", chat: true },
+        { provider: "groq", id: "qwen/qwen3.8-27b", chat: true },
+        { provider: "groq", id: "whisper-large-v3", chat: false },
+        { provider: "groq", id: "meta-llama/llama-prompt-guard-2-86m", chat: false },
       ],
     });
     renderPicker();
@@ -130,8 +131,8 @@ describe("AiModelPicker — your model, the workspace's key", () => {
 
     const groups = within(select).getAllByRole("group");
     expect(groups.map((g) => g.getAttribute("label"))).toEqual([
-      "Chat models",
-      "Other — may not work for building",
+      "Groq",
+      "Groq — may not work for building",
     ]);
     expect(within(groups[0]).getAllByRole("option").map((o) => o.textContent)).toEqual([
       "openai/gpt-oss-120b",
@@ -146,7 +147,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
   });
 
   it("offers no empty group when every model can build", async () => {
-    m.listAiModels.mockResolvedValue({ models: [{ id: "openai/gpt-oss-120b", chat: true }] });
+    m.listAiModels.mockResolvedValue({ models: [{ provider: "groq", id: "openai/gpt-oss-120b", chat: true }] });
     renderPicker();
     const select = await screen.findByRole("combobox");
     select.focus();
@@ -162,7 +163,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     await screen.findByRole("option", { name: "llama-3.3-70b-versatile" });
 
     await userEvent.selectOptions(select, "llama-3.3-70b-versatile");
-    await waitFor(() => expect(m.chooseMyAiModel).toHaveBeenCalledWith("t1", "llama-3.3-70b-versatile"));
+    await waitFor(() => expect(m.chooseMyAiModel).toHaveBeenCalledWith("t1", "groq", "llama-3.3-70b-versatile"));
   });
 
   it("sends null when going back to the workspace default", async () => {
@@ -173,7 +174,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
 
     await userEvent.selectOptions(select, "");
     // null, not "": "follow the workspace" must keep tracking it, not freeze today's value.
-    await waitFor(() => expect(m.chooseMyAiModel).toHaveBeenCalledWith("t1", null));
+    await waitFor(() => expect(m.chooseMyAiModel).toHaveBeenCalledWith("t1", null, null));
   });
 
   it("keeps a saved choice selectable before the live list arrives", async () => {
@@ -185,7 +186,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     renderPicker();
     const select = await screen.findByRole("combobox");
     expect(select).toHaveValue("some-pinned-model");
-    resolveModels({ models: [{ id: "some-pinned-model", chat: true }] });
+    resolveModels({ models: [{ provider: "groq", id: "some-pinned-model", chat: true }] });
   });
 
   it("surfaces a refusal instead of appearing to have saved", async () => {

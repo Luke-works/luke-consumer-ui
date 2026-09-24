@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/authApi";
-import { ModelOptions } from "./modelOptions";
+import AiConnectionRow from "./AiConnectionRow";
 import {
   chooseAiModel,
   connectAiProvider,
   disconnectAiProvider,
   getAiProvider,
   listAiModels,
+  setDefaultAiProvider,
   verifyAiProvider,
-  type AiProviderId,
   type AiModel,
+  type AiProviderId,
   type AiProviderOption,
   type AiProviderView,
 } from "../../lib/aiProviderApi";
@@ -22,26 +23,21 @@ function messageOf(e: unknown, fallback: string): string {
   return e instanceof Error && e.message ? e.message : fallback;
 }
 
-function formatDate(value?: string | null): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
-}
-
 /**
- * AI — where a workspace connects the provider account its assistant runs on.
+ * AI — the provider accounts this workspace's assistant runs on.
  *
- * Lives as a section of Account settings rather than a page of its own: it is a thing you set
- * up once and rarely revisit, and a permanent slot in the primary navigation was already pushing
- * the last item below a fold at laptop height.
+ * Lives as a section of Account settings rather than a page of its own: it is set up once and
+ * rarely revisited, and a permanent slot in the primary navigation was pushing the last nav item
+ * below a fold at laptop height.
  *
- * Bring-your-own-key: the owner pastes their own Groq / OpenAI / Anthropic / Gemini key and
- * picks a model. Every AI turn in the app — building a form, drafting an email, sketching a
- * workflow — then runs on that account. Lukeflow enables the assistant and pays nothing for
- * it, which is also why there is no plan gate here.
+ * **A workspace may connect several.** It began as one, which meant connecting a second silently
+ * overwrote the first one's key — someone who had verified Groq and then added Gemini lost the
+ * Groq key with no warning and no way back. Each provider now keeps its own key, so people can
+ * run a quick draft on the cheap fast one and something hard on the capable one.
  *
- * The key is verified with the provider before it is stored, encrypted at rest, and never
- * comes back to this page: the most it ever shows is the last four characters.
+ * Bring-your-own-key throughout: the workspace pays its own provider, Lukeflow adds nothing to
+ * the bill, and no key ever comes back to this page — the most it shows is the last four
+ * characters.
  */
 export default function AiProviderSection() {
   const { session } = useAuth();
@@ -49,26 +45,32 @@ export default function AiProviderSection() {
 
   const [view, setView] = useState<AiProviderView | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<null | "connect" | "verify" | "disconnect" | "model">(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Connect form
   const [provider, setProvider] = useState<AiProviderId>("groq");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("");
+  const [adding, setAdding] = useState(false);
+  // One fetch serves every row: the endpoint returns every connected provider's models, so a
+  // row filters rather than asking again.
   const [models, setModels] = useState<AiModel[] | null>(null);
+
+  const loadModels = useCallback(async () => {
+    if (!tenant || models) return;
+    try {
+      setModels((await listAiModels(tenant)).models);
+    } catch {
+      setModels([]); // unreadable → keep the current choice, offer nothing new
+    }
+  }, [tenant, models]);
 
   useEffect(() => {
     if (!tenant) return;
     let live = true;
     setLoading(true);
     getAiProvider(tenant)
-      .then((v) => {
-        if (!live) return;
-        setView(v);
-        if (v.provider) setProvider(v.provider);
-      })
+      .then((v) => live && setView(v))
       .catch((e) => live && setError(messageOf(e, "Couldn't load your AI settings.")))
       .finally(() => live && setLoading(false));
     return () => {
@@ -76,254 +78,202 @@ export default function AiProviderSection() {
     };
   }, [tenant]);
 
+  // Merge, never replace: a response missing `enabled`/`canManage` would otherwise make this card
+  // report the feature as unavailable the moment something succeeded.
   const apply = useCallback((v: AiProviderView, message?: string) => {
-    // Merge, never replace. A response missing `enabled`/`canManage` would otherwise make this
-    // card report the feature as unavailable the moment a key was successfully connected. The
-    // server now always sends both; merging keeps the component independent of that.
     setView((prev) => ({ ...(prev ?? {}), ...v }));
-    setApiKey("");
-    setModels(v.models ?? null);
     setError(null);
     if (message) setNotice(message);
   }, []);
 
-  const run = async (action: "connect" | "verify" | "disconnect") => {
-    if (!tenant) return;
-    setBusy(action);
+  const act = async (fn: () => Promise<AiProviderView>, message?: string) => {
+    setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      if (action === "connect") {
-        apply(
-          await connectAiProvider(tenant, { provider, apiKey, model: model.trim() || undefined }),
-          "Connected. The assistant now runs on your own account.",
-        );
-        setModel("");
-      } else if (action === "verify") {
-        const v = await verifyAiProvider(tenant);
-        apply(v, v.status === "CONNECTED" ? "Your key still works." : undefined);
-      } else {
-        apply(await disconnectAiProvider(tenant), "Disconnected. The assistant is off until you connect a provider.");
-        setModels(null);
-      }
+      apply(await fn(), message);
     } catch (e) {
       setError(messageOf(e, "Something went wrong. Please try again."));
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
 
-  /** Read the models this key may actually use — live from the provider, not a hardcoded list. */
-  const loadModels = async () => {
-    if (!tenant || models) return;
-    try {
-      setModels((await listAiModels(tenant)).models);
-    } catch {
-      setModels([]); // an unreadable list just means no picker; the default still works
-    }
-  };
-
-  const saveModel = async (next: string) => {
+  const connect = async () => {
     if (!tenant) return;
-    setBusy("model");
-    setError(null);
-    setNotice(null);
-    try {
-      apply(await chooseAiModel(tenant, next || null), "Model updated.");
-    } catch (e) {
-      setError(messageOf(e, "Couldn't change the model."));
-    } finally {
-      setBusy(null);
-    }
+    await act(
+      () => connectAiProvider(tenant, { provider, apiKey }),
+      "Connected. Your workspace can use this provider now.",
+    );
+    setApiKey("");
+    setAdding(false);
   };
 
   const options: AiProviderOption[] = view?.providers ?? [];
-  /** The provider the connect FORM is showing — used for its placeholder and console link. */
   const chosen = options.find((p) => p.id === provider);
-  /** The provider actually CONNECTED — used for anything describing current behaviour. */
-  const connectedDefault = options.find((p) => p.id === view?.provider)?.defaultModel;
-  const connected = view?.status === "CONNECTED";
-  const invalid = view?.status === "INVALID";
+  const connections = view?.connections ?? [];
   const canManage = view?.canManage === true;
+  // Connecting the same provider again replaces that one key; a different one joins beside it.
+  const replacing = options.find((p) => p.id === provider)?.connected === true;
 
   return (
     // id="ai" so the assistant panels can link straight here with /account/settings#ai
     <section id="ai" className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
       <h2 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">AI assistant</h2>
       <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Bring your own AI provider. The assistant that builds your forms, emails and workflows runs on your
-        workspace's own account — Lukeflow never sees your usage and adds nothing to your bill.
+        Bring your own AI providers. The assistant that builds your forms, emails and workflows runs on your
+        workspace's own accounts — Lukeflow never sees your usage and adds nothing to your bill. Connect more
+        than one and people can pick whichever suits the job.
       </p>
 
-        {error ? (
-          <p role="alert" className="mb-4 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p role="status" className="mb-4 rounded-lg bg-success-50 px-4 py-3 text-sm text-success-600 dark:bg-success-500/15 dark:text-success-500">
-            {notice}
-          </p>
-        ) : null}
+      {error ? (
+        <p role="alert" className="mb-4 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p role="status" className="mb-4 rounded-lg bg-success-50 px-4 py-3 text-sm text-success-600 dark:bg-success-500/15 dark:text-success-500">
+          {notice}
+        </p>
+      ) : null}
 
-        <div>
-          {loading && !view ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
-          ) : !view ? null : !view.enabled ? (
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              AI features aren't available on this Lukeflow environment yet.
-            </p>
+      {loading && !view ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+      ) : !view ? null : !view.enabled ? (
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          AI features aren't available on this Lukeflow environment yet.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {connections.length > 0 ? (
+            <ul className="space-y-3">
+              {connections.map((c) => (
+                <AiConnectionRow
+                  key={c.provider}
+                  connection={c}
+                  canManage={canManage}
+                  busy={busy}
+                  models={models === null ? null : models.filter((m) => m.provider === c.provider)}
+                  onLoadModels={() => void loadModels()}
+                  onChooseModel={(model) =>
+                    tenant && void act(() => chooseAiModel(tenant, c.provider, model || null), "Model updated.")
+                  }
+                  onVerify={() => tenant && void act(() => verifyAiProvider(tenant, c.provider))}
+                  onMakeDefault={() =>
+                    tenant && void act(() => setDefaultAiProvider(tenant, c.provider), "Default changed.")
+                  }
+                  onRemove={() =>
+                    tenant &&
+                    void act(
+                      () => disconnectAiProvider(tenant, c.provider),
+                      "Removed. That key is gone; the others are untouched.",
+                    )
+                  }
+                />
+              ))}
+            </ul>
           ) : (
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/10">
-                    <Sparkles className="size-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 dark:text-white/90">
-                      {connected || invalid ? view.providerLabel || view.provider : "No provider connected"}
-                    </p>
-                    <p className="mt-0.5 break-all text-sm text-gray-500 dark:text-gray-400">
-                      {connected || invalid
-                        ? `Key ending ${view.keyLast4 ?? "••••"}${view.effectiveModel ? ` · ${view.effectiveModel}` : ""}`
-                        : "Connect a provider to turn the assistant on."}
-                    </p>
-                  </div>
-                </div>
-                {canManage && (connected || invalid) ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void run("verify")} disabled={busy !== null}>
-                      {busy === "verify" ? "Checking…" : "Check again"}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => void run("disconnect")} disabled={busy !== null}>
-                      {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              No AI provider connected yet — the assistant is off until one is.
+            </p>
+          )}
 
-              {connected ? (
-                <p className="rounded-lg bg-success-50 px-4 py-3 text-sm text-success-600 dark:bg-success-500/15 dark:text-success-500">
-                  The assistant is ready.
-                  {formatDate(view.verifiedAt) ? ` Last checked ${formatDate(view.verifiedAt)}.` : ""}
-                </p>
-              ) : null}
-              {invalid ? (
-                <p className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
-                  {view.lastError || "Your provider rejected this key."} Paste a new key below to turn the assistant
-                  back on.
-                </p>
-              ) : null}
-
-              {/* Model picker — only meaningful once a key is stored. */}
-              {connected && canManage ? (
+          {canManage ? (
+            adding || connections.length === 0 ? (
+              <form
+                className="space-y-4 border-t border-gray-200 pt-4 dark:border-gray-800"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void connect();
+                }}
+              >
                 <div>
-                  <label htmlFor="ai-model" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Model
+                  <label htmlFor="ai-provider" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Provider
                   </label>
                   <select
-                    id="ai-model"
+                    id="ai-provider"
                     className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-white/90"
-                    value={view.model ?? ""}
-                    disabled={busy !== null}
-                    onFocus={() => void loadModels()}
-                    onChange={(e) => void saveModel(e.target.value)}
+                    value={provider}
+                    disabled={busy}
+                    onChange={(e) => setProvider(e.target.value as AiProviderId)}
                   >
-                    <option value="">
-                      {/* The CONNECTED provider's default — `chosen` follows the connect form's
-                          dropdown, which is a different provider until someone submits it. */}
-                      Provider default{connectedDefault ? ` (${connectedDefault})` : ""}
-                    </option>
-                    <ModelOptions models={models ?? []} selected={view.model} />
+                    {options.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                        {p.connected ? " — already connected" : ""}
+                      </option>
+                    ))}
                   </select>
+                </div>
+
+                <div>
+                  <label htmlFor="ai-key" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    API key
+                  </label>
+                  <input
+                    id="ai-key"
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder={chosen?.keyPrefix ? `${chosen.keyPrefix}…` : "Paste your key"}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-white/90"
+                    value={apiKey}
+                    disabled={busy}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
                   <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    Read from your own account, so this is what your key can actually run.
+                    Stored encrypted and never shown again. We check it with {chosen?.label ?? "your provider"} before
+                    saving.
+                    {replacing ? " This replaces the key already stored for this provider." : ""}
+                    {chosen?.consoleUrl ? (
+                      <>
+                        {" "}
+                        <a
+                          href={chosen.consoleUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-0.5 font-medium text-brand-600 underline dark:text-brand-400"
+                        >
+                          Create one<ExternalLink className="size-3" />
+                        </a>
+                      </>
+                    ) : null}
                   </p>
                 </div>
-              ) : null}
 
-              {/* Connect / rotate. Shown whenever an owner could change the key. */}
-              {canManage ? (
-                <form
-                  className="space-y-4 border-t border-gray-200 pt-5 dark:border-gray-800"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void run("connect");
-                  }}
-                >
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {connected || invalid ? "Use a different key" : "Connect a provider"}
-                  </p>
-
-                  <div>
-                    <label htmlFor="ai-provider" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Provider
-                    </label>
-                    <select
-                      id="ai-provider"
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-white/90"
-                      value={provider}
-                      disabled={busy !== null}
-                      onChange={(e) => {
-                        setProvider(e.target.value as AiProviderId);
-                        setModels(null);
-                      }}
-                    >
-                      {options.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="ai-key" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      API key
-                    </label>
-                    <input
-                      id="ai-key"
-                      type="password"
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder={chosen?.keyPrefix ? `${chosen.keyPrefix}…` : "Paste your key"}
-                      className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-white/90"
-                      value={apiKey}
-                      disabled={busy !== null}
-                      onChange={(e) => setApiKey(e.target.value)}
-                    />
-                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                      Stored encrypted and never shown again. We check it with {chosen?.label ?? "your provider"}{" "}
-                      before saving.
-                      {chosen?.consoleUrl ? (
-                        <>
-                          {" "}
-                          <a
-                            href={chosen.consoleUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-0.5 font-medium text-brand-600 underline dark:text-brand-400"
-                          >
-                            Create one<ExternalLink className="size-3" />
-                          </a>
-                        </>
-                      ) : null}
-                    </p>
-                  </div>
-
-                  <Button size="sm" disabled={busy !== null || apiKey.trim().length === 0}>
-                    {busy === "connect" ? "Checking your key…" : connected || invalid ? "Replace key" : "Connect"}
+                <div className="flex gap-2">
+                  <Button size="sm" disabled={busy || apiKey.trim().length === 0}>
+                    {busy ? "Checking your key…" : replacing ? "Replace key" : "Connect"}
                   </Button>
-                </form>
-              ) : (
-                <p className="border-t border-gray-200 pt-5 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                  Only the workspace owner can change the AI provider.
-                </p>
-              )}
-            </div>
+                  {/* A plain button, not our Button: our Button takes no `type`, so inside a
+                      <form> it defaults to submit and Cancel would submit the form it cancels. */}
+                  {connections.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setAdding(false)}
+                      disabled={busy}
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                </div>
+              </form>
+            ) : (
+              <div className="border-t border-gray-200 pt-4 dark:border-gray-800">
+                <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={busy}>
+                  Add another provider
+                </Button>
+              </div>
+            )
+          ) : (
+            <p className="border-t border-gray-200 pt-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+              Only the workspace owner can change AI providers.
+            </p>
           )}
         </div>
+      )}
     </section>
   );
 }

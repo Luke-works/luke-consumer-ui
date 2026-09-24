@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StrictMode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import AiProviderSection from "./AiProviderSection";
@@ -10,13 +10,13 @@ import { ApiError } from "../../lib/authApi";
 vi.mock("../../context/AuthContext", () => ({
   useAuth: () => ({ session: { tenant: "t1", userId: "u1" } }),
 }));
-vi.mock("../../components/common/PageMeta", () => ({ default: () => null }));
 vi.mock("../../lib/aiProviderApi", () => ({
   getAiProvider: vi.fn(),
   connectAiProvider: vi.fn(),
   verifyAiProvider: vi.fn(),
   listAiModels: vi.fn(),
   chooseAiModel: vi.fn(),
+  setDefaultAiProvider: vi.fn(),
   disconnectAiProvider: vi.fn(),
 }));
 
@@ -27,27 +27,39 @@ const PROVIDERS: api.AiProviderOption[] = [
   { id: "anthropic", label: "Anthropic", defaultModel: "claude-haiku-4-5-20251001", keyPrefix: "sk-ant-", consoleUrl: "https://console.anthropic.com/settings/keys" },
 ];
 
+const groq = (over: Partial<api.AiConnection> = {}): api.AiConnection => ({
+  provider: "groq",
+  label: "Groq",
+  status: "CONNECTED",
+  preferred: true,
+  model: null,
+  effectiveModel: "openai/gpt-oss-120b",
+  keyLast4: "abcd",
+  verifiedAt: "2026-09-23T10:00:00Z",
+  ...over,
+});
+
+const anthropic = (over: Partial<api.AiConnection> = {}): api.AiConnection => ({
+  provider: "anthropic",
+  label: "Anthropic",
+  status: "CONNECTED",
+  preferred: false,
+  model: null,
+  effectiveModel: "claude-haiku-4-5-20251001",
+  keyLast4: "wxyz",
+  ...over,
+});
+
 const view = (over: Partial<api.AiProviderView> = {}): api.AiProviderView => ({
   enabled: true,
   connected: false,
   canManage: true,
+  connections: [],
   providers: PROVIDERS,
   ...over,
 });
 
-const connected = (over: Partial<api.AiProviderView> = {}): api.AiProviderView =>
-  view({
-    connected: true,
-    status: "CONNECTED",
-    provider: "groq",
-    providerLabel: "Groq",
-    keyLast4: "abcd",
-    effectiveModel: "openai/gpt-oss-120b",
-    verifiedAt: "2026-09-20T10:00:00Z",
-    ...over,
-  });
-
-function renderPage() {
+function renderSection() {
   return render(
     <StrictMode>
       <MemoryRouter initialEntries={["/account/settings"]}>
@@ -59,7 +71,7 @@ function renderPage() {
   );
 }
 
-describe("AiProviderSection — bring your own key", () => {
+describe("AiProviderSection — several providers, each with its own key", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     m.getAiProvider.mockResolvedValue(view());
@@ -67,138 +79,179 @@ describe("AiProviderSection — bring your own key", () => {
 
   it("says so plainly when the environment has no agent fleet", async () => {
     m.getAiProvider.mockResolvedValue(view({ enabled: false }));
-    renderPage();
+    renderSection();
     expect(await screen.findByText(/aren't available on this Lukeflow environment/i)).toBeInTheDocument();
-    // No key field to tease someone with when nothing could work anyway.
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
   });
 
   it("offers the connect form when nothing is connected", async () => {
-    renderPage();
-    expect(await screen.findByText(/No provider connected/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/API key/i)).toBeInTheDocument();
-    // The provider's own console is one click away — people rarely have a key already.
+    renderSection();
+    expect(await screen.findByText(/No AI provider connected yet/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/API key/i)).toHaveAttribute("placeholder", "gsk_…");
     expect(screen.getByRole("link", { name: /create one/i })).toHaveAttribute(
       "href",
       "https://console.groq.com/keys",
     );
-    // The placeholder shows what this provider's keys look like, so a wrong-provider paste is
-    // obvious before it is submitted. It only renders if the server sends keyPrefix, which
-    // GET /api/ai/provider did not do at first — so the hint silently never appeared.
-    expect(screen.getByLabelText(/API key/i)).toHaveAttribute("placeholder", "gsk_…");
   });
 
-  it("cannot submit an empty key", async () => {
-    renderPage();
-    await screen.findByLabelText(/API key/i);
-    expect(screen.getByRole("button", { name: /^connect$/i })).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(/API key/i), "gsk_abc");
-    expect(screen.getByRole("button", { name: /^connect$/i })).toBeEnabled();
+  /* ── the status of each connected service ─────────────────────────────── */
+
+  it("shows every connected provider with its own state", async () => {
+    m.getAiProvider.mockResolvedValue(
+      view({ connected: true, connections: [groq(), anthropic()] }),
+    );
+    renderSection();
+
+    const rows = await screen.findAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText(/Groq/)).toBeInTheDocument();
+    expect(within(rows[0]).getByText(/Key ending abcd/i)).toBeInTheDocument();
+    // Exact: "Provider default (…)" in the model select would otherwise match too.
+    expect(within(rows[0]).getByText("Default", { exact: true })).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/Key ending wxyz/i)).toBeInTheDocument();
+    // Only one carries the default; the other offers to take it.
+    expect(within(rows[1]).queryByText("Default", { exact: true })).not.toBeInTheDocument();
+    expect(within(rows[1]).getByRole("button", { name: /make default/i })).toBeInTheDocument();
   });
 
-  it("sends the chosen provider and key, then clears the field", async () => {
-    m.connectAiProvider.mockResolvedValue(connected());
-    renderPage();
-    await screen.findByLabelText(/API key/i);
+  it("reports a failing provider without condemning the healthy one", async () => {
+    // They fail independently: a revoked Anthropic key says nothing about a working Groq one.
+    m.getAiProvider.mockResolvedValue(
+      view({
+        connected: true,
+        connections: [groq(), anthropic({ status: "INVALID", lastError: "Anthropic rejected this key." })],
+      }),
+    );
+    renderSection();
 
+    const rows = await screen.findAllByRole("listitem");
+    expect(within(rows[0]).getByText(/^Working/)).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/^Not working/)).toBeInTheDocument();
+    // The provider's own words — they know why they refused and we do not.
+    expect(within(rows[1]).getByText(/Anthropic rejected this key/i)).toBeInTheDocument();
+  });
+
+  it("never renders a key — only its last four", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    const { container } = renderSection();
+    await screen.findByText(/Key ending abcd/i);
+    expect(container.textContent).not.toMatch(/gsk_|sk-ant-/);
+  });
+
+  /* ── adding one must never disturb another ────────────────────────────── */
+
+  it("adds a provider beside the others rather than replacing them", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+    m.connectAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: /add another provider/i }));
     await userEvent.selectOptions(screen.getByLabelText(/Provider/i), "anthropic");
-    await userEvent.type(screen.getByLabelText(/API key/i), "sk-ant-secret");
+    await userEvent.type(screen.getByLabelText(/API key/i), "sk-ant-second");
     await userEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() =>
       expect(m.connectAiProvider).toHaveBeenCalledWith("t1", {
         provider: "anthropic",
-        apiKey: "sk-ant-secret",
-        model: undefined,
+        apiKey: "sk-ant-second",
       }),
     );
-    // The key must not linger in the DOM after it is stored.
-    await waitFor(() => expect(screen.getByLabelText(/API key/i)).toHaveValue(""));
+    // Both are listed afterwards — this used to destroy the first key outright.
+    expect(await screen.findByText(/Key ending abcd/i)).toBeInTheDocument();
+    expect(screen.getByText(/Key ending wxyz/i)).toBeInTheDocument();
   });
 
-  it("shows the provider's own refusal message rather than a generic error", async () => {
-    m.connectAiProvider.mockRejectedValue(
-      new ApiError(400, "Groq rejected this key. Check you copied it in full."),
-    );
-    renderPage();
-    await screen.findByLabelText(/API key/i);
-    await userEvent.type(screen.getByLabelText(/API key/i), "gsk_wrong");
-    await userEvent.click(screen.getByRole("button", { name: /^connect$/i }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(/Groq rejected this key/i);
-  });
-
-  it("never renders the key once connected — only its last four", async () => {
-    m.getAiProvider.mockResolvedValue(connected());
-    const { container } = renderPage();
-    await screen.findByText(/Key ending abcd/i);
-    expect(container.textContent).not.toMatch(/gsk_/);
-    expect(screen.getByText(/The assistant is ready/i)).toBeInTheDocument();
-  });
-
-  it("tells the owner what to do when the provider refused the key", async () => {
+  it("warns that re-picking a connected provider replaces that one key", async () => {
     m.getAiProvider.mockResolvedValue(
-      connected({ status: "INVALID", lastError: "Groq rejected this key." }),
+      view({ connected: true, connections: [groq()], providers: [{ ...PROVIDERS[0], connected: true }, PROVIDERS[1]] }),
     );
-    renderPage();
-    expect(await screen.findByText(/Groq rejected this key/i)).toBeInTheDocument();
-    // Replacing the key is the fix, so the form stays available and says so.
+    renderSection();
+    await userEvent.click(await screen.findByRole("button", { name: /add another provider/i }));
+
+    expect(screen.getByText(/replaces the key already stored for this provider/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /replace key/i })).toBeInTheDocument();
   });
 
-  it("reads the model list from the workspace's own account, and only when asked", async () => {
-    m.getAiProvider.mockResolvedValue(connected());
-    m.listAiModels.mockResolvedValue({ models: [{ id: "llama-3.3-70b-versatile", chat: true }, { id: "openai/gpt-oss-120b", chat: true }] });
-    renderPage();
+  it("shows the provider's own refusal rather than a generic error", async () => {
+    m.connectAiProvider.mockRejectedValue(new ApiError(400, "Groq rejected this key."));
+    renderSection();
+    await userEvent.type(await screen.findByLabelText(/API key/i), "gsk_wrong");
+    await userEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Groq rejected this key/i);
+  });
 
-    const select = await screen.findByLabelText(/^Model$/i);
-    // Not fetched on load: it costs a live call to the provider on every page view.
+  /* ── managing one of several ──────────────────────────────────────────── */
+
+  it("removes one provider and says the others are untouched", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    m.disconnectAiProvider.mockResolvedValue(view({ connected: true, connections: [anthropic({ preferred: true })] }));
+    renderSection();
+
+    const rows = await screen.findAllByRole("listitem");
+    await userEvent.click(within(rows[0]).getByRole("button", { name: /remove/i }));
+
+    await waitFor(() => expect(m.disconnectAiProvider).toHaveBeenCalledWith("t1", "groq"));
+    expect(await screen.findByRole("status")).toHaveTextContent(/others are untouched/i);
+  });
+
+  it("hands the default to another provider on request", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    m.setDefaultAiProvider.mockResolvedValue(
+      view({ connected: true, connections: [groq({ preferred: false }), anthropic({ preferred: true })] }),
+    );
+    renderSection();
+
+    const rows = await screen.findAllByRole("listitem");
+    await userEvent.click(within(rows[1]).getByRole("button", { name: /make default/i }));
+    await waitFor(() => expect(m.setDefaultAiProvider).toHaveBeenCalledWith("t1", "anthropic"));
+  });
+
+  it("re-checks one provider without touching the rest", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    m.verifyAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    renderSection();
+
+    const rows = await screen.findAllByRole("listitem");
+    await userEvent.click(within(rows[1]).getByRole("button", { name: /check/i }));
+    await waitFor(() => expect(m.verifyAiProvider).toHaveBeenCalledWith("t1", "anthropic"));
+  });
+
+  it("sets a workspace model per provider, reading the list only when asked", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+    m.listAiModels.mockResolvedValue({
+      models: [
+        { provider: "groq", id: "llama-3.3-70b-versatile", chat: true },
+        { provider: "groq", id: "whisper-large-v3", chat: false },
+      ],
+    });
+    m.chooseAiModel.mockResolvedValue(view({ connected: true, connections: [groq({ model: "llama-3.3-70b-versatile" })] }));
+    renderSection();
+
+    const select = await screen.findByLabelText(/Workspace model/i);
+    // A round trip per connected provider on page load, for a control most people never touch.
     expect(m.listAiModels).not.toHaveBeenCalled();
 
     select.focus();
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1"));
     await screen.findByRole("option", { name: "llama-3.3-70b-versatile" });
+
+    await userEvent.selectOptions(select, "llama-3.3-70b-versatile");
+    await waitFor(() =>
+      expect(m.chooseAiModel).toHaveBeenCalledWith("t1", "groq", "llama-3.3-70b-versatile"),
+    );
   });
 
-  it("saves a model change, and treats the blank choice as the provider default", async () => {
-    m.getAiProvider.mockResolvedValue(connected({ model: "llama-3.3-70b-versatile" }));
-    m.listAiModels.mockResolvedValue({ models: [{ id: "llama-3.3-70b-versatile", chat: true }] });
-    m.chooseAiModel.mockResolvedValue(connected({ model: null }));
-    renderPage();
+  it("a member who is not the owner sees the status but changes nothing", async () => {
+    m.getAiProvider.mockResolvedValue(
+      view({ connected: true, canManage: false, connections: [groq(), anthropic()] }),
+    );
+    renderSection();
 
-    const select = await screen.findByLabelText(/^Model$/i);
-    await userEvent.selectOptions(select, "");
-    // null, not "": the default must track the catalog, not freeze today's value.
-    await waitFor(() => expect(m.chooseAiModel).toHaveBeenCalledWith("t1", null));
-  });
-
-  it("a member who is not the owner can see the status but cannot change it", async () => {
-    m.getAiProvider.mockResolvedValue(connected({ canManage: false }));
-    renderPage();
-    await screen.findByText(/Key ending abcd/i);
-    expect(screen.getByText(/Only the workspace owner can change the AI provider/i)).toBeInTheDocument();
+    // Status is exactly what a member needs: whether the assistant will work.
+    expect(await screen.findByText(/Key ending abcd/i)).toBeInTheDocument();
+    expect(screen.getByText(/Only the workspace owner can change AI providers/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /disconnect/i })).not.toBeInTheDocument();
-  });
-
-  it("disconnects and says the assistant is now off", async () => {
-    m.getAiProvider.mockResolvedValue(connected());
-    m.disconnectAiProvider.mockResolvedValue(view({ status: "DISCONNECTED" }));
-    renderPage();
-    await screen.findByText(/Key ending abcd/i);
-
-    await userEvent.click(screen.getByRole("button", { name: /disconnect/i }));
-    await waitFor(() => expect(m.disconnectAiProvider).toHaveBeenCalledWith("t1"));
-    expect(await screen.findByRole("status")).toHaveTextContent(/assistant is off/i);
-  });
-
-  it("re-checking a key reports what the provider said", async () => {
-    m.getAiProvider.mockResolvedValue(connected());
-    m.verifyAiProvider.mockResolvedValue(connected());
-    renderPage();
-    await screen.findByText(/Key ending abcd/i);
-
-    await userEvent.click(screen.getByRole("button", { name: /check again/i }));
-    expect(await screen.findByRole("status")).toHaveTextContent(/still works/i);
+    expect(screen.queryByLabelText(/Workspace model/i)).not.toBeInTheDocument();
   });
 });

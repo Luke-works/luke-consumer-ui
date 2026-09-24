@@ -58,13 +58,16 @@ export default function AiModelPicker({ className = "" }: { className?: string }
 
   const choose = async (model: string) => {
     if (!tenant) return;
+    // A model name only means something to the provider offering it, and a workspace may have
+    // several connected — so the provider travels with the choice.
+    const owner = (models ?? []).find((m) => m.id === model)?.provider ?? null;
     // Keep the control usable rather than disabling it: a browser blurs a focused element when it
     // becomes disabled and drops focus to <body>, so a keyboard user loses their place on every
     // save. `saving` now only guards against overlapping writes.
     setSaving(true);
     setError(null);
     try {
-      const saved = await chooseMyAiModel(tenant, model || null);
+      const saved = await chooseMyAiModel(tenant, model ? owner : null, model || null);
       // Merge, never replace: a response missing `enabled` would otherwise unmount this control
       // the instant a save succeeded. The server now always sends it; this makes the component
       // independent of that promise.
@@ -96,6 +99,9 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   }
 
   const options = models ?? [];
+  const providerLabels = Object.fromEntries(
+    (pref.providers ?? []).map((p) => [p.id, p.label]),
+  ) as Record<string, string>;
   const current = pref.model ?? "";
 
   return (
@@ -115,7 +121,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
         <option value="">
           Workspace default{pref.workspaceModel ? ` (${pref.workspaceModel})` : ""}
         </option>
-        <ModelOptions models={options} selected={current} />
+        <ModelOptions models={options} selected={current} providerLabels={providerLabels} />
       </select>
       {error ? (
         <span role="alert" className="text-xs text-error-600 dark:text-error-400">
