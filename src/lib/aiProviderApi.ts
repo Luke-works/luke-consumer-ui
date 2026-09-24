@@ -27,6 +27,22 @@ export type AiProviderOption = {
   consoleUrl: string;
 };
 
+/**
+ * One model the workspace's key may use, and whether the assistant could run on it.
+ *
+ * A provider's list is every model the account can reach across ALL modalities — Groq returns
+ * Whisper (speech-to-text) and Orpheus (text-to-speech) beside its chat models, OpenAI returns
+ * embeddings and image models. Offering those as equal choices is a trap: pick one and every
+ * turn fails with a provider error nobody can act on. `chat` is how the UI groups them.
+ *
+ * Nothing is hidden. The classification is partly a guess about names the provider owns, and a
+ * wrong guess should demote a model into a second group, never make it unreachable.
+ */
+export type AiModel = {
+  id: string;
+  chat: boolean;
+};
+
 export type AiProviderStatus =
   /** Verified and usable. */
   | "CONNECTED"
@@ -56,8 +72,8 @@ export type AiProviderView = {
   /** Why the provider last refused. Never contains the key. */
   lastError?: string | null;
   providers?: AiProviderOption[];
-  /** Only on a connect response: the models that key may use. */
-  models?: string[];
+  /** Only on a connect response: the models that key may use, with their capability. */
+  models?: AiModel[];
 };
 
 export type AiConfig = {
@@ -101,7 +117,7 @@ export function verifyAiProvider(tenantId: string): Promise<AiProviderView> {
 }
 
 /** The models this workspace's own key may use — read live from their provider. */
-export function listAiModels(tenantId: string): Promise<{ models: string[] }> {
+export function listAiModels(tenantId: string): Promise<{ models: AiModel[] }> {
   return authed(`${BASE}/provider/models`, tenantInit(tenantId));
 }
 

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { ModelOptions } from "./modelOptions";
 import {
   chooseMyAiModel,
   getAiPreference,
   listAiModels,
+  type AiModel,
   type AiPreference,
 } from "../../lib/aiProviderApi";
 
@@ -24,7 +26,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   const tenant = session?.tenant ?? null;
 
   const [pref, setPref] = useState<AiPreference | null>(null);
-  const [models, setModels] = useState<string[] | null>(null);
+  const [models, setModels] = useState<AiModel[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The live model list costs a round trip to the provider, so it is fetched when someone
@@ -113,14 +115,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
         <option value="">
           Workspace default{pref.workspaceModel ? ` (${pref.workspaceModel})` : ""}
         </option>
-        {/* The saved choice stays selectable before the live list arrives, so the control never
-            appears to have silently reset to the default while loading. */}
-        {current && !options.includes(current) ? <option value={current}>{current}</option> : null}
-        {options.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
+        <ModelOptions models={options} selected={current} />
       </select>
       {error ? (
         <span role="alert" className="text-xs text-error-600 dark:text-error-400">
