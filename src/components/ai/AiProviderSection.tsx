@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Sparkles } from "lucide-react";
-import PageMeta from "../../components/common/PageMeta";
-import Button from "../../components/ui/button/Button";
+import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/authApi";
 import {
@@ -30,6 +29,10 @@ function formatDate(value?: string | null): string | null {
 /**
  * AI — where a workspace connects the provider account its assistant runs on.
  *
+ * Lives as a section of Account settings rather than a page of its own: it is a thing you set
+ * up once and rarely revisit, and a permanent slot in the primary navigation was already pushing
+ * the last item below a fold at laptop height.
+ *
  * Bring-your-own-key: the owner pastes their own Groq / OpenAI / Anthropic / Gemini key and
  * picks a model. Every AI turn in the app — building a form, drafting an email, sketching a
  * workflow — then runs on that account. Lukeflow enables the assistant and pays nothing for
@@ -38,7 +41,7 @@ function formatDate(value?: string | null): string | null {
  * The key is verified with the provider before it is stored, encrypted at rest, and never
  * comes back to this page: the most it ever shows is the last four characters.
  */
-export default function AiSettings() {
+export default function AiProviderSection() {
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
 
@@ -72,7 +75,10 @@ export default function AiSettings() {
   }, [tenant]);
 
   const apply = useCallback((v: AiProviderView, message?: string) => {
-    setView(v);
+    // Merge, never replace. A response missing `enabled`/`canManage` would otherwise make this
+    // card report the feature as unavailable the moment a key was successfully connected. The
+    // server now always sends both; merging keeps the component independent of that.
+    setView((prev) => ({ ...(prev ?? {}), ...v }));
     setApiKey("");
     setModels(v.models ?? null);
     setError(null);
@@ -130,22 +136,22 @@ export default function AiSettings() {
   };
 
   const options: AiProviderOption[] = view?.providers ?? [];
+  /** The provider the connect FORM is showing — used for its placeholder and console link. */
   const chosen = options.find((p) => p.id === provider);
+  /** The provider actually CONNECTED — used for anything describing current behaviour. */
+  const connectedDefault = options.find((p) => p.id === view?.provider)?.defaultModel;
   const connected = view?.status === "CONNECTED";
   const invalid = view?.status === "INVALID";
   const canManage = view?.canManage === true;
 
   return (
-    <>
-      <PageMeta title="AI | Lukeflow" description="Connect your own AI provider — your key, your model, your bill." />
-      <div className="mx-auto max-w-[760px]">
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">AI assistant</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Bring your own AI provider. The assistant that builds your forms, emails and workflows runs on your
-            account, with the model you choose — Lukeflow never sees your usage and adds nothing to your bill.
-          </p>
-        </div>
+    // id="ai" so the assistant panels can link straight here with /account/settings#ai
+    <section id="ai" className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+      <h2 className="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">AI assistant</h2>
+      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+        Bring your own AI provider. The assistant that builds your forms, emails and workflows runs on your
+        workspace's own account — Lukeflow never sees your usage and adds nothing to your bill.
+      </p>
 
         {error ? (
           <p role="alert" className="mb-4 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
@@ -158,7 +164,7 @@ export default function AiSettings() {
           </p>
         ) : null}
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div>
           {loading && !view ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
           ) : !view ? null : !view.enabled ? (
@@ -223,7 +229,9 @@ export default function AiSettings() {
                     onChange={(e) => void saveModel(e.target.value)}
                   >
                     <option value="">
-                      Provider default{chosen?.defaultModel ? ` (${chosen.defaultModel})` : ""}
+                      {/* The CONNECTED provider's default — `chosen` follows the connect form's
+                          dropdown, which is a different provider until someone submits it. */}
+                      Provider default{connectedDefault ? ` (${connectedDefault})` : ""}
                     </option>
                     {/* The stored choice stays selectable even before the live list loads. */}
                     {view.model && !(models ?? []).includes(view.model) ? (
@@ -322,7 +330,6 @@ export default function AiSettings() {
             </div>
           )}
         </div>
-      </div>
-    </>
+    </section>
   );
 }

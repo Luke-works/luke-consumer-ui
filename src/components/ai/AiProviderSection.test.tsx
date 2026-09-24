@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
-import AiSettings from "./AiSettings";
+import AiProviderSection from "./AiProviderSection";
 import * as api from "../../lib/aiProviderApi";
 import { ApiError } from "../../lib/authApi";
 
@@ -50,16 +50,16 @@ const connected = (over: Partial<api.AiProviderView> = {}): api.AiProviderView =
 function renderPage() {
   return render(
     <StrictMode>
-      <MemoryRouter initialEntries={["/ai"]}>
+      <MemoryRouter initialEntries={["/account/settings"]}>
         <Routes>
-          <Route path="/ai" element={<AiSettings />} />
+          <Route path="/account/settings" element={<AiProviderSection />} />
         </Routes>
       </MemoryRouter>
     </StrictMode>,
   );
 }
 
-describe("AiSettings — bring your own key", () => {
+describe("AiProviderSection — bring your own key", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     m.getAiProvider.mockResolvedValue(view());

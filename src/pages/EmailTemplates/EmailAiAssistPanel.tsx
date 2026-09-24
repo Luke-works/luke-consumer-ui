@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import AiModelPicker from "../../components/ai/AiModelPicker";
 import LukeBuildsMark from "../../components/branding/LukeBuildsMark";
 import Button from "../../components/ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
@@ -121,6 +122,9 @@ export default function EmailAiAssistPanel({
             Describe the email — I'll design it{brain ? ` · ${brain}` : ""}
           </p>
         </div>
+        {/* Your model, not the workspace's: same key and same bill, but a quick draft and a
+            gnarly build need not cost the same. Renders nothing when there is nothing to pick. */}
+        <AiModelPicker className="shrink-0" />
       </div>
 
       {/* Log */}
@@ -154,7 +158,7 @@ export default function EmailAiAssistPanel({
               >
                 {m.error ? `⚠ ${m.text}` : m.text}
                 {m.connect ? (
-                  <Link to="/ai" className="mt-2 block font-medium underline">
+                  <Link to="/account/settings#ai" className="mt-2 block font-medium underline">
                     Connect your AI provider
                   </Link>
                 ) : null}

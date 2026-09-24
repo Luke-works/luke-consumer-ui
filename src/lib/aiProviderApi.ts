@@ -121,3 +121,43 @@ export function chooseAiModel(tenantId: string, model: string | null): Promise<A
 export function disconnectAiProvider(tenantId: string): Promise<AiProviderView> {
   return authed(`${BASE}/provider`, tenantInit(tenantId, { method: "DELETE" }));
 }
+
+/**
+ * One person's own model choice, within this workspace.
+ *
+ * The KEY is the workspace's — the owner connects it once and everyone runs on that account.
+ * The MODEL is each person's: someone drafting forms may want the cheap fast one while someone
+ * working through a tricky workflow wants the capable one, on the same bill. Kept server-side
+ * rather than in the browser so the choice follows them between devices.
+ */
+export type AiPreference = {
+  enabled: boolean;
+  /** False when the workspace has no usable provider — there is nothing to choose yet. */
+  connected: boolean;
+  /** Whether this person could connect one themselves (owner), or must ask someone who can. */
+  canManage?: boolean;
+  provider?: AiProviderId | null;
+  /** What the workspace is set to, offered as the "follow the workspace" option. */
+  workspaceModel?: string | null;
+  /** This person's own pick; null means they follow the workspace. */
+  model?: string | null;
+  /** What their turns actually run on right now. */
+  effectiveModel?: string | null;
+};
+
+/** This person's model choice. Any member — everyone picks their own. */
+export function getAiPreference(tenantId: string): Promise<AiPreference> {
+  return authed(`${BASE}/preference`, tenantInit(tenantId));
+}
+
+/** Choose the model THIS person's turns run on. Blank/null follows the workspace. */
+export function chooseMyAiModel(tenantId: string, model: string | null): Promise<AiPreference> {
+  return authed(
+    `${BASE}/preference`,
+    tenantInit(tenantId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: model ?? "" }),
+    }),
+  );
+}
