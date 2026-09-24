@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import AiModelPicker from "./AiModelPicker";
@@ -37,7 +37,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     m.getAiPreference.mockResolvedValue(pref());
-    m.listAiModels.mockResolvedValue({ models: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"] });
+    m.listAiModels.mockResolvedValue({ models: [{ id: "llama-3.3-70b-versatile", chat: true }, { id: "openai/gpt-oss-120b", chat: true }] });
   });
 
   it("stays out of the way when this deployment has no AI at all", async () => {
@@ -111,6 +111,49 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     await screen.findByRole("option", { name: "llama-3.3-70b-versatile" });
   });
 
+  it("separates models that can build from ones that cannot — without hiding any", async () => {
+    // Verbatim from a real Groq account: chat models listed beside speech-to-text and a
+    // prompt-injection classifier. Offered as equal choices they are a trap — pick Whisper and
+    // every turn fails with a provider error nobody can act on.
+    m.listAiModels.mockResolvedValue({
+      models: [
+        { id: "openai/gpt-oss-120b", chat: true },
+        { id: "qwen/qwen3.8-27b", chat: true },
+        { id: "whisper-large-v3", chat: false },
+        { id: "meta-llama/llama-prompt-guard-2-86m", chat: false },
+      ],
+    });
+    renderPicker();
+    const select = await screen.findByRole("combobox");
+    select.focus();
+    await screen.findByRole("option", { name: "openai/gpt-oss-120b" });
+
+    const groups = within(select).getAllByRole("group");
+    expect(groups.map((g) => g.getAttribute("label"))).toEqual([
+      "Chat models",
+      "Other — may not work for building",
+    ]);
+    expect(within(groups[0]).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "openai/gpt-oss-120b",
+      "qwen/qwen3.8-27b",
+    ]);
+    // Demoted, never removed: the capability is partly a guess about names the provider owns,
+    // and a wrong guess must leave the model one click away rather than unreachable.
+    expect(within(groups[1]).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "whisper-large-v3",
+      "meta-llama/llama-prompt-guard-2-86m",
+    ]);
+  });
+
+  it("offers no empty group when every model can build", async () => {
+    m.listAiModels.mockResolvedValue({ models: [{ id: "openai/gpt-oss-120b", chat: true }] });
+    renderPicker();
+    const select = await screen.findByRole("combobox");
+    select.focus();
+    await screen.findByRole("option", { name: "openai/gpt-oss-120b" });
+    expect(within(select).getAllByRole("group")).toHaveLength(1);
+  });
+
   it("saves the choice against the person, not the browser", async () => {
     m.chooseMyAiModel.mockResolvedValue(pref({ model: "llama-3.3-70b-versatile", effectiveModel: "llama-3.3-70b-versatile" }));
     renderPicker();
@@ -142,7 +185,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     renderPicker();
     const select = await screen.findByRole("combobox");
     expect(select).toHaveValue("some-pinned-model");
-    resolveModels({ models: ["some-pinned-model"] });
+    resolveModels({ models: [{ id: "some-pinned-model", chat: true }] });
   });
 
   it("surfaces a refusal instead of appearing to have saved", async () => {

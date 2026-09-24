@@ -148,7 +148,7 @@ describe("AiProviderSection — bring your own key", () => {
 
   it("reads the model list from the workspace's own account, and only when asked", async () => {
     m.getAiProvider.mockResolvedValue(connected());
-    m.listAiModels.mockResolvedValue({ models: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"] });
+    m.listAiModels.mockResolvedValue({ models: [{ id: "llama-3.3-70b-versatile", chat: true }, { id: "openai/gpt-oss-120b", chat: true }] });
     renderPage();
 
     const select = await screen.findByLabelText(/^Model$/i);
@@ -162,7 +162,7 @@ describe("AiProviderSection — bring your own key", () => {
 
   it("saves a model change, and treats the blank choice as the provider default", async () => {
     m.getAiProvider.mockResolvedValue(connected({ model: "llama-3.3-70b-versatile" }));
-    m.listAiModels.mockResolvedValue({ models: ["llama-3.3-70b-versatile"] });
+    m.listAiModels.mockResolvedValue({ models: [{ id: "llama-3.3-70b-versatile", chat: true }] });
     m.chooseAiModel.mockResolvedValue(connected({ model: null }));
     renderPage();
 

@@ -3,6 +3,7 @@ import { ExternalLink, Sparkles } from "lucide-react";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/authApi";
+import { ModelOptions } from "./modelOptions";
 import {
   chooseAiModel,
   connectAiProvider,
@@ -11,6 +12,7 @@ import {
   listAiModels,
   verifyAiProvider,
   type AiProviderId,
+  type AiModel,
   type AiProviderOption,
   type AiProviderView,
 } from "../../lib/aiProviderApi";
@@ -55,7 +57,7 @@ export default function AiProviderSection() {
   const [provider, setProvider] = useState<AiProviderId>("groq");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
-  const [models, setModels] = useState<string[] | null>(null);
+  const [models, setModels] = useState<AiModel[] | null>(null);
 
   useEffect(() => {
     if (!tenant) return;
@@ -233,15 +235,7 @@ export default function AiProviderSection() {
                           dropdown, which is a different provider until someone submits it. */}
                       Provider default{connectedDefault ? ` (${connectedDefault})` : ""}
                     </option>
-                    {/* The stored choice stays selectable even before the live list loads. */}
-                    {view.model && !(models ?? []).includes(view.model) ? (
-                      <option value={view.model}>{view.model}</option>
-                    ) : null}
-                    {(models ?? []).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
+                    <ModelOptions models={models ?? []} selected={view.model} />
                   </select>
                   <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                     Read from your own account, so this is what your key can actually run.
