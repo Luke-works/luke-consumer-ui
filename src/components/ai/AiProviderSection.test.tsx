@@ -105,10 +105,10 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     const rows = await screen.findAllByRole("listitem");
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByText(/Groq/)).toBeInTheDocument();
-    expect(within(rows[0]).getByText(/Key ending abcd/i)).toBeInTheDocument();
+    expect(within(rows[0]).getByText(/key ending abcd/i)).toBeInTheDocument();
     // Exact: "Provider default (…)" in the model select would otherwise match too.
     expect(within(rows[0]).getByText("Default", { exact: true })).toBeInTheDocument();
-    expect(within(rows[1]).getByText(/Key ending wxyz/i)).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/key ending wxyz/i)).toBeInTheDocument();
     // Only one carries the default; the other offers to take it.
     expect(within(rows[1]).queryByText("Default", { exact: true })).not.toBeInTheDocument();
     expect(within(rows[1]).getByRole("button", { name: /make default/i })).toBeInTheDocument();
@@ -134,7 +134,7 @@ describe("AiProviderSection — several providers, each with its own key", () =>
   it("never renders a key — only its last four", async () => {
     m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
     const { container } = renderSection();
-    await screen.findByText(/Key ending abcd/i);
+    await screen.findByText(/key ending abcd/i);
     expect(container.textContent).not.toMatch(/gsk_|sk-ant-/);
   });
 
@@ -157,8 +157,8 @@ describe("AiProviderSection — several providers, each with its own key", () =>
       }),
     );
     // Both are listed afterwards — this used to destroy the first key outright.
-    expect(await screen.findByText(/Key ending abcd/i)).toBeInTheDocument();
-    expect(screen.getByText(/Key ending wxyz/i)).toBeInTheDocument();
+    expect(await screen.findByText(/key ending abcd/i)).toBeInTheDocument();
+    expect(screen.getByText(/key ending wxyz/i)).toBeInTheDocument();
   });
 
   it("warns that re-picking a connected provider replaces that one key", async () => {
@@ -227,18 +227,48 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     m.chooseAiModel.mockResolvedValue(view({ connected: true, connections: [groq({ model: "llama-3.3-70b-versatile" })] }));
     renderSection();
 
-    const select = await screen.findByLabelText(/Workspace model/i);
+    // Rows start collapsed — a workspace with four providers is a list to scan, not four
+    // stacked forms — so the detail has to be asked for.
+    await userEvent.click(await screen.findByRole("button", { name: /Groq/ }));
+    const trigger = await screen.findByRole("combobox", { name: /Workspace model for Groq/i });
     // A round trip per connected provider on page load, for a control most people never touch.
     expect(m.listAiModels).not.toHaveBeenCalled();
 
-    select.focus();
+    await userEvent.click(trigger);
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1"));
-    await screen.findByRole("option", { name: "llama-3.3-70b-versatile" });
+    await userEvent.click(await screen.findByRole("option", { name: "llama-3.3-70b-versatile" }));
 
-    await userEvent.selectOptions(select, "llama-3.3-70b-versatile");
     await waitFor(() =>
       expect(m.chooseAiModel).toHaveBeenCalledWith("t1", "groq", "llama-3.3-70b-versatile"),
     );
+  });
+
+  it("opens a failing provider by default so its explanation is not hidden behind a click", async () => {
+    m.getAiProvider.mockResolvedValue(
+      view({
+        connected: true,
+        connections: [groq({ status: "INVALID", lastError: "Groq rejected this key." })],
+      }),
+    );
+    renderSection();
+    // The one row that needs reading is the one already open.
+    expect(await screen.findByText(/Groq rejected this key/i)).toBeInTheDocument();
+  });
+
+  it("collapses a healthy provider's detail until asked for", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+    renderSection();
+    const row = await screen.findByRole("button", { name: /Groq/ });
+
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    // The summary still carries what matters at a glance.
+    expect(screen.getByText(/Working/)).toBeInTheDocument();
+    expect(screen.getByText(/key ending abcd/i)).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Workspace model/i })).not.toBeInTheDocument();
+
+    await userEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("combobox", { name: /Workspace model/i })).toBeInTheDocument();
   });
 
   it("keeps the pasted key when connecting fails", async () => {
@@ -267,8 +297,10 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     m.connectAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
     renderSection();
 
-    (await screen.findByLabelText(/Workspace model/i)).focus();
+    await userEvent.click(await screen.findByRole("button", { name: /Groq/ }));
+    await userEvent.click(await screen.findByRole("combobox", { name: /Workspace model for Groq/i }));
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledTimes(1));
+    await userEvent.keyboard("{Escape}");
 
     await userEvent.click(screen.getByRole("button", { name: /add another provider/i }));
     await userEvent.selectOptions(screen.getByLabelText(/Provider/i), "anthropic");
@@ -277,8 +309,8 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     await waitFor(() => expect(m.connectAiProvider).toHaveBeenCalled());
 
     // The new provider's dropdown asks again rather than showing nothing.
-    const selects = await screen.findAllByLabelText(/Workspace model/i);
-    selects[1].focus();
+    await userEvent.click(await screen.findByRole("button", { name: /Anthropic/ }));
+    await userEvent.click(await screen.findByRole("combobox", { name: /Workspace model for Anthropic/i }));
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledTimes(2));
   });
 
@@ -300,7 +332,7 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     renderSection();
 
     // Status is exactly what a member needs: whether the assistant will work.
-    expect(await screen.findByText(/Key ending abcd/i)).toBeInTheDocument();
+    expect(await screen.findByText(/key ending abcd/i)).toBeInTheDocument();
     expect(screen.getByText(/Only the workspace owner can change AI providers/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();

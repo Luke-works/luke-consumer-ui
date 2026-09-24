@@ -19,6 +19,7 @@
  * fix through the imperative `onApplyAiSchema` handle, so the builder + AI chat stay mounted.
  */
 import { useEffect, useRef, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { Modal, MODAL_HEADER_SAFE } from "../../components/ui/modal";
 import Button from "../../components/ui/button/Button";
 import Tooltip from "../../components/ui/tooltip/Tooltip";
@@ -398,14 +399,14 @@ export default function FormTestPanel({
                     {aiFilling ? "Generating…" : "Generate data"}
                   </Button>
                 </Tooltip>
-                <select
+                <Select
                   aria-label="How many datasets to generate"
                   value={genCount}
                   onChange={(e) => setGenCount(Number(e.target.value))}
                   className="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-300"
                 >
                   {[1, 3, 5].map((n) => <option key={n} value={n}>{n} set{n === 1 ? "" : "s"}</option>)}
-                </select>
+                </Select>
               </div>
             )}
             {canEdit && hasFixableFailure && (

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import { ModelOptions } from "./modelOptions";
+import Listbox, { type ListboxOption } from "../ui/select/Listbox";
 import {
   chooseMyAiModel,
   getAiPreference,
@@ -98,31 +98,38 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     );
   }
 
-  const options = models ?? [];
-  const providerLabels = Object.fromEntries(
-    (pref.providers ?? []).map((p) => [p.id, p.label]),
-  ) as Record<string, string>;
-  const current = pref.model ?? "";
+  const providerLabel = (id: string) =>
+    (pref.providers ?? []).find((p) => p.id === id)?.label ?? id;
+
+  const options: ListboxOption[] = [
+    {
+      value: "",
+      label: "Workspace default",
+      hint: pref.workspaceModel ?? undefined,
+    },
+    ...(models ?? []).map((m) => ({
+      value: m.id,
+      label: m.id,
+      // Two dimensions at once: which provider offers it, and whether a turn could run on it.
+      // A workspace may have several providers connected, and each lists every modality its
+      // account can reach — so "Groq" and "Groq — may not work" are different groups.
+      group: m.chat ? providerLabel(m.provider) : `${providerLabel(m.provider)} — may not work`,
+    })),
+  ];
 
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
-      <label htmlFor="ai-model-picker" className="sr-only">
-        Model
-      </label>
-      <select
-        id="ai-model-picker"
-        value={current}
-        aria-busy={saving}
-        title={`Runs on ${pref.effectiveModel ?? "the workspace default"}`}
-        onFocus={() => void loadModels()}
-        onChange={(e) => void choose(e.target.value)}
-        className="max-w-[180px] truncate rounded-lg border border-gray-200 bg-transparent px-2 py-1 text-xs text-gray-600 focus:border-brand-300 focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:text-gray-300"
-      >
-        <option value="">
-          Workspace default{pref.workspaceModel ? ` (${pref.workspaceModel})` : ""}
-        </option>
-        <ModelOptions models={options} selected={current} providerLabels={providerLabels} />
-      </select>
+      <Listbox
+        ariaLabel="Model"
+        size="sm"
+        className="max-w-[220px]"
+        value={pref.model ?? ""}
+        options={options}
+        disabled={saving}
+        placeholder="Workspace default"
+        onOpen={() => void loadModels()}
+        onChange={(next) => void choose(next)}
+      />
       {error ? (
         <span role="alert" className="text-xs text-error-600 dark:text-error-400">
           {error}

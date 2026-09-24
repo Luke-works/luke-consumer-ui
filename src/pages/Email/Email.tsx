@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import Select from "../../components/ui/select/Select";
 import PageMeta from "../../components/common/PageMeta";
 import Button from "../../components/ui/button/Button";
 import Input from "../../components/form/input/InputField";
@@ -536,7 +537,7 @@ function EmailBoxes({ tenant, senderDomain }: { tenant: string; senderDomain: st
         {direction === "OUTBOUND" ? (
           <div>
             <Label htmlFor="box-stream">Stream type</Label>
-            <select
+            <Select
               id="box-stream"
               value={streamType}
               onChange={(e) => setStreamType(e.target.value)}
@@ -544,7 +545,7 @@ function EmailBoxes({ tenant, senderDomain }: { tenant: string; senderDomain: st
             >
               <option value="Transactional">Transactional</option>
               <option value="Broadcasts">Broadcasts</option>
-            </select>
+            </Select>
           </div>
         ) : (
           <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300">

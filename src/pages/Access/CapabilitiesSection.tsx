@@ -11,6 +11,7 @@
  * a bulk endpoint would be the natural backend follow-up if orgs get large.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { Layers, ShieldCheck, Users } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import * as api from "../../lib/authApi";
@@ -216,7 +217,7 @@ function ResourceOwners({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="sm:flex-1">
           <Label htmlFor={`owner-${capability.code}`}>Add a resource owner</Label>
-          <select
+          <Select
             id={`owner-${capability.code}`}
             value={pick}
             disabled={busy || candidates.length === 0}
@@ -232,7 +233,7 @@ function ResourceOwners({
                 </option>
               ))
             )}
-          </select>
+          </Select>
         </div>
         <Button
           size="sm"

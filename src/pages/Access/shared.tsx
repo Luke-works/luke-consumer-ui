@@ -5,6 +5,7 @@
  * mutate access identically instead of drifting apart.
  */
 import { useCallback, useState, type ReactNode } from "react";
+import Select from "../../components/ui/select/Select";
 import { Building2, type LucideIcon } from "lucide-react";
 import type { AccessProvenance, OrgGroup, OrgMember, RoleLevel } from "../../lib/authApi";
 import {
@@ -97,7 +98,7 @@ export function RoleLevelSelect({
   label?: string;
 }) {
   return (
-    <select
+    <Select
       value={value}
       disabled={disabled}
       aria-label={label}
@@ -107,7 +108,7 @@ export function RoleLevelSelect({
       <option value="none">None</option>
       <option value="read">Read</option>
       <option value="read-write">Read &amp; write</option>
-    </select>
+    </Select>
   );
 }
 
@@ -124,7 +125,7 @@ export function CapabilityLevelSelect({
   label?: string;
 }) {
   return (
-    <select
+    <Select
       value={value}
       disabled={disabled}
       aria-label={label}
@@ -138,7 +139,7 @@ export function CapabilityLevelSelect({
           {LEVEL_LABEL[l]}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 

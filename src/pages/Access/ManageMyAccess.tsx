@@ -8,6 +8,7 @@
  * me".
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { Clock, CornerDownLeft, KeyRound, Send, Trash2 } from "lucide-react";
 import * as api from "../../lib/authApi";
 import type { CapabilityCatalogItem, SubscribedCapability } from "../../lib/authApi";
@@ -99,7 +100,7 @@ function ReturnedRequestCard({
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor={`redo-level-${request.id}`}>Revised level</Label>
-          <select
+          <Select
             id={`redo-level-${request.id}`}
             value={level}
             onChange={(e) => setLevel(e.target.value as AccessRequestLevel)}
@@ -110,7 +111,7 @@ function ReturnedRequestCard({
                 {LEVEL_LABEL[l]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <Label htmlFor={`redo-note-${request.id}`}>Justification</Label>
@@ -356,7 +357,7 @@ export default function ManageMyAccessSection({
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <Label htmlFor="req-cap">Capability</Label>
-                <select
+                <Select
                   id="req-cap"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
@@ -367,11 +368,11 @@ export default function ManageMyAccessSection({
                       {s.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="req-level">Level</Label>
-                <select
+                <Select
                   id="req-level"
                   value={level}
                   onChange={(e) => setLevel(e.target.value as AccessRequestLevel)}
@@ -382,7 +383,7 @@ export default function ManageMyAccessSection({
                       {LEVEL_LABEL[l]}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 

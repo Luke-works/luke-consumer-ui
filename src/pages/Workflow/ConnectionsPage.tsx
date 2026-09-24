@@ -1,4 +1,5 @@
 import { Link2, RefreshCw, Unplug } from "lucide-react";
+import Select from "../../components/ui/select/Select";
 import { useCallback, useEffect, useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import ConnectIntegration from "../../components/workflow/ConnectIntegration";
@@ -104,7 +105,7 @@ export default function ConnectionsPage() {
           <label htmlFor="wf-provider" className="text-sm text-gray-600 dark:text-gray-300">
             Connect an app
           </label>
-          <select
+          <Select
             id="wf-provider"
             value={selection}
             onChange={(e) => setSelection(e.target.value)}
@@ -116,7 +117,7 @@ export default function ConnectionsPage() {
               </option>
             ))}
             <option value={OTHER}>Other…</option>
-          </select>
+          </Select>
           {selection === OTHER ? (
             <input
               value={otherProvider}

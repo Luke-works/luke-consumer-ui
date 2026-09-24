@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { ChevronLeft, Eye, GitBranch, Workflow } from "lucide-react";
 import Button from "../../components/ui/button/Button";
 import { Modal } from "../../components/ui/modal";
@@ -254,7 +255,7 @@ export default function InstanceDetail({
         {versions.length > 1 && (
           <label className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <GitBranch className="size-3.5" /> Render under
-            <select
+            <Select
               value={selectedVersion}
               onChange={(e) => setSelectedVersion(Number(e.target.value))}
               className="h-8 rounded-lg border border-gray-300 bg-transparent px-2 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-300"
@@ -262,7 +263,7 @@ export default function InstanceDetail({
               {versions.map((v) => (
                 <option key={v.version} value={v.version}>v{v.version}{v.version === instance.version ? " (submitted)" : ""}</option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
       </div>

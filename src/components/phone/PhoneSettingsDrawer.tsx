@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { Check, KeyRound, Phone as PhoneIcon, X } from "lucide-react";
 import { useDialog } from "../../hooks/useDialog";
 import {
@@ -143,7 +144,7 @@ function NumberSection({
         <p className="text-sm text-gray-400">No number yet. An owner can provision one.</p>
       ) : (
         <div className="space-y-2">
-          <select
+          <Select
             value={form.provider}
             onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value as ProvisionNumberInput["provider"] }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5"
@@ -152,7 +153,7 @@ function NumberSection({
             <option value="twilio">Import Twilio</option>
             <option value="telnyx">Import Telnyx</option>
             <option value="vonage">Import Vonage</option>
-          </select>
+          </Select>
           {form.provider === "vapi" ? (
             <input
               value={form.areaCode ?? ""}
