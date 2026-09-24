@@ -58,7 +58,9 @@ export default function AiConnectionRow({
           <div className="min-w-0">
             <p className="flex flex-wrap items-center gap-2 font-medium text-gray-800 dark:text-white/90">
               {connection.label ?? connection.provider}
-              {connection.preferred ? (
+              {/* Not on a failing one: it cannot serve a turn, and showing the star there also
+                  hid the "Make default" button that would move the default off it. */}
+              {connection.preferred && !invalid ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium uppercase text-brand-600 dark:bg-brand-500/15 dark:text-brand-300">
                   <Star className="size-3" />
                   Default
@@ -107,6 +109,10 @@ export default function AiConnectionRow({
             className="h-9 w-full max-w-sm rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-white/90"
             value={connection.model ?? ""}
             aria-busy={busy}
+            // Disabled while any row is saving: the section tracks one in-flight action, so a
+            // second change started meanwhile would land on a view rebuilt by the first and
+            // appear to revert it.
+            disabled={busy}
             // Read live from this provider, and only when someone opens it: fetching for every
             // connected provider on page load would cost a round trip each, for a control most
             // people never touch.

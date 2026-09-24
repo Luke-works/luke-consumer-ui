@@ -82,18 +82,24 @@ export default function AiProviderSection() {
   // report the feature as unavailable the moment something succeeded.
   const apply = useCallback((v: AiProviderView, message?: string) => {
     setView((prev) => ({ ...(prev ?? {}), ...v }));
+    // Drop the cached model list: which providers exist may have just changed, and a one-shot
+    // cache meant a newly added provider's dropdown stayed empty for the life of the page.
+    setModels(null);
     setError(null);
     if (message) setNotice(message);
   }, []);
 
-  const act = async (fn: () => Promise<AiProviderView>, message?: string) => {
+  /** Runs one action, reporting whether it actually succeeded. */
+  const act = async (fn: () => Promise<AiProviderView>, message?: string): Promise<boolean> => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       apply(await fn(), message);
+      return true;
     } catch (e) {
       setError(messageOf(e, "Something went wrong. Please try again."));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -101,10 +107,14 @@ export default function AiProviderSection() {
 
   const connect = async () => {
     if (!tenant) return;
-    await act(
+    // Only on success. `act` swallows the error to show it, so awaiting it says nothing about
+    // the outcome — clearing unconditionally threw away the key someone had just pasted and
+    // collapsed the form as though it had worked, with the failure showing above an empty form.
+    const ok = await act(
       () => connectAiProvider(tenant, { provider, apiKey }),
       "Connected. Your workspace can use this provider now.",
     );
+    if (!ok) return;
     setApiKey("");
     setAdding(false);
   };

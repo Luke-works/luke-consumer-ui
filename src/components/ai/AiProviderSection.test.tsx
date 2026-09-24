@@ -241,6 +241,58 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     );
   });
 
+  it("keeps the pasted key when connecting fails", async () => {
+    // `act` swallows the error to display it, so awaiting it says nothing about the outcome.
+    // Clearing unconditionally threw away the key someone had just pasted and collapsed the form
+    // as though it had worked — the failure showing above an empty form.
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+    m.connectAiProvider.mockRejectedValue(new ApiError(400, "Anthropic rejected this key."));
+    renderSection();
+
+    await userEvent.click(await screen.findByRole("button", { name: /add another provider/i }));
+    await userEvent.selectOptions(screen.getByLabelText(/Provider/i), "anthropic");
+    await userEvent.type(screen.getByLabelText(/API key/i), "sk-ant-typo");
+    await userEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Anthropic rejected this key/i);
+    // Still there to correct, rather than retyped from scratch.
+    expect(screen.getByLabelText(/API key/i)).toHaveValue("sk-ant-typo");
+  });
+
+  it("re-reads the model list after the set of providers changes", async () => {
+    // It was a one-shot cache nothing reset, so a provider added after the first fetch had an
+    // empty model dropdown for the life of the page.
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+    m.listAiModels.mockResolvedValue({ models: [{ provider: "groq", id: "openai/gpt-oss-120b", chat: true }] });
+    m.connectAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    renderSection();
+
+    (await screen.findByLabelText(/Workspace model/i)).focus();
+    await waitFor(() => expect(m.listAiModels).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole("button", { name: /add another provider/i }));
+    await userEvent.selectOptions(screen.getByLabelText(/Provider/i), "anthropic");
+    await userEvent.type(screen.getByLabelText(/API key/i), "sk-ant-second");
+    await userEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+    await waitFor(() => expect(m.connectAiProvider).toHaveBeenCalled());
+
+    // The new provider's dropdown asks again rather than showing nothing.
+    const selects = await screen.findAllByLabelText(/Workspace model/i);
+    selects[1].focus();
+    await waitFor(() => expect(m.listAiModels).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not star a provider that cannot serve a turn", async () => {
+    // A failing row that kept the star also hid the "Make default" button that would move the
+    // default off it.
+    m.getAiProvider.mockResolvedValue(
+      view({ connected: true, connections: [groq({ status: "INVALID", lastError: "nope" }), anthropic()] }),
+    );
+    renderSection();
+    const rows = await screen.findAllByRole("listitem");
+    expect(within(rows[0]).queryByText("Default", { exact: true })).not.toBeInTheDocument();
+  });
+
   it("a member who is not the owner sees the status but changes nothing", async () => {
     m.getAiProvider.mockResolvedValue(
       view({ connected: true, canManage: false, connections: [groq(), anthropic()] }),
