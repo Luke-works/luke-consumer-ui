@@ -25,6 +25,8 @@ export type AiProviderOption = {
   keyPrefix?: string;
   /** Where to go and create the key. */
   consoleUrl: string;
+  /** Whether this workspace already has this one, so the page offers Add vs Replace key. */
+  connected?: boolean;
 };
 
 /**
@@ -39,6 +41,8 @@ export type AiProviderOption = {
  * wrong guess should demote a model into a second group, never make it unreachable.
  */
 export type AiModel = {
+  /** Which connected provider offers it — a workspace may have several. */
+  provider: AiProviderId;
   id: string;
   chat: boolean;
 };
@@ -51,28 +55,42 @@ export type AiProviderStatus =
   /** Removed. */
   | "DISCONNECTED";
 
-export type AiProviderView = {
-  /** Whether this deployment has an agent fleet at all. */
-  enabled: boolean;
-  /** Whether a usable provider is connected right now. */
-  connected: boolean;
-  /** Whether the signed-in user may change any of this (owner only). */
-  canManage?: boolean;
-  status?: AiProviderStatus;
-  provider?: AiProviderId;
-  providerLabel?: string;
-  /** What the workspace picked; null/absent means "the provider default". */
+/** One provider this workspace has connected, and how it is doing. */
+export type AiConnection = {
+  provider: AiProviderId;
+  label?: string;
+  status: AiProviderStatus;
+  /** The one a turn uses when the person running it hasn't picked a provider. */
+  preferred: boolean;
+  /** The workspace's model for this provider; null means the provider's own default. */
   model?: string | null;
-  /** What a turn will actually run on — the choice, or the provider default. */
+  /** What a turn on this provider would actually use. */
   effectiveModel?: string | null;
   keyLast4?: string | null;
   connectedAt?: string | null;
   connectedBy?: string | null;
   verifiedAt?: string | null;
-  /** Why the provider last refused. Never contains the key. */
+  /** Why this provider last refused. Never contains the key. */
   lastError?: string | null;
+};
+
+export type AiProviderView = {
+  /** Whether this deployment has an agent fleet at all. */
+  enabled: boolean;
+  /** Whether at least one connected provider can actually run a turn. */
+  connected: boolean;
+  /** Whether the signed-in user may change any of this (owner only). */
+  canManage?: boolean;
+  /**
+   * Every provider connected to this workspace, healthy or not.
+   *
+   * A list rather than a single provider: connecting a second one used to overwrite the first
+   * one's key outright, so a workspace could only ever hold one. Now each keeps its own key and
+   * people can run on different ones.
+   */
+  connections?: AiConnection[];
   providers?: AiProviderOption[];
-  /** Only on a connect response: the models that key may use, with their capability. */
+  /** Only on a connect response: the models that key may use. */
   models?: AiModel[];
 };
 
@@ -111,9 +129,14 @@ export function connectAiProvider(
   );
 }
 
-/** Re-check the stored key against the provider. Owner only. */
-export function verifyAiProvider(tenantId: string): Promise<AiProviderView> {
-  return authed(`${BASE}/provider/verify`, tenantInit(tenantId, { method: "POST" }));
+/** Re-check one connected provider's stored key against it. Owner only. */
+export function verifyAiProvider(tenantId: string, provider: AiProviderId): Promise<AiProviderView> {
+  return authed(`${BASE}/provider/${provider}/verify`, tenantInit(tenantId, { method: "POST" }));
+}
+
+/** Choose which provider a turn uses when the person running it hasn't picked one. Owner only. */
+export function setDefaultAiProvider(tenantId: string, provider: AiProviderId): Promise<AiProviderView> {
+  return authed(`${BASE}/provider/${provider}/default`, tenantInit(tenantId, { method: "PUT" }));
 }
 
 /** The models this workspace's own key may use — read live from their provider. */
@@ -121,10 +144,14 @@ export function listAiModels(tenantId: string): Promise<{ models: AiModel[] }> {
   return authed(`${BASE}/provider/models`, tenantInit(tenantId));
 }
 
-/** Change the model without re-pasting the key. Owner only. */
-export function chooseAiModel(tenantId: string, model: string | null): Promise<AiProviderView> {
+/** Change one provider's workspace model without re-pasting its key. Owner only. */
+export function chooseAiModel(
+  tenantId: string,
+  provider: AiProviderId,
+  model: string | null,
+): Promise<AiProviderView> {
   return authed(
-    `${BASE}/provider/model`,
+    `${BASE}/provider/${provider}/model`,
     tenantInit(tenantId, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -133,9 +160,9 @@ export function chooseAiModel(tenantId: string, model: string | null): Promise<A
   );
 }
 
-/** Forget the key. The row survives as the audit trail of who connected what. Owner only. */
-export function disconnectAiProvider(tenantId: string): Promise<AiProviderView> {
-  return authed(`${BASE}/provider`, tenantInit(tenantId, { method: "DELETE" }));
+/** Forget ONE provider's key. The row survives as the audit trail. Owner only. */
+export function disconnectAiProvider(tenantId: string, provider: AiProviderId): Promise<AiProviderView> {
+  return authed(`${BASE}/provider/${provider}`, tenantInit(tenantId, { method: "DELETE" }));
 }
 
 /**
@@ -152,9 +179,13 @@ export type AiPreference = {
   connected: boolean;
   /** Whether this person could connect one themselves (owner), or must ask someone who can. */
   canManage?: boolean;
+  /** The provider this person's turns run on. */
   provider?: AiProviderId | null;
-  /** What the workspace is set to, offered as the "follow the workspace" option. */
+  /** What the workspace defaults to, offered as the "follow the workspace" option. */
+  workspaceProvider?: AiProviderId | null;
   workspaceModel?: string | null;
+  /** Labels for the providers this workspace has, so groups read "Anthropic" not "anthropic". */
+  providers?: { id: AiProviderId; label: string }[];
   /** This person's own pick; null means they follow the workspace. */
   model?: string | null;
   /** What their turns actually run on right now. */
@@ -166,14 +197,23 @@ export function getAiPreference(tenantId: string): Promise<AiPreference> {
   return authed(`${BASE}/preference`, tenantInit(tenantId));
 }
 
-/** Choose the model THIS person's turns run on. Blank/null follows the workspace. */
-export function chooseMyAiModel(tenantId: string, model: string | null): Promise<AiPreference> {
+/**
+ * Choose the provider AND model THIS person's turns run on. Blank model follows the workspace.
+ *
+ * Both travel together: a model name only means something to the provider that offers it, and a
+ * workspace may now have several connected.
+ */
+export function chooseMyAiModel(
+  tenantId: string,
+  provider: AiProviderId | null,
+  model: string | null,
+): Promise<AiPreference> {
   return authed(
     `${BASE}/preference`,
     tenantInit(tenantId, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: model ?? "" }),
+      body: JSON.stringify({ provider: provider ?? "", model: model ?? "" }),
     }),
   );
 }
