@@ -106,12 +106,21 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   const providerLabel = (id: string) =>
     (pref.providers ?? []).find((p) => p.id === id)?.label ?? id;
 
+  const pinned = pref.model;
   const options: ListboxOption[] = [
     {
       value: "",
       label: "Workspace default",
       hint: pref.workspaceModel ?? undefined,
     },
+    // The pinned model has to be SELECTABLE, not merely displayable. The list is fetched on
+    // open and may never arrive (a provider blip leaves it empty for good), and without a row
+    // to land on the highlight falls to index 0 — so Enter, the natural way to confirm "yes,
+    // this one", silently unpinned the model instead. Displaying it was only half the fix; this
+    // is the half that was missing here but present in AiConnectionRow.
+    ...(pinned && !(models ?? []).some((m) => m.id === pinned)
+      ? [{ value: pinned, label: pinned, group: "Current choice" }]
+      : []),
     ...(models ?? []).map((m) => ({
       value: m.id,
       label: m.id,

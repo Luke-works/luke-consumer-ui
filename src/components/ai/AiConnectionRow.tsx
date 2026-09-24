@@ -60,7 +60,15 @@ export default function AiConnectionRow({
 
   const pinned = connection.model;
   const modelOptions: ListboxOption[] = [
-    { value: "", label: "Provider default", hint: connection.effectiveModel ?? undefined },
+    {
+      value: "",
+      label: "Provider default",
+      // Only when nothing is pinned. `effectiveModel` is what a turn WOULD use, so once a model
+      // is pinned it equals that model — and showing it here made "Provider default" claim to
+      // resolve to the very model sitting selected below it, with no way to tell what reverting
+      // would do. The native markup guarded this with `!connection.model`; the port dropped it.
+      hint: !connection.model ? (connection.effectiveModel ?? undefined) : undefined,
+    },
     // A stored choice stays SELECTABLE even when the provider's list has not arrived (it is
     // fetched on open) or came back without it — the same fallback the native version carried.
     ...(pinned && !(models ?? []).some((m) => m.id === pinned)
@@ -172,8 +180,7 @@ export default function AiConnectionRow({
                 size="sm"
                 value={connection.model ?? ""}
                 options={modelOptions}
-                disabled={busy}
-                // Read live from this provider, and only when someone opens it: fetching for
+                        // Read live from this provider, and only when someone opens it: fetching for
                 // every connected provider on page load would cost a round trip each, for a
                 // control most people never touch.
                 onOpen={onLoadModels}

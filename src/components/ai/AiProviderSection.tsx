@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
+import Select from "../ui/select/Select";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/authApi";
@@ -201,9 +202,8 @@ export default function AiProviderSection() {
                   <label htmlFor="ai-provider" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Provider
                   </label>
-                  <select
+                  <Select
                     id="ai-provider"
-                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-white/90"
                     value={provider}
                     disabled={busy}
                     onChange={(e) => setProvider(e.target.value as AiProviderId)}
@@ -214,7 +214,7 @@ export default function AiProviderSection() {
                         {p.connected ? " — already connected" : ""}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>

@@ -109,6 +109,7 @@ export default function ConnectionsPage() {
             id="wf-provider"
             value={selection}
             onChange={(e) => setSelection(e.target.value)}
+            size="sm"
             fullWidth={false}
           >
             {COMMON_PROVIDERS.map((p) => (
@@ -122,7 +123,7 @@ export default function ConnectionsPage() {
             <input
               value={otherProvider}
               onChange={(e) => setOtherProvider(e.target.value.trim())}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-white/5"
+              className="h-9 rounded-lg border border-gray-200 px-3 text-xs dark:border-gray-700 dark:bg-white/5"
               placeholder="Nango provider key, e.g. airtable"
             />
           ) : null}

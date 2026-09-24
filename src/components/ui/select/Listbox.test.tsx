@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Listbox, { type ListboxOption } from "./Listbox";
 
@@ -16,18 +16,31 @@ function Harness({
   options,
   initial = "",
   onPick,
+  lazy = false,
 }: {
   options: ListboxOption[];
   initial?: string;
   onPick?: (v: string) => void;
+  /**
+   * Deliver `options` only AFTER the list is opened, which is what both real call sites do —
+   * they fetch the provider's model list on `onOpen`. Passing the full list at mount quietly
+   * removes the race these tests exist to pin down, and a test written that way passes against
+   * the broken code too.
+   */
+  lazy?: boolean;
 }) {
   const [value, setValue] = useState(initial);
+  const [loaded, setLoaded] = useState<ListboxOption[] | null>(lazy ? null : options);
+  const shown = loaded ?? options.filter((o) => o.value === "");
   return (
     <>
       <Listbox
         ariaLabel="Model"
         value={value}
-        options={options}
+        options={shown}
+        onOpen={() => {
+          if (lazy) void Promise.resolve().then(() => setLoaded(options));
+        }}
         onChange={(v) => {
           setValue(v);
           onPick?.(v);
@@ -92,40 +105,63 @@ describe("Listbox — the things a native select does for free", () => {
     warn.mockRestore();
   });
 
-  it("puts the highlight on the saved value, not on the first row", async () => {
-    render(<Harness options={[{ value: "", label: "Workspace default" }, chat("a"), chat("b")]} initial="b" />);
+  it("moves the highlight onto the saved value once the options arrive", async () => {
+    // Lazy on purpose. With the list present at mount, the old `[open]`-only effect already saw
+    // it and this passed against the broken code — the race was never created.
+    render(
+      <Harness lazy options={[{ value: "", label: "Workspace default" }, chat("a"), chat("b")]} initial="b" />,
+    );
     const trigger = screen.getByRole("combobox");
     await userEvent.click(trigger);
+    await screen.findByRole("option", { name: "b" });
 
-    const activeId = trigger.getAttribute("aria-activedescendant");
-    expect(document.getElementById(activeId!)).toHaveTextContent("b");
+    await waitFor(() => {
+      const activeId = trigger.getAttribute("aria-activedescendant");
+      expect(document.getElementById(activeId!)).toHaveTextContent("b");
+    });
   });
 
-  it("Enter commits the saved row, not the first one", async () => {
-    // The consequence of the above: a keyboard user opening on their pinned model and pressing
-    // Enter to confirm was silently reset to the workspace default.
+  it("Enter commits the saved row, not the workspace default", async () => {
+    // The consequence of the above, and the reason it matters: a keyboard user opening on their
+    // pinned model and pressing Enter to confirm it was silently reset to the workspace default.
     const onPick = vi.fn();
-    render(<Harness options={[{ value: "", label: "Workspace default" }, chat("a"), chat("b")]} initial="b" onPick={onPick} />);
+    render(
+      <Harness
+        lazy
+        options={[{ value: "", label: "Workspace default" }, chat("a"), chat("b")]}
+        initial="b"
+        onPick={onPick}
+      />,
+    );
     screen.getByRole("combobox").focus();
 
-    await userEvent.keyboard("{ArrowDown}"); // opens
+    await userEvent.keyboard("{ArrowDown}"); // opens, and triggers the fetch
+    await screen.findByRole("option", { name: "b" });
     await userEvent.keyboard("{Enter}");
 
     expect(onPick).not.toHaveBeenCalledWith("");
   });
 
-  it("returns focus to the page, not to <body>, when tabbing out", async () => {
-    // The popup is a portal at the end of <body>; letting Tab proceed from inside it walks off
-    // the end of the document instead of to the next control.
-    render(<Harness options={[chat("a"), chat("b")]} />);
+  it("hands focus back to the trigger before letting Tab move on", async () => {
+    // The scenario is Tab from the FILTER, which lives in a portal at the end of <body> — so it
+    // needs a list long enough to render one (the two-option version tested nothing: no filter
+    // was mounted and focus never left the trigger).
+    //
+    // Asserted as the handler's own contract — focus is on the trigger once Tab is handled —
+    // rather than through userEvent.tab(). user-event computes its destination from the event
+    // TARGET rather than the post-handler activeElement, so it lands on <body> in jsdom whatever
+    // this code does. Verified separately in a real browser that focus then moves to #after.
+    const many = Array.from({ length: 20 }, (_, i) => chat(`model-${i}`));
+    render(<Harness options={many} />);
     const trigger = screen.getByRole("combobox");
-    trigger.focus();
-    await userEvent.keyboard("{ArrowDown}");
+    await userEvent.click(trigger);
+    const filter = await screen.findByRole("textbox", { name: /filter/i });
+    expect(document.activeElement).toBe(filter);
 
-    await userEvent.tab();
+    fireEvent.keyDown(filter, { key: "Tab" });
 
-    expect(document.body).not.toBe(document.activeElement);
-    expect(document.activeElement).toBe(document.getElementById("after"));
+    expect(document.activeElement).toBe(trigger);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
   it("focuses the filter the FIRST time it opens, not only the second", async () => {

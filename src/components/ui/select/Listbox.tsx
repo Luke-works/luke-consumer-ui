@@ -46,6 +46,8 @@ const BOX: Record<SelectSize, string> = {
 /** Room to leave between the popup and the viewport edge. */
 const GUTTER = 24;
 const MAX_POPUP = 320;
+/** Model ids are long; a popup matching a narrow trigger truncates all of them. */
+const MIN_POPUP_WIDTH = 240;
 
 /**
  * A dropdown for lists the native one genuinely fails: long, grouped, worth searching.
@@ -160,15 +162,21 @@ export default function Listbox({
   /**
    * Keep the highlight on the selection.
    *
-   * <p>Depends on `flatOptions` as well as `open`, because the options arrive AFTER opening —
-   * that is the whole point of `onOpen`. Keyed on `open` alone, this ran against an empty list,
-   * fell back to 0, and never corrected itself.
+   * <p>Has to re-run when the options ARRIVE, because they are fetched after opening — keyed on
+   * `open` alone this ran against an empty list and never corrected itself.
+   *
+   * <p>But it must not re-run merely because the array is a NEW array. Both call sites build
+   * `options` inline, so every parent render mints a fresh one — a streaming assistant turn, a
+   * sibling row going busy — and depending on its identity meant the highlight snapped back to
+   * the selection every time, so a keyboard user could not arrow anywhere while the panel was
+   * alive. Depending on the CONTENT fires on a real change and stays quiet for a re-render.
    */
+  const optionSignature = flatOptions.map((o) => o.value).join("\u0000");
   useEffect(() => {
     if (!open) return;
     const at = flatOptions.findIndex((o) => o.value === value);
     setActive(at >= 0 ? at : 0);
-  }, [open, flatOptions, value]);
+  }, [open, optionSignature, value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Focus the filter once it actually exists.
@@ -194,7 +202,11 @@ export default function Listbox({
     if (!open) return;
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (!popupRef.current?.contains(t) && !triggerRef.current?.contains(t)) setOpen(false);
+      if (popupRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
+      // Clear the query too. Every other exit does, and leaving it behind meant reopening to a
+      // stale filter and an empty list, with nothing on screen explaining where the models went.
+      setOpen(false);
+      setQuery("");
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -311,16 +323,23 @@ export default function Listbox({
 
   const activeDescendant = open && flatOptions[active] ? optionId(active) : undefined;
 
-  /** Flip above the trigger when there is more room up there. */
+  /** Keep the popup on screen: flip above the trigger when there is more room up there, and
+   *  never let it run off the right edge. It is position:fixed, so anything outside the viewport
+   *  is clipped rather than scrollable — and this control's main home is a RIGHT-DOCKED panel,
+   *  where a popup wider than its trigger grows straight off the screen. */
   const geometry = () => {
     if (!rect) return null;
     const below = window.innerHeight - rect.bottom - GUTTER;
     const above = rect.top - GUTTER;
     const flip = below < 180 && above > below;
     const height = Math.max(160, Math.min(MAX_POPUP, flip ? above : below));
+    const room = Math.max(160, window.innerWidth - 2 * GUTTER);
+    const width = Math.min(Math.max(rect.width, MIN_POPUP_WIDTH), room);
     return {
       height,
+      width,
       top: flip ? Math.max(GUTTER, rect.top - 6 - height) : rect.bottom + 6,
+      left: Math.max(GUTTER, Math.min(rect.left, window.innerWidth - width - GUTTER)),
     };
   };
   const geo = geometry();
@@ -373,8 +392,8 @@ export default function Listbox({
               style={{
                 position: "fixed",
                 top: geo.top,
-                left: rect.left,
-                width: Math.max(rect.width, 240),
+                left: geo.left,
+                width: geo.width,
                 maxHeight: geo.height,
               }}
               className="z-[60] flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
