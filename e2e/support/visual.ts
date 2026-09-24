@@ -1,3 +1,5 @@
+import type { Page } from "@playwright/test";
+
 /**
  * WHERE AND WHEN THE VISUAL BASELINES RUN — the single rule, shared by `visual.spec.ts` and
  * `visual-states.spec.ts` so the two can never disagree.
@@ -81,3 +83,31 @@ export const SCREENSHOT_OPTIONS = {
    */
   maxDiffPixels: 20,
 } as const;
+
+/**
+ * Put every scrollable container back to its origin, immediately before a shot.
+ *
+ * Browsers scroll things on their own: a sidebar with more items than fit gets scrolled to
+ * reveal the active one; a sub-nav tab strip narrower than its tabs gets scrolled to bring the
+ * selected tab into view. Both containers here hide their scrollbars, so nothing in the picture
+ * says it happened — and the amount varies between runs. Shots therefore differed from
+ * THEMSELVES across two runs of the same commit: ~4,700 px on desktop-nav-expanded (sidebar,
+ * vertical), ~1,200 px on access-candidate-groups-phone (tab strip, horizontal).
+ *
+ * This is the fix SCREENSHOT_OPTIONS asks for above — find the nondeterminism rather than raise
+ * maxDiffPixels, because every pixel added to that budget is a pixel of the product nobody is
+ * looking at. Applied to every container rather than the two we happened to catch, so the next
+ * scrollable thing someone adds is deterministic without having to know about this.
+ *
+ * It does NOT settle the UX question underneath: at 1280x800 the sidebar rail is now full
+ * enough for the last item to sit below a fold with no scrollbar to hint at it. That is a
+ * layout decision, and a screenshot that cannot reproduce itself is no way to ask it.
+ */
+export async function pinScrollPositions(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
+      if (el.scrollTop) el.scrollTop = 0;
+      if (el.scrollLeft) el.scrollLeft = 0;
+    }
+  });
+}
