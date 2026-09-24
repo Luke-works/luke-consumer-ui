@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth, useUser } from "../../context/AuthContext";
 import PageMeta from "../../components/common/PageMeta";
+import AiProviderSection from "../../components/ai/AiProviderSection";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
@@ -96,6 +97,12 @@ export default function Settings() {
             </span>
           </div>
         </section>
+
+        {/* AI assistant — the provider this workspace's assistant runs on. A workspace setting
+            rather than a personal one, so it is owner-gated inside; it lives here because it is
+            set up once and rarely revisited, and a permanent slot in the primary navigation was
+            pushing the last nav item below a fold at laptop height. */}
+        <AiProviderSection />
 
         {/* Password */}
         <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
