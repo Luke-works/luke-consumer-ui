@@ -56,10 +56,17 @@ export default function AiModelPicker({ className = "" }: { className?: string }
 
   const choose = async (model: string) => {
     if (!tenant) return;
+    // Keep the control usable rather than disabling it: a browser blurs a focused element when it
+    // becomes disabled and drops focus to <body>, so a keyboard user loses their place on every
+    // save. `saving` now only guards against overlapping writes.
     setSaving(true);
     setError(null);
     try {
-      setPref(await chooseMyAiModel(tenant, model || null));
+      const saved = await chooseMyAiModel(tenant, model || null);
+      // Merge, never replace: a response missing `enabled` would otherwise unmount this control
+      // the instant a save succeeded. The server now always sends it; this makes the component
+      // independent of that promise.
+      setPref((prev) => ({ ...(prev ?? {}), ...saved }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't change the model.");
     } finally {
@@ -69,16 +76,20 @@ export default function AiModelPicker({ className = "" }: { className?: string }
 
   if (!pref?.enabled) return null;
 
-  // Nothing connected: point at the one thing that would fix it, and only for the person who
-  // can act on it — a member seeing "go connect a provider" they cannot connect is just noise.
+  // Nothing connected. Only the owner can fix that, so only the owner is sent to the page that
+  // fixes it; anyone else is told who to ask, which is the actionable half for them.
   if (!pref.connected) {
-    return (
+    return pref.canManage ? (
       <Link
         to="/account/settings#ai"
         className={`text-xs font-medium text-brand-600 underline dark:text-brand-400 ${className}`}
       >
         Connect an AI provider
       </Link>
+    ) : (
+      <span className={`text-xs text-gray-400 ${className}`}>
+        Ask the workspace owner to connect an AI provider
+      </span>
     );
   }
 
@@ -93,7 +104,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
       <select
         id="ai-model-picker"
         value={current}
-        disabled={saving}
+        aria-busy={saving}
         title={`Runs on ${pref.effectiveModel ?? "the workspace default"}`}
         onFocus={() => void loadModels()}
         onChange={(e) => void choose(e.target.value)}

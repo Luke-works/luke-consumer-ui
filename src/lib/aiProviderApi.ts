@@ -134,6 +134,8 @@ export type AiPreference = {
   enabled: boolean;
   /** False when the workspace has no usable provider — there is nothing to choose yet. */
   connected: boolean;
+  /** Whether this person could connect one themselves (owner), or must ask someone who can. */
+  canManage?: boolean;
   provider?: AiProviderId | null;
   /** What the workspace is set to, offered as the "follow the workspace" option. */
   workspaceModel?: string | null;

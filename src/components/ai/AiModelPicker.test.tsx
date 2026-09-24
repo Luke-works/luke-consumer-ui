@@ -49,12 +49,47 @@ describe("AiModelPicker — your model, the workspace's key", () => {
   });
 
   it("offers the one useful action when no provider is connected", async () => {
-    m.getAiPreference.mockResolvedValue(pref({ connected: false }));
+    m.getAiPreference.mockResolvedValue(pref({ connected: false, canManage: true }));
     renderPicker();
     const link = await screen.findByRole("link", { name: /connect an ai provider/i });
     // Settings, not a page of its own — the nav slot went back to the product.
     expect(link).toHaveAttribute("href", "/account/settings#ai");
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("tells a non-owner who to ask instead of linking them somewhere they can't act", async () => {
+    m.getAiPreference.mockResolvedValue(pref({ connected: false, canManage: false }));
+    renderPicker();
+    expect(await screen.findByText(/ask the workspace owner/i)).toBeInTheDocument();
+    // Only the owner can connect one, so only the owner is sent to the page that does it.
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("survives a save whose response omits the flags it renders on", async () => {
+    // The response is merged, not swapped in: a body without `enabled` used to unmount this
+    // control the instant a save SUCCEEDED.
+    m.chooseMyAiModel.mockResolvedValue({ connected: true, model: "llama-3.3-70b-versatile" } as api.AiPreference);
+    renderPicker();
+    const select = await screen.findByRole("combobox");
+    select.focus();
+    await screen.findByRole("option", { name: "llama-3.3-70b-versatile" });
+
+    await userEvent.selectOptions(select, "llama-3.3-70b-versatile");
+    await waitFor(() => expect(m.chooseMyAiModel).toHaveBeenCalled());
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("does not drop keyboard focus while saving", async () => {
+    // Disabling a focused element blurs it to <body>, so a keyboard user lost their place on
+    // every save.
+    m.chooseMyAiModel.mockResolvedValue(pref({ model: "llama-3.3-70b-versatile" }));
+    renderPicker();
+    const select = await screen.findByRole("combobox");
+    select.focus();
+    await screen.findByRole("option", { name: "llama-3.3-70b-versatile" });
+
+    await userEvent.selectOptions(select, "llama-3.3-70b-versatile");
+    expect(document.activeElement).toBe(select);
   });
 
   it("defaults to following the workspace, and names what that means", async () => {

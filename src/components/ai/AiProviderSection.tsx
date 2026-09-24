@@ -75,7 +75,10 @@ export default function AiProviderSection() {
   }, [tenant]);
 
   const apply = useCallback((v: AiProviderView, message?: string) => {
-    setView(v);
+    // Merge, never replace. A response missing `enabled`/`canManage` would otherwise make this
+    // card report the feature as unavailable the moment a key was successfully connected. The
+    // server now always sends both; merging keeps the component independent of that.
+    setView((prev) => ({ ...(prev ?? {}), ...v }));
     setApiKey("");
     setModels(v.models ?? null);
     setError(null);
@@ -133,7 +136,10 @@ export default function AiProviderSection() {
   };
 
   const options: AiProviderOption[] = view?.providers ?? [];
+  /** The provider the connect FORM is showing — used for its placeholder and console link. */
   const chosen = options.find((p) => p.id === provider);
+  /** The provider actually CONNECTED — used for anything describing current behaviour. */
+  const connectedDefault = options.find((p) => p.id === view?.provider)?.defaultModel;
   const connected = view?.status === "CONNECTED";
   const invalid = view?.status === "INVALID";
   const canManage = view?.canManage === true;
@@ -223,7 +229,9 @@ export default function AiProviderSection() {
                     onChange={(e) => void saveModel(e.target.value)}
                   >
                     <option value="">
-                      Provider default{chosen?.defaultModel ? ` (${chosen.defaultModel})` : ""}
+                      {/* The CONNECTED provider's default — `chosen` follows the connect form's
+                          dropdown, which is a different provider until someone submits it. */}
+                      Provider default{connectedDefault ? ` (${connectedDefault})` : ""}
                     </option>
                     {/* The stored choice stays selectable even before the live list loads. */}
                     {view.model && !(models ?? []).includes(view.model) ? (
