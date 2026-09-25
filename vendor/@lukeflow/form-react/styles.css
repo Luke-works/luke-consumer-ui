@@ -980,6 +980,22 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 }
 
 /* ── Breadth controls: rating · ranking · matrix · address · rich text ───────────── */
+/* A stepper is a short answer — a count — so it sits BESIDE its label rather than under it,
+   the way a checkbox does. Stacking it left a wide empty row for a control 7rem across.
+   Scoped to the field type so no other field's layout moves, and only when the author has not
+   chosen a label position themselves. */
+.lf-field[data-type="stepper"][data-label-position="top"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.lf-field[data-type="stepper"][data-label-position="top"] > .lf-label { margin-bottom: 0; }
+/* The hint/error still belong under the pair, not beside it. */
+.lf-field[data-type="stepper"][data-label-position="top"] > .lf-desc,
+.lf-field[data-type="stepper"][data-label-position="top"] > .lf-count,
+.lf-field[data-type="stepper"][data-label-position="top"] > .lf-error { flex-basis: 100%; }
+
 /* ── Stepper: − value + ─────────────────────────────────────────────────────
    One bordered group rather than three separate controls, so it reads as a single field. The
    buttons are aria-hidden and untabbable: the input between them is a real number input and

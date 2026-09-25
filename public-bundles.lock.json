@@ -1,9 +1,9 @@
 {
   "_comment": "SHA-256 of the public bundles built here and SERVED by luke-core-engine. If `npm run bundles:check` fails, the bundles changed: run `npm run vendor:embed` and `npm run vendor:respond` to copy them into core-engine, commit BOTH repos, then `npm run bundles:lock` to record the new hashes.",
   "bundles": {
-    "embed/embed.js": "79441d40f1dfec8288228405adac0ac8bf588cc044c5f11cdb4382fccc030f27",
-    "embed/embed.css": "ca3a23ffa0c03fae79d84ab39df26117eceb53eb9a0be2f2b277e0e5abc6e75e",
-    "respond/respond.js": "674da4d34046c5d2067a7530c6cddfaa1c8208f085a81aa10e05f960c1fee9e4",
-    "respond/respond.css": "ca3a23ffa0c03fae79d84ab39df26117eceb53eb9a0be2f2b277e0e5abc6e75e"
+    "embed/embed.js": "77e2fc9eef12b075aca6fa0c751c5d79b2c9bd6ac16da0cd53def42256b48ebe",
+    "embed/embed.css": "536f7c48fd077acec7471c56142e5b339fe53ab471a634f628dcf108ac39ff74",
+    "respond/respond.js": "44f6bc5a6f62974280530d3f3b252ff6230af9497cdef6d6526833957bd5a5ea",
+    "respond/respond.css": "536f7c48fd077acec7471c56142e5b339fe53ab471a634f628dcf108ac39ff74"
   }
 }
