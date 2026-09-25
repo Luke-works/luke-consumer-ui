@@ -238,7 +238,7 @@ export default function AiAssistPanel({
             squeezed between the title and the panel edge — the one place in this panel with
             no room, on a control whose whole job is to be read at a glance. */}
         <div className="mt-2 flex items-center justify-between gap-2">
-          <AiModelPicker className="min-w-0" />
+          <AiModelPicker className="min-w-0" agent="form" task="building forms" />
         </div>
         <p className="mt-1.5 text-[11px] leading-tight text-gray-400">
           Best for adding & editing fields. Existing tabs/tables are preserved but may move below new fields.

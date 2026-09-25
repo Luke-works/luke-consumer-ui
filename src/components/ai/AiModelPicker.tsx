@@ -25,11 +25,30 @@ import {
  */
 /** Quiet by default: these sit under the prompt box and should read as settings you can reach,
  *  not form fields competing with the thing you are typing. */
+/** Sentinel for the row that expands the list instead of choosing from it. */
+const SHOW_ALL = "__show_all__";
+
 const QUIET =
   "h-7 max-w-full border-transparent bg-transparent px-2 text-[11px] text-gray-500 " +
   "hover:border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:hover:border-gray-700 dark:hover:bg-white/5";
 
-export default function AiModelPicker({ className = "" }: { className?: string }) {
+export default function AiModelPicker({
+  className = "",
+  agent,
+  task,
+}: {
+  className?: string;
+  /**
+   * Which job the models are for — `form`, `email`, `workflow`.
+   *
+   * <p>A model that drafts a good email is not automatically one that builds a valid form, so
+   * the recommendation is per agent. Omitted, the list comes back unranked and this behaves
+   * exactly as it did.
+   */
+  agent?: string;
+  /** How to name that job to a person: "building forms". */
+  task?: string;
+}) {
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
 
@@ -43,6 +62,8 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   const savingRef = useRef(false);
   /** The model whose ⓘ was pressed, if any. */
   const [info, setInfo] = useState<ListboxOption | null>(null);
+  /** Whether the long tail past the shortlist is on screen. */
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (!tenant) return;
@@ -59,13 +80,13 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     if (!tenant || models || loading.current) return;
     loading.current = true;
     try {
-      setModels((await listAiModels(tenant)).models);
+      setModels((await listAiModels(tenant, agent)).models);
     } catch {
       setModels([]); // no list → keep the current choice, offer nothing new
     } finally {
       loading.current = false;
     }
-  }, [tenant, models]);
+  }, [tenant, models, agent]);
 
   /**
    * Option values carry their provider.
@@ -92,6 +113,12 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   };
 
   const choose = async (value: string) => {
+    // Not a model — it reveals the rest of them. Handled here rather than by the Listbox so
+    // that component stays a list of choices and knows nothing about this one's meaning.
+    if (value === SHOW_ALL) {
+      setShowAll(true);
+      return;
+    }
     // A ref, not the `saving` state: the state read here is the one captured when this render's
     // closure was built, so a second pick in the same tick would sail past it.
     if (!tenant || savingRef.current) return;
@@ -177,6 +204,29 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   const forProvider = (models ?? []).filter((m) => m.provider === shownProvider);
   /** Every model of an out-of-credit provider is equally unrunnable — mark them all. */
   const providerDry = (pref.providers ?? []).find((p) => p.id === shownProvider)?.exhausted ?? false;
+  /**
+   * Two dozen models is not a choice, it is a quiz.
+   *
+   * <p>So the few worth using come first and the rest sit behind one more click — never
+   * removed. Capability here is partly learned and partly guessed, and the rule this file has
+   * followed throughout is that a wrong guess costs a click rather than making a model
+   * unreachable. While someone is filtering, everything is in scope: a filter that searched
+   * only the shortlist would be a worse lie than a long list.
+   */
+  const recommended = forProvider
+    .filter((m) => m.recommended)
+    .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
+  const rest = forProvider.filter((m) => !m.recommended);
+  const shortlisted = recommended.length > 0 && !showAll;
+
+  const asOption = (m: AiModel, group?: string): ListboxOption => ({
+    value: `m:${m.provider}:${m.id}`,
+    label: m.id,
+    group,
+    hint: providerDry ? "Out of credit" : undefined,
+    tone: providerDry ? ("danger" as const) : undefined,
+  });
+
   const modelOptions: ListboxOption[] = [
     { value: "", label: "Workspace default", hint: pref.workspaceModel ?? undefined },
     // A pinned model stays SELECTABLE even when the live list has not arrived or came back
@@ -184,19 +234,20 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     ...(pinned && !forProvider.some((m) => m.id === pinned)
       ? [{ value: `m:${mine ?? ""}:${pinned}`, label: pinned, group: "Current choice" }]
       : []),
-    ...forProvider.filter((m) => m.chat).map((m) => ({
-      value: `m:${m.provider}:${m.id}`,
-      label: m.id,
-      hint: providerDry ? "Out of credit" : undefined,
-      tone: providerDry ? ("danger" as const) : undefined,
-    })),
-    // Demoted, never hidden: capability is partly guessed from names, and a wrong guess must
-    // cost a click, not make a model unreachable.
-    ...forProvider.filter((m) => !m.chat).map((m) => ({
-      value: `m:${m.provider}:${m.id}`,
-      label: m.id,
-      group: "May not work for building",
-    })),
+    ...recommended.map((m) => asOption(m, task ? `Recommended for ${task}` : "Recommended")),
+    // One row to reveal the rest. Selecting it expands rather than commits — it is not a model,
+    // so picking it must not change what anyone's turns run on.
+    ...(shortlisted && rest.length > 0
+      ? [{ value: SHOW_ALL, label: `Show all ${forProvider.length} models`, keepOpen: true }]
+      : []),
+    ...(shortlisted
+      ? []
+      : [
+          ...rest.filter((m) => m.chat).map((m) => asOption(m, recommended.length ? "Other models" : undefined)),
+          // Demoted, never hidden: capability is partly guessed from names, and a wrong guess
+          // must cost a click, not make a model unreachable.
+          ...rest.filter((m) => !m.chat).map((m) => asOption(m, "May not work for building")),
+        ]),
   ];
 
   return (
