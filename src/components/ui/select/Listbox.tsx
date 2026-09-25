@@ -106,8 +106,6 @@ export default function Listbox({
   const listRef = useRef<HTMLUListElement>(null);
   // Type-ahead state, for jumping to an option by typing when there is no search box.
   const typed = useRef({ text: "", at: 0 });
-  // Whether the pointer has actually moved since the last keyboard-driven scroll.
-  const pointerMoved = useRef(false);
 
   const selected = options.find((o) => o.value === value);
   /**
@@ -174,20 +172,26 @@ export default function Listbox({
    * alive. Depending on the CONTENT fires on a real change and stays quiet for a re-render.
    */
   //
-  // <p>Built from `options`, the UNFILTERED prop — not from the filtered list. Keyed on the
-  // filtered one it re-ran on every keystroke that changed the result set, overwriting the
-  // deliberate `setActive(0)` the filter does to highlight its top match. The two then fought,
-  // and which won depended on whether your last keystroke happened to narrow the list: typing
-  // "gpt-1" left the highlight on the already-pinned gpt-11 instead of the first match, so
-  // filter-then-Enter re-committed the model you were trying to move away from.
+  // <p>Built from `options`, the UNFILTERED prop, and skipped entirely while a query is active:
+  // once someone is filtering, the filter owns the highlight (it puts it on the top match).
+  //
+  // <p>`query` is in the deps, and that is load-bearing rather than tidiness. Reading it inside
+  // the effect while leaving it out meant CLEARING the filter re-ran nothing — none of `open`,
+  // the signature, or `value` changes when a query empties — so the highlight stayed where the
+  // filter had left it, on row 0, and Enter then committed "Workspace default" and unpinned the
+  // model. That is the very failure an earlier round fixed, reintroduced by the fix for the
+  // round after it. The exhaustive-deps rule would have caught it; the disable comment that
+  // used to sit here is why it did not.
   const optionSignature = options.map((o) => o.value).join("\u0000");
   useEffect(() => {
-    if (!open) return;
-    // Only while unfiltered. Once someone is filtering, the filter owns the highlight.
-    if (query) return;
+    if (!open || query) return;
     const at = flatOptions.findIndex((o) => o.value === value);
     setActive(at >= 0 ? at : 0);
-  }, [open, optionSignature, value]); // eslint-disable-line react-hooks/exhaustive-deps
+    // flatOptions is intentionally absent: unfiltered it is `options`, which optionSignature
+    // already tracks by content, and depending on its identity is what made this effect fight
+    // every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, query, optionSignature, value]);
 
   /**
    * Focus the filter once it actually exists.
@@ -206,12 +210,11 @@ export default function Listbox({
    *
    * <p>Scrolling the list slides a different row under a STATIONARY cursor, and the browser
    * fires `mouseenter` for that — so arrowing past the fold handed the highlight back to
-   * whatever the pointer happened to be over. `pointerMoved` gates the hover handler so only a
-   * real pointer movement counts.
+   * whatever the pointer happened to be over. The rows listen for `mousemove` instead, which
+   * only fires when the pointer itself moves.
    */
   useEffect(() => {
     if (!open) return;
-    pointerMoved.current = false;
     // getElementById, not a CSS selector: useId produces ids containing colons, which need
     // escaping in a selector and need nothing here.
     document.getElementById(optionId(active))?.scrollIntoView?.({ block: "nearest" });
@@ -478,10 +481,8 @@ export default function Listbox({
                               role="option"
                               aria-selected={isSelected}
                               aria-disabled={option.disabled || undefined}
-                              onMouseMove={() => {
-                                pointerMoved.current = true;
-                                if (i !== active) setActive(i);
-                              }}
+                              // mousemove, not mouseenter: see the scroll-into-view note above.
+                              onMouseMove={() => i !== active && setActive(i)}
                               onClick={() => pick(option)}
                               className={[
                                 "flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",

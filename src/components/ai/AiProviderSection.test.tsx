@@ -381,6 +381,80 @@ describe("AiProviderSection — one write at a time", () => {
     release(view({ connected: true, connections: [groq(), anthropic()] }));
   });
 
+  it("says so when it refuses a second write instead of dropping it silently", async () => {
+    // The model Listbox is deliberately not disabled while busy, so picking again mid-save is
+    // an ordinary thing to do. Dropping it with no request, no message and a control that snaps
+    // back to the old value is indistinguishable from the app ignoring you.
+    let release: (v: api.AiProviderView) => void = () => {};
+    m.chooseAiModel.mockImplementation(
+      () => new Promise<api.AiProviderView>((res) => { release = res; }),
+    );
+
+    renderSection();
+    await userEvent.click((await screen.findAllByRole("button", { name: /Groq/ }))[0]!);
+    const picker = (await screen.findAllByRole("combobox"))[0]!;
+    await userEvent.click(picker);
+    await userEvent.click(await screen.findByRole("option", { name: /llama-3.3-70b-versatile/ }));
+    await waitFor(() => expect(m.chooseAiModel).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(picker);
+    const second = screen.queryAllByRole("option");
+    if (second.length) await userEvent.click(second[0]!);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/still saving/i);
+    release(view({ connected: true, connections: [groq(), anthropic()] }));
+  });
+
+  it("still fills a dropdown reopened while a superseded fetch is outstanding", async () => {
+    // Two guards that each did the right thing alone deadlocked together: the in-flight guard
+    // swallowed the reopen, and the superseded fetch then threw its own result away — leaving
+    // an open dropdown showing no models at all, with no spinner and no error.
+    const pending: Array<(v: { models: api.AiModel[] }) => void> = [];
+    m.listAiModels.mockImplementation(
+      () => new Promise<{ models: api.AiModel[] }>((res) => { pending.push(res); }),
+    );
+    m.verifyAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+
+    renderSection();
+    await userEvent.click((await screen.findAllByRole("button", { name: /Groq/ }))[0]!);
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!); // fetch #1 starts
+    await userEvent.keyboard("{Escape}");
+
+    // Something changes the providers under it; the outstanding fetch is now superseded.
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Check$/ }))[0]!);
+    await waitFor(() => expect(m.verifyAiProvider).toHaveBeenCalled());
+
+    // Reopening must be able to start a FRESH fetch rather than be swallowed.
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!);
+    await waitFor(() => expect(pending.length).toBeGreaterThan(1));
+    pending[pending.length - 1]!({
+      models: [{ provider: "groq", id: "llama-3.3-70b-versatile", chat: true }],
+    });
+
+    expect(await screen.findByRole("option", { name: /llama-3.3-70b-versatile/ })).toBeInTheDocument();
+  });
+
+  it("carries the pinned model through a key rotation", async () => {
+    // The server reads an absent model as "no model", not "leave it alone", so omitting it on a
+    // rotation silently reset the workspace to the provider's default.
+    m.getAiProvider.mockResolvedValue(
+      view({ connected: true, connections: [groq({ model: "llama-3.3-70b-versatile" })] }),
+    );
+    m.connectAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+
+    renderSection();
+    await userEvent.click(await screen.findByRole("button", { name: /Add another|Connect/i }));
+    await userEvent.type(await screen.findByLabelText(/key/i), "gsk_rotated_key_value");
+    await userEvent.click(await screen.findByRole("button", { name: /^Connect$/ }));
+
+    await waitFor(() =>
+      expect(m.connectAiProvider).toHaveBeenCalledWith(
+        "t1",
+        expect.objectContaining({ model: "llama-3.3-70b-versatile" }),
+      ),
+    );
+  });
+
   it("discards a model list that arrives after the providers changed under it", async () => {
     // loadModels bails on any non-null cache, so a fetch in flight across a connect that writes
     // its PRE-connect list back afterwards leaves the new provider's dropdown empty for the life

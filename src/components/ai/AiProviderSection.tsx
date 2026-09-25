@@ -64,19 +64,27 @@ export default function AiProviderSection() {
   // `loadModels` bails on any non-null cache, the new provider's dropdown stays empty for the
   // life of the page. That is the bug the comment in `apply` claims to have fixed.
   const generation = useRef(0);
-  const fetching = useRef(false);
+  // WHICH generation is in flight, not merely whether one is. A plain boolean deadlocked the
+  // two guards against each other: a reopen while a stale fetch was outstanding bailed on the
+  // boolean, and then the stale fetch discarded its own result because the generation had moved
+  // — zero fetches, zero data, and a dropdown left open in front of someone showing no models
+  // at all until they closed and reopened it. A fetch only blocks another fetch of its OWN
+  // generation.
+  const fetching = useRef<number | null>(null);
 
   const loadModels = useCallback(async () => {
-    if (!tenant || models || fetching.current) return;
+    if (!tenant || models) return;
     const startedAt = generation.current;
-    fetching.current = true;
+    if (fetching.current === startedAt) return;
+    fetching.current = startedAt;
     try {
       const fetched = (await listAiModels(tenant)).models;
       if (generation.current === startedAt) setModels(fetched);
     } catch {
       if (generation.current === startedAt) setModels([]); // unreadable → offer nothing new
     } finally {
-      fetching.current = false;
+      // Only clear it if a newer fetch has not claimed the slot meanwhile.
+      if (fetching.current === startedAt) fetching.current = null;
     }
   }, [tenant, models]);
 
@@ -105,6 +113,10 @@ export default function AiProviderSection() {
     if (message) setNotice(message);
   }, []);
 
+  /** What this provider already has pinned, so a key rotation does not silently drop it. */
+  const pinnedModelFor = (id: AiProviderId): string | undefined =>
+    (view?.connections ?? []).find((c) => c.provider === id)?.model ?? undefined;
+
   /** Runs one action, reporting whether it actually succeeded. */
   const act = async (fn: () => Promise<AiProviderView>, message?: string): Promise<boolean> => {
     // A ref, for the same reason AiModelPicker uses one: `busy` is state, read from the closure
@@ -115,7 +127,15 @@ export default function AiProviderSection() {
     // `disabled={busy}`, which left the model picker as the one unguarded way in — and `apply`
     // is last-response-wins, so two overlapping saves let the older server snapshot land second
     // and wipe the newer change off the screen while the server kept it.
-    if (busyRef.current) return false;
+    if (busyRef.current) {
+      // Say so. The model Listbox is deliberately NOT disabled while busy (disabling a focused
+      // control drops focus to <body>), which makes picking again mid-save an ordinary thing to
+      // do rather than a rarity — and silently dropping it left someone watching the control
+      // snap back to the old value with no request sent and nothing explaining why.
+      setNotice(null);
+      setError("Still saving the last change — try that again in a moment.");
+      return false;
+    }
     busyRef.current = true;
     setBusy(true);
     setError(null);
@@ -138,7 +158,11 @@ export default function AiProviderSection() {
     // the outcome — clearing unconditionally threw away the key someone had just pasted and
     // collapsed the form as though it had worked, with the failure showing above an empty form.
     const ok = await act(
-      () => connectAiProvider(tenant, { provider, apiKey }),
+      // Carry the pinned model through a ROTATION. The server treats an absent model as
+      // "no model", not as "leave it alone" — normalizeModel(null) returns null and the row is
+      // set to it — so replacing a key silently reset the workspace back to the provider's
+      // default, which is not what "rotate this key" means to anyone.
+      () => connectAiProvider(tenant, { provider, apiKey, model: pinnedModelFor(provider) }),
       "Connected. Your workspace can use this provider now.",
     );
     if (!ok) return;

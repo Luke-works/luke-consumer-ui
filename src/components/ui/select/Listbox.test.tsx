@@ -208,6 +208,37 @@ describe("Listbox — the things a native select does for free", () => {
     expect(active).not.toHaveTextContent("model-11");
   });
 
+  it("puts the highlight back on the saved value when the filter is cleared", async () => {
+    // The filter owns the highlight while a query is active, so clearing it has to HAND THE
+    // HIGHLIGHT BACK. Reading `query` in the effect without depending on it meant nothing
+    // re-ran when the box emptied: the highlight stayed on row 0 where the filter left it, and
+    // Enter committed "Workspace default" — unpinning the very model the trigger was showing.
+    const many = Array.from({ length: 12 }, (_, i) => chat(`model-${i}`));
+    const onPick = vi.fn();
+    render(
+      <Harness
+        options={[{ value: "", label: "Workspace default" }, ...many]}
+        initial="model-11"
+        onPick={onPick}
+      />,
+    );
+    const trigger = screen.getByRole("combobox");
+    await userEvent.click(trigger);
+
+    const filter = await screen.findByRole("textbox", { name: /filter/i });
+    await userEvent.type(filter, "zzz"); // matches nothing
+    await userEvent.clear(filter);
+
+    await waitFor(() => {
+      const activeId = filter.getAttribute("aria-activedescendant");
+      expect(document.getElementById(activeId!)).toHaveTextContent("model-11");
+    });
+
+    // And the consequence a person actually feels.
+    await userEvent.keyboard("{Enter}");
+    expect(onPick).not.toHaveBeenCalledWith("");
+  });
+
   it("leaves Home and End to the caret while typing in the filter", async () => {
     const many = Array.from({ length: 20 }, (_, i) => chat(`model-${i}`));
     render(<Harness options={many} />);
