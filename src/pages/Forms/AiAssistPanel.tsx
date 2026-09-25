@@ -143,9 +143,6 @@ export default function AiAssistPanel({
             Describe it — I'll build the capability{brain ? ` · ${brain}` : ""}
           </p>
         </div>
-        {/* Your model, not the workspace's: same key and same bill, but a quick draft and a
-            gnarly build need not cost the same. Renders nothing when there is nothing to pick. */}
-        <AiModelPicker className="shrink-0" />
       </div>
 
       {/* Log */}
@@ -237,7 +234,13 @@ export default function AiAssistPanel({
             Send
           </Button>
         </div>
-        <p className="mt-2 text-[11px] leading-tight text-gray-400">
+        {/* Under the prompt, where the thing it affects is. It used to sit in the header,
+            squeezed between the title and the panel edge — the one place in this panel with
+            no room, on a control whose whole job is to be read at a glance. */}
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <AiModelPicker className="min-w-0" />
+        </div>
+        <p className="mt-1.5 text-[11px] leading-tight text-gray-400">
           Best for adding & editing fields. Existing tabs/tables are preserved but may move below new fields.
         </p>
       </div>
