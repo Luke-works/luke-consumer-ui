@@ -57,7 +57,7 @@ describe("AiModelPicker — the provider travels with the model", () => {
         <AiModelPicker />
       </MemoryRouter>,
     );
-    await userEvent.click(await screen.findByRole("combobox"));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Model" }));
     await userEvent.click(await screen.findByRole("option", { name: /claude-3-5-sonnet/ }));
 
     // Not (…, null, …): a null provider re-points the preference at the workspace default, so
@@ -68,7 +68,9 @@ describe("AiModelPicker — the provider travels with the model", () => {
   });
 
   it("still sends the offering provider when the model IS in the list", async () => {
-    m.getAiPreference.mockResolvedValue(pref({ model: null, provider: "groq" }));
+    // Provider is its own control now, so the model list is scoped to the provider in force.
+    // On Anthropic, its models must still carry Anthropic rather than falling back to anything.
+    m.getAiPreference.mockResolvedValue(pref({ model: null, provider: "anthropic" }));
     m.listAiModels.mockResolvedValue({
       models: [{ provider: "anthropic", id: "claude-haiku-4-5", chat: true }],
     });
@@ -79,10 +81,9 @@ describe("AiModelPicker — the provider travels with the model", () => {
         <AiModelPicker />
       </MemoryRouter>,
     );
-    await userEvent.click(await screen.findByRole("combobox"));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Model" }));
     await userEvent.click(await screen.findByRole("option", { name: /claude-haiku-4-5/ }));
 
-    // The list wins over the fallback — picking another provider's model must move you to it.
     await waitFor(() =>
       expect(m.chooseMyAiModel).toHaveBeenCalledWith("t1", "anthropic", "claude-haiku-4-5"),
     );
@@ -98,7 +99,7 @@ describe("AiModelPicker — the provider travels with the model", () => {
         <AiModelPicker />
       </MemoryRouter>,
     );
-    await userEvent.click(await screen.findByRole("combobox"));
+    await userEvent.click(await screen.findByRole("combobox", { name: "Model" }));
     await userEvent.click(await screen.findByRole("option", { name: /Workspace default/i }));
 
     // The fallback must not leak into "follow the workspace" — that has to keep tracking it.

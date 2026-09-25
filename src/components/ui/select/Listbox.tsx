@@ -10,15 +10,6 @@ export type ListboxOption = {
   hint?: string;
   /** Heading this option sits under. Options with no group come first, ungrouped. */
   group?: string;
-  /**
-   * Render as a section heading that is ALSOselectable.
-   *
-   * <p>For a list with two levels where the parent is itself a choice — a provider you can
-   * switch to, above the individual models it offers. A plain `group` heading is decorative
-   * text; this is a real option that happens to look like one, so it keeps its place in the
-   * keyboard order and is announced as selectable.
-   */
-  parent?: boolean;
   disabled?: boolean;
 };
 
@@ -44,7 +35,7 @@ export type ListboxProps = {
    */
   onOpen?: () => void;
   /**
-   * Show an ⓘ on each non-parent option, and call this when it is pressed.
+   * Show an ⓘ on each option, and call this when it is pressed.
    *
    * <p>Deliberately `tabIndex={-1}` and `aria-hidden`: a focusable control nested inside a
    * `role="option"` is invalid ARIA and would break the listbox's keyboard model. It is a
@@ -504,14 +495,12 @@ export default function Listbox({
                               onMouseMove={() => i !== active && setActive(i)}
                               onClick={() => pick(option)}
                               className={[
-                                "flex cursor-pointer items-start gap-2 px-3 text-sm",
-                                option.parent
-                                  ? "mt-1 py-1.5 font-semibold uppercase tracking-wide text-[11px] text-gray-500 dark:text-gray-400"
-                                  : "py-2",
+                                "flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",
                                 option.disabled ? "cursor-not-allowed opacity-50" : "",
                                 isActive ? "bg-brand-50 dark:bg-brand-500/10" : "",
-                                isSelected ? "font-medium text-brand-600 dark:text-brand-300" : "",
-                                !isSelected && !option.parent ? "text-gray-700 dark:text-gray-200" : "",
+                                isSelected
+                                  ? "font-medium text-brand-600 dark:text-brand-300"
+                                  : "text-gray-700 dark:text-gray-200",
                               ].join(" ")}
                             >
                               <Check aria-hidden className={`mt-0.5 size-3.5 shrink-0 ${isSelected ? "" : "invisible"}`} />
@@ -523,7 +512,7 @@ export default function Listbox({
                                   </span>
                                 ) : null}
                               </span>
-                              {onOptionInfo && !option.parent ? (
+                              {onOptionInfo ? (
                                 <span
                                   role="presentation"
                                   aria-hidden

@@ -23,6 +23,12 @@ import {
  * connected, or a single model available, and it stays out of the way — the panel it sits in is
  * for building forms, not for administering AI.
  */
+/** Quiet by default: these sit under the prompt box and should read as settings you can reach,
+ *  not form fields competing with the thing you are typing. */
+const QUIET =
+  "h-7 max-w-full border-transparent bg-transparent px-2 text-[11px] text-gray-500 " +
+  "hover:border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:hover:border-gray-700 dark:hover:bg-white/5";
+
 export default function AiModelPicker({ className = "" }: { className?: string }) {
   const { session } = useAuth();
   const tenant = session?.tenant ?? null;
@@ -132,64 +138,72 @@ export default function AiModelPicker({ className = "" }: { className?: string }
 
   const pinned = pref.model;
   const mine = pref.provider ?? null;
+  /** Whose models the model control should offer: your provider, else the workspace's. */
+  const shownProvider = mine ?? pref.workspaceProvider ?? null;
+  const labelOf = (id?: string | null) =>
+    (pref.providers ?? []).find((p) => p.id === id)?.label ?? id ?? "";
 
-  /** Providers in the order the workspace lists them, each with the models it actually offers. */
-  const byProvider = (pref.providers ?? []).map((p) => ({
-    ...p,
-    models: (models ?? []).filter((m) => m.provider === p.id),
-  }));
+  /** Providers that actually have models to offer. */
+  const connected = (pref.providers ?? []).filter(
+    (p) => (models ?? []).some((m) => m.provider === p.id),
+  );
 
-  const options: ListboxOption[] = [
-    { value: "", label: "Workspace default", hint: pref.workspaceModel ?? undefined },
-    // The pinned model stays SELECTABLE even when the live list has not arrived or came back
-    // without it — otherwise the highlight falls to row 0 and Enter silently unpins it.
-    ...(pinned && !(models ?? []).some((m) => m.id === pinned)
-      ? [{ value: `m:${mine ?? ""}:${pinned}`, label: pinned, group: "Current choice" }]
-      : []),
-    // Each provider is a heading you can actually PICK — that is how you move from Anthropic to
-    // Google without first knowing which of its models you want.
-    ...byProvider.flatMap((p) =>
-      p.models.length === 0
-        ? []
-        : [
-            {
-              value: `p:${p.id}`,
-              label: p.label,
-              parent: true,
-              hint: p.id === mine ? "Current provider" : "Switch to this provider",
-            } satisfies ListboxOption,
-            ...p.models
-              .filter((m) => m.chat)
-              .map((m) => ({ value: `m:${p.id}:${m.id}`, label: m.id })),
-            ...p.models
-              .filter((m) => !m.chat)
-              .map((m) => ({
-                value: `m:${p.id}:${m.id}`,
-                label: m.id,
-                // Demoted, never hidden: capability is partly guessed from names, and a wrong
-                // guess must cost a click, not make a model unreachable.
-                group: `${p.label} — may not work for building`,
-              })),
-          ],
-    ),
+  /**
+   * Provider is its own control.
+   *
+   * <p>It was only reachable as a heading inside the model list, which meant moving from
+   * Anthropic to Google was something you had to go looking for — and you could not see which
+   * provider you were on without opening that list. Which account a turn is billed to is at
+   * least as consequential as which model runs it, so it gets equal billing in the panel.
+   */
+  const providerOptions: ListboxOption[] = [
+    {
+      value: "",
+      label: "Workspace default",
+      hint: pref.workspaceProvider ? labelOf(pref.workspaceProvider) : undefined,
+    },
+    ...connected.map((p) => ({ value: `p:${p.id}`, label: p.label })),
   ];
 
-  /** What the closed control should say. */
-  const current = pinned
-    ? `${(pref.providers ?? []).find((p) => p.id === mine)?.label ?? mine ?? ""} · ${pinned}`.replace(/^ · /, "")
-    : "Workspace default";
+  /** Models of the provider in force — the other control decides which that is. */
+  const forProvider = (models ?? []).filter((m) => m.provider === shownProvider);
+  const modelOptions: ListboxOption[] = [
+    { value: "", label: "Workspace default", hint: pref.workspaceModel ?? undefined },
+    // A pinned model stays SELECTABLE even when the live list has not arrived or came back
+    // without it — otherwise the highlight falls to row 0 and Enter silently unpins it.
+    ...(pinned && !forProvider.some((m) => m.id === pinned)
+      ? [{ value: `m:${mine ?? ""}:${pinned}`, label: pinned, group: "Current choice" }]
+      : []),
+    ...forProvider.filter((m) => m.chat).map((m) => ({ value: `m:${m.provider}:${m.id}`, label: m.id })),
+    // Demoted, never hidden: capability is partly guessed from names, and a wrong guess must
+    // cost a click, not make a model unreachable.
+    ...forProvider.filter((m) => !m.chat).map((m) => ({
+      value: `m:${m.provider}:${m.id}`,
+      label: m.id,
+      group: "May not work for building",
+    })),
+  ];
 
   return (
     <div className={`flex min-w-0 items-center gap-1.5 ${className}`} aria-busy={saving || undefined}>
       <Listbox
+        ariaLabel="Provider"
+        size="sm"
+        className={QUIET}
+        value={mine ? `p:${mine}` : ""}
+        options={providerOptions}
+        placeholder={mine ? labelOf(mine) : "Workspace default"}
+        onOpen={() => void loadModels()}
+        onChange={(next) => void choose(next)}
+      />
+      <span aria-hidden className="shrink-0 text-[11px] text-gray-300 dark:text-gray-600">/</span>
+      <Listbox
         ariaLabel="Model"
         size="sm"
-        // Quiet by default: this sits under the prompt box, where it should read as a setting
-        // you can reach, not a form field competing with the thing you are typing.
-        className="h-7 max-w-full border-transparent bg-transparent px-2 text-[11px] text-gray-500 hover:border-gray-200 hover:bg-gray-50 dark:text-gray-400 dark:hover:border-gray-700 dark:hover:bg-white/5"
+        className={QUIET}
         value={pinned ? `m:${mine ?? ""}:${pinned}` : ""}
-        options={options}
-        placeholder={current}
+        options={modelOptions}
+        placeholder={pinned ?? pref.workspaceModel ?? "Workspace default"}
         onOpen={() => void loadModels()}
         onChange={(next) => void choose(next)}
         onOptionInfo={(o) => setInfo(o)}
