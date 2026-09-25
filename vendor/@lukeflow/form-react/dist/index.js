@@ -47,7 +47,7 @@ function useFormEngine(schema, options2) {
 }
 
 // src/FormRenderer.tsx
-import { useState as useState11, useEffect as useEffect8, useRef as useRef9, useCallback as useCallback2, useMemo as useMemo4 } from "react";
+import { useState as useState11, useEffect as useEffect8, useRef as useRef9, useCallback as useCallback2, useMemo as useMemo5 } from "react";
 import {
   createDefaultFieldTypeRegistry,
   submitButtonId,
@@ -1393,10 +1393,11 @@ function SignatureField({
 }
 
 // src/render/controls/DateField.tsx
-import { useState as useState8, useEffect as useEffect6, useRef as useRef6 } from "react";
+import { useState as useState8, useEffect as useEffect6, useMemo as useMemo4, useRef as useRef6 } from "react";
 import { createPortal as createPortal3 } from "react-dom";
-import { jsx as jsx12, jsxs as jsxs7 } from "react/jsx-runtime";
+import { Fragment as Fragment2, jsx as jsx12, jsxs as jsxs7 } from "react/jsx-runtime";
 var pad = (n) => String(n).padStart(2, "0");
+var PICK_A_DATE = "Pick a date first";
 var daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
 function parseDate(value) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
@@ -1422,11 +1423,19 @@ function format(kind, date, time) {
   return `${d}T${t || "00:00"}`;
 }
 function display(kind, raw) {
-  return kind === "datetime" && raw.includes("T") ? raw.replace("T", " ") : raw;
+  if (kind !== "datetime") return raw;
+  const at = raw.indexOf("T");
+  return at >= 0 ? raw.slice(0, at) : raw;
 }
-function toStored(kind, typed) {
-  if (kind !== "datetime") return typed;
-  return typed.includes(" ") && !typed.includes("T") ? typed.replace(" ", "T") : typed;
+function toStored(kind, typedDate, keepTime) {
+  if (kind !== "datetime") return typedDate;
+  const date = typedDate.includes("T") ? typedDate.slice(0, typedDate.indexOf("T")) : typedDate;
+  if (!date) return "";
+  return keepTime ? `${date}T${keepTime}` : date;
+}
+function partName(fieldLabel, part) {
+  const owner = fieldLabel.trim();
+  return owner ? `${owner} ${part}` : part.charAt(0).toUpperCase() + part.slice(1);
 }
 function monthMatrix(y, m) {
   const firstWeekday = new Date(y, m, 1).getDay();
@@ -1460,17 +1469,34 @@ function DateField({
   disabled,
   onChange,
   clearable,
-  minuteStep = 1
+  minuteStep = 1,
+  fieldLabel = ""
 }) {
   const { locale } = useLocale();
   const weekdays = weekdayLabels(locale);
-  const raw = toStored(kind, typeof value === "string" ? value : "");
+  const raw = typeof value === "string" ? value : "";
   const date = parseDate(raw);
   const time = parseTime(raw, kind);
   const hasCal = kind === "day" || kind === "datetime";
   const hasTime = kind === "datetime" || kind === "time";
-  const minStep = Math.max(1, Math.floor(minuteStep) || 1);
-  const timeDisabled = disabled || kind === "datetime" && !date;
+  const minStep = Math.min(24 * 60, Math.max(1, Math.floor(minuteStep) || 1));
+  const current = time ? time.h * 60 + time.min : null;
+  const timeList = useMemo4(() => {
+    if (minStep <= 1) return null;
+    const list = Array.from({ length: Math.ceil(24 * 60 / minStep) }, (_, i) => i * minStep);
+    if (current !== null && current % minStep !== 0) {
+      const at = list.findIndex((t) => t > current);
+      list.splice(at < 0 ? list.length : at, 0, current);
+    }
+    return list;
+  }, [minStep, current]);
+  const needsDate = kind === "datetime" && !date;
+  const timeDisabled = disabled || needsDate;
+  const timeA11y = {
+    "aria-required": a11y["aria-required"],
+    "aria-invalid": a11y["aria-invalid"],
+    "aria-describedby": [a11y["aria-describedby"], needsDate ? `${a11y.id}-needs-date` : ""].filter(Boolean).join(" ") || void 0
+  };
   const [open, setOpen] = useState8(false);
   const today = (() => {
     const n = /* @__PURE__ */ new Date();
@@ -1591,10 +1617,10 @@ function DateField({
           type: "text",
           inputMode: kind === "time" ? "numeric" : void 0,
           autoComplete: "off",
-          placeholder: kind === "day" ? "YYYY-MM-DD" : kind === "time" ? "HH:MM" : "YYYY-MM-DD HH:MM",
+          placeholder: kind === "time" ? "HH:MM" : "YYYY-MM-DD",
           value: display(kind, raw),
           disabled,
-          onChange: (e) => onChange(toStored(kind, e.target.value)),
+          onChange: (e) => onChange(toStored(kind, e.target.value, time ? `${pad(time.h)}:${pad(time.min)}` : "")),
           onKeyDown: (e) => {
             if (e.key === "ArrowDown" && hasCal) {
               e.preventDefault();
@@ -1620,40 +1646,66 @@ function DateField({
         }
       )
     ] }),
-    hasTime && /* @__PURE__ */ jsxs7("span", { className: "lf-datefield-time", title: kind === "datetime" && !date ? "Pick a date first" : void 0, children: [
-      /* @__PURE__ */ jsxs7(
+    hasTime && /* @__PURE__ */ jsxs7("span", { className: "lf-datefield-time", title: needsDate ? PICK_A_DATE : void 0, children: [
+      needsDate && /* @__PURE__ */ jsx12("span", { id: `${a11y.id}-needs-date`, className: "lf-sr-only", children: PICK_A_DATE }),
+      timeList ? /* @__PURE__ */ jsxs7(
         "select",
         {
-          "aria-label": "Hour",
+          ...timeA11y,
+          "aria-label": partName(fieldLabel, "time"),
           disabled: timeDisabled,
-          value: time ? time.h : "",
+          value: current ?? "",
           onChange: (e) => {
             if (e.target.value === "") return;
-            setTimePart(+e.target.value, time?.min ?? 0);
+            const total = +e.target.value;
+            setTimePart(Math.floor(total / 60), total % 60);
           },
           children: [
             /* @__PURE__ */ jsx12("option", { value: "" }),
-            Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ jsx12("option", { value: h, children: pad(h) }, h))
+            timeList.map((total) => /* @__PURE__ */ jsxs7("option", { value: total, children: [
+              pad(Math.floor(total / 60)),
+              ":",
+              pad(total % 60)
+            ] }, total))
           ]
         }
-      ),
-      /* @__PURE__ */ jsx12("span", { "aria-hidden": "true", children: ":" }),
-      /* @__PURE__ */ jsxs7(
-        "select",
-        {
-          "aria-label": "Minute",
-          disabled: timeDisabled,
-          value: time ? time.min : "",
-          onChange: (e) => {
-            if (e.target.value === "") return;
-            setTimePart(time?.h ?? 0, +e.target.value);
-          },
-          children: [
-            /* @__PURE__ */ jsx12("option", { value: "" }),
-            Array.from({ length: Math.ceil(60 / minStep) }, (_, i) => i * minStep).map((min) => /* @__PURE__ */ jsx12("option", { value: min, children: pad(min) }, min))
-          ]
-        }
-      )
+      ) : /* @__PURE__ */ jsxs7(Fragment2, { children: [
+        /* @__PURE__ */ jsxs7(
+          "select",
+          {
+            ...timeA11y,
+            "aria-label": partName(fieldLabel, "hour"),
+            disabled: timeDisabled,
+            value: time ? time.h : "",
+            onChange: (e) => {
+              if (e.target.value === "") return;
+              setTimePart(+e.target.value, time?.min ?? 0);
+            },
+            children: [
+              /* @__PURE__ */ jsx12("option", { value: "" }),
+              Array.from({ length: 24 }, (_, h) => /* @__PURE__ */ jsx12("option", { value: h, children: pad(h) }, h))
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsx12("span", { "aria-hidden": "true", children: ":" }),
+        /* @__PURE__ */ jsxs7(
+          "select",
+          {
+            ...timeA11y,
+            "aria-label": partName(fieldLabel, "minute"),
+            disabled: timeDisabled,
+            value: time ? time.min : "",
+            onChange: (e) => {
+              if (e.target.value === "") return;
+              setTimePart(time?.h ?? 0, +e.target.value);
+            },
+            children: [
+              /* @__PURE__ */ jsx12("option", { value: "" }),
+              Array.from({ length: 60 }, (_, min) => min).map((min) => /* @__PURE__ */ jsx12("option", { value: min, children: pad(min) }, min))
+            ]
+          }
+        )
+      ] })
     ] }),
     open && hasCal && popoverTarget(wrapRef) && createPortal3(
       /* @__PURE__ */ jsxs7("div", { ref: popRef, className: "lf-pop lf-datefield-pop", "data-theme": dataTheme, role: "dialog", "aria-label": "Choose date", style: { ...themeStyle, ...popStyle ?? {} }, children: [
@@ -2697,10 +2749,10 @@ function EditGridField({
 }
 
 // src/FormRenderer.tsx
-import { Fragment as Fragment2, jsx as jsx15, jsxs as jsxs10 } from "react/jsx-runtime";
+import { Fragment as Fragment3, jsx as jsx15, jsxs as jsxs10 } from "react/jsx-runtime";
 function FormRenderer(props) {
   const { schema, initialValues, onSubmit, onChange, readOnly = false, submitting = false, registry, components, restore, onAutosave, autosaveDelay = 800, beforeSubmit, theme, colorScheme, virtualize, sanitizeHtml, allowJs, jsEvaluator, onEvent, errorFallback, onResult, autoSubmitSignal, playback, className } = props;
-  const authorSubmitId = useMemo4(() => submitButtonId(schema), [schema]);
+  const authorSubmitId = useMemo5(() => submitButtonId(schema), [schema]);
   const submitLabel = props.submitLabel !== void 0 ? props.submitLabel : authorSubmitId ? null : "Submit";
   const formClass = ["lf-form", virtualize && "lf-virtualized", className].filter(Boolean).join(" ");
   const engineOptions = { initialValues, registry, restore, allowJs, jsEvaluator };
@@ -2860,7 +2912,7 @@ function FormRenderer(props) {
     }
   ) : /* @__PURE__ */ jsxs10("form", { noValidate: true, dir, "data-theme": dataTheme, className: formClass, style: mergedTheme, onSubmit: handleSubmit, children: [
     schema.root.map((id) => /* @__PURE__ */ jsx15(RenderEntity, { id, schema, ctx: ctxWithChange }, id)),
-    submitLabel !== null && !readOnly && /* @__PURE__ */ jsxs10(Fragment2, { children: [
+    submitLabel !== null && !readOnly && /* @__PURE__ */ jsxs10(Fragment3, { children: [
       !authorSubmitId && beforeSubmit,
       /* @__PURE__ */ jsx15("button", { type: "submit", className: "lf-submit", disabled: submitting, "aria-busy": submitting || void 0, children: t(submitLabel) })
     ] })
@@ -2966,7 +3018,7 @@ function RenderEntity(props) {
   const node = RenderEntityNode(props);
   const { id, ctx } = props;
   if (node !== null && ctx.beforeSubmit && ctx.beforeSubmitAnchorId === id) {
-    return /* @__PURE__ */ jsxs10(Fragment2, { children: [
+    return /* @__PURE__ */ jsxs10(Fragment3, { children: [
       ctx.beforeSubmit,
       node
     ] });
@@ -3203,7 +3255,8 @@ function Field({ entity, fs, ctx }) {
             disabled,
             onChange: set,
             clearable: Boolean(a.clearable) && !disabled,
-            minuteStep: numAttr(a.minuteStep) ?? 1
+            minuteStep: numAttr(a.minuteStep) ?? 1,
+            fieldLabel: typeof a.label === "string" ? a.label : ""
           }
         );
         break;

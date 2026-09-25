@@ -879,7 +879,7 @@ function standardEditors() {
     // Date / time fields default to the rich calendar + time picker; expose the per-field
     // native opt-out and the time-selector minute increment.
     { id: "nativeInput", tab: "settings", attribute: "nativeInput", label: "Use native input", control: "checkbox", order: 40, appliesTo: ["day", "datetime", "time"], hint: "Use the browser's native date/time input instead of the rich calendar / time picker." },
-    { id: "minuteStep", tab: "settings", attribute: "minuteStep", label: "Minute step", control: "number", order: 41, appliesTo: ["datetime", "time"], when: (e) => !e.attributes?.nativeInput, hint: "Increment (in minutes) between options in the time selector. Default 1." },
+    { id: "minuteStep", tab: "settings", attribute: "minuteStep", label: "Minute step", control: "number", order: 41, appliesTo: ["datetime", "time"], when: (e) => !e.attributes?.nativeInput, hint: "Offer one list of times at this increment (15 \u2192 09:00, 09:15, 09:30). Leave blank for separate hour and minute lists." },
     { id: "ratingMax", tab: "settings", attribute: "max", label: "Max stars", control: "number", order: 42, appliesTo: ["rating"], hint: "Number of stars to show (default 5)." },
     // The stepper's own bounds. `min`/`max` are shared attribute names with the number field's
     // validation, so they are declared separately here rather than reused — an author setting a
