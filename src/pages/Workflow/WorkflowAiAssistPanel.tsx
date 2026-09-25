@@ -217,7 +217,7 @@ export default function WorkflowAiAssistPanel({
             squeezed between the title and the panel edge — the one place in this panel with
             no room, on a control whose whole job is to be read at a glance. */}
         <div className="mt-2 flex items-center justify-between gap-2">
-          <AiModelPicker className="min-w-0" />
+          <AiModelPicker className="min-w-0" agent="workflow" task="workflows" />
         </div>
         <p className="mt-1.5 text-[11px] leading-tight text-gray-400">
           Describe steps to add or rewire. Check in &amp; publish from the toolbar when it's ready.

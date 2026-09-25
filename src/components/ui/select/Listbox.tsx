@@ -18,6 +18,14 @@ export type ListboxOption = {
    * but picking it blind and learning from a failed turn is the thing to avoid.
    */
   tone?: "danger";
+  /**
+   * Leave the list open after this one is chosen.
+   *
+   * <p>For a row that acts ON the list rather than picking from it — "Show all 22 models" being
+   * the case that needed it. Closing there would dismiss the very list the person just asked to
+   * see more of, so they would reopen it to find what they had already requested.
+   */
+  keepOpen?: boolean;
   disabled?: boolean;
 };
 
@@ -267,6 +275,7 @@ export default function Listbox({
   const pick = (option: ListboxOption) => {
     if (option.disabled) return;
     onChange(option.value);
+    if (option.keepOpen) return;  // it acted on the list; leave it up
     close();
   };
 

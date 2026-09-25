@@ -57,6 +57,16 @@ export type AiModel = {
   description?: string;
   contextTokens?: number;
   maxOutputTokens?: number;
+  /**
+   * Worth putting in front of someone for the agent that was asked about.
+   *
+   * <p>Learned from turns people already ran — which model was used, and whether the answer
+   * parsed into that agent's schema — so it reflects real use rather than a benchmark nobody
+   * paid for. Absent when no agent was named, or when the fleet had no opinion to give.
+   */
+  recommended?: boolean;
+  /** Its place in that order, best first. */
+  rank?: number;
 };
 
 export type AiProviderStatus =
@@ -160,8 +170,12 @@ export function setDefaultAiProvider(tenantId: string, provider: AiProviderId): 
 }
 
 /** The models this workspace's own key may use — read live from their provider. */
-export function listAiModels(tenantId: string): Promise<{ models: AiModel[] }> {
-  return authed(`${BASE}/provider/models`, tenantInit(tenantId));
+export function listAiModels(tenantId: string, agent?: string): Promise<{ models: AiModel[] }> {
+  // `agent` asks the server which of these are worth putting first FOR THAT JOB — a model that
+  // drafts a good email is not automatically one that builds a valid form. Omitted, the list
+  // comes back exactly as before, unmarked.
+  const q = agent ? `?agent=${encodeURIComponent(agent)}` : "";
+  return authed(`${BASE}/provider/models${q}`, tenantInit(tenantId));
 }
 
 /** Change one provider's workspace model without re-pasting its key. Owner only. */

@@ -96,7 +96,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     expect(m.listAiModels).not.toHaveBeenCalled();
 
     await open();
-    await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1"));
+    await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1", undefined));
   });
 
   it("marks an out-of-credit provider red, and still lets you pick it", async () => {
@@ -156,6 +156,79 @@ describe("AiModelPicker — your model, the workspace's key", () => {
 
     expect(screen.queryByRole("option", { name: /claude-haiku/ })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: "qwen/qwen3.8-27b" })).toBeInTheDocument();
+  });
+
+  it("explains a model without picking it", async () => {
+    // Restored: this shipped without a test because an earlier edit of mine swallowed it.
+    // The ⓘ sits inside the option row, so the thing it must NOT do is select the row it is on.
+    renderPicker();
+    await open();
+    const row = await screen.findByRole("option", { name: "qwen/qwen3.8-27b" });
+
+    await userEvent.click(row.querySelector('[role="presentation"]') as HTMLElement);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("qwen/qwen3.8-27b");
+    expect(dialog).toHaveTextContent(/Groq/);
+    expect(m.chooseMyAiModel).not.toHaveBeenCalled();
+  });
+
+  it("shows the few worth using, with the rest one click away", async () => {
+    // Two dozen models is not a choice, it is a quiz. But nothing may become unreachable —
+    // the same rule this control already follows for models that cannot build.
+    m.listAiModels.mockResolvedValue({
+      models: [
+        { provider: "groq", id: "openai/gpt-oss-120b", chat: true, recommended: true, rank: 0 },
+        { provider: "groq", id: "qwen/qwen3.8-27b", chat: true },
+        { provider: "groq", id: "whisper-large-v3", chat: false },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <AiModelPicker agent="form" task="building forms" />
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("combobox", { name: "Model" }));
+    await screen.findByRole("option", { name: "openai/gpt-oss-120b" });
+
+    expect(screen.getByText(/Recommended for building forms/i)).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "qwen/qwen3.8-27b" })).not.toBeInTheDocument();
+
+    // …and the rest is one click, not a dead end.
+    await userEvent.click(screen.getByRole("option", { name: /Show all 3 models/i }));
+    expect(await screen.findByRole("option", { name: "qwen/qwen3.8-27b" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "whisper-large-v3" })).toBeInTheDocument();
+  });
+
+  it("revealing the rest is not a choice of model", async () => {
+    // It sits in a list where everything else commits. Selecting it must expand and nothing more.
+    m.listAiModels.mockResolvedValue({
+      models: [
+        { provider: "groq", id: "openai/gpt-oss-120b", chat: true, recommended: true, rank: 0 },
+        { provider: "groq", id: "qwen/qwen3.8-27b", chat: true },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <AiModelPicker agent="form" />
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("combobox", { name: "Model" }));
+    await userEvent.click(await screen.findByRole("option", { name: /Show all/i }));
+
+    expect(m.chooseMyAiModel).not.toHaveBeenCalled();
+  });
+
+  it("asks for the ranking that matches the job it is in", async () => {
+    render(
+      <MemoryRouter>
+        <AiModelPicker agent="email" />
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("combobox", { name: "Model" }));
+
+    // A model that drafts a good email is not automatically one that builds a valid form.
+    await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1", "email"));
   });
 
   it("saves the choice with the provider that offers it", async () => {
