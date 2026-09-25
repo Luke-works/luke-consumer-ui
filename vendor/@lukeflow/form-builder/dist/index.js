@@ -817,7 +817,10 @@ function standardEditors() {
       attribute: "labelPosition",
       label: "Label position",
       control: "select",
-      order: 40,
+      // Directly under Label. It used to sit below Description and Tooltip, where it reads as a
+      // sibling of those rather than as a property of the label, and authors reported not finding
+      // it at all. Settings that describe one thing should be adjacent to it.
+      order: 2,
       // Grouped choices are labelled by a <legend>, which the UA lays out inside the fieldset's
       // border and which therefore cannot be placed in a grid column reliably across browsers.
       // Offering the control there would be offering a setting that does nothing.
@@ -828,7 +831,7 @@ function standardEditors() {
         { label: "Right", value: "right" }
       ]
     },
-    { id: "hideLabel", tab: "display", attribute: "hideLabel", label: "Hide label", control: "checkbox", order: 50, when: (e, s) => data(e) && notInCell(e, s) },
+    { id: "hideLabel", tab: "display", attribute: "hideLabel", label: "Hide label", control: "checkbox", order: 3, when: (e, s) => data(e) && notInCell(e, s) },
     { id: "customClass", tab: "display", attribute: "customClass", label: "Custom CSS class", control: "text", order: 60, when: notInCell },
     { id: "hidden", tab: "display", attribute: "hidden", label: "Hidden", control: "checkbox", order: 70 },
     { id: "disabled", tab: "display", attribute: "disabled", label: "Disabled", control: "checkbox", order: 80, when: data },
@@ -870,6 +873,24 @@ function standardEditors() {
     { id: "stepperMin", tab: "settings", attribute: "min", label: "Minimum", control: "number", order: 42, appliesTo: ["stepper"], hint: "The lowest value \u2212 will go to. Leave blank for no floor." },
     { id: "stepperMax", tab: "settings", attribute: "max", label: "Maximum", control: "number", order: 43, appliesTo: ["stepper"], hint: "The highest value + will go to. Leave blank for no ceiling." },
     { id: "stepperStep", tab: "settings", attribute: "step", label: "Step", control: "number", order: 44, appliesTo: ["stepper"], hint: "How much each \u2212 / + changes the value. Default 1." },
+    { id: "stepperWidth", tab: "settings", attribute: "width", label: "Width (px)", control: "number", order: 45, appliesTo: ["stepper"], hint: "How wide the whole \u2212 / + control is, 128\u2013480px. Leave blank for the default \u2014 widen it for prices, years or anything over three digits." },
+    {
+      id: "controlAlign",
+      tab: "display",
+      attribute: "controlAlign",
+      label: "Control position",
+      control: "select",
+      order: 4,
+      // Only meaningful for a field laid out on ONE line with its label. `left`/`right` label
+      // positions put the control in a grid column, which already aligns it.
+      appliesTo: ["stepper"],
+      when: (e) => e.attributes?.labelPosition !== "left" && e.attributes?.labelPosition !== "right",
+      options: [
+        { label: "End of the row", value: "end" },
+        { label: "Next to the label", value: "start" }
+      ],
+      hint: "End of the row keeps a column of fields lined up on the right whatever their labels are."
+    },
     { id: "matrixMultiple", tab: "settings", attribute: "multiple", label: "Allow multiple per row", control: "checkbox", order: 43, appliesTo: ["matrix"], hint: "Use checkboxes instead of radios so each row can have several answers." },
     // Panel-like containers: collapse + a color theme for different purposes.
     { id: "collapsible", tab: "settings", attribute: "collapsible", label: "Collapsible", control: "checkbox", order: 30, appliesTo: ["panel", "well", "fieldset"] },
@@ -1773,18 +1794,28 @@ function NodePreview({ entity, field, components }) {
   const label = str2(a.label) || str2(a.key) || entity.type;
   const desc = str2(a.description);
   const required = field ? field.isRequired : Boolean(a.required);
-  return /* @__PURE__ */ jsxs7("div", { className: "lf-pv-field", "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
-    /* @__PURE__ */ jsxs7("span", { className: "lf-pv-fieldlabel", children: [
-      label,
-      required ? /* @__PURE__ */ jsx7("span", { className: "lf-pv-required", children: " *" }) : null,
-      str2(a.tooltip) ? /* @__PURE__ */ jsxs7("span", { className: "lf-tooltip", children: [
-        /* @__PURE__ */ jsx7("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
-        /* @__PURE__ */ jsx7("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
-      ] }) : null
-    ] }),
-    control,
-    desc ? /* @__PURE__ */ jsx7("span", { className: "lf-pv-desc", children: desc }) : null
-  ] });
+  return /* @__PURE__ */ jsxs7(
+    "div",
+    {
+      className: "lf-pv-field",
+      "data-label-position": labelPos,
+      "data-control-align": a.controlAlign === "start" ? "start" : a.controlAlign === "end" ? "end" : void 0,
+      "data-type": entity.type,
+      "data-hide-label": hideLabel || void 0,
+      children: [
+        /* @__PURE__ */ jsxs7("span", { className: "lf-pv-fieldlabel", children: [
+          label,
+          required ? /* @__PURE__ */ jsx7("span", { className: "lf-pv-required", children: " *" }) : null,
+          str2(a.tooltip) ? /* @__PURE__ */ jsxs7("span", { className: "lf-tooltip", children: [
+            /* @__PURE__ */ jsx7("span", { className: "lf-tooltip-icon", "aria-hidden": "true", children: "i" }),
+            /* @__PURE__ */ jsx7("span", { className: "lf-tooltip-bubble", children: str2(a.tooltip) })
+          ] }) : null
+        ] }),
+        control,
+        desc ? /* @__PURE__ */ jsx7("span", { className: "lf-pv-desc", children: desc }) : null
+      ]
+    }
+  );
 }
 function CustomPreview({ Custom, entity, field }) {
   const fs = field ?? fallbackFieldState(entity);
@@ -1821,7 +1852,7 @@ function previewControl(entity, field) {
     // Drawn as the live control is, so the canvas does not promise a plain number box and then
     // render − / + on the filled form.
     case "stepper":
-      return /* @__PURE__ */ jsxs7("span", { className: "lf-pv-stepper", children: [
+      return /* @__PURE__ */ jsxs7("span", { className: "lf-pv-stepper", style: stepperWidth(a.width), children: [
         /* @__PURE__ */ jsx7("span", { className: "lf-pv-stepper-btn", "aria-hidden": "true", children: "\u2212" }),
         /* @__PURE__ */ jsx7("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 }),
         /* @__PURE__ */ jsx7("span", { className: "lf-pv-stepper-btn", "aria-hidden": "true", children: "+" })
@@ -1928,6 +1959,10 @@ function paymentSummary(entity) {
     default:
       return `Card payment \xB7 ${currency.code} \u2014 choose how the amount is decided`;
   }
+}
+function stepperWidth(v) {
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+  return Number.isFinite(n) ? { width: `${Math.min(480, Math.max(128, Math.round(n)))}px` } : void 0;
 }
 function str2(v) {
   return typeof v === "string" ? v : "";

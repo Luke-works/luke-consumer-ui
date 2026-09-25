@@ -368,6 +368,21 @@
 /* Inline field preview (read-only, non-interactive) — mirrors the rendered field. */
 .lf-node-preview { pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
 .lf-pv-field { display: flex; flex-direction: column; gap: 3px; }
+/* Mirrors `.lf-field[data-type="stepper"]` in the live sheet: a stepper is a short answer and
+   reads as ONE row with its label, with the control at the end of it so a column of fields lines
+   up. Without this the canvas stacked it while the live form did not — builder ≠ live, which is
+   the one thing the canvas exists to avoid. */
+.lf-pv-field[data-type="stepper"][data-label-position="top"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.lf-pv-field[data-type="stepper"][data-label-position="top"] > .lf-pv-desc { flex-basis: 100%; }
+.lf-pv-field[data-label-position="top"]:not([data-control-align="start"])[data-type="stepper"],
+.lf-pv-field[data-label-position="top"][data-control-align="end"] {
+  justify-content: space-between;
+}
 .lf-pv-field[data-label-position="left"],
 .lf-pv-field[data-label-position="right"] {
   display: grid;
@@ -1003,6 +1018,9 @@
 }
 
 /* Canvas preview of the stepper — the same shape as the live control, inert. */
-.lf-pv-stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); overflow: hidden; }
-.lf-pv-stepper .lf-pv-input { width: 3.5rem; border: 0; border-left: 1px solid var(--lf-border, #d9d9d9); border-right: 1px solid var(--lf-border, #d9d9d9); border-radius: 0; text-align: center; }
+/* Same default width as the live control, and for the same reason — see .lf-stepper. */
+.lf-pv-stepper { display: inline-flex; width: 8.5rem; min-width: 8rem; max-width: 100%; align-items: stretch; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); overflow: hidden; }
+/* `width` is the flex basis, so an author-set width on the group lands on the value box while
+   the buttons keep their size — matching .lf-stepper-input in the live sheet. */
+.lf-pv-stepper .lf-pv-input { flex: 1 1 auto; min-width: 0; width: auto; border: 0; border-left: 1px solid var(--lf-border, #d9d9d9); border-right: 1px solid var(--lf-border, #d9d9d9); border-radius: 0; text-align: center; }
 .lf-pv-stepper-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 1.75rem; color: var(--lf-muted, #6b7280); }
