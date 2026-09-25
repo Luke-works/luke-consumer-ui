@@ -1761,6 +1761,7 @@ function StepperField({
   min,
   max,
   step = 1,
+  width,
   disabled,
   onChange
 }) {
@@ -1781,53 +1782,60 @@ function StepperField({
   };
   const atMin = current !== void 0 && lo !== void 0 && current <= lo;
   const atMax = current !== void 0 && hi !== void 0 && current >= hi;
-  return /* @__PURE__ */ jsxs8("div", { className: "lf-stepper", children: [
-    /* @__PURE__ */ jsx13(
-      "button",
-      {
-        type: "button",
-        className: "lf-stepper-btn",
-        tabIndex: -1,
-        "aria-hidden": "true",
-        disabled: disabled || atMin,
-        onClick: () => nudge(-1),
-        children: "\u2212"
-      }
-    ),
-    /* @__PURE__ */ jsx13(
-      "input",
-      {
-        ...a11y,
-        type: "number",
-        className: "lf-stepper-input",
-        inputMode: Number.isInteger(by) ? "numeric" : "decimal",
-        value: current ?? "",
-        min: lo,
-        max: hi,
-        step: by,
-        disabled,
-        onChange: (e) => {
-          const raw = e.target.value;
-          if (raw === "") return onChange(void 0);
-          const n = Number(raw);
-          onChange(Number.isFinite(n) ? n : void 0);
-        },
-        onBlur: () => current !== void 0 && onChange(clamp(current))
-      }
-    ),
-    /* @__PURE__ */ jsx13(
-      "button",
-      {
-        type: "button",
-        className: "lf-stepper-btn",
-        tabIndex: -1,
-        "aria-hidden": "true",
-        disabled: disabled || atMax,
-        onClick: () => nudge(1),
-        children: "+"
-      }
-    )
-  ] });
+  return /* @__PURE__ */ jsxs8(
+    "div",
+    {
+      className: "lf-stepper",
+      style: typeof width === "number" && Number.isFinite(width) ? { width: `${Math.min(480, Math.max(128, Math.round(width)))}px` } : void 0,
+      children: [
+        /* @__PURE__ */ jsx13(
+          "button",
+          {
+            type: "button",
+            className: "lf-stepper-btn",
+            tabIndex: -1,
+            "aria-hidden": "true",
+            disabled: disabled || atMin,
+            onClick: () => nudge(-1),
+            children: "\u2212"
+          }
+        ),
+        /* @__PURE__ */ jsx13(
+          "input",
+          {
+            ...a11y,
+            type: "number",
+            className: "lf-stepper-input",
+            inputMode: Number.isInteger(by) ? "numeric" : "decimal",
+            value: current ?? "",
+            min: lo,
+            max: hi,
+            step: by,
+            disabled,
+            onChange: (e) => {
+              const raw = e.target.value;
+              if (raw === "") return onChange(void 0);
+              const n = Number(raw);
+              onChange(Number.isFinite(n) ? n : void 0);
+            },
+            onBlur: () => current !== void 0 && onChange(clamp(current))
+          }
+        ),
+        /* @__PURE__ */ jsx13(
+          "button",
+          {
+            type: "button",
+            className: "lf-stepper-btn",
+            tabIndex: -1,
+            "aria-hidden": "true",
+            disabled: disabled || atMax,
+            onClick: () => nudge(1),
+            children: "+"
+          }
+        )
+      ]
+    }
+  );
 }
 function RatingField({
   a11y,
@@ -3223,6 +3231,7 @@ function Field({ entity, fs, ctx }) {
             min: numAttr(a.min),
             max: numAttr(a.max),
             step: numAttr(a.step) ?? 1,
+            width: numAttr(a.width),
             disabled,
             onChange: set
           }
@@ -3275,9 +3284,10 @@ function Field({ entity, fs, ctx }) {
         );
     }
   const labelPos = a.labelPosition === "left" || a.labelPosition === "right" ? a.labelPosition : "top";
+  const controlAlign = a.controlAlign === "start" ? "start" : a.controlAlign === "end" ? "end" : void 0;
   const hideLabel = Boolean(a.hideLabel);
   const fieldClass = ["lf-field", typeof a.customClass === "string" ? a.customClass : ""].filter(Boolean).join(" ");
-  return /* @__PURE__ */ jsxs10("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-hide-label": hideLabel || void 0, children: [
+  return /* @__PURE__ */ jsxs10("div", { className: fieldClass, "data-type": entity.type, "data-label-position": labelPos, "data-control-align": controlAlign, "data-hide-label": hideLabel || void 0, children: [
     /* @__PURE__ */ jsxs10("label", { htmlFor: id, id: `${id}-label`, className: `lf-label${hideLabel ? " lf-sr-only" : ""}`, children: [
       ctx.t(labelText(a) ?? key),
       fs.isRequired && /* @__PURE__ */ jsx15("span", { "aria-hidden": "true", children: " *" }),

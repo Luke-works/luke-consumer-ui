@@ -96,13 +96,19 @@
 .lf-field[data-label-position="left"],
 .lf-field[data-label-position="right"] {
   display: grid;
-  grid-template-columns: minmax(110px, max-content) 1fr;
+  /* `minmax(0, …)`, not a bare `1fr`. A bare `1fr` is `minmax(auto, 1fr)`, whose automatic
+     minimum is the item's min-content contribution — and a control with a DEFINITE width (a
+     stepper the author sized) contributes that width, so the track grows to it and the
+     `max-width: 100%` meant to cap it then resolves against the already-grown track. A definite
+     0 minimum breaks that cycle and lets the cap bind. `min-width: 0` on the children below
+     handles the item's own minimum; this handles the track's. */
+  grid-template-columns: minmax(110px, max-content) minmax(0, 1fr);
   align-items: center;
   column-gap: 10px;
   row-gap: 4px;
 }
 .lf-field[data-label-position="right"] {
-  grid-template-columns: 1fr minmax(110px, max-content);
+  grid-template-columns: minmax(0, 1fr) minmax(110px, max-content);
 }
 /* A grid item's default `min-width: auto` resolves to its MIN-CONTENT width, so a track can never
    shrink below the widest thing in it. A control with a large intrinsic minimum — `<input
@@ -127,7 +133,7 @@
    fraction of its width. With no label to sit beside, the field is a single column. */
 .lf-field[data-hide-label][data-label-position="left"],
 .lf-field[data-hide-label][data-label-position="right"] {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 /* A single checkbox belongs BESIDE its label, not stacked above it.
    `.lf-field` is a flex column whose default `align-items: stretch` stretched the input to the full
@@ -985,12 +991,25 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
    Scoped to the field type so no other field's layout moves, and only when the author has not
    chosen a label position themselves. */
 .lf-field[data-type="stepper"][data-label-position="top"] {
-  display: flex;
+  /* `.lf-field` is already `display: flex` with `flex-direction: column`. Setting `display: flex`
+     here and stopping changed NOTHING — the direction is what stacks it, so the control stayed
+     under the label and this rule read correct while doing nothing. The checkbox rule above gets
+     it right; this one did not. Set the direction, not the display. */
+  flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
 }
 .lf-field[data-type="stepper"][data-label-position="top"] > .lf-label { margin-bottom: 0; }
+/* Label left, control flush to the end of the row — so a column of inline fields lines up on the
+   right whatever their labels are, instead of each control starting wherever its own label
+   happened to end. `space-between` only affects lines with room to spare: the description, error
+   and counter below take `flex-basis: 100%`, fill their own line, and are untouched.
+   A stepper opts in by DEFAULT (see the renderer); `controlAlign: "start"` puts it back. */
+.lf-field[data-label-position="top"]:not([data-control-align="start"])[data-type="stepper"],
+.lf-field[data-label-position="top"][data-control-align="end"] {
+  justify-content: space-between;
+}
 /* The hint/error still belong under the pair, not beside it. */
 .lf-field[data-type="stepper"][data-label-position="top"] > .lf-desc,
 .lf-field[data-type="stepper"][data-label-position="top"] > .lf-count,
@@ -1000,7 +1019,19 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
    One bordered group rather than three separate controls, so it reads as a single field. The
    buttons are aria-hidden and untabbable: the input between them is a real number input and
    already announces and operates as a spin button. */
-.lf-stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); overflow: hidden; background: var(--lf-bg, #fff); }
+/* An explicit default width, because the group cannot be left to size itself: its only flexible
+   child is a number input, and a growable flex item contributes its MAX-CONTENT width to the
+   container's intrinsic size — for `<input type="number">` that is the UA's ~20-character default,
+   which is why the control sat ~236px wide no matter what was set on the box inside it. 8.5rem is
+   the two buttons plus a 4rem value box. An author's `width` overrides this inline. */
+/* `max-width: 100%` is load-bearing, not tidiness. At labelPosition top the group is a flex item
+   and shrinks on its own, but `left`/`right` turn `.lf-field` into a GRID, where a definite
+   specified width is the item's minimum contribution and the track grows to it: an author sets
+   480 on a desktop, the respondent opens the form on a 390px phone, and the control sticks 242px
+   outside the form with the whole page scrolling sideways. Same defect `.lf-file
+   input[type="file"]` already guards against, and it would break the Reflow (1.4.10) claim in
+   docs/ACCESSIBILITY.md. */
+.lf-stepper { display: inline-flex; width: 8.5rem; min-width: 8rem; max-width: 100%; align-items: stretch; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); overflow: hidden; background: var(--lf-bg, #fff); }
 .lf-stepper-btn {
   border: 0; background: transparent; cursor: pointer;
   /* A comfortable pointer target — this control exists to be tapped. */
@@ -1009,9 +1040,22 @@ fieldset.lf-panel { min-inline-size: 0; margin: 0; padding: 0; }
 }
 .lf-stepper-btn:hover:not(:disabled) { background: var(--lf-bg-muted, #f2f4f7); }
 .lf-stepper-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.lf-stepper-input {
-  width: 4rem; border: 0; border-left: 1px solid var(--lf-border, #d9d9d9); border-right: 1px solid var(--lf-border, #d9d9d9);
-  padding: 0.375rem 0.5rem; text-align: center; font: inherit; color: var(--lf-text, #1a1a1a); background: transparent;
+/* Matched via the group, NOT as a bare class. `.lf-form input` above is (0,1,1) and a lone
+   `.lf-stepper-input` is (0,1,0), so its `width: 4rem` never applied: the value box inherited
+   `width: 100%` and the control sat ~236px wide, filling the row. The declaration read like the
+   control's size and was decoration. Matching on `.lf-stepper` raises this to (0,2,0) so the
+   stepper's own sizing finally wins.
+
+   The box then takes whatever the group's width leaves after the two buttons: `flex: 1 1 auto`
+   with `width: auto`, so it grows and shrinks with the group rather than pinning a size of its
+   own. The group's width is what is authored — see `.lf-stepper` below; it is an explicit
+   default, NOT content sizing, and removing it brings back the 236px control. */
+.lf-stepper .lf-stepper-input {
+  flex: 1 1 auto; width: auto; min-width: 0;
+  border: 0; border-left: 1px solid var(--lf-border, #d9d9d9); border-right: 1px solid var(--lf-border, #d9d9d9);
+  /* Narrow side padding: the value is centred, so generous gutters buy nothing and cost the
+     digits the room they need at the narrow end of the width range. */
+  padding: 0.375rem 0.25rem; text-align: center; font: inherit; color: var(--lf-text, #1a1a1a); background: transparent;
 }
 .lf-stepper-input:focus { outline: 2px solid var(--lf-primary, #2563eb); outline-offset: -2px; }
 /* The native spinners duplicate the − / + and crowd a narrow box. */

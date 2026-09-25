@@ -1,5 +1,5 @@
 {
-  "vendoredAt": "2026-09-25T16:53:20.413Z",
+  "vendoredAt": "2026-09-25T20:25:01.747Z",
   "packages": {
     "form-core": {
       "version": "0.1.0-alpha.0",
@@ -17,25 +17,25 @@
     "form-react": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "87b3ba54c65857e813117435c37200abe9944c1b84b7518ab0b6324d53a1ec50",
+        "dist/index.cjs": "10658d1983a4bf7c482398f27f11cbc85d43351f6589be5cd783394c778bcda5",
         "dist/index.d.cts": "3f546ab0278bbd1a51469074cd2ca40c0f50c4e887771edc80c6cc30e94e5f90",
         "dist/index.d.ts": "3f546ab0278bbd1a51469074cd2ca40c0f50c4e887771edc80c6cc30e94e5f90",
-        "dist/index.js": "d40885a040cd27fd4eab9b28611c9113db71db3aaeabbe29bcb8c2acfef0be08",
+        "dist/index.js": "46bba76bd58efca706f711e4b2c6285fa7d3281638bb6637866fd69d7fcb2341",
         "dist/stripe.cjs": "021b3ef88bdcd62ec10ad3f97af5e07ac3b3a62f528ed82d522a30bc9f9e2459",
         "dist/stripe.d.cts": "cf65712647d0953f548b788d3ce33485ad6943c89bf7e333d53c8eea6c76d26f",
         "dist/stripe.d.ts": "cf65712647d0953f548b788d3ce33485ad6943c89bf7e333d53c8eea6c76d26f",
         "dist/stripe.js": "53a7f587eb8e62ee8b4b030014a07d650b763679a8f301d32ef5d5383a94d257",
-        "styles.css": "ce4771180d4d95923b1a2a6b1037f02a94fc66db065d5a7cb60b048c01521f3e"
+        "styles.css": "66114f096b5e12dab75bac19ddcde06ec99d7a80fc264451d41e8d44dd38b423"
       }
     },
     "form-builder": {
       "version": "0.1.0-alpha.0",
       "files": {
-        "dist/index.cjs": "27b4e2e6f5f8337c16912f8e3b09a773380d1a44896135758041911634f478a1",
+        "dist/index.cjs": "1945f7efea0c92275ec5d545a8c5d836340a2e66d8f3a0b78045f5c9ee49674a",
         "dist/index.d.cts": "5d613ffacfb8531535e96f49ec0c5bb5005b1e892567642f35b4be3974131460",
         "dist/index.d.ts": "5d613ffacfb8531535e96f49ec0c5bb5005b1e892567642f35b4be3974131460",
-        "dist/index.js": "5023a981715d8f89080e6fd590dd44d4f297f3aaabff1c73daa3c30bbd6612ea",
-        "styles.css": "26c7aec5a174b26c91cadee1dee629620d276214cb68b5069c6fe8f5a85d1c2b"
+        "dist/index.js": "c5ce7608fc307617b42bfa395274e857db00a63e60c16f0a81dea2a54f39081c",
+        "styles.css": "264adc55a7e3b4c4449cb24d359a9402d0871c7e29bdcd8cba0ff6fdc7a9f461"
       }
     },
     "form-embed": {
