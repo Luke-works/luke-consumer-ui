@@ -77,6 +77,8 @@ export default function FormInbox() {
   // Task ids we've completed but the server list may still return for a beat
   // (completion can lag). We suppress these from refetches until the server drops them.
   const completedRef = useRef<Set<string>>(new Set());
+  /** Monotonic ticket for the reading pane, so a slow response cannot overwrite a newer one. */
+  const openTicket = useRef(0);
 
   const sortCol = sorting[0];
   const sortField = sortCol ? SORT_FIELD[sortCol.id] : undefined;
@@ -119,6 +121,10 @@ export default function FormInbox() {
         const items = p.items.filter((t) => !done.has(t.taskId));
         setTasks(items);
         setTotal(Math.max(0, p.total - (p.items.length - items.length)));
+        // A load that WORKED has to clear a stale error. Nothing reset this, so one transient
+        // failure — a dropped poll, a 502 — latched the inbox into an error state that hid every
+        // task until the user navigated away and back, long after the problem had passed.
+        setError(null);
         setLoading(false);
       })
       .catch((e: unknown) => {
@@ -158,14 +164,27 @@ export default function FormInbox() {
     const id = kind === "email" ? task.emailMessageId : task.instanceId;
     if (!id) return;
 
+    // Stamp this open, and drop any response that is no longer the current one.
+    //
+    // Clicking task A then task B while A is still loading let A's response land LAST and write
+    // itself into the shared pane — so the header said B while the body showed A's submission.
+    // Someone reviewing the visible content and pressing Complete completed B on the strength of
+    // A's answers, and any document attached from that pane went to A's instance. Two clicks on
+    // a slow connection is all it takes.
+    const ticket = ++openTicket.current;
     setViewLoading(true);
     try {
-      if (kind === "email") setEmailView(await getInboundEmail(tenant, id));
-      else setView(await getInstance(tenant, id));
+      if (kind === "email") {
+        const got = await getInboundEmail(tenant, id);
+        if (openTicket.current === ticket) setEmailView(got);
+      } else {
+        const got = await getInstance(tenant, id);
+        if (openTicket.current === ticket) setView(got);
+      }
     } catch {
       /* show the task without its content rather than failing the whole pane */
     } finally {
-      setViewLoading(false);
+      if (openTicket.current === ticket) setViewLoading(false);
     }
   };
 

@@ -95,8 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    await api.logout();
-    apply(null);
+    // Clear the session even if the server call fails. The only caller fires this as
+    // `void signOut()` with no catch, so a logout that 500s or times out left the rejection
+    // unhandled and `apply(null)` never ran — the user pressed Sign out, saw nothing happen,
+    // and stayed fully signed in with a live token. Signing out is a local act; the server
+    // call is best-effort revocation on top of it, not a precondition for it.
+    try {
+      await api.logout();
+    } catch {
+      /* best effort — the local session goes regardless */
+    } finally {
+      apply(null);
+    }
   }, [apply]);
 
   const social = useCallback((provider: SocialProvider) => {
