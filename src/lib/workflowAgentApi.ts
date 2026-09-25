@@ -33,7 +33,10 @@ export { AgentCancelledError, AgentProviderRequiredError } from "./agentTranspor
 const LABEL = "workflow assistant";
 
 /** This agent reasons over the whole catalog, so it gets a longer budget. */
-const TIMEOUTS = { attemptMs: 30000, deadlineMs: 80000 };
+// 30s exactly EQUALLED luke-agents' own LLM_TIMEOUT_SECONDS, leaving nothing for request
+// overhead — a turn using its full server budget was a coin flip between an answer and an abort.
+// The workflow agent does no web research, so it needs less headroom than DEFAULT_TIMEOUTS.
+const TIMEOUTS = { attemptMs: 45_000, deadlineMs: 120_000 };
 
 const postWithRetry = <T,>(path: string, body: unknown, tenant?: string, signal?: AbortSignal) =>
   agentPost<T>(path, body, tenant, signal, LABEL, TIMEOUTS);
