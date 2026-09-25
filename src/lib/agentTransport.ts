@@ -62,7 +62,20 @@ export type AgentTimeouts = {
   deadlineMs: number;
 };
 
-export const DEFAULT_TIMEOUTS: AgentTimeouts = { attemptMs: 25_000, deadlineMs: 75_000 };
+/**
+ * The client's budget must EXCEED the server's, or a turn that is working perfectly well is
+ * killed mid-flight and the person is told the assistant could not be reached.
+ *
+ * luke-agents caps one provider call at `LLM_TIMEOUT_SECONDS` (30), and a LukeBuilds turn can be
+ * THREE of them in a single request — the build that asks for a fact it does not have, the web
+ * search, then the rebuild with the findings — bounded there at 30 + `RESEARCH_TIMEOUT_SECONDS`
+ * (25) + 30 = 85s. At the previous 25s a research turn could NEVER complete: it aborted every
+ * time with "signal is aborted without reason", and then retried, starting a fresh billable
+ * search nobody would ever see. Even an ordinary turn was aborted at 25s against a 30s ceiling.
+ *
+ * Raise the server's timeouts and this has to move with them.
+ */
+export const DEFAULT_TIMEOUTS: AgentTimeouts = { attemptMs: 100_000, deadlineMs: 210_000 };
 
 /** Exponential backoff with jitter so retries don't thundering-herd a recovering service. */
 function backoffDelay(attempt: number): number {
@@ -122,7 +135,11 @@ export async function agentPost<T>(
     if (signal?.aborted) throw new AgentCancelledError();
 
     const timeoutCtl = new AbortController();
-    const timer = setTimeout(() => timeoutCtl.abort(), timeouts.attemptMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      timeoutCtl.abort();
+    }, timeouts.attemptMs);
     const onExternalAbort = () => timeoutCtl.abort();
     signal?.addEventListener("abort", onExternalAbort, { once: true });
 
@@ -166,8 +183,13 @@ export async function agentPost<T>(
       }
     }
 
+    // Our OWN deadline firing is not a transient blip. The server may still be working on that
+    // turn, and re-sending it bills the workspace a second time — for a LukeBuilds research turn,
+    // a second round of web searches — for an answer the first attempt might yet have produced.
+    // Retry a genuine network drop or a cold start; do not retry ourselves.
     const transient =
-      networkErr !== null || res === null || data === null || COLD_START_STATUSES.has(status);
+      (networkErr !== null && !timedOut) ||
+      (res !== null && (data === null || COLD_START_STATUSES.has(status)));
     const delay = backoffDelay(attempt);
     const canRetry = transient && attempt < MAX_ATTEMPTS && Date.now() + delay < deadline;
 
