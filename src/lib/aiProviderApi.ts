@@ -82,6 +82,14 @@ export type AiConnection = {
   connectedAt?: string | null;
   connectedBy?: string | null;
   verifiedAt?: string | null;
+  /**
+   * The provider says this account is out of credit or over its quota.
+   *
+   * <p>Not a status: the key still works and the workspace stays connected — they fix this
+   * with their provider, not by reconnecting here. It clears when a turn next succeeds.
+   */
+  exhausted?: boolean;
+  exhaustedAt?: string | null;
   /** Why this provider last refused. Never contains the key. */
   lastError?: string | null;
 };
@@ -196,8 +204,11 @@ export type AiPreference = {
   /** What the workspace defaults to, offered as the "follow the workspace" option. */
   workspaceProvider?: AiProviderId | null;
   workspaceModel?: string | null;
-  /** Labels for the providers this workspace has, so groups read "Anthropic" not "anthropic". */
-  providers?: { id: AiProviderId; label: string }[];
+  /**
+   * The providers this workspace has, with the label to show and whether that account is out
+   * of credit — so the picker can say so BEFORE someone picks it and watches a turn fail.
+   */
+  providers?: { id: AiProviderId; label: string; exhausted?: boolean }[];
   /** This person's own pick; null means they follow the workspace. */
   model?: string | null;
   /** What their turns actually run on right now. */

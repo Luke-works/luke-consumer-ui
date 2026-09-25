@@ -41,22 +41,26 @@ export default function AiConnectionRow({
   onRemove: () => void;
 }) {
   const invalid = connection.status === "INVALID";
+  // The key works and the workspace is connected — this is about their balance, so it is shown
+  // rather than acted on. Reconnecting would not fix it.
+  const dry = !invalid && !!connection.exhausted;
   const checked = when(connection.verifiedAt);
   const panelId = useId();
   // Open when it needs attention: a failing provider should not hide its own explanation behind
   // a click. Otherwise collapsed — a workspace with four providers is a list to scan, not four
   // stacked forms.
-  const [open, setOpen] = useState(invalid);
+  const [open, setOpen] = useState(invalid || dry);
   // …and RE-open it if this provider fails later. `useState(invalid)` only reads its argument on
   // the first render, so a connection that was healthy at mount and then failed a Check kept its
   // own explanation collapsed — the one case this disclosure exists to reveal. Tracked against
   // the previous value so it opens on the TRANSITION, leaving someone free to collapse a row
   // that is still failing.
-  const wasInvalid = useRef(invalid);
+  const wasInvalid = useRef(invalid || dry);
   useEffect(() => {
-    if (invalid && !wasInvalid.current) setOpen(true);
-    wasInvalid.current = invalid;
-  }, [invalid]);
+    const needsAttention = invalid || dry;
+    if (needsAttention && !wasInvalid.current) setOpen(true);
+    wasInvalid.current = needsAttention;
+  }, [invalid, dry]);
 
   const pinned = connection.model;
   const modelOptions: ListboxOption[] = [
@@ -100,10 +104,12 @@ export default function AiConnectionRow({
             className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
               invalid
                 ? "bg-error-50 text-error-500 dark:bg-error-500/10"
-                : "bg-success-50 text-success-600 dark:bg-success-500/10"
+                : dry
+                  ? "bg-warning-50 text-warning-600 dark:bg-warning-500/10"
+                  : "bg-success-50 text-success-600 dark:bg-success-500/10"
             }`}
           >
-            {invalid ? <CircleAlert className="size-4" /> : <CheckCircle2 className="size-4" />}
+            {invalid || dry ? <CircleAlert className="size-4" /> : <CheckCircle2 className="size-4" />}
           </span>
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2 font-medium text-gray-800 dark:text-white/90">
@@ -118,8 +124,10 @@ export default function AiConnectionRow({
               ) : null}
             </span>
             {/* The one line worth seeing without expanding: is it working, and since when. */}
-            <span className="mt-0.5 block truncate text-xs text-gray-400">
-              {invalid ? "Not working" : "Working"}
+            <span
+              className={`mt-0.5 block truncate text-xs ${dry ? "text-warning-600 dark:text-warning-400" : "text-gray-400"}`}
+            >
+              {invalid ? "Not working" : dry ? "Out of credit — top up with your provider" : "Working"}
               {connection.keyLast4 ? ` · key ending ${connection.keyLast4}` : ""}
               {checked ? ` · checked ${checked}` : ""}
             </span>

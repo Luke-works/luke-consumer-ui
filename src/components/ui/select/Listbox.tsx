@@ -10,6 +10,14 @@ export type ListboxOption = {
   hint?: string;
   /** Heading this option sits under. Options with no group come first, ungrouped. */
   group?: string;
+  /**
+   * Colours the row to flag a problem with the thing itself, while leaving it selectable.
+   *
+   * <p>Distinct from `disabled`: an AI provider that is out of credit can still be chosen —
+   * it is the workspace's own account and the credit may be back before we hear about it —
+   * but picking it blind and learning from a failed turn is the thing to avoid.
+   */
+  tone?: "danger";
   disabled?: boolean;
 };
 
@@ -498,16 +506,23 @@ export default function Listbox({
                                 "flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",
                                 option.disabled ? "cursor-not-allowed opacity-50" : "",
                                 isActive ? "bg-brand-50 dark:bg-brand-500/10" : "",
-                                isSelected
-                                  ? "font-medium text-brand-600 dark:text-brand-300"
-                                  : "text-gray-700 dark:text-gray-200",
+                                option.tone === "danger"
+                                  ? "text-error-600 dark:text-error-400"
+                                  : isSelected
+                                    ? "font-medium text-brand-600 dark:text-brand-300"
+                                    : "text-gray-700 dark:text-gray-200",
+                                option.tone === "danger" && isSelected ? "font-medium" : "",
                               ].join(" ")}
                             >
                               <Check aria-hidden className={`mt-0.5 size-3.5 shrink-0 ${isSelected ? "" : "invisible"}`} />
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate">{option.label}</span>
                                 {option.hint ? (
-                                  <span className="block truncate text-xs font-normal normal-case tracking-normal text-gray-400">
+                                  <span
+                                    className={`block truncate text-xs font-normal normal-case tracking-normal ${
+                                      option.tone === "danger" ? "text-error-500" : "text-gray-400"
+                                    }`}
+                                  >
                                     {option.hint}
                                   </span>
                                 ) : null}

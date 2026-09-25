@@ -162,11 +162,21 @@ export default function AiModelPicker({ className = "" }: { className?: string }
       label: "Workspace default",
       hint: pref.workspaceProvider ? labelOf(pref.workspaceProvider) : undefined,
     },
-    ...connected.map((p) => ({ value: `p:${p.id}`, label: p.label })),
+    // An out-of-credit provider stays SELECTABLE — it is their account and the credit may be
+    // back before we hear about it — but it says so, because the alternative is picking it and
+    // learning from a failed turn.
+    ...connected.map((p) => ({
+      value: `p:${p.id}`,
+      label: p.label,
+      hint: p.exhausted ? "Out of credit" : undefined,
+      tone: p.exhausted ? ("danger" as const) : undefined,
+    })),
   ];
 
   /** Models of the provider in force — the other control decides which that is. */
   const forProvider = (models ?? []).filter((m) => m.provider === shownProvider);
+  /** Every model of an out-of-credit provider is equally unrunnable — mark them all. */
+  const providerDry = (pref.providers ?? []).find((p) => p.id === shownProvider)?.exhausted ?? false;
   const modelOptions: ListboxOption[] = [
     { value: "", label: "Workspace default", hint: pref.workspaceModel ?? undefined },
     // A pinned model stays SELECTABLE even when the live list has not arrived or came back
@@ -174,7 +184,12 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     ...(pinned && !forProvider.some((m) => m.id === pinned)
       ? [{ value: `m:${mine ?? ""}:${pinned}`, label: pinned, group: "Current choice" }]
       : []),
-    ...forProvider.filter((m) => m.chat).map((m) => ({ value: `m:${m.provider}:${m.id}`, label: m.id })),
+    ...forProvider.filter((m) => m.chat).map((m) => ({
+      value: `m:${m.provider}:${m.id}`,
+      label: m.id,
+      hint: providerDry ? "Out of credit" : undefined,
+      tone: providerDry ? ("danger" as const) : undefined,
+    })),
     // Demoted, never hidden: capability is partly guessed from names, and a wrong guess must
     // cost a click, not make a model unreachable.
     ...forProvider.filter((m) => !m.chat).map((m) => ({

@@ -99,6 +99,27 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1"));
   });
 
+  it("marks an out-of-credit provider red, and still lets you pick it", async () => {
+    // It is the workspace's own account and the credit may be back before we hear about it, so
+    // this must not be disabled — but picking it blind and learning from a failed turn is
+    // exactly what showing it avoids.
+    m.getAiPreference.mockResolvedValue(
+      pref({
+        providers: [
+          { id: "groq", label: "Groq" },
+          { id: "anthropic", label: "Anthropic", exhausted: true },
+        ],
+      }),
+    );
+    renderPicker();
+    await open("Provider");
+
+    const row = await screen.findByRole("option", { name: /^Anthropic/ });
+    expect(row).toHaveTextContent(/out of credit/i);
+    expect(row.className).toMatch(/text-error/);
+    expect(row).not.toHaveAttribute("aria-disabled");
+  });
+
   it("offers provider as its own control, listing every connected one", async () => {
     // Which account a turn is billed to is at least as consequential as which model runs it,
     // so it is a control in the panel rather than a heading you have to go looking for inside
