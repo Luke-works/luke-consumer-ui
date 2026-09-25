@@ -1,4 +1,5 @@
 import { Link2, RefreshCw, Unplug } from "lucide-react";
+import Select from "../../components/ui/select/Select";
 import { useCallback, useEffect, useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import ConnectIntegration from "../../components/workflow/ConnectIntegration";
@@ -104,11 +105,12 @@ export default function ConnectionsPage() {
           <label htmlFor="wf-provider" className="text-sm text-gray-600 dark:text-gray-300">
             Connect an app
           </label>
-          <select
+          <Select
             id="wf-provider"
             value={selection}
             onChange={(e) => setSelection(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-white/5"
+            size="sm"
+            fullWidth={false}
           >
             {COMMON_PROVIDERS.map((p) => (
               <option key={p.key} value={p.key}>
@@ -116,12 +118,12 @@ export default function ConnectionsPage() {
               </option>
             ))}
             <option value={OTHER}>Other…</option>
-          </select>
+          </Select>
           {selection === OTHER ? (
             <input
               value={otherProvider}
               onChange={(e) => setOtherProvider(e.target.value.trim())}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-white/5"
+              className="h-9 rounded-lg border border-gray-200 px-3 text-xs dark:border-gray-700 dark:bg-white/5"
               placeholder="Nango provider key, e.g. airtable"
             />
           ) : null}

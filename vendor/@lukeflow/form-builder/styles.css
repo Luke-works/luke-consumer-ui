@@ -502,6 +502,59 @@
   border-radius: var(--lf-radius, 6px);
   font: inherit;
 }
+
+/* ── Selects in the builder's own chrome ──────────────────────────────────────
+   Deliberately scoped to the AUTHORING controls — the settings panel, the logic
+   rules, the parameter rows — and NOT to .lf-pv-input, the disabled select
+   NodePreview draws to show what the published field will look like. The builder
+   is supposed to look like the live form; restyling the preview would make it
+   stop telling the truth about the thing it previews.
+
+   The native element stays. Its popup is the most reliable list we can offer —
+   right on every mobile keyboard, screen reader and zoom level — and what looked
+   unfinished was only the closed state, which is entirely ours: drop the OS
+   chevron, draw our own, and give focus the same ring .lf-palette-search and
+   .lf-opt-json already use, so one form doesn't have three focus styles. */
+.lf-setting select,
+.lf-param-row select,
+.lf-logic-cond > select:not(.lf-logic-conn),
+.lf-logic-then select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 24px;
+  background-color: var(--lf-bg, #fff);
+  /* Inline so there is no extra request and nothing to 404 in a consumer's build. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.lf-setting select:hover,
+.lf-param-row select:hover,
+.lf-logic-cond > select:not(.lf-logic-conn):hover,
+.lf-logic-then select:hover {
+  border-color: var(--lf-muted, #6b7280);
+}
+
+.lf-setting select:focus,
+.lf-param-row select:focus,
+.lf-logic-cond > select:not(.lf-logic-conn):focus,
+.lf-logic-then select:focus {
+  outline: none;
+  border-color: var(--lf-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.lf-setting select:disabled,
+.lf-param-row select:disabled,
+.lf-logic-cond > select:not(.lf-logic-conn):disabled,
+.lf-logic-then select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background-color: var(--lf-bg-muted, #f8f9fa);
+}
 .lf-setting-inline input { order: -1; }
 .lf-setting-hint { font-size: 0.7rem; color: var(--lf-muted, #6b7280); }
 
@@ -563,8 +616,18 @@
   font-size: 0.8rem;
   border: 1px solid var(--lf-border, #d9d9d9);
   border-radius: var(--lf-radius, 6px);
-  background: var(--lf-bg, #fff);
+  /* background-COLOR, not the shorthand. `background` resets background-image, and this rule
+     sits after the select polish above — the shorthand silently wiped the chevron off every
+     logic-rule select while leaving it on every other select in the builder. */
+  background-color: var(--lf-bg, #fff);
   color: var(--lf-text, #1a1a1a);
+}
+/* …and the room for it, which the `padding` shorthand above resets in the same way.
+   Not .lf-logic-conn: that is the 66px AND/OR connector, where 24px of chevron gutter eats
+   the word itself. */
+.lf-logic-cond > select:not(.lf-logic-conn),
+.lf-logic-then select {
+  padding-right: 24px;
 }
 .lf-logic-cond > select:not(.lf-logic-conn),
 .lf-logic-cond > input { flex: 1 1 0; min-width: 88px; }
@@ -703,6 +766,19 @@
 .lf-settings-minion, .lf-settings-params { border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 .lf-settings-minion legend, .lf-settings-params legend { font-size: 0.75rem; font-weight: 600; padding: 0 4px; }
 .lf-param-row { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; }
+/* These controls sit outside .lf-setting, so they inherit no field styling — and the select has
+   appearance:none, which removes the UA's. Without this the row is a borderless select beside a
+   bordered input. (consumer-ui's skin hid this; the standalone builder showed it.) */
+.lf-param-row input,
+.lf-param-row select {
+  padding: 3px 5px;
+  border: 1px solid var(--lf-border, #d9d9d9);
+  border-radius: var(--lf-radius, 6px);
+  background-color: var(--lf-bg, #fff);
+  color: var(--lf-text, #1a1a1a);
+  font: inherit;
+}
+.lf-param-row select { padding-right: 20px; background-position: right 5px center; }
 .lf-param-row input, .lf-param-row select { flex: 1; min-width: 0; }
 .lf-param-add { align-self: flex-start; padding: 3px 8px; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); background: var(--lf-bg, #fff); cursor: pointer; }
 

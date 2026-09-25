@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { ArrowDown, ArrowUp, Filter, Trash2 } from "lucide-react";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
@@ -142,7 +143,7 @@ export default function EmailRoutingRules({ tenant, boxes }: { tenant: string; b
           </div>
           <div className="sm:w-56">
             <Label htmlFor="rule-box">Applies to</Label>
-            <Select id="rule-box" value={boxId} onChange={setBoxId}>
+            <Select id="rule-box" value={boxId} onChange={(e) => setBoxId(e.target.value)}>
               <option value="">All inbound boxes</option>
               {inboundBoxes.map((b) => (
                 <option key={b.id} value={b.id}>{b.address}</option>
@@ -154,7 +155,7 @@ export default function EmailRoutingRules({ tenant, boxes }: { tenant: string; b
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="sm:w-36">
             <Label htmlFor="rule-field">When</Label>
-            <Select id="rule-field" value={matchField} onChange={(v) => setMatchField(v as RuleField)}>
+            <Select id="rule-field" value={matchField} onChange={(e) => setMatchField(e.target.value as RuleField)}>
               <option value="SUBJECT">Subject</option>
               <option value="FROM">From</option>
               <option value="TO">To</option>
@@ -164,7 +165,7 @@ export default function EmailRoutingRules({ tenant, boxes }: { tenant: string; b
           </div>
           <div className="sm:w-40">
             <Label htmlFor="rule-op">Condition</Label>
-            <Select id="rule-op" value={matchOperator} onChange={(v) => setMatchOperator(v as RuleOperator)}>
+            <Select id="rule-op" value={matchOperator} onChange={(e) => setMatchOperator(e.target.value as RuleOperator)}>
               <option value="CONTAINS">contains</option>
               <option value="EQUALS">is exactly</option>
               <option value="STARTS_WITH">starts with</option>
@@ -265,23 +266,6 @@ export function summariseActions(r: EmailRoutingRule): string {
   if (r.actionProcessKey) parts.push(`run ${r.actionProcessKey}`);
   if (r.actionTaskName) parts.push(`named “${r.actionTaskName}”`);
   return parts.length ? parts.join(", ") : "Standard review task";
-}
-
-function Select({
-  id, value, onChange, children,
-}: {
-  id: string; value: string; onChange: (v: string) => void; children: React.ReactNode;
-}) {
-  return (
-    <select
-      id={id}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-    >
-      {children}
-    </select>
-  );
 }
 
 function IconBtn({

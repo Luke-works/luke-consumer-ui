@@ -9,6 +9,7 @@
  * visibly shrinks what they're approving.
  */
 import { useCallback, useEffect, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { CheckCircle2, CornerDownLeft, Inbox } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -161,21 +162,21 @@ export default function ApproveRequestsSection({ tenant }: { tenant: string }) {
                   <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800 sm:flex-row sm:items-end">
                     <div>
                       <Label htmlFor={`grant-${r.id}`}>Grant level</Label>
-                      <select
+                      <Select
                         id={`grant-${r.id}`}
                         value={granting}
                         disabled={busy}
                         onChange={(e) =>
                           setLevels((p) => ({ ...p, [r.id]: e.target.value as AccessRequestLevel }))
                         }
-                        className="h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                        fullWidth={false}
                       >
                         {GRANTABLE_LEVELS.map((l) => (
                           <option key={l} value={l}>
                             {LEVEL_LABEL[l]}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </div>
                     <div className="sm:flex-1">
                       <Label htmlFor={`deny-${r.id}`}>Reason for sending back (optional)</Label>

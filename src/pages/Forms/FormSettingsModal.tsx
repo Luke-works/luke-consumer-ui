@@ -15,6 +15,7 @@
  * lifecycle (dirty tracking, autosave debounce, the paid-plan gate on branding).
  */
 import { useEffect, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { Modal, MODAL_HEADER_SAFE } from "../../components/ui/modal";
 import Label from "../../components/form/Label";
 import Input from "../../components/form/input/InputField";
@@ -359,11 +360,10 @@ export default function FormSettingsModal({
           <>
             <Field hint={chosen.hint}>
               <Label>Font</Label>
-              <select
+              <Select
                 value={font || "default"}
                 onChange={(e) => onFontChange(e.target.value)}
                 disabled={!editable}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
               >
                 {FORM_FONTS.map((f) => (
                   // Each option is set in its own face so the list previews the choices. (Native option
@@ -372,7 +372,7 @@ export default function FormSettingsModal({
                     {f.label}
                   </option>
                 ))}
-              </select>
+              </Select>
               <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-white/5">
                 <p className="text-[11px] uppercase tracking-wide text-gray-400">Preview</p>
                 <p className="mt-1 text-base text-gray-800 dark:text-white/90" style={{ fontFamily: chosen.stack }}>

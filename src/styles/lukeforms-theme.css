@@ -287,9 +287,45 @@
   padding: 0.375rem 0.625rem;
   font-size: 0.875rem;
   color: var(--lf-text);
-  background: var(--lf-bg);
+  /* background-COLOR, not the shorthand: `background` resets background-image, which silently
+     wiped the chevron the package draws on its selects. A shorthand here clobbers anything a
+     package paints, so it is worth keeping longhand. */
+  background-color: var(--lf-bg);
   border: 1px solid var(--lf-border);
   border-radius: 0.5rem;
+}
+
+/* ── Selects: the app's chevron, on the builder's own controls ────────────────
+   The element stays native — its popup is the most reliable list we can offer, and only the
+   closed state looked unfinished. Not applied to .lf-pv-input, the disabled select NodePreview
+   draws to show what the PUBLISHED field will look like: the builder is meant to look like the
+   live form, so the preview must keep matching the renderer rather than the app chrome. */
+.lf-builder .lf-setting select,
+.lf-builder .lf-settings-minion select,
+.lf-builder .lf-param-row select,
+.lf-builder .lf-logic-cond > select:not(.lf-logic-conn),
+.lf-builder .lf-logic-then select {
+  appearance: none;
+  -webkit-appearance: none;
+  /* Room for the chevron; the shorthand above would otherwise leave it over the text. */
+  padding-right: 1.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.lf-builder .lf-setting select:hover,
+.lf-builder .lf-settings-minion select:hover,
+.lf-builder .lf-param-row select:hover,
+.lf-builder .lf-logic-cond > select:not(.lf-logic-conn):hover,
+.lf-builder .lf-logic-then select:hover {
+  border-color: var(--color-gray-400, #98a2b3);
+}
+.lf-builder .lf-setting select:disabled,
+.lf-builder .lf-param-row select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .lf-builder .lf-setting input:focus,
 .lf-builder .lf-setting select:focus,

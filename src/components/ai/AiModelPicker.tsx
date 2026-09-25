@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../../context/AuthContext";
-import { ModelOptions } from "./modelOptions";
+import Listbox, { type ListboxOption } from "../ui/select/Listbox";
 import {
   chooseMyAiModel,
   getAiPreference,
@@ -32,6 +32,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   // The live model list costs a round trip to the provider, so it is fetched when someone
   // actually opens the picker rather than on every panel mount.
   const loading = useRef(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (!tenant) return;
@@ -57,10 +58,20 @@ export default function AiModelPicker({ className = "" }: { className?: string }
   }, [tenant, models]);
 
   const choose = async (model: string) => {
-    if (!tenant) return;
+    // A ref, not the `saving` state: the state read here is the one captured when this render's
+    // closure was built, so a second pick in the same tick would sail past it.
+    if (!tenant || savingRef.current) return;
+    savingRef.current = true;
     // A model name only means something to the provider offering it, and a workspace may have
     // several connected — so the provider travels with the choice.
-    const owner = (models ?? []).find((m) => m.id === model)?.provider ?? null;
+    //
+    // Falling back to the preference's OWN provider matters for the "Current choice" row, which
+    // exists precisely because the pinned model is absent from `models` — so this lookup always
+    // misses for it. Sending no provider made the server resolve to the workspace's PREFERRED
+    // one, so re-confirming your own Anthropic model either failed with an error naming Groq, or
+    // silently re-pointed you at Groq while still showing the Claude id. Every turn then asked
+    // the wrong provider for a model it has never heard of.
+    const owner = (models ?? []).find((m) => m.id === model)?.provider ?? pref?.provider ?? null;
     // Keep the control usable rather than disabling it: a browser blurs a focused element when it
     // becomes disabled and drops focus to <body>, so a keyboard user loses their place on every
     // save. `saving` now only guards against overlapping writes.
@@ -75,6 +86,7 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't change the model.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -98,31 +110,46 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     );
   }
 
-  const options = models ?? [];
-  const providerLabels = Object.fromEntries(
-    (pref.providers ?? []).map((p) => [p.id, p.label]),
-  ) as Record<string, string>;
-  const current = pref.model ?? "";
+  const providerLabel = (id: string) =>
+    (pref.providers ?? []).find((p) => p.id === id)?.label ?? id;
+
+  const pinned = pref.model;
+  const options: ListboxOption[] = [
+    {
+      value: "",
+      label: "Workspace default",
+      hint: pref.workspaceModel ?? undefined,
+    },
+    // The pinned model has to be SELECTABLE, not merely displayable. The list is fetched on
+    // open and may never arrive (a provider blip leaves it empty for good), and without a row
+    // to land on the highlight falls to index 0 — so Enter, the natural way to confirm "yes,
+    // this one", silently unpinned the model instead. Displaying it was only half the fix; this
+    // is the half that was missing here but present in AiConnectionRow.
+    ...(pinned && !(models ?? []).some((m) => m.id === pinned)
+      ? [{ value: pinned, label: pinned, group: "Current choice" }]
+      : []),
+    ...(models ?? []).map((m) => ({
+      value: m.id,
+      label: m.id,
+      // Two dimensions at once: which provider offers it, and whether a turn could run on it.
+      // A workspace may have several providers connected, and each lists every modality its
+      // account can reach — so "Groq" and "Groq — may not work" are different groups.
+      group: m.chat ? providerLabel(m.provider) : `${providerLabel(m.provider)} — may not work`,
+    })),
+  ];
 
   return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
-      <label htmlFor="ai-model-picker" className="sr-only">
-        Model
-      </label>
-      <select
-        id="ai-model-picker"
-        value={current}
-        aria-busy={saving}
-        title={`Runs on ${pref.effectiveModel ?? "the workspace default"}`}
-        onFocus={() => void loadModels()}
-        onChange={(e) => void choose(e.target.value)}
-        className="max-w-[180px] truncate rounded-lg border border-gray-200 bg-transparent px-2 py-1 text-xs text-gray-600 focus:border-brand-300 focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:text-gray-300"
-      >
-        <option value="">
-          Workspace default{pref.workspaceModel ? ` (${pref.workspaceModel})` : ""}
-        </option>
-        <ModelOptions models={options} selected={current} providerLabels={providerLabels} />
-      </select>
+    <div className={`flex items-center gap-1.5 ${className}`} aria-busy={saving || undefined}>
+      <Listbox
+        ariaLabel="Model"
+        size="sm"
+        className="max-w-[220px]"
+        value={pref.model ?? ""}
+        options={options}
+        placeholder="Workspace default"
+        onOpen={() => void loadModels()}
+        onChange={(next) => void choose(next)}
+      />
       {error ? (
         <span role="alert" className="text-xs text-error-600 dark:text-error-400">
           {error}

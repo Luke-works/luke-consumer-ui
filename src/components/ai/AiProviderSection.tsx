@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
+import Select from "../ui/select/Select";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
 import { ApiError } from "../../lib/authApi";
@@ -52,16 +53,38 @@ export default function AiProviderSection() {
   const [provider, setProvider] = useState<AiProviderId>("groq");
   const [apiKey, setApiKey] = useState("");
   const [adding, setAdding] = useState(false);
+  const busyRef = useRef(false);
   // One fetch serves every row: the endpoint returns every connected provider's models, so a
   // row filters rather than asking again.
   const [models, setModels] = useState<AiModel[] | null>(null);
 
+  // Bumped by `apply` whenever the set of providers may have changed. A fetch stamps the
+  // generation it started in and discards its own result if that has moved on — otherwise a
+  // request in flight across a connect writes its PRE-connect list back afterwards, and since
+  // `loadModels` bails on any non-null cache, the new provider's dropdown stays empty for the
+  // life of the page. That is the bug the comment in `apply` claims to have fixed.
+  const generation = useRef(0);
+  // WHICH generation is in flight, not merely whether one is. A plain boolean deadlocked the
+  // two guards against each other: a reopen while a stale fetch was outstanding bailed on the
+  // boolean, and then the stale fetch discarded its own result because the generation had moved
+  // — zero fetches, zero data, and a dropdown left open in front of someone showing no models
+  // at all until they closed and reopened it. A fetch only blocks another fetch of its OWN
+  // generation.
+  const fetching = useRef<number | null>(null);
+
   const loadModels = useCallback(async () => {
     if (!tenant || models) return;
+    const startedAt = generation.current;
+    if (fetching.current === startedAt) return;
+    fetching.current = startedAt;
     try {
-      setModels((await listAiModels(tenant)).models);
+      const fetched = (await listAiModels(tenant)).models;
+      if (generation.current === startedAt) setModels(fetched);
     } catch {
-      setModels([]); // unreadable → keep the current choice, offer nothing new
+      if (generation.current === startedAt) setModels([]); // unreadable → offer nothing new
+    } finally {
+      // Only clear it if a newer fetch has not claimed the slot meanwhile.
+      if (fetching.current === startedAt) fetching.current = null;
     }
   }, [tenant, models]);
 
@@ -84,13 +107,36 @@ export default function AiProviderSection() {
     setView((prev) => ({ ...(prev ?? {}), ...v }));
     // Drop the cached model list: which providers exist may have just changed, and a one-shot
     // cache meant a newly added provider's dropdown stayed empty for the life of the page.
+    generation.current += 1;
     setModels(null);
     setError(null);
     if (message) setNotice(message);
   }, []);
 
+  /** What this provider already has pinned, so a key rotation does not silently drop it. */
+  const pinnedModelFor = (id: AiProviderId): string | undefined =>
+    (view?.connections ?? []).find((c) => c.provider === id)?.model ?? undefined;
+
   /** Runs one action, reporting whether it actually succeeded. */
   const act = async (fn: () => Promise<AiProviderView>, message?: string): Promise<boolean> => {
+    // A ref, for the same reason AiModelPicker uses one: `busy` is state, read from the closure
+    // this render built, so a second call in the same tick sails past it.
+    //
+    // This became load-bearing when the model Listbox stopped honouring `busy` (a disabled
+    // focused control drops focus to <body>). Every OTHER caller here is still behind
+    // `disabled={busy}`, which left the model picker as the one unguarded way in — and `apply`
+    // is last-response-wins, so two overlapping saves let the older server snapshot land second
+    // and wipe the newer change off the screen while the server kept it.
+    if (busyRef.current) {
+      // Say so. The model Listbox is deliberately NOT disabled while busy (disabling a focused
+      // control drops focus to <body>), which makes picking again mid-save an ordinary thing to
+      // do rather than a rarity — and silently dropping it left someone watching the control
+      // snap back to the old value with no request sent and nothing explaining why.
+      setNotice(null);
+      setError("Still saving the last change — try that again in a moment.");
+      return false;
+    }
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -101,6 +147,7 @@ export default function AiProviderSection() {
       setError(messageOf(e, "Something went wrong. Please try again."));
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -111,7 +158,11 @@ export default function AiProviderSection() {
     // the outcome — clearing unconditionally threw away the key someone had just pasted and
     // collapsed the form as though it had worked, with the failure showing above an empty form.
     const ok = await act(
-      () => connectAiProvider(tenant, { provider, apiKey }),
+      // Carry the pinned model through a ROTATION. The server treats an absent model as
+      // "no model", not as "leave it alone" — normalizeModel(null) returns null and the row is
+      // set to it — so replacing a key silently reset the workspace back to the provider's
+      // default, which is not what "rotate this key" means to anyone.
+      () => connectAiProvider(tenant, { provider, apiKey, model: pinnedModelFor(provider) }),
       "Connected. Your workspace can use this provider now.",
     );
     if (!ok) return;
@@ -201,9 +252,8 @@ export default function AiProviderSection() {
                   <label htmlFor="ai-provider" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Provider
                   </label>
-                  <select
+                  <Select
                     id="ai-provider"
-                    className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:text-white/90"
                     value={provider}
                     disabled={busy}
                     onChange={(e) => setProvider(e.target.value as AiProviderId)}
@@ -214,7 +264,7 @@ export default function AiProviderSection() {
                         {p.connected ? " — already connected" : ""}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>

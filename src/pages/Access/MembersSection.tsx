@@ -5,6 +5,7 @@
  * RolesSection / AttributesSection / CapabilitiesSection.
  */
 import { useCallback, useEffect, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { UserPlus, Users, UsersRound } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import * as api from "../../lib/authApi";
@@ -338,17 +339,17 @@ export default function MembersSection({ tenant }: { tenant: string }) {
           </div>
           <div>
             <Label htmlFor="add-role">Role</Label>
-            <select
+            <Select
               id="add-role"
               value={addRole}
               onChange={(e) => setAddRole(e.target.value)}
-              className="h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+              fullWidth={false}
             >
               <option value="tenant-user">Member</option>
               <option value="process-operator">Process operator</option>
               <option value="task-worker">Task worker</option>
               <option value="tenant-admin">Org owner</option>
-            </select>
+            </Select>
           </div>
           <Button
             size="sm"

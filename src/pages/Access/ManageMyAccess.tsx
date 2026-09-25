@@ -8,6 +8,7 @@
  * me".
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { Clock, CornerDownLeft, KeyRound, Send, Trash2 } from "lucide-react";
 import * as api from "../../lib/authApi";
 import type { CapabilityCatalogItem, SubscribedCapability } from "../../lib/authApi";
@@ -99,18 +100,17 @@ function ReturnedRequestCard({
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor={`redo-level-${request.id}`}>Revised level</Label>
-          <select
+          <Select
             id={`redo-level-${request.id}`}
             value={level}
             onChange={(e) => setLevel(e.target.value as AccessRequestLevel)}
-            className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
           >
             {GRANTABLE_LEVELS.map((l) => (
               <option key={l} value={l}>
                 {LEVEL_LABEL[l]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <Label htmlFor={`redo-note-${request.id}`}>Justification</Label>
@@ -356,33 +356,31 @@ export default function ManageMyAccessSection({
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <Label htmlFor="req-cap">Capability</Label>
-                <select
+                <Select
                   id="req-cap"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                 >
                   {requestable.map((s) => (
                     <option key={s.code} value={s.code}>
                       {s.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="req-level">Level</Label>
-                <select
+                <Select
                   id="req-level"
                   value={level}
                   onChange={(e) => setLevel(e.target.value as AccessRequestLevel)}
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                 >
                   {options.map((l) => (
                     <option key={l} value={l}>
                       {LEVEL_LABEL[l]}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 

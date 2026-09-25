@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Select from "../../components/ui/select/Select";
 import { Check, KeyRound, Phone as PhoneIcon, X } from "lucide-react";
 import { useDialog } from "../../hooks/useDialog";
 import {
@@ -143,22 +144,21 @@ function NumberSection({
         <p className="text-sm text-gray-400">No number yet. An owner can provision one.</p>
       ) : (
         <div className="space-y-2">
-          <select
+          <Select
             value={form.provider}
             onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value as ProvisionNumberInput["provider"] }))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5"
           >
             <option value="vapi">Vapi number (US)</option>
             <option value="twilio">Import Twilio</option>
             <option value="telnyx">Import Telnyx</option>
             <option value="vonage">Import Vonage</option>
-          </select>
+          </Select>
           {form.provider === "vapi" ? (
             <input
               value={form.areaCode ?? ""}
               onChange={(e) => setForm((f) => ({ ...f, areaCode: e.target.value }))}
               placeholder="Area code (optional, e.g. 415)"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5"
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
             />
           ) : (
             <>
@@ -166,13 +166,13 @@ function NumberSection({
                 value={form.number ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, number: e.target.value }))}
                 placeholder="Number, E.164 (e.g. +14155551234)"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5"
+                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
               />
               <input
                 value={form.credentialId ?? ""}
                 onChange={(e) => setForm((f) => ({ ...f, credentialId: e.target.value }))}
                 placeholder="Vapi credential id for the carrier"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5"
+                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
               />
             </>
           )}
@@ -180,7 +180,7 @@ function NumberSection({
             value={form.assistantId ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, assistantId: e.target.value }))}
             placeholder="Assistant id to answer inbound (optional)"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-white/5"
+            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
           />
           <div className="flex justify-end">
             <button onClick={submit} disabled={busy} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50">

@@ -105,10 +105,10 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     const rows = await screen.findAllByRole("listitem");
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByText(/Groq/)).toBeInTheDocument();
-    expect(within(rows[0]).getByText(/Key ending abcd/i)).toBeInTheDocument();
+    expect(within(rows[0]).getByText(/key ending abcd/i)).toBeInTheDocument();
     // Exact: "Provider default (…)" in the model select would otherwise match too.
     expect(within(rows[0]).getByText("Default", { exact: true })).toBeInTheDocument();
-    expect(within(rows[1]).getByText(/Key ending wxyz/i)).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/key ending wxyz/i)).toBeInTheDocument();
     // Only one carries the default; the other offers to take it.
     expect(within(rows[1]).queryByText("Default", { exact: true })).not.toBeInTheDocument();
     expect(within(rows[1]).getByRole("button", { name: /make default/i })).toBeInTheDocument();
@@ -134,7 +134,7 @@ describe("AiProviderSection — several providers, each with its own key", () =>
   it("never renders a key — only its last four", async () => {
     m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
     const { container } = renderSection();
-    await screen.findByText(/Key ending abcd/i);
+    await screen.findByText(/key ending abcd/i);
     expect(container.textContent).not.toMatch(/gsk_|sk-ant-/);
   });
 
@@ -157,8 +157,8 @@ describe("AiProviderSection — several providers, each with its own key", () =>
       }),
     );
     // Both are listed afterwards — this used to destroy the first key outright.
-    expect(await screen.findByText(/Key ending abcd/i)).toBeInTheDocument();
-    expect(screen.getByText(/Key ending wxyz/i)).toBeInTheDocument();
+    expect(await screen.findByText(/key ending abcd/i)).toBeInTheDocument();
+    expect(screen.getByText(/key ending wxyz/i)).toBeInTheDocument();
   });
 
   it("warns that re-picking a connected provider replaces that one key", async () => {
@@ -227,18 +227,48 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     m.chooseAiModel.mockResolvedValue(view({ connected: true, connections: [groq({ model: "llama-3.3-70b-versatile" })] }));
     renderSection();
 
-    const select = await screen.findByLabelText(/Workspace model/i);
+    // Rows start collapsed — a workspace with four providers is a list to scan, not four
+    // stacked forms — so the detail has to be asked for.
+    await userEvent.click(await screen.findByRole("button", { name: /Groq/ }));
+    const trigger = await screen.findByRole("combobox", { name: /Workspace model for Groq/i });
     // A round trip per connected provider on page load, for a control most people never touch.
     expect(m.listAiModels).not.toHaveBeenCalled();
 
-    select.focus();
+    await userEvent.click(trigger);
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1"));
-    await screen.findByRole("option", { name: "llama-3.3-70b-versatile" });
+    await userEvent.click(await screen.findByRole("option", { name: "llama-3.3-70b-versatile" }));
 
-    await userEvent.selectOptions(select, "llama-3.3-70b-versatile");
     await waitFor(() =>
       expect(m.chooseAiModel).toHaveBeenCalledWith("t1", "groq", "llama-3.3-70b-versatile"),
     );
+  });
+
+  it("opens a failing provider by default so its explanation is not hidden behind a click", async () => {
+    m.getAiProvider.mockResolvedValue(
+      view({
+        connected: true,
+        connections: [groq({ status: "INVALID", lastError: "Groq rejected this key." })],
+      }),
+    );
+    renderSection();
+    // The one row that needs reading is the one already open.
+    expect(await screen.findByText(/Groq rejected this key/i)).toBeInTheDocument();
+  });
+
+  it("collapses a healthy provider's detail until asked for", async () => {
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+    renderSection();
+    const row = await screen.findByRole("button", { name: /Groq/ });
+
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    // The summary still carries what matters at a glance.
+    expect(screen.getByText(/Working/)).toBeInTheDocument();
+    expect(screen.getByText(/key ending abcd/i)).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /Workspace model/i })).not.toBeInTheDocument();
+
+    await userEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("combobox", { name: /Workspace model/i })).toBeInTheDocument();
   });
 
   it("keeps the pasted key when connecting fails", async () => {
@@ -267,8 +297,10 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     m.connectAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
     renderSection();
 
-    (await screen.findByLabelText(/Workspace model/i)).focus();
+    await userEvent.click(await screen.findByRole("button", { name: /Groq/ }));
+    await userEvent.click(await screen.findByRole("combobox", { name: /Workspace model for Groq/i }));
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledTimes(1));
+    await userEvent.keyboard("{Escape}");
 
     await userEvent.click(screen.getByRole("button", { name: /add another provider/i }));
     await userEvent.selectOptions(screen.getByLabelText(/Provider/i), "anthropic");
@@ -277,8 +309,8 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     await waitFor(() => expect(m.connectAiProvider).toHaveBeenCalled());
 
     // The new provider's dropdown asks again rather than showing nothing.
-    const selects = await screen.findAllByLabelText(/Workspace model/i);
-    selects[1].focus();
+    await userEvent.click(await screen.findByRole("button", { name: /Anthropic/ }));
+    await userEvent.click(await screen.findByRole("combobox", { name: /Workspace model for Anthropic/i }));
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledTimes(2));
   });
 
@@ -300,10 +332,157 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     renderSection();
 
     // Status is exactly what a member needs: whether the assistant will work.
-    expect(await screen.findByText(/Key ending abcd/i)).toBeInTheDocument();
+    expect(await screen.findByText(/key ending abcd/i)).toBeInTheDocument();
     expect(screen.getByText(/Only the workspace owner can change AI providers/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Workspace model/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("AiProviderSection — one write at a time", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    m.listAiModels.mockResolvedValue({
+      models: [
+        { provider: "groq", id: "openai/gpt-oss-120b", chat: true },
+        { provider: "groq", id: "llama-3.3-70b-versatile", chat: true },
+        { provider: "anthropic", id: "claude-haiku-4-5", chat: true },
+      ],
+    });
+  });
+
+  it("refuses a second write while one is still in flight", async () => {
+    // The model Listbox deliberately no longer honours `busy` — disabling a focused control
+    // drops focus to <body>. That left it as the one un-guarded way into act(), and act()
+    // applies whichever response lands LAST, so an older server snapshot could overwrite a newer
+    // change on screen while the server had actually kept it.
+    let release: (v: api.AiProviderView) => void = () => {};
+    m.chooseAiModel.mockImplementation(
+      () => new Promise<api.AiProviderView>((res) => { release = res; }),
+    );
+
+    renderSection();
+    const rows = await screen.findAllByRole("button", { name: /Groq/ });
+    await userEvent.click(rows[0]!); // expand the Groq row
+
+    const picker = (await screen.findAllByRole("combobox"))[0]!;
+    await userEvent.click(picker);
+    await userEvent.click(await screen.findByRole("option", { name: /llama-3.3-70b-versatile/ }));
+    await waitFor(() => expect(m.chooseAiModel).toHaveBeenCalledTimes(1));
+
+    // Second pick while the first is unresolved.
+    await userEvent.click(picker);
+    const again = screen.queryAllByRole("option");
+    if (again.length) await userEvent.click(again[0]!);
+
+    expect(m.chooseAiModel).toHaveBeenCalledTimes(1);
+    release(view({ connected: true, connections: [groq(), anthropic()] }));
+  });
+
+  it("says so when it refuses a second write instead of dropping it silently", async () => {
+    // The model Listbox is deliberately not disabled while busy, so picking again mid-save is
+    // an ordinary thing to do. Dropping it with no request, no message and a control that snaps
+    // back to the old value is indistinguishable from the app ignoring you.
+    let release: (v: api.AiProviderView) => void = () => {};
+    m.chooseAiModel.mockImplementation(
+      () => new Promise<api.AiProviderView>((res) => { release = res; }),
+    );
+
+    renderSection();
+    await userEvent.click((await screen.findAllByRole("button", { name: /Groq/ }))[0]!);
+    const picker = (await screen.findAllByRole("combobox"))[0]!;
+    await userEvent.click(picker);
+    await userEvent.click(await screen.findByRole("option", { name: /llama-3.3-70b-versatile/ }));
+    await waitFor(() => expect(m.chooseAiModel).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(picker);
+    const second = screen.queryAllByRole("option");
+    if (second.length) await userEvent.click(second[0]!);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/still saving/i);
+    release(view({ connected: true, connections: [groq(), anthropic()] }));
+  });
+
+  it("still fills a dropdown reopened while a superseded fetch is outstanding", async () => {
+    // Two guards that each did the right thing alone deadlocked together: the in-flight guard
+    // swallowed the reopen, and the superseded fetch then threw its own result away — leaving
+    // an open dropdown showing no models at all, with no spinner and no error.
+    const pending: Array<(v: { models: api.AiModel[] }) => void> = [];
+    m.listAiModels.mockImplementation(
+      () => new Promise<{ models: api.AiModel[] }>((res) => { pending.push(res); }),
+    );
+    m.verifyAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+
+    renderSection();
+    await userEvent.click((await screen.findAllByRole("button", { name: /Groq/ }))[0]!);
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!); // fetch #1 starts
+    await userEvent.keyboard("{Escape}");
+
+    // Something changes the providers under it; the outstanding fetch is now superseded.
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Check$/ }))[0]!);
+    await waitFor(() => expect(m.verifyAiProvider).toHaveBeenCalled());
+
+    // Reopening must be able to start a FRESH fetch rather than be swallowed.
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!);
+    await waitFor(() => expect(pending.length).toBeGreaterThan(1));
+    pending[pending.length - 1]!({
+      models: [{ provider: "groq", id: "llama-3.3-70b-versatile", chat: true }],
+    });
+
+    expect(await screen.findByRole("option", { name: /llama-3.3-70b-versatile/ })).toBeInTheDocument();
+  });
+
+  it("carries the pinned model through a key rotation", async () => {
+    // The server reads an absent model as "no model", not "leave it alone", so omitting it on a
+    // rotation silently reset the workspace to the provider's default.
+    m.getAiProvider.mockResolvedValue(
+      view({ connected: true, connections: [groq({ model: "llama-3.3-70b-versatile" })] }),
+    );
+    m.connectAiProvider.mockResolvedValue(view({ connected: true, connections: [groq()] }));
+
+    renderSection();
+    await userEvent.click(await screen.findByRole("button", { name: /Add another|Connect/i }));
+    await userEvent.type(await screen.findByLabelText(/key/i), "gsk_rotated_key_value");
+    await userEvent.click(await screen.findByRole("button", { name: /^Connect$/ }));
+
+    await waitFor(() =>
+      expect(m.connectAiProvider).toHaveBeenCalledWith(
+        "t1",
+        expect.objectContaining({ model: "llama-3.3-70b-versatile" }),
+      ),
+    );
+  });
+
+  it("discards a model list that arrives after the providers changed under it", async () => {
+    // loadModels bails on any non-null cache, so a fetch in flight across a connect that writes
+    // its PRE-connect list back afterwards leaves the new provider's dropdown empty for the life
+    // of the page — the exact bug `apply`'s comment claims to have fixed.
+    let deliver: (v: { models: api.AiModel[] }) => void = () => {};
+    m.listAiModels.mockImplementation(
+      () => new Promise<{ models: api.AiModel[] }>((res) => { deliver = res; }),
+    );
+    m.verifyAiProvider.mockResolvedValue(
+      view({ connected: true, connections: [groq(), anthropic()] }),
+    );
+
+    renderSection();
+    const rows = await screen.findAllByRole("button", { name: /Groq/ });
+    await userEvent.click(rows[0]!);
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!); // starts the fetch
+
+    // Providers change while that fetch is outstanding.
+    // Both connected rows render a Check; take the expanded Groq one.
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Check$/ }))[0]!);
+    await waitFor(() => expect(m.verifyAiProvider).toHaveBeenCalled());
+
+    // The stale response lands last and must NOT be written into the cleared cache.
+    deliver({ models: [{ provider: "groq", id: "stale-only-model", chat: true }] });
+
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!);
+    await waitFor(() =>
+      expect(screen.queryByRole("option", { name: /stale-only-model/ })).not.toBeInTheDocument(),
+    );
   });
 });

@@ -5,6 +5,7 @@
  * mutate access identically instead of drifting apart.
  */
 import { useCallback, useState, type ReactNode } from "react";
+import Select from "../../components/ui/select/Select";
 import { Building2, type LucideIcon } from "lucide-react";
 import type { AccessProvenance, OrgGroup, OrgMember, RoleLevel } from "../../lib/authApi";
 import {
@@ -77,9 +78,6 @@ export function MemberAvatar({ member }: { member: OrgMember }) {
   );
 }
 
-const selectClass =
-  "rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 focus:border-brand-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200";
-
 /**
  * Level picker for ROLES. Roles are a none/read/read-write dimension — `contributor` is a
  * capability level only (core-engine CapabilityLevel) and the role API would reject it, so it
@@ -97,17 +95,17 @@ export function RoleLevelSelect({
   label?: string;
 }) {
   return (
-    <select
+    <Select
       value={value}
       disabled={disabled}
       aria-label={label}
       onChange={(e) => onChange(e.target.value as RoleLevel)}
-      className={selectClass}
+      fullWidth={false}
     >
       <option value="none">None</option>
       <option value="read">Read</option>
       <option value="read-write">Read &amp; write</option>
-    </select>
+    </Select>
   );
 }
 
@@ -124,13 +122,13 @@ export function CapabilityLevelSelect({
   label?: string;
 }) {
   return (
-    <select
+    <Select
       value={value}
       disabled={disabled}
       aria-label={label}
       title={LEVEL_HINT[value]}
       onChange={(e) => onChange(e.target.value as CapabilityLevel)}
-      className={selectClass}
+      fullWidth={false}
     >
       <option value="none">No access</option>
       {GRANTABLE_LEVELS.map((l) => (
@@ -138,7 +136,7 @@ export function CapabilityLevelSelect({
           {LEVEL_LABEL[l]}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
