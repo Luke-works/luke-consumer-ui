@@ -47,8 +47,8 @@ const renderPicker = () =>
   );
 
 /** The list only exists while open — that is the point of a listbox. */
-const open = async () => {
-  const trigger = await screen.findByRole("combobox");
+const open = async (which: "Model" | "Provider" = "Model") => {
+  const trigger = await screen.findByRole("combobox", { name: which });
   await userEvent.click(trigger);
   return trigger;
 };
@@ -87,32 +87,49 @@ describe("AiModelPicker — your model, the workspace's key", () => {
   it("shows what a turn runs on without being opened", async () => {
     renderPicker();
     // The closed state is what people actually read, so it must name the current choice.
-    expect(await screen.findByRole("combobox")).toHaveTextContent(/Workspace default/i);
+    expect(await screen.findByRole("combobox", { name: "Model" })).toHaveTextContent(/Workspace default/i);
   });
 
   it("does not spend a provider round trip until someone opens it", async () => {
     renderPicker();
-    await screen.findByRole("combobox");
+    await screen.findByRole("combobox", { name: "Model" });
     expect(m.listAiModels).not.toHaveBeenCalled();
 
     await open();
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1"));
   });
 
-  it("offers each provider as a heading you can pick, with its models under it", async () => {
-    // A workspace may have several providers, and moving between them is a first-class action:
-    // you should be able to say "use Anthropic" without first knowing which of its models you
-    // want. So the provider is a real option that looks like a heading, not decorative text.
+  it("marks an out-of-credit provider red, and still lets you pick it", async () => {
+    // It is the workspace's own account and the credit may be back before we hear about it, so
+    // this must not be disabled — but picking it blind and learning from a failed turn is
+    // exactly what showing it avoids.
+    m.getAiPreference.mockResolvedValue(
+      pref({
+        providers: [
+          { id: "groq", label: "Groq" },
+          { id: "anthropic", label: "Anthropic", exhausted: true },
+        ],
+      }),
+    );
     renderPicker();
-    await open();
-    // Exact: the "Workspace default" row carries this same id as its hint.
-    await screen.findByRole("option", { name: "openai/gpt-oss-120b" });
+    await open("Provider");
 
-    expect(screen.getByRole("option", { name: /^Groq/ })).toBeInTheDocument();
+    const row = await screen.findByRole("option", { name: /^Anthropic/ });
+    expect(row).toHaveTextContent(/out of credit/i);
+    expect(row.className).toMatch(/text-error/);
+    expect(row).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("offers provider as its own control, listing every connected one", async () => {
+    // Which account a turn is billed to is at least as consequential as which model runs it,
+    // so it is a control in the panel rather than a heading you have to go looking for inside
+    // the model list.
+    renderPicker();
+    await open("Provider");
+
+    expect(await screen.findByRole("option", { name: /^Groq/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /^Anthropic/ })).toBeInTheDocument();
-    // …and every model is still reachable, including one that cannot build.
-    expect(screen.getByRole("option", { name: /qwen3\.8-27b/ })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /whisper-large-v3/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Workspace default/i })).toBeInTheDocument();
   });
 
   it("switching provider picks that provider's own model, never a blank one", async () => {
@@ -121,7 +138,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     // put the person back on the workspace default.
     m.chooseMyAiModel.mockResolvedValue(pref({ provider: "anthropic", model: "claude-haiku-4-5" }));
     renderPicker();
-    await open();
+    await open("Provider");
     await userEvent.click(await screen.findByRole("option", { name: /^Anthropic/ }));
 
     await waitFor(() =>
@@ -129,26 +146,22 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     );
   });
 
-  it("explains a model without picking it", async () => {
-    // The ⓘ sits inside the option row, so the thing it must NOT do is select the row it is on.
+  it("the model list only offers the provider in force", async () => {
+    // Two controls, one job each: picking a model must not silently move you to another
+    // account. Anthropic's models belong to the provider control, not this one.
+    m.getAiPreference.mockResolvedValue(pref({ provider: "groq" }));
     renderPicker();
-    await open();
-    const row = await screen.findByRole("option", { name: "qwen/qwen3.8-27b" });
+    await open("Model");
+    await screen.findByRole("option", { name: "openai/gpt-oss-120b" });
 
-    await userEvent.click(row.querySelector('[role="presentation"]') as HTMLElement);
-
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("qwen/qwen3.8-27b");
-    // The provider's OWN numbers, not our characterisation of them.
-    expect(dialog).toHaveTextContent(/Groq/);
-    expect(dialog).toHaveTextContent(/131k tokens/);
-    expect(dialog).toHaveTextContent(/33k tokens/);
-    // Groq ships no prose, and we say so rather than inventing any.
-    expect(dialog).toHaveTextContent(/publishes no description/i);
-    expect(m.chooseMyAiModel).not.toHaveBeenCalled();
+    expect(screen.queryByRole("option", { name: /claude-haiku/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "qwen/qwen3.8-27b" })).toBeInTheDocument();
   });
 
   it("saves the choice with the provider that offers it", async () => {
+    // On Anthropic, picking one of its models must send Anthropic — the id alone is meaningless
+    // to the server, which resolves a missing provider to the workspace's preferred one.
+    m.getAiPreference.mockResolvedValue(pref({ provider: "anthropic", model: null }));
     m.chooseMyAiModel.mockResolvedValue(pref({ provider: "anthropic", model: "claude-haiku-4-5" }));
     renderPicker();
     await open();
@@ -203,7 +216,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
   it("is keyboard operable end to end", async () => {
     m.chooseMyAiModel.mockResolvedValue(pref());
     renderPicker();
-    const trigger = await screen.findByRole("combobox");
+    const trigger = await screen.findByRole("combobox", { name: "Model" });
     trigger.focus();
 
     await userEvent.keyboard("{ArrowDown}"); // opens
@@ -231,7 +244,7 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     await userEvent.click(await screen.findByRole("option", { name: /qwen3\.8-27b/ }));
 
     await waitFor(() => expect(m.chooseMyAiModel).toHaveBeenCalled());
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Model" })).toBeInTheDocument();
   });
 
   it("is still usable when the provider's model list cannot be read", async () => {

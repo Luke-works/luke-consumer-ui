@@ -11,14 +11,13 @@ export type ListboxOption = {
   /** Heading this option sits under. Options with no group come first, ungrouped. */
   group?: string;
   /**
-   * Render as a section heading that is ALSOselectable.
+   * Colours the row to flag a problem with the thing itself, while leaving it selectable.
    *
-   * <p>For a list with two levels where the parent is itself a choice — a provider you can
-   * switch to, above the individual models it offers. A plain `group` heading is decorative
-   * text; this is a real option that happens to look like one, so it keeps its place in the
-   * keyboard order and is announced as selectable.
+   * <p>Distinct from `disabled`: an AI provider that is out of credit can still be chosen —
+   * it is the workspace's own account and the credit may be back before we hear about it —
+   * but picking it blind and learning from a failed turn is the thing to avoid.
    */
-  parent?: boolean;
+  tone?: "danger";
   disabled?: boolean;
 };
 
@@ -44,7 +43,7 @@ export type ListboxProps = {
    */
   onOpen?: () => void;
   /**
-   * Show an ⓘ on each non-parent option, and call this when it is pressed.
+   * Show an ⓘ on each option, and call this when it is pressed.
    *
    * <p>Deliberately `tabIndex={-1}` and `aria-hidden`: a focusable control nested inside a
    * `role="option"` is invalid ARIA and would break the listbox's keyboard model. It is a
@@ -504,26 +503,31 @@ export default function Listbox({
                               onMouseMove={() => i !== active && setActive(i)}
                               onClick={() => pick(option)}
                               className={[
-                                "flex cursor-pointer items-start gap-2 px-3 text-sm",
-                                option.parent
-                                  ? "mt-1 py-1.5 font-semibold uppercase tracking-wide text-[11px] text-gray-500 dark:text-gray-400"
-                                  : "py-2",
+                                "flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",
                                 option.disabled ? "cursor-not-allowed opacity-50" : "",
                                 isActive ? "bg-brand-50 dark:bg-brand-500/10" : "",
-                                isSelected ? "font-medium text-brand-600 dark:text-brand-300" : "",
-                                !isSelected && !option.parent ? "text-gray-700 dark:text-gray-200" : "",
+                                option.tone === "danger"
+                                  ? "text-error-600 dark:text-error-400"
+                                  : isSelected
+                                    ? "font-medium text-brand-600 dark:text-brand-300"
+                                    : "text-gray-700 dark:text-gray-200",
+                                option.tone === "danger" && isSelected ? "font-medium" : "",
                               ].join(" ")}
                             >
                               <Check aria-hidden className={`mt-0.5 size-3.5 shrink-0 ${isSelected ? "" : "invisible"}`} />
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate">{option.label}</span>
                                 {option.hint ? (
-                                  <span className="block truncate text-xs font-normal normal-case tracking-normal text-gray-400">
+                                  <span
+                                    className={`block truncate text-xs font-normal normal-case tracking-normal ${
+                                      option.tone === "danger" ? "text-error-500" : "text-gray-400"
+                                    }`}
+                                  >
                                     {option.hint}
                                   </span>
                                 ) : null}
                               </span>
-                              {onOptionInfo && !option.parent ? (
+                              {onOptionInfo ? (
                                 <span
                                   role="presentation"
                                   aria-hidden
