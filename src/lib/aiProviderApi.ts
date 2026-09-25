@@ -45,6 +45,18 @@ export type AiModel = {
   provider: AiProviderId;
   id: string;
   chat: boolean;
+  /**
+   * What the PROVIDER says about this model. Every field is optional because they disagree
+   * about what to publish — Google ships prose and both token limits, Groq reports its
+   * windows, Anthropic only a display name, OpenAI close to nothing.
+   *
+   * <p>Absent means "the provider did not tell us", which is worth showing as such. None of
+   * this is inferred on our side.
+   */
+  displayName?: string;
+  description?: string;
+  contextTokens?: number;
+  maxOutputTokens?: number;
 };
 
 export type AiProviderStatus =

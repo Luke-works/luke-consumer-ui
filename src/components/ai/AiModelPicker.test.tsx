@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import AiModelPicker from "./AiModelPicker";
@@ -33,7 +33,8 @@ const pref = (over: Partial<api.AiPreference> = {}): api.AiPreference => ({
 
 const MODELS: api.AiModel[] = [
   { provider: "groq", id: "openai/gpt-oss-120b", chat: true },
-  { provider: "groq", id: "qwen/qwen3.8-27b", chat: true },
+  // What Groq actually reports for a model: windows, no prose.
+  { provider: "groq", id: "qwen/qwen3.8-27b", chat: true, contextTokens: 131072, maxOutputTokens: 32766 },
   { provider: "groq", id: "whisper-large-v3", chat: false },
   { provider: "anthropic", id: "claude-haiku-4-5", chat: true },
 ];
@@ -98,23 +99,53 @@ describe("AiModelPicker — your model, the workspace's key", () => {
     await waitFor(() => expect(m.listAiModels).toHaveBeenCalledWith("t1"));
   });
 
-  it("groups by provider, and demotes what cannot build — hiding nothing", async () => {
-    // A workspace may have several providers, and each lists every modality its account can
-    // reach. Flattened, a speech-to-text model sits beside a chat model as an equal choice.
+  it("offers each provider as a heading you can pick, with its models under it", async () => {
+    // A workspace may have several providers, and moving between them is a first-class action:
+    // you should be able to say "use Anthropic" without first knowing which of its models you
+    // want. So the provider is a real option that looks like a heading, not decorative text.
     renderPicker();
     await open();
+    // Exact: the "Workspace default" row carries this same id as its hint.
     await screen.findByRole("option", { name: "openai/gpt-oss-120b" });
 
-    const groups = screen.getAllByRole("group");
-    expect(groups.map((g) => g.getAttribute("aria-labelledby") && g.textContent)).toHaveLength(3);
-    const labels = groups.map((g) => within(g).getAllByRole("option").map((o) => o.textContent));
-    expect(labels[0]?.join()).toMatch(/gpt-oss-120b/);
-    expect(labels[0]?.join()).toMatch(/qwen3\.8-27b/);
-    // Demoted into its own group, still selectable — a wrong guess about a provider's names
-    // must not make a model unreachable.
+    expect(screen.getByRole("option", { name: /^Groq/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Anthropic/ })).toBeInTheDocument();
+    // …and every model is still reachable, including one that cannot build.
+    expect(screen.getByRole("option", { name: /qwen3\.8-27b/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /whisper-large-v3/ })).toBeInTheDocument();
-    // …and the second provider's models are there too.
-    expect(screen.getByRole("option", { name: /claude-haiku-4-5/ })).toBeInTheDocument();
+  });
+
+  it("switching provider picks that provider's own model, never a blank one", async () => {
+    // A blank model means "follow the workspace" to the server — and it forgets the provider
+    // too. So "switch to Anthropic" has to name one of Anthropic's models or it would silently
+    // put the person back on the workspace default.
+    m.chooseMyAiModel.mockResolvedValue(pref({ provider: "anthropic", model: "claude-haiku-4-5" }));
+    renderPicker();
+    await open();
+    await userEvent.click(await screen.findByRole("option", { name: /^Anthropic/ }));
+
+    await waitFor(() =>
+      expect(m.chooseMyAiModel).toHaveBeenCalledWith("t1", "anthropic", "claude-haiku-4-5"),
+    );
+  });
+
+  it("explains a model without picking it", async () => {
+    // The ⓘ sits inside the option row, so the thing it must NOT do is select the row it is on.
+    renderPicker();
+    await open();
+    const row = await screen.findByRole("option", { name: "qwen/qwen3.8-27b" });
+
+    await userEvent.click(row.querySelector('[role="presentation"]') as HTMLElement);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("qwen/qwen3.8-27b");
+    // The provider's OWN numbers, not our characterisation of them.
+    expect(dialog).toHaveTextContent(/Groq/);
+    expect(dialog).toHaveTextContent(/131k tokens/);
+    expect(dialog).toHaveTextContent(/33k tokens/);
+    // Groq ships no prose, and we say so rather than inventing any.
+    expect(dialog).toHaveTextContent(/publishes no description/i);
+    expect(m.chooseMyAiModel).not.toHaveBeenCalled();
   });
 
   it("saves the choice with the provider that offers it", async () => {

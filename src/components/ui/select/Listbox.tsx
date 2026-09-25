@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Info, Search } from "lucide-react";
 
 export type ListboxOption = {
   value: string;
@@ -10,6 +10,15 @@ export type ListboxOption = {
   hint?: string;
   /** Heading this option sits under. Options with no group come first, ungrouped. */
   group?: string;
+  /**
+   * Render as a section heading that is ALSOselectable.
+   *
+   * <p>For a list with two levels where the parent is itself a choice — a provider you can
+   * switch to, above the individual models it offers. A plain `group` heading is decorative
+   * text; this is a real option that happens to look like one, so it keeps its place in the
+   * keyboard order and is announced as selectable.
+   */
+  parent?: boolean;
   disabled?: boolean;
 };
 
@@ -34,6 +43,15 @@ export type ListboxProps = {
    * round trip happens when someone actually looks rather than on every render of every row.
    */
   onOpen?: () => void;
+  /**
+   * Show an ⓘ on each non-parent option, and call this when it is pressed.
+   *
+   * <p>Deliberately `tabIndex={-1}` and `aria-hidden`: a focusable control nested inside a
+   * `role="option"` is invalid ARIA and would break the listbox's keyboard model. It is a
+   * pointer affordance layered on top, so the list itself stays exactly as operable by keyboard
+   * as it was — anything it reveals must also be reachable another way.
+   */
+  onOptionInfo?: (option: ListboxOption) => void;
 };
 
 export type SelectSize = "sm" | "md";
@@ -91,6 +109,7 @@ export default function Listbox({
   ariaLabel,
   id,
   onOpen,
+  onOptionInfo,
 }: ListboxProps) {
   const reactId = useId();
   const baseId = id ?? reactId;
@@ -485,19 +504,41 @@ export default function Listbox({
                               onMouseMove={() => i !== active && setActive(i)}
                               onClick={() => pick(option)}
                               className={[
-                                "flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",
+                                "flex cursor-pointer items-start gap-2 px-3 text-sm",
+                                option.parent
+                                  ? "mt-1 py-1.5 font-semibold uppercase tracking-wide text-[11px] text-gray-500 dark:text-gray-400"
+                                  : "py-2",
                                 option.disabled ? "cursor-not-allowed opacity-50" : "",
                                 isActive ? "bg-brand-50 dark:bg-brand-500/10" : "",
-                                isSelected ? "font-medium text-brand-600 dark:text-brand-300" : "text-gray-700 dark:text-gray-200",
+                                isSelected ? "font-medium text-brand-600 dark:text-brand-300" : "",
+                                !isSelected && !option.parent ? "text-gray-700 dark:text-gray-200" : "",
                               ].join(" ")}
                             >
                               <Check aria-hidden className={`mt-0.5 size-3.5 shrink-0 ${isSelected ? "" : "invisible"}`} />
-                              <span className="min-w-0">
+                              <span className="min-w-0 flex-1">
                                 <span className="block truncate">{option.label}</span>
                                 {option.hint ? (
-                                  <span className="block truncate text-xs text-gray-400">{option.hint}</span>
+                                  <span className="block truncate text-xs font-normal normal-case tracking-normal text-gray-400">
+                                    {option.hint}
+                                  </span>
                                 ) : null}
                               </span>
+                              {onOptionInfo && !option.parent ? (
+                                <span
+                                  role="presentation"
+                                  aria-hidden
+                                  tabIndex={-1}
+                                  title={`What ${option.label} is for`}
+                                  onClick={(e) => {
+                                    // Don't let it pick the row it sits on.
+                                    e.stopPropagation();
+                                    onOptionInfo(option);
+                                  }}
+                                  className="mt-0.5 shrink-0 rounded p-0.5 text-gray-300 transition hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-white/10"
+                                >
+                                  <Info className="size-3.5" />
+                                </span>
+                              ) : null}
                             </li>
                           );
                         })}
