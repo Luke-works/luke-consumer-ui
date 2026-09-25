@@ -851,7 +851,7 @@ function SearchSelect({
       if (timer.current) clearTimeout(timer.current);
     };
   }, [query, open, client]);
-  const display = open ? query : selectedLabel || asText(value);
+  const display2 = open ? query : selectedLabel || asText(value);
   const listId = `${a11y.id}-listbox`;
   const wrapRef = useRef4(null);
   const popStyle = useAnchoredPosition(wrapRef, open && (loading || options2.length > 0));
@@ -887,7 +887,7 @@ function SearchSelect({
         "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
         autoComplete: "off",
         placeholder,
-        value: display,
+        value: display2,
         disabled,
         onFocus: () => {
           clearBlur();
@@ -980,7 +980,7 @@ function SearchableSelect({
       setActive(-1);
     }
   };
-  const display = open ? query : selected ? t(selected.label) : asText(value);
+  const display2 = open ? query : selected ? t(selected.label) : asText(value);
   const showClear = !disabled && !required && asText(value) !== "" && !open;
   const wrapRef = useRef4(null);
   const popStyle = useAnchoredPosition(wrapRef, open && filtered.length > 0);
@@ -997,7 +997,7 @@ function SearchableSelect({
         "aria-activedescendant": open && active >= 0 ? optionId(active) : void 0,
         autoComplete: "off",
         placeholder: placeholder ?? (required ? void 0 : "Search\u2026"),
-        value: display,
+        value: display2,
         onFocus: () => {
           clearBlur();
           setOpen(true);
@@ -1112,12 +1112,12 @@ function NumberInput({
   const { formatNumber } = useLocale();
   const [focused, setFocused] = useState6(false);
   const raw = asText(value);
-  let display = raw;
+  let display2 = raw;
   if (!focused && raw !== "") {
     const n = Number(raw);
     const fixed = typeof decimalLimit === "number" && Number.isFinite(decimalLimit) && decimalLimit >= 0;
     if (!Number.isNaN(n) && (currency || fixed || delimiter)) {
-      display = formatNumber(n, {
+      display2 = formatNumber(n, {
         ...currency ? { style: "currency", currency } : {},
         ...fixed ? { minimumFractionDigits: decimalLimit, maximumFractionDigits: decimalLimit } : {},
         // A plain number groups only when the author asked; currency groups by locale convention.
@@ -1134,7 +1134,7 @@ function NumberInput({
         inputMode: "decimal",
         ...a11y,
         ...extra,
-        value: display,
+        value: display2,
         onFocus: () => setFocused(true),
         onBlur: () => {
           setFocused(false);
@@ -1421,6 +1421,13 @@ function format(kind, date, time) {
   if (!d) return "";
   return `${d}T${t || "00:00"}`;
 }
+function display(kind, raw) {
+  return kind === "datetime" && raw.includes("T") ? raw.replace("T", " ") : raw;
+}
+function toStored(kind, typed) {
+  if (kind !== "datetime") return typed;
+  return typed.includes(" ") && !typed.includes("T") ? typed.replace(" ", "T") : typed;
+}
 function monthMatrix(y, m) {
   const firstWeekday = new Date(y, m, 1).getDay();
   const cells = [];
@@ -1457,7 +1464,7 @@ function DateField({
 }) {
   const { locale } = useLocale();
   const weekdays = weekdayLabels(locale);
-  const raw = typeof value === "string" ? value : "";
+  const raw = toStored(kind, typeof value === "string" ? value : "");
   const date = parseDate(raw);
   const time = parseTime(raw, kind);
   const hasCal = kind === "day" || kind === "datetime";
@@ -1584,10 +1591,10 @@ function DateField({
           type: "text",
           inputMode: kind === "time" ? "numeric" : void 0,
           autoComplete: "off",
-          placeholder: kind === "day" ? "YYYY-MM-DD" : kind === "time" ? "HH:MM" : "YYYY-MM-DDTHH:MM",
-          value: raw,
+          placeholder: kind === "day" ? "YYYY-MM-DD" : kind === "time" ? "HH:MM" : "YYYY-MM-DD HH:MM",
+          value: display(kind, raw),
           disabled,
-          onChange: (e) => onChange(e.target.value),
+          onChange: (e) => onChange(toStored(kind, e.target.value)),
           onKeyDown: (e) => {
             if (e.key === "ArrowDown" && hasCal) {
               e.preventDefault();
@@ -1696,6 +1703,80 @@ import {
   toAddressSuggestions
 } from "@lukeflow/form-core";
 import { jsx as jsx13, jsxs as jsxs8 } from "react/jsx-runtime";
+function StepperField({
+  a11y,
+  value,
+  min,
+  max,
+  step = 1,
+  disabled,
+  onChange
+}) {
+  const by = Math.abs(step) || 1;
+  const lo = typeof min === "number" ? min : void 0;
+  const hi = typeof max === "number" ? max : void 0;
+  const current = typeof value === "number" && Number.isFinite(value) ? value : void 0;
+  const clamp = (n) => {
+    let out = n;
+    if (lo !== void 0) out = Math.max(lo, out);
+    if (hi !== void 0) out = Math.min(hi, out);
+    const places = (String(by).split(".")[1] ?? "").length;
+    return places ? Number(out.toFixed(places)) : out;
+  };
+  const nudge = (dir) => {
+    if (disabled) return;
+    onChange(clamp((current ?? 0) + dir * by));
+  };
+  const atMin = current !== void 0 && lo !== void 0 && current <= lo;
+  const atMax = current !== void 0 && hi !== void 0 && current >= hi;
+  return /* @__PURE__ */ jsxs8("div", { className: "lf-stepper", children: [
+    /* @__PURE__ */ jsx13(
+      "button",
+      {
+        type: "button",
+        className: "lf-stepper-btn",
+        tabIndex: -1,
+        "aria-hidden": "true",
+        disabled: disabled || atMin,
+        onClick: () => nudge(-1),
+        children: "\u2212"
+      }
+    ),
+    /* @__PURE__ */ jsx13(
+      "input",
+      {
+        ...a11y,
+        type: "number",
+        className: "lf-stepper-input",
+        inputMode: Number.isInteger(by) ? "numeric" : "decimal",
+        value: current ?? "",
+        min: lo,
+        max: hi,
+        step: by,
+        disabled,
+        onChange: (e) => {
+          const raw = e.target.value;
+          if (raw === "") return onChange(void 0);
+          const n = Number(raw);
+          onChange(Number.isFinite(n) ? n : void 0);
+        },
+        onBlur: () => current !== void 0 && onChange(clamp(current))
+      }
+    ),
+    /* @__PURE__ */ jsx13(
+      "button",
+      {
+        type: "button",
+        className: "lf-stepper-btn",
+        tabIndex: -1,
+        "aria-hidden": "true",
+        disabled: disabled || atMax,
+        onClick: () => nudge(1),
+        children: "+"
+      }
+    )
+  ] });
+}
 function RatingField({
   a11y,
   value,
@@ -2924,6 +3005,14 @@ function RenderEntityNode({ id, schema, ctx }) {
   if (!fs) return null;
   return /* @__PURE__ */ jsx15(Field, { entity, fs, ctx });
 }
+function numAttr(v) {
+  if (typeof v === "number") return Number.isFinite(v) ? v : void 0;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : void 0;
+  }
+  return void 0;
+}
 function Field({ entity, fs, ctx }) {
   const a = entity.attributes ?? {};
   const id = entity.id;
@@ -2955,15 +3044,20 @@ function Field({ entity, fs, ctx }) {
   const ph = typeof a.placeholder === "string" ? a.placeholder : void 0;
   const inputProps = {};
   if (ph) inputProps.placeholder = ph;
-  if (typeof a.maxLength === "number") inputProps.maxLength = a.maxLength;
-  if (typeof a.minLength === "number") inputProps.minLength = a.minLength;
+  const maxLen = numAttr(a.maxLength);
+  if (maxLen !== void 0) inputProps.maxLength = maxLen;
+  const minLen = numAttr(a.minLength);
+  if (minLen !== void 0) inputProps.minLength = minLen;
   if (typeof a.pattern === "string" && a.pattern) inputProps.pattern = a.pattern;
-  if (typeof a.tabIndex === "number") inputProps.tabIndex = a.tabIndex;
+  const tabIdx = numAttr(a.tabIndex);
+  if (tabIdx !== void 0) inputProps.tabIndex = tabIdx;
   if (a.spellcheck !== void 0) inputProps.spellCheck = Boolean(a.spellcheck);
   if (a.autofocus) inputProps.autoFocus = true;
   const numProps = {};
-  if (typeof a.min === "number") numProps.min = a.min;
-  if (typeof a.max === "number") numProps.max = a.max;
+  const numMin = numAttr(a.min);
+  if (numMin !== void 0) numProps.min = numMin;
+  const numMax = numAttr(a.max);
+  if (numMax !== void 0) numProps.max = numMax;
   const Custom = ctx.components[entity.type];
   if (!Custom && entity.type === "radio") {
     return /* @__PURE__ */ jsx15(Group, { entity, fs, ctx, children: fieldOptions.map((o) => /* @__PURE__ */ jsxs10("label", { className: "lf-option", children: [
@@ -3019,7 +3113,7 @@ function Field({ entity, fs, ctx }) {
             ...a11y,
             ...inputProps,
             className: a.autoExpand ? "lf-autoexpand" : void 0,
-            rows: typeof a.rows === "number" ? a.rows : void 0,
+            rows: numAttr(a.rows),
             value: asText(fs.value),
             onChange: (e) => set(e.target.value)
           }
@@ -3046,7 +3140,7 @@ function Field({ entity, fs, ctx }) {
             currency: entity.type === "currency" ? typeof a.currency === "string" ? a.currency : typeof a.currencyCode === "string" ? a.currencyCode : "USD" : void 0,
             prefix: typeof a.prefix === "string" ? a.prefix : void 0,
             suffix: typeof a.suffix === "string" ? a.suffix : void 0,
-            decimalLimit: typeof a.decimalLimit === "number" ? a.decimalLimit : void 0,
+            decimalLimit: numAttr(a.decimalLimit),
             delimiter: Boolean(a.delimiter),
             onChange: set
           }
@@ -3066,7 +3160,21 @@ function Field({ entity, fs, ctx }) {
         control = /* @__PURE__ */ jsx15(SignatureField, { a11y, value: fs.value, disabled, onChange: set, penColor: typeof a.penColor === "string" ? a.penColor : void 0, allowType: Boolean(a.allowType) });
         break;
       case "rating":
-        control = /* @__PURE__ */ jsx15(RatingField, { a11y, value: fs.value, max: typeof a.max === "number" ? a.max : 5, disabled, onChange: set });
+        control = /* @__PURE__ */ jsx15(RatingField, { a11y, value: fs.value, max: numAttr(a.max) ?? 5, disabled, onChange: set });
+        break;
+      case "stepper":
+        control = /* @__PURE__ */ jsx15(
+          StepperField,
+          {
+            a11y,
+            value: fs.value,
+            min: numAttr(a.min),
+            max: numAttr(a.max),
+            step: numAttr(a.step) ?? 1,
+            disabled,
+            onChange: set
+          }
+        );
         break;
       case "ranking":
         control = /* @__PURE__ */ jsx15(RankingField, { a11y, entity, value: fs.value, disabled, onChange: set });
@@ -3095,7 +3203,7 @@ function Field({ entity, fs, ctx }) {
             disabled,
             onChange: set,
             clearable: Boolean(a.clearable) && !disabled,
-            minuteStep: typeof a.minuteStep === "number" ? a.minuteStep : 1
+            minuteStep: numAttr(a.minuteStep) ?? 1
           }
         );
         break;

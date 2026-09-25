@@ -864,6 +864,12 @@ function standardEditors() {
     { id: "nativeInput", tab: "settings", attribute: "nativeInput", label: "Use native input", control: "checkbox", order: 40, appliesTo: ["day", "datetime", "time"], hint: "Use the browser's native date/time input instead of the rich calendar / time picker." },
     { id: "minuteStep", tab: "settings", attribute: "minuteStep", label: "Minute step", control: "number", order: 41, appliesTo: ["datetime", "time"], when: (e) => !e.attributes?.nativeInput, hint: "Increment (in minutes) between options in the time selector. Default 1." },
     { id: "ratingMax", tab: "settings", attribute: "max", label: "Max stars", control: "number", order: 42, appliesTo: ["rating"], hint: "Number of stars to show (default 5)." },
+    // The stepper's own bounds. `min`/`max` are shared attribute names with the number field's
+    // validation, so they are declared separately here rather than reused — an author setting a
+    // stepper's floor is saying "the − stops here", not writing a validation rule.
+    { id: "stepperMin", tab: "settings", attribute: "min", label: "Minimum", control: "number", order: 42, appliesTo: ["stepper"], hint: "The lowest value \u2212 will go to. Leave blank for no floor." },
+    { id: "stepperMax", tab: "settings", attribute: "max", label: "Maximum", control: "number", order: 43, appliesTo: ["stepper"], hint: "The highest value + will go to. Leave blank for no ceiling." },
+    { id: "stepperStep", tab: "settings", attribute: "step", label: "Step", control: "number", order: 44, appliesTo: ["stepper"], hint: "How much each \u2212 / + changes the value. Default 1." },
     { id: "matrixMultiple", tab: "settings", attribute: "multiple", label: "Allow multiple per row", control: "checkbox", order: 43, appliesTo: ["matrix"], hint: "Use checkboxes instead of radios so each row can have several answers." },
     // Panel-like containers: collapse + a color theme for different purposes.
     { id: "collapsible", tab: "settings", attribute: "collapsible", label: "Collapsible", control: "checkbox", order: 30, appliesTo: ["panel", "well", "fieldset"] },
@@ -1812,6 +1818,14 @@ function previewControl(entity, field) {
     case "number":
     case "currency":
       return /* @__PURE__ */ jsx7("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 || (entity.type === "currency" ? "0.00" : "") });
+    // Drawn as the live control is, so the canvas does not promise a plain number box and then
+    // render − / + on the filled form.
+    case "stepper":
+      return /* @__PURE__ */ jsxs7("span", { className: "lf-pv-stepper", children: [
+        /* @__PURE__ */ jsx7("span", { className: "lf-pv-stepper-btn", "aria-hidden": "true", children: "\u2212" }),
+        /* @__PURE__ */ jsx7("input", { className: "lf-pv-input", disabled: true, type: "number", value: dv, placeholder: ph2 }),
+        /* @__PURE__ */ jsx7("span", { className: "lf-pv-stepper-btn", "aria-hidden": "true", children: "+" })
+      ] });
     case "checkbox":
       return /* @__PURE__ */ jsxs7("label", { className: "lf-pv-check", children: [
         /* @__PURE__ */ jsx7("input", { type: "checkbox", disabled: true, checked: field ? Boolean(field.value) : Boolean(a.defaultChecked) }),
@@ -1842,7 +1856,15 @@ function previewControl(entity, field) {
     case "day":
     case "datetime":
       return a.nativeInput ? /* @__PURE__ */ jsx7("input", { className: "lf-pv-input", disabled: true, type: entity.type === "datetime" ? "datetime-local" : "date", value: dv }) : /* @__PURE__ */ jsxs7("span", { className: "lf-pv-datefield", children: [
-        /* @__PURE__ */ jsx7("input", { className: "lf-pv-input", disabled: true, value: dv, placeholder: entity.type === "datetime" ? "YYYY-MM-DDTHH:MM" : "YYYY-MM-DD" }),
+        /* @__PURE__ */ jsx7(
+          "input",
+          {
+            className: "lf-pv-input",
+            disabled: true,
+            value: entity.type === "datetime" ? dv.replace("T", " ") : dv,
+            placeholder: entity.type === "datetime" ? "YYYY-MM-DD HH:MM" : "YYYY-MM-DD"
+          }
+        ),
         /* @__PURE__ */ jsx7("span", { className: "lf-pv-cal", "aria-hidden": "true", children: "\u{1F4C5}" })
       ] });
     case "time":
@@ -2133,6 +2155,10 @@ var PALETTE_GROUPS = [
       // can't add one here.
       { type: "signature", label: "Signature" },
       { type: "rating", label: "Rating", defaults: { max: 5 } },
+      // A count you nudge rather than type. A floor of 0 by default because the common uses
+      // (guests, seats, quantity) have no meaningful negative, and an author who wants one
+      // can clear it.
+      { type: "stepper", label: "Stepper", defaults: { min: 0, step: 1 } },
       { type: "ranking", label: "Ranking", defaults: OPTS },
       { type: "matrix", label: "Matrix", defaults: { rows: [{ label: "Row 1", value: "row1" }, { label: "Row 2", value: "row2" }], columns: [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }] } },
       { type: "addressBlock", label: "Address" },

@@ -1001,3 +1001,8 @@
 .lf-modal-body .lf-settings-panel > .lf-setting-wrap:has(.lf-code) {
   grid-column: 1 / -1;
 }
+
+/* Canvas preview of the stepper — the same shape as the live control, inert. */
+.lf-pv-stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--lf-border, #d9d9d9); border-radius: var(--lf-radius, 6px); overflow: hidden; }
+.lf-pv-stepper .lf-pv-input { width: 3.5rem; border: 0; border-left: 1px solid var(--lf-border, #d9d9d9); border-right: 1px solid var(--lf-border, #d9d9d9); border-radius: 0; text-align: center; }
+.lf-pv-stepper-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 1.75rem; color: var(--lf-muted, #6b7280); }
