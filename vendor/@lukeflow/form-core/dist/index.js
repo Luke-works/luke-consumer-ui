@@ -1311,7 +1311,7 @@ var maxFileSizeRule = {
 function isBlank(v) {
   return v === void 0 || v === null || v === "" || Array.isArray(v) && v.length === 0;
 }
-var NUMERIC_TYPES = /* @__PURE__ */ new Set(["number", "currency", "rating"]);
+var NUMERIC_TYPES = /* @__PURE__ */ new Set(["number", "currency", "rating", "stepper"]);
 var DATE_TYPES = /* @__PURE__ */ new Set(["day", "datetime"]);
 var typeRule = {
   code: "type",
@@ -2735,7 +2735,7 @@ var STRING_TYPES = [
   // WYSIWYG → sanitized HTML string
 ];
 var DATE_TYPES2 = ["day", "datetime"];
-var NUMBER_TYPES = ["number", "currency", "rating"];
+var NUMBER_TYPES = ["number", "currency", "rating", "stepper"];
 var ARRAY_TYPES = ["selectBoxes", "tags", "tagsField", "array", "ranking"];
 var GRID_TYPES2 = ["dataGrid", "editGrid"];
 var CONTAINER_TYPES = ["panel", "columns", "fieldset", "well", "table", "tabs", "container", "wizard", "page"];
@@ -3531,6 +3531,7 @@ var ACCEPTS = {
   number: "Number",
   currency: "Currency amount",
   rating: "Rating (stars)",
+  stepper: "Stepper (\u2212 / +)",
   checkbox: "Checkbox (yes / no)",
   selectBoxes: "Multiple choice",
   tags: "Tags",
