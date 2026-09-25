@@ -33,7 +33,8 @@ const pref = (over: Partial<api.AiPreference> = {}): api.AiPreference => ({
 
 const MODELS: api.AiModel[] = [
   { provider: "groq", id: "openai/gpt-oss-120b", chat: true },
-  { provider: "groq", id: "qwen/qwen3.8-27b", chat: true },
+  // What Groq actually reports for a model: windows, no prose.
+  { provider: "groq", id: "qwen/qwen3.8-27b", chat: true, contextTokens: 131072, maxOutputTokens: 32766 },
   { provider: "groq", id: "whisper-large-v3", chat: false },
   { provider: "anthropic", id: "claude-haiku-4-5", chat: true },
 ];
@@ -136,9 +137,14 @@ describe("AiModelPicker — your model, the workspace's key", () => {
 
     await userEvent.click(row.querySelector('[role="presentation"]') as HTMLElement);
 
-    expect(await screen.findByRole("dialog")).toHaveTextContent("qwen/qwen3.8-27b");
-    // It says which provider offers it, and is honest that real guidance is not here yet.
-    expect(screen.getByRole("dialog")).toHaveTextContent(/Groq/);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("qwen/qwen3.8-27b");
+    // The provider's OWN numbers, not our characterisation of them.
+    expect(dialog).toHaveTextContent(/Groq/);
+    expect(dialog).toHaveTextContent(/131k tokens/);
+    expect(dialog).toHaveTextContent(/33k tokens/);
+    // Groq ships no prose, and we say so rather than inventing any.
+    expect(dialog).toHaveTextContent(/publishes no description/i);
     expect(m.chooseMyAiModel).not.toHaveBeenCalled();
   });
 

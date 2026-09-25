@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import Listbox, { type ListboxOption } from "../ui/select/Listbox";
@@ -204,23 +204,37 @@ export default function AiModelPicker({ className = "" }: { className?: string }
         {(() => {
           const m = (models ?? []).find((x) => `m:${x.provider}:${x.id}` === info?.value);
           const label = (pref.providers ?? []).find((p) => p.id === m?.provider)?.label ?? m?.provider;
+          const tokens = (n?: number) =>
+            n == null ? null : n >= 1000 ? `${Math.round(n / 1000).toLocaleString()}k` : String(n);
+          // What the provider published about it. Absent fields stay absent: a provider that
+          // says nothing is a fact about that provider, not a blank for us to fill in.
+          const facts: { term: string; value: string }[] = [
+            label ? { term: "Provider", value: label } : null,
+            m ? { term: "Runs a build turn", value: m.chat ? "Yes" : "No — a turn on it would fail" } : null,
+            tokens(m?.contextTokens) ? { term: "Context window", value: `${tokens(m?.contextTokens)} tokens` } : null,
+            tokens(m?.maxOutputTokens) ? { term: "Longest reply", value: `${tokens(m?.maxOutputTokens)} tokens` } : null,
+          ].filter(Boolean) as { term: string; value: string }[];
+
           return (
             <div className="mt-3 space-y-3 text-sm text-gray-600 dark:text-gray-300">
-              <p>
-                Offered by <span className="font-medium text-gray-800 dark:text-white/90">{label ?? "your provider"}</span>
-                {m ? (m.chat
-                  ? " · can run a build turn"
-                  : " · not a chat model, so a build turn on it would fail") : ""}
-              </p>
-              {/* Placeholder. We do not invent capability claims: providers do not publish a
-                  machine-readable "what this is good at", and the model list we get back carries
-                  only an id and its modality. Real guidance goes here once there is a source for
-                  it — a curated catalogue, or the provider's own metadata. */}
-              <p className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-white/5 dark:text-gray-400">
-                Guidance on what this model is best at is coming. For now the honest answer is
-                that we only know what your provider tells us — its name and whether it can hold
-                a conversation — so anything more specific would be a guess dressed up as advice.
-              </p>
+              {m?.description ? (
+                <p className="leading-relaxed">{m.description}</p>
+              ) : null}
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+                {facts.map((f) => (
+                  <Fragment key={f.term}>
+                    <dt className="text-gray-400">{f.term}</dt>
+                    <dd className="text-gray-700 dark:text-gray-200">{f.value}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+              {!m?.description ? (
+                <p className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-white/5 dark:text-gray-400">
+                  {label ?? "This provider"} publishes no description for its models — the
+                  figures above are everything it tells us. Google is the one that ships prose
+                  today, so a model from there will say more here.
+                </p>
+              ) : null}
             </div>
           );
         })()}
