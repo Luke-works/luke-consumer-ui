@@ -106,6 +106,8 @@ export default function Listbox({
   const listRef = useRef<HTMLUListElement>(null);
   // Type-ahead state, for jumping to an option by typing when there is no search box.
   const typed = useRef({ text: "", at: 0 });
+  // Whether the pointer has actually moved since the last keyboard-driven scroll.
+  const pointerMoved = useRef(false);
 
   const selected = options.find((o) => o.value === value);
   /**
@@ -171,9 +173,18 @@ export default function Listbox({
    * the selection every time, so a keyboard user could not arrow anywhere while the panel was
    * alive. Depending on the CONTENT fires on a real change and stays quiet for a re-render.
    */
-  const optionSignature = flatOptions.map((o) => o.value).join("\u0000");
+  //
+  // <p>Built from `options`, the UNFILTERED prop — not from the filtered list. Keyed on the
+  // filtered one it re-ran on every keystroke that changed the result set, overwriting the
+  // deliberate `setActive(0)` the filter does to highlight its top match. The two then fought,
+  // and which won depended on whether your last keystroke happened to narrow the list: typing
+  // "gpt-1" left the highlight on the already-pinned gpt-11 instead of the first match, so
+  // filter-then-Enter re-committed the model you were trying to move away from.
+  const optionSignature = options.map((o) => o.value).join("\u0000");
   useEffect(() => {
     if (!open) return;
+    // Only while unfiltered. Once someone is filtering, the filter owns the highlight.
+    if (query) return;
     const at = flatOptions.findIndex((o) => o.value === value);
     setActive(at >= 0 ? at : 0);
   }, [open, optionSignature, value]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -190,9 +201,17 @@ export default function Listbox({
     if (flatOptions.length > searchAfter) searchRef.current?.focus();
   }, [open, rect, flatOptions.length, searchAfter]);
 
-  /** Keep the active row on screen — the list scrolls, and the highlight must not walk off it. */
+  /**
+   * Keep the active row on screen — the list scrolls, and the highlight must not walk off it.
+   *
+   * <p>Scrolling the list slides a different row under a STATIONARY cursor, and the browser
+   * fires `mouseenter` for that — so arrowing past the fold handed the highlight back to
+   * whatever the pointer happened to be over. `pointerMoved` gates the hover handler so only a
+   * real pointer movement counts.
+   */
   useEffect(() => {
     if (!open) return;
+    pointerMoved.current = false;
     // getElementById, not a CSS selector: useId produces ids containing colons, which need
     // escaping in a selector and need nothing here.
     document.getElementById(optionId(active))?.scrollIntoView?.({ block: "nearest" });
@@ -459,7 +478,10 @@ export default function Listbox({
                               role="option"
                               aria-selected={isSelected}
                               aria-disabled={option.disabled || undefined}
-                              onMouseEnter={() => setActive(i)}
+                              onMouseMove={() => {
+                                pointerMoved.current = true;
+                                if (i !== active) setActive(i);
+                              }}
                               onClick={() => pick(option)}
                               className={[
                                 "flex cursor-pointer items-start gap-2 px-3 py-2 text-sm",

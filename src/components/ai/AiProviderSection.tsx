@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import Select from "../ui/select/Select";
 import Button from "../ui/button/Button";
@@ -53,16 +53,30 @@ export default function AiProviderSection() {
   const [provider, setProvider] = useState<AiProviderId>("groq");
   const [apiKey, setApiKey] = useState("");
   const [adding, setAdding] = useState(false);
+  const busyRef = useRef(false);
   // One fetch serves every row: the endpoint returns every connected provider's models, so a
   // row filters rather than asking again.
   const [models, setModels] = useState<AiModel[] | null>(null);
 
+  // Bumped by `apply` whenever the set of providers may have changed. A fetch stamps the
+  // generation it started in and discards its own result if that has moved on — otherwise a
+  // request in flight across a connect writes its PRE-connect list back afterwards, and since
+  // `loadModels` bails on any non-null cache, the new provider's dropdown stays empty for the
+  // life of the page. That is the bug the comment in `apply` claims to have fixed.
+  const generation = useRef(0);
+  const fetching = useRef(false);
+
   const loadModels = useCallback(async () => {
-    if (!tenant || models) return;
+    if (!tenant || models || fetching.current) return;
+    const startedAt = generation.current;
+    fetching.current = true;
     try {
-      setModels((await listAiModels(tenant)).models);
+      const fetched = (await listAiModels(tenant)).models;
+      if (generation.current === startedAt) setModels(fetched);
     } catch {
-      setModels([]); // unreadable → keep the current choice, offer nothing new
+      if (generation.current === startedAt) setModels([]); // unreadable → offer nothing new
+    } finally {
+      fetching.current = false;
     }
   }, [tenant, models]);
 
@@ -85,6 +99,7 @@ export default function AiProviderSection() {
     setView((prev) => ({ ...(prev ?? {}), ...v }));
     // Drop the cached model list: which providers exist may have just changed, and a one-shot
     // cache meant a newly added provider's dropdown stayed empty for the life of the page.
+    generation.current += 1;
     setModels(null);
     setError(null);
     if (message) setNotice(message);
@@ -92,6 +107,16 @@ export default function AiProviderSection() {
 
   /** Runs one action, reporting whether it actually succeeded. */
   const act = async (fn: () => Promise<AiProviderView>, message?: string): Promise<boolean> => {
+    // A ref, for the same reason AiModelPicker uses one: `busy` is state, read from the closure
+    // this render built, so a second call in the same tick sails past it.
+    //
+    // This became load-bearing when the model Listbox stopped honouring `busy` (a disabled
+    // focused control drops focus to <body>). Every OTHER caller here is still behind
+    // `disabled={busy}`, which left the model picker as the one unguarded way in — and `apply`
+    // is last-response-wins, so two overlapping saves let the older server snapshot land second
+    // and wipe the newer change off the screen while the server kept it.
+    if (busyRef.current) return false;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -102,6 +127,7 @@ export default function AiProviderSection() {
       setError(messageOf(e, "Something went wrong. Please try again."));
       return false;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };

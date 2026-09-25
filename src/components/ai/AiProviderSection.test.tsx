@@ -339,3 +339,76 @@ describe("AiProviderSection — several providers, each with its own key", () =>
     expect(screen.queryByLabelText(/Workspace model/i)).not.toBeInTheDocument();
   });
 });
+
+describe("AiProviderSection — one write at a time", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.getAiProvider.mockResolvedValue(view({ connected: true, connections: [groq(), anthropic()] }));
+    m.listAiModels.mockResolvedValue({
+      models: [
+        { provider: "groq", id: "openai/gpt-oss-120b", chat: true },
+        { provider: "groq", id: "llama-3.3-70b-versatile", chat: true },
+        { provider: "anthropic", id: "claude-haiku-4-5", chat: true },
+      ],
+    });
+  });
+
+  it("refuses a second write while one is still in flight", async () => {
+    // The model Listbox deliberately no longer honours `busy` — disabling a focused control
+    // drops focus to <body>. That left it as the one un-guarded way into act(), and act()
+    // applies whichever response lands LAST, so an older server snapshot could overwrite a newer
+    // change on screen while the server had actually kept it.
+    let release: (v: api.AiProviderView) => void = () => {};
+    m.chooseAiModel.mockImplementation(
+      () => new Promise<api.AiProviderView>((res) => { release = res; }),
+    );
+
+    renderSection();
+    const rows = await screen.findAllByRole("button", { name: /Groq/ });
+    await userEvent.click(rows[0]!); // expand the Groq row
+
+    const picker = (await screen.findAllByRole("combobox"))[0]!;
+    await userEvent.click(picker);
+    await userEvent.click(await screen.findByRole("option", { name: /llama-3.3-70b-versatile/ }));
+    await waitFor(() => expect(m.chooseAiModel).toHaveBeenCalledTimes(1));
+
+    // Second pick while the first is unresolved.
+    await userEvent.click(picker);
+    const again = screen.queryAllByRole("option");
+    if (again.length) await userEvent.click(again[0]!);
+
+    expect(m.chooseAiModel).toHaveBeenCalledTimes(1);
+    release(view({ connected: true, connections: [groq(), anthropic()] }));
+  });
+
+  it("discards a model list that arrives after the providers changed under it", async () => {
+    // loadModels bails on any non-null cache, so a fetch in flight across a connect that writes
+    // its PRE-connect list back afterwards leaves the new provider's dropdown empty for the life
+    // of the page — the exact bug `apply`'s comment claims to have fixed.
+    let deliver: (v: { models: api.AiModel[] }) => void = () => {};
+    m.listAiModels.mockImplementation(
+      () => new Promise<{ models: api.AiModel[] }>((res) => { deliver = res; }),
+    );
+    m.verifyAiProvider.mockResolvedValue(
+      view({ connected: true, connections: [groq(), anthropic()] }),
+    );
+
+    renderSection();
+    const rows = await screen.findAllByRole("button", { name: /Groq/ });
+    await userEvent.click(rows[0]!);
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!); // starts the fetch
+
+    // Providers change while that fetch is outstanding.
+    // Both connected rows render a Check; take the expanded Groq one.
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Check$/ }))[0]!);
+    await waitFor(() => expect(m.verifyAiProvider).toHaveBeenCalled());
+
+    // The stale response lands last and must NOT be written into the cleared cache.
+    deliver({ models: [{ provider: "groq", id: "stale-only-model", chat: true }] });
+
+    await userEvent.click((await screen.findAllByRole("combobox"))[0]!);
+    await waitFor(() =>
+      expect(screen.queryByRole("option", { name: /stale-only-model/ })).not.toBeInTheDocument(),
+    );
+  });
+});

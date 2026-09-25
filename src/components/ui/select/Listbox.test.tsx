@@ -188,6 +188,26 @@ describe("Listbox — the things a native select does for free", () => {
     expect(screen.getAllByRole("combobox")).toHaveLength(1);
   });
 
+  it("highlights the top MATCH while filtering, not the saved value", async () => {
+    // The active-index effect and the filter's own setActive(0) both want the highlight. Keying
+    // the effect on the FILTERED list made it re-run on every keystroke that changed the result
+    // set and win — so typing "model-1" left the highlight on the already-saved model-11 and
+    // Enter re-committed the very model you were filtering away from. Worse, it was
+    // inconsistent: a keystroke that narrowed nothing left setActive(0) standing.
+    const many = Array.from({ length: 12 }, (_, i) => chat(`model-${i}`));
+    render(<Harness options={[{ value: "", label: "Workspace default" }, ...many]} initial="model-11" />);
+    const trigger = screen.getByRole("combobox");
+    await userEvent.click(trigger);
+
+    const filter = await screen.findByRole("textbox", { name: /filter/i });
+    await userEvent.type(filter, "model-1");
+
+    // model-1, model-10, model-11 match; the first is what a person expects to be armed.
+    const active = document.getElementById(filter.getAttribute("aria-activedescendant")!);
+    expect(active).toHaveTextContent("model-1");
+    expect(active).not.toHaveTextContent("model-11");
+  });
+
   it("leaves Home and End to the caret while typing in the filter", async () => {
     const many = Array.from({ length: 20 }, (_, i) => chat(`model-${i}`));
     render(<Harness options={many} />);

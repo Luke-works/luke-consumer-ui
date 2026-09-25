@@ -64,7 +64,14 @@ export default function AiModelPicker({ className = "" }: { className?: string }
     savingRef.current = true;
     // A model name only means something to the provider offering it, and a workspace may have
     // several connected — so the provider travels with the choice.
-    const owner = (models ?? []).find((m) => m.id === model)?.provider ?? null;
+    //
+    // Falling back to the preference's OWN provider matters for the "Current choice" row, which
+    // exists precisely because the pinned model is absent from `models` — so this lookup always
+    // misses for it. Sending no provider made the server resolve to the workspace's PREFERRED
+    // one, so re-confirming your own Anthropic model either failed with an error naming Groq, or
+    // silently re-pointed you at Groq while still showing the Claude id. Every turn then asked
+    // the wrong provider for a model it has never heard of.
+    const owner = (models ?? []).find((m) => m.id === model)?.provider ?? pref?.provider ?? null;
     // Keep the control usable rather than disabling it: a browser blurs a focused element when it
     // becomes disabled and drops focus to <body>, so a keyboard user loses their place on every
     // save. `saving` now only guards against overlapping writes.
